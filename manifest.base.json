@@ -20,7 +20,8 @@
   ],
 
   "host_permissions": [
-    "https://*/*"
+    "https://*/*",
+    "http://*/*"
   ],
 
   "action": {
@@ -36,11 +37,11 @@
   "web_accessible_resources": [
     {
       "resources": ["sidebar/*", "webcomponent/*"],
-      "matches": ["https://*/*"]
+      "matches": ["https://*/*", "http://*/*"]
     }
   ],
 
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https:; connect-src 'self' https:; frame-ancestors *; object-src 'none'; base-uri 'self'; form-action 'self'"
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https: http:; connect-src 'self' https: http:; frame-ancestors *; object-src 'none'; base-uri 'self'; form-action 'self'"
   }
 }
