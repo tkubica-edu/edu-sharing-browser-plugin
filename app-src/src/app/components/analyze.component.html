@@ -115,10 +115,22 @@
   </section>
 </div>
 
-<!-- Step 4: assign -->
+<!-- Step 4: assign into a collection -->
 <div [hidden]="wiz.step() !== 4">
   <section class="card">
     <h2>Zuordnen</h2>
-    <p class="muted">Sammlung oder redaktionelle Gruppe – folgt.</p>
+    <p class="muted">Sammlung auswählen und den Node per „In Sammlung einfügen" hinzufügen.</p>
+  </section>
+
+  <section class="card upload" *ngIf="wiz.assigning() || wiz.assignError() || wiz.assignedCollections().length">
+    <p class="muted" *ngIf="wiz.assigning()">Wird hinzugefügt…</p>
+    <p class="error" *ngIf="wiz.assignError()">Hinzufügen fehlgeschlagen: {{ wiz.assignError() }}</p>
+    <p class="upload-ok" *ngFor="let c of wiz.assignedCollections()">
+      ✓ Hinzugefügt zu: <strong>{{ c.name || c.id }}</strong>
+    </p>
+  </section>
+
+  <section class="card" *ngIf="wiz.createdNode()">
+    <es-collection-selector (choose)="onAssign($event)"></es-collection-selector>
   </section>
 </div>

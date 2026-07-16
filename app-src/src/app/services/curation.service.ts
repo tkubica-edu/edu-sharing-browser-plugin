@@ -1,10 +1,16 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Node } from 'ngx-edu-sharing-api';
 
+import { AssignService } from './assign.service';
 import { AuthService } from './auth.service';
 import { GenerateService } from './generate.service';
 import { HistoryService } from './history.service';
 import { UploadService, UploadedNode } from './upload.service';
+
+export interface AssignedCollection {
+  id: string;
+  name: string;
+}
 
 export type WizardStep = 1 | 2 | 3 | 4;
 
@@ -19,6 +25,7 @@ export class CurationService {
   private readonly gen = inject(GenerateService);
   private readonly upload = inject(UploadService);
   private readonly history = inject(HistoryService);
+  private readonly assign = inject(AssignService);
 
   readonly step = signal<WizardStep>(1);
   readonly createdNode = signal<CreatedNode | null>(null);
@@ -27,6 +34,11 @@ export class CurationService {
   readonly previewNode = signal<Node | null>(null);
   readonly saving = signal(false);
   readonly saveError = signal<string | null>(null);
+
+  // Step 4 "Zuordnen": add the created node to a collection.
+  readonly assigning = signal(false);
+  readonly assignError = signal<string | null>(null);
+  readonly assignedCollections = signal<AssignedCollection[]>([]);
 
   readonly running = this.gen.running;
 
@@ -57,6 +69,8 @@ export class CurationService {
     this.nodeMetadata.set(null);
     this.previewNode.set(null);
     this.saveError.set(null);
+    this.assignError.set(null);
+    this.assignedCollections.set([]);
     const o = await this.gen.run('de');
     if (o.ok && o.parsed && o.source) {
       await this.history.add({
@@ -97,6 +111,27 @@ export class CurationService {
       this.saveError.set(String((e as Error)?.message || e));
     } finally {
       this.saving.set(false);
+    }
+  }
+
+  // Step 4 "Zuordnen": add the created node to the given collection(s).
+  async assignToCollection(collections: AssignedCollection[]): Promise<void> {
+    const node = this.createdNode();
+    if (!node || !this.auth.state().loggedIn || !collections.length) return;
+    this.assigning.set(true);
+    this.assignError.set(null);
+    try {
+      for (const c of collections) {
+        await this.assign.addToCollection(c.id, node.nodeId);
+        // Track it once, avoiding duplicates on repeated inserts.
+        this.assignedCollections.update((list) =>
+          list.some((x) => x.id === c.id) ? list : [...list, c]
+        );
+      }
+    } catch (e: unknown) {
+      this.assignError.set(String((e as Error)?.message || e));
+    } finally {
+      this.assigning.set(false);
     }
   }
 }

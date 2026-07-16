@@ -1,0 +1,12 @@
+:host { display: block; }
+
+.selector-wrap { display: flex; flex-direction: column; }
+
+.selector-frame {
+  width: 100%;
+  min-height: 560px;
+  height: 70vh;
+  border: none;
+  display: block;
+  background: #fff;
+}

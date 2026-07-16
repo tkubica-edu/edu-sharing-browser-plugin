@@ -7,11 +7,12 @@ import { GenerateService } from '../services/generate.service';
 import { CurationService } from '../services/curation.service';
 import { MdsEditorComponent } from './mds-editor.component';
 import { PreviewNodeComponent } from './preview-node.component';
+import { CollectionChoice, CollectionSelectorComponent } from './collection-selector.component';
 
 @Component({
   selector: 'es-analyze',
   standalone: true,
-  imports: [CommonModule, FormsModule, MdsEditorComponent, PreviewNodeComponent],
+  imports: [CommonModule, FormsModule, MdsEditorComponent, PreviewNodeComponent, CollectionSelectorComponent],
   templateUrl: './analyze.component.html',
   styleUrl: './analyze.component.scss'
 })
@@ -45,5 +46,9 @@ export class AnalyzeComponent {
 
   onSave(values: Record<string, string[]>): Promise<void> {
     return this.wiz.save(values);
+  }
+
+  onAssign(collections: CollectionChoice[]): Promise<void> {
+    return this.wiz.assignToCollection(collections);
   }
 }

@@ -15,8 +15,13 @@ sidebar with three tabs:
   3. *Preview node* — the created node's name + link, plus a live preview rendered
      by the **`edu-sharing-preview-sidebar`** web component (unlocked once a node
      exists). Its `node` input takes the full hydrated node (loaded after save).
-  4. *Zuordnen* — placeholder for collection/editorial assignment (further web
-     components to follow).
+  4. *Zuordnen* — the **`edu-sharing-nodes-selector`** web component (Collections
+     tab) lets you pick a collection; on its apply ("In Sammlung einfügen") button
+     the sidebar adds the created node to that collection. The selector's contract
+     is callback-based (`option.optionConfig.onNodesChoosen`), so the bridge owns
+     the callback and posts only the chosen collection back; the add itself runs in
+     the sidebar (`PUT …/collection/v1/collections/{repo}/{collection}/references/{node}`
+     via `HttpClient`, since ngx-edu-sharing-api does not export `CollectionV1Service`).
 - **Suche nach Inhalten** — a main tab shown only when the active tab URL matches
   `/src/tools/onlyoffice` (placeholder content for now).
 - **Verlauf** — lists previously processed pages (expandable).
