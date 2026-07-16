@@ -1,0 +1,28 @@
+<div class="head">
+  <p class="subtitle">Bereits erschlossene Seiten</p>
+  <button class="btn-text" (click)="clear()" *ngIf="history.entries().length">Leeren</button>
+</div>
+
+<p class="empty" *ngIf="!history.entries().length">Noch keine Erschließungen.</p>
+
+<ul class="list">
+  <li class="item" *ngFor="let e of history.entries()">
+    <button class="item-head" (click)="toggle(e)">
+      <img class="favicon" *ngIf="e.favIconUrl" [src]="e.favIconUrl" alt="" (error)="onImgError($event)" />
+      <span class="item-main">
+        <span class="item-title">{{ e.title || e.url }}</span>
+        <span class="item-url">{{ e.url }}</span>
+      </span>
+      <span class="chip">{{ e.fieldsExtracted ?? '–' }}/{{ e.fieldsTotal ?? '–' }}</span>
+    </button>
+    <div class="item-body" *ngIf="expanded() === e.id">
+      <div class="meta-line">{{ e.timestamp | date:'dd.MM.yyyy HH:mm' }}</div>
+      <dl class="fields">
+        <ng-container *ngFor="let f of e.parsed.fields">
+          <dt>{{ f.key }}</dt>
+          <dd><span class="val" *ngFor="let v of f.values">{{ v }}</span></dd>
+        </ng-container>
+      </dl>
+    </div>
+  </li>
+</ul>

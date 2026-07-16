@@ -1,0 +1,19 @@
+<section class="card">
+  <label class="field-label" for="repo-url">Repository-URL <span class="req">*</span></label>
+  <input id="repo-url" type="url" class="input" [(ngModel)]="repoUrl"
+         (change)="onRepoChange()" placeholder="https://…/edu-sharing"
+         [class.invalid]="touched && !repoUrl.trim()" />
+  <p class="hint" *ngIf="touched && !repoUrl.trim()">Die Repository-URL ist erforderlich.</p>
+  <p class="desc">
+    Basis-URL des edu-sharing Repositoriums. Wird für die Anmeldung verwendet.
+  </p>
+
+  <div class="notice" *ngIf="auth.state().needsReload">
+    <span>Repository geändert. Zum Übernehmen neu laden.</span>
+    <button class="btn btn-tonal btn-small" (click)="applyRepo()">Übernehmen</button>
+  </div>
+
+  <div class="row">
+    <button class="btn-text" (click)="resetDefault()">Auf Standard zurücksetzen</button>
+  </div>
+</section>

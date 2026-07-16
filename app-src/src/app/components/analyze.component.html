@@ -1,0 +1,120 @@
+<!-- Sub-step navigation -->
+<nav class="steps">
+  <button class="step" [class.active]="wiz.step() === 1" (click)="wiz.goTo(1)">
+    1. Erschließen
+  </button>
+  <button class="step" [class.active]="wiz.step() === 2" [disabled]="!wiz.hasResult()" (click)="wiz.goTo(2)">
+    2. Metadaten
+  </button>
+  <button class="step" [class.active]="wiz.step() === 3" [disabled]="!wiz.hasNode()" (click)="wiz.goTo(3)">
+    3. Preview node
+  </button>
+  <button class="step" [class.active]="wiz.step() === 4" [disabled]="!wiz.hasNode()" (click)="wiz.goTo(4)">
+    4. Zuordnen
+  </button>
+</nav>
+
+<!-- Step 1: login (required) + start -->
+<div [hidden]="wiz.step() !== 1">
+  <section class="card">
+    <div class="card-head">
+      <h2>Anmeldung</h2>
+      <span class="badge" [class.badge-user]="auth.state().loggedIn" [class.badge-guest]="!auth.state().loggedIn">
+        {{ auth.state().loggedIn ? auth.state().username : 'Nicht angemeldet' }}
+      </span>
+    </div>
+
+    <ng-container *ngIf="!auth.state().loggedIn; else loggedIn">
+      <input type="text" class="input" [(ngModel)]="username" placeholder="Benutzername" autocomplete="username" />
+      <input type="password" class="input" [(ngModel)]="password" placeholder="Passwort"
+             autocomplete="current-password" (keyup.enter)="login()" />
+      <p class="error" *ngIf="auth.state().error">{{ auth.state().error }}</p>
+      <div class="row">
+        <button class="btn btn-tonal" (click)="login()"
+                [disabled]="loggingIn || !username || !password || auth.state().needsReload">
+          {{ loggingIn ? 'Anmelden…' : 'Anmelden' }}
+        </button>
+        <span class="muted">Anmeldung ist für die Erschließung erforderlich.</span>
+      </div>
+      <p class="hint" *ngIf="auth.state().needsReload">
+        Repository geändert – bitte in „Einstellungen" übernehmen, um dich anzumelden.
+      </p>
+    </ng-container>
+    <ng-template #loggedIn>
+      <div class="row">
+        <span class="muted">Angemeldet als <strong>{{ auth.state().username }}</strong></span>
+        <button class="btn-text" (click)="logout()">Abmelden</button>
+      </div>
+    </ng-template>
+  </section>
+
+  <button class="btn btn-primary btn-large" (click)="start()"
+          [disabled]="wiz.running() || !auth.state().loggedIn">
+    <span *ngIf="!wiz.running()">Erschließung starten</span>
+    <span *ngIf="wiz.running()">Erschließe… (kann etwas dauern)</span>
+  </button>
+  <p class="hint center" *ngIf="!auth.state().loggedIn">Bitte zuerst anmelden.</p>
+  <section class="card" *ngIf="gen.last() as o">
+    <p class="error" *ngIf="!o.ok">{{ o.error }}</p>
+  </section>
+</div>
+
+<!-- Step 2: edit metadata + save -->
+<div [hidden]="wiz.step() !== 2">
+  <section class="card result" *ngIf="gen.last()?.parsed as p">
+    <div class="result-head">
+      <div class="result-title" [title]="gen.last()?.source?.url">
+        {{ gen.last()?.source?.title || gen.last()?.source?.url }}
+      </div>
+      <div class="result-sub">
+        <span class="chip">{{ p.fieldsExtracted ?? '–' }} / {{ p.fieldsTotal ?? '–' }} Felder</span>
+        <span class="chip" *ngIf="wiz.createdNode()">Node: {{ wiz.createdNode()?.name }}</span>
+      </div>
+    </div>
+    <es-mds-editor *ngIf="wiz.editorMetadata() as md"
+                   [metadata]="md" groupId="io" (save)="onSave($event)"></es-mds-editor>
+  </section>
+
+  <section class="card upload" *ngIf="wiz.saving() || wiz.saveError() || wiz.createdNode()">
+    <p class="muted" *ngIf="wiz.saving()">Wird gespeichert…</p>
+    <p class="error" *ngIf="wiz.saveError()">Speichern fehlgeschlagen: {{ wiz.saveError() }}</p>
+    <p class="upload-ok" *ngIf="!wiz.saving() && !wiz.saveError() && wiz.createdNode() as n">
+      ✓ Gespeichert: <strong>{{ n.name }}</strong>
+    </p>
+  </section>
+
+  <details class="card raw" *ngIf="gen.last()?.parsed as p">
+    <summary>Extrahierte Felder ({{ p.fields.length }})</summary>
+    <dl class="fields">
+      <ng-container *ngFor="let f of p.fields">
+        <dt>{{ f.key }}</dt>
+        <dd><span class="val" *ngFor="let v of f.values">{{ v }}</span></dd>
+      </ng-container>
+    </dl>
+  </details>
+
+  <details class="card raw" *ngIf="gen.last()?.parsed as p">
+    <summary>Rohdaten (JSON)</summary>
+    <pre>{{ p.raw | json }}</pre>
+  </details>
+</div>
+
+<!-- Step 3: preview -->
+<div [hidden]="wiz.step() !== 3">
+  <section class="card">
+    <h2>Preview node</h2>
+    <ng-container *ngIf="wiz.createdNode() as n; else noNode">
+      <p class="muted">Node: <strong>{{ n.name }}</strong></p>
+      <a class="upload-link" [href]="n.link" target="_blank" rel="noopener noreferrer">Node öffnen</a>
+    </ng-container>
+    <ng-template #noNode><p class="muted">Noch kein Node erstellt.</p></ng-template>
+  </section>
+</div>
+
+<!-- Step 4: assign -->
+<div [hidden]="wiz.step() !== 4">
+  <section class="card">
+    <h2>Zuordnen</h2>
+    <p class="muted">Sammlung oder redaktionelle Gruppe – folgt.</p>
+  </section>
+</div>

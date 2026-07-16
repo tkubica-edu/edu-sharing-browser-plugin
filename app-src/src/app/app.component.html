@@ -1,0 +1,29 @@
+<header class="topbar">
+  <img class="logo" src="../icons/32.png" alt="" (error)="onLogoError($event)" />
+  <span class="title">Edu-Sharing</span>
+  <button class="close" title="Schließen" aria-label="Schließen" (click)="close()">✕</button>
+</header>
+
+<nav class="tabs">
+  <button class="tab" [class.active]="tab() === 'analyze'" (click)="tab.set('analyze')">
+    Erschließung
+  </button>
+  <button class="tab" *ngIf="showSearch()" [class.active]="tab() === 'search'" (click)="tab.set('search')">
+    Suche nach Inhalten
+  </button>
+  <button class="tab" [class.active]="tab() === 'history'" (click)="tab.set('history')">
+    Verlauf
+    <span class="count" *ngIf="history.entries().length">{{ history.entries().length }}</span>
+  </button>
+  <button class="tab" [class.active]="tab() === 'settings'" (click)="tab.set('settings')">
+    Einstellungen
+    <span class="dot" *ngIf="auth.state().needsReload" title="Änderung übernehmen"></span>
+  </button>
+</nav>
+
+<main class="content" [ngSwitch]="tab()">
+  <es-analyze *ngSwitchCase="'analyze'"></es-analyze>
+  <es-search *ngSwitchCase="'search'" [contextUrl]="activeUrl()"></es-search>
+  <es-history *ngSwitchCase="'history'"></es-history>
+  <es-settings *ngSwitchCase="'settings'"></es-settings>
+</main>

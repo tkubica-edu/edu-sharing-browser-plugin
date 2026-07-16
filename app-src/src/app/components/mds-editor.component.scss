@@ -1,0 +1,12 @@
+:host { display: block; }
+
+.mds-wrap { display: flex; flex-direction: column; }
+
+.mds-frame {
+  width: 100%;
+  min-height: 520px;
+  height: 60vh;
+  border: none;
+  display: block;
+  background: #fff;
+}

@@ -1,0 +1,22 @@
+{
+  "name": "edu-sharing-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cross-browser (Chrome/Edge/Firefox/Safari) edu-sharing Erschließung extension with an Angular sidebar.",
+  "scripts": {
+    "install:app": "npm --prefix app-src install",
+    "build": "npm run install:app && node scripts/build.mjs --target=all",
+    "build:chrome": "node scripts/build.mjs --target=chrome",
+    "build:firefox": "node scripts/build.mjs --target=firefox",
+    "build:safari": "node scripts/build.mjs --target=safari",
+    "build:no-ng": "node scripts/build.mjs --target=all --no-ng",
+    "lint:firefox": "web-ext lint --source-dir dist/firefox",
+    "start:firefox": "web-ext run --source-dir dist/firefox"
+  },
+  "devDependencies": {
+    "archiver": "^7.0.1",
+    "web-ext": "^8.3.0",
+    "webextension-polyfill": "^0.12.0"
+  }
+}

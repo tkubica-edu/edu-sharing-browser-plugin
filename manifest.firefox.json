@@ -1,0 +1,15 @@
+{
+  "background": {
+    "scripts": [
+      "vendor/browser-polyfill.min.js",
+      "config.js",
+      "background/background.js"
+    ]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "edu-sharing-erschliessung@edu-sharing.com",
+      "strict_min_version": "128.0"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+:host { display: block; }
+
+.card {
+  background: var(--es-surface);
+  border: 1px solid var(--es-border);
+  border-radius: var(--es-radius);
+  padding: 14px;
+}
+h2 { font-size: 14px; margin: 0 0 8px; }
+.muted { color: var(--es-muted); font-size: 13px; }
+.ctx { font-size: 11px; color: var(--es-muted); word-break: break-all; margin-top: 8px; }

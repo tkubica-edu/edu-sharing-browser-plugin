@@ -1,0 +1,30 @@
+{
+  "name": "edu-sharing-sidebar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Angular sidebar app for the edu-sharing extension.",
+  "scripts": {
+    "build": "ng build --configuration=production",
+    "watch": "ng build --watch --configuration=development"
+  },
+  "dependencies": {
+    "@angular/common": "^21.0.0",
+    "@angular/compiler": "^21.0.0",
+    "@angular/core": "^21.0.0",
+    "@angular/forms": "^21.0.0",
+    "@angular/platform-browser": "^21.0.0",
+    "ngx-edu-sharing-api": "^10.0.1",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.6.0",
+    "uuid": "^3.4.0",
+    "webextension-polyfill": "^0.12.0",
+    "zone.js": "~0.15.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.0.0",
+    "@angular/cli": "^21.0.0",
+    "@angular/compiler-cli": "^21.0.0",
+    "@types/webextension-polyfill": "^0.12.5",
+    "typescript": "~5.9.0"
+  }
+}

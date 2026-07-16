@@ -1,0 +1,9 @@
+node_modules/
+dist/
+app-src/node_modules/
+app-src/dist/
+app-src/.angular/
+*.log
+.DS_Store
+.idea
+scripts/webcomponent/
