@@ -44,6 +44,18 @@ export class ExtService {
     await browser.storage.local.set({ [key]: value });
   }
 
+  /** Forward selected edu-sharing node(s) to the host page (e.g. OnlyOffice). */
+  insertNodes(nodes: unknown[]): void {
+    try {
+      if (window.parent && window.parent !== window) {
+        console.log('[edu-sharing][ext.service] ➡ posting "edusharing-insert-node" to host page (window.parent):', nodes);
+        window.parent.postMessage({ type: 'edusharing-insert-node', nodes }, '*');
+      } else {
+        console.warn('[edu-sharing][ext.service] insertNodes: no host-page parent window — running standalone?');
+      }
+    } catch (e) { console.warn('[edu-sharing][ext.service] insertNodes failed (cross-origin parent?)', e); }
+  }
+
   /** Close the injected panel by messaging the host page; fall back to closing a tab. */
   closePanel(): void {
     try {

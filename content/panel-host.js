@@ -179,13 +179,51 @@
     // Keep the panel within bounds if the window is resized narrower.
     window.addEventListener('resize', () => applyWidth(panelWidth));
 
+    // Envelope contract shared with the OnlyOffice page-side plugin. It listens on both
+    // window.postMessage and a CustomEvent named EDU_PLUGIN_CHANNEL, and only accepts
+    // messages whose `source` marker matches, dispatching by `event` name.
+    const EDU_PLUGIN_SOURCE = 'edu-sharing-browser-plugin';
+    const EDU_PLUGIN_CHANNEL = 'edu-sharing-browser-plugin';
+
+    // OnlyOffice loads its plugins in a nested, cross-origin iframe (top → editor iframe →
+    // plugin iframe). A postMessage/CustomEvent on the top page does NOT propagate into
+    // child frames, so we must post the envelope into every frame of the tree. postMessage
+    // with '*' works cross-origin and through arbitrary nesting; reading `.frames`/`.length`
+    // and calling `.postMessage` on a cross-origin Window are all on the safe whitelist.
+    function broadcastToFrames(win, envelope) {
+      let count = 0;
+      try { win.postMessage(envelope, '*'); count++; } catch (_) { /* ignore */ }
+      const frames = (win && win.frames) || [];
+      for (let i = 0; i < frames.length; i++) {
+        try { count += broadcastToFrames(frames[i], envelope); } catch (_) { /* cross-origin frame */ }
+      }
+      return count;
+    }
+
     // Messages from the panel iframe:
     //  - edusharing-panel-close: user closed the panel.
+    //  - edusharing-insert-node: selected edu-sharing node(s) to hand to the host page
+    //    (e.g. OnlyOffice). Re-emitted into the page's main world via both transports so
+    //    the page plugin can catch either a window message or a named CustomEvent.
     const handler = (event) => {
       if (event.source !== iframe.contentWindow) return;
       const type = event.data && event.data.type;
       if (type === 'edusharing-panel-close') {
         closePanel();
+      } else if (type === 'edusharing-insert-node') {
+        const nodes = event.data && event.data.nodes;
+        const envelope = { source: EDU_PLUGIN_SOURCE, event: 'INSERT_NODE', data: { nodes: nodes } };
+        console.log('[edu-sharing][panel-host] ⬅ received "edusharing-insert-node" from sidebar iframe:',
+          (nodes && nodes.length) || 0, 'node(s) → broadcasting envelope to all frames:', envelope);
+        // Primary transport: post the envelope into EVERY frame of the tab (top → editor
+        // iframe → cross-origin plugin iframe). Self-posts to the top window fail our own
+        // `event.source !== iframe.contentWindow` guard below → no loop.
+        const delivered = broadcastToFrames(window.top, envelope);
+        console.log('[edu-sharing][panel-host] ➡ broadcast INSERT_NODE envelope to ' + delivered + ' frame(s)');
+        // Extra fallback for a content-script that might run directly inside a frame with
+        // all_frames:true (CustomEvent stays within its own frame; harmless otherwise).
+        try { window.dispatchEvent(new CustomEvent(EDU_PLUGIN_CHANNEL, { detail: envelope })); } catch (_) { /* ignore */ }
+        try { document.dispatchEvent(new CustomEvent(EDU_PLUGIN_CHANNEL, { detail: envelope })); } catch (_) { /* ignore */ }
       }
     };
     window.__eduSharingPanelMsgHandler = handler;

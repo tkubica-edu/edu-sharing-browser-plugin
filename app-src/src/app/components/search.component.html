@@ -1,5 +1,3 @@
-<section class="card">
-  <h2>Suche nach Inhalten</h2>
-  <p class="muted">Inhalts-Suche für die erkannte Seite – folgt.</p>
-  <p class="ctx" *ngIf="contextUrl">{{ contextUrl }}</p>
-</section>
+<div class="nodes-wrap">
+  <iframe #frame class="nodes-frame" [src]="frameSrc" title="Suche nach Inhalten"></iframe>
+</div>
