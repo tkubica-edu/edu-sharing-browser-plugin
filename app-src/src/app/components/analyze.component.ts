@@ -4,20 +4,21 @@ import { FormsModule } from '@angular/forms';
 
 import { AuthService } from '../services/auth.service';
 import { GenerateService } from '../services/generate.service';
-import { ErschliessenService } from '../services/erschliessen.service';
+import { CurationService } from '../services/curation.service';
 import { MdsEditorComponent } from './mds-editor.component';
+import { PreviewNodeComponent } from './preview-node.component';
 
 @Component({
   selector: 'es-analyze',
   standalone: true,
-  imports: [CommonModule, FormsModule, MdsEditorComponent],
+  imports: [CommonModule, FormsModule, MdsEditorComponent, PreviewNodeComponent],
   templateUrl: './analyze.component.html',
   styleUrl: './analyze.component.scss'
 })
 export class AnalyzeComponent {
   readonly auth = inject(AuthService);
   readonly gen = inject(GenerateService);
-  readonly wiz = inject(ErschliessenService);
+  readonly wiz = inject(CurationService);
 
   username = '';
   password = '';

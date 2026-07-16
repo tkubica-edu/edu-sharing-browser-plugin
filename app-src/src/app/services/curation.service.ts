@@ -1,4 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { Node } from 'ngx-edu-sharing-api';
 
 import { AuthService } from './auth.service';
 import { GenerateService } from './generate.service';
@@ -11,9 +12,9 @@ export interface CreatedNode extends UploadedNode {
   link: string;
 }
 
-// State + actions for the multi-step "Erschließen" flow.
+// State + actions for the multi-step curation flow.
 @Injectable({ providedIn: 'root' })
-export class ErschliessenService {
+export class CurationService {
   private readonly auth = inject(AuthService);
   private readonly gen = inject(GenerateService);
   private readonly upload = inject(UploadService);
@@ -22,6 +23,8 @@ export class ErschliessenService {
   readonly step = signal<WizardStep>(1);
   readonly createdNode = signal<CreatedNode | null>(null);
   readonly nodeMetadata = signal<Record<string, string[]> | null>(null);
+  // The full hydrated node, fed to the preview web component (step 3).
+  readonly previewNode = signal<Node | null>(null);
   readonly saving = signal(false);
   readonly saveError = signal<string | null>(null);
 
@@ -52,6 +55,7 @@ export class ErschliessenService {
     if (!this.auth.state().loggedIn) return;
     this.createdNode.set(null);
     this.nodeMetadata.set(null);
+    this.previewNode.set(null);
     this.saveError.set(null);
     const o = await this.gen.run('de');
     if (o.ok && o.parsed && o.source) {
@@ -79,11 +83,14 @@ export class ErschliessenService {
         : await this.upload.createInInbox(values);
       const base = this.auth.state().repositoryUrl.replace(/\/+$/, '');
       this.createdNode.set({ ...node, link: `${base}/components/render/${node.nodeId}` });
-      // Load persisted metadata so re-editing uses the stored values.
+      // Load the full hydrated node once: its properties re-seed the editor (so
+      // re-editing uses the stored values) and the node itself feeds the preview.
       try {
-        this.nodeMetadata.set(await this.upload.getNodeMetadata(node.nodeId));
+        const full = await this.upload.getNode(node.nodeId);
+        this.previewNode.set(full);
+        this.nodeMetadata.set((full.properties ?? {}) as Record<string, string[]>);
       } catch {
-        /* keep editor as-is if the reload fails */
+        /* keep editor/preview as-is if the reload fails */
       }
       if (!existing) this.step.set(3); // first create → Preview shows the link
     } catch (e: unknown) {

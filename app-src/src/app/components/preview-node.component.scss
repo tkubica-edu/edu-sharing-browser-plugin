@@ -1,0 +1,12 @@
+:host { display: block; }
+
+.preview-wrap { display: flex; flex-direction: column; }
+
+.preview-frame {
+  width: 100%;
+  min-height: 520px;
+  height: 60vh;
+  border: none;
+  display: block;
+  background: #fff;
+}

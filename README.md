@@ -12,7 +12,9 @@ sidebar with three tabs:
      time (`NodeService.createChild`) or updates it thereafter (`editNodeMetadata`);
      re-entering the step edits the node's stored metadata. Raw fields/JSON stay in
      collapsibles.
-  3. *Preview node* — the created node's name + link (unlocked once a node exists).
+  3. *Preview node* — the created node's name + link, plus a live preview rendered
+     by the **`edu-sharing-preview-sidebar`** web component (unlocked once a node
+     exists). Its `node` input takes the full hydrated node (loaded after save).
   4. *Zuordnen* — placeholder for collection/editorial assignment (further web
      components to follow).
 - **Suche nach Inhalten** — a main tab shown only when the active tab URL matches
@@ -31,20 +33,32 @@ The pre-built edu-sharing web-component bundle lives in `scripts/webcomponent/`
 own full Angular runtime (zone.js + DI), it cannot share a document with this
 sidebar's Angular app. So it is hosted in a **same-origin iframe**:
 
-- `webcomponent-host/{mds-editor.html, mds-env.js, mds-bridge.js}` are overlaid onto
-  the bundle at build time (→ `dist/<t>/webcomponent/`). `mds-env.js` sets
+- `webcomponent-host/{mds-editor.html, preview.html, mds-env.js, mds-bridge.js,
+  preview-bridge.js}` are overlaid onto the bundle at build time
+  (→ `dist/<t>/webcomponent/`). `mds-env.js` (shared by both host pages) sets
   `window.__env.EDU_SHARING_API_URL` from the iframe's `?api=` param (an inline
   script would violate the CSP); `mds-bridge.js` creates `<edu-sharing-mds-editor>`
   and relays `save`/`valuesChange`/`cancel` back to the sidebar via `postMessage`.
 - The sidebar's `MdsEditorComponent` embeds that iframe, and on the bridge's `ready`
   handshake posts the generated metadata (`init` → element `.metadata`), plus
   `groupId='io'` and `editorMode='form'`.
+- The same pattern hosts the node preview: `preview-bridge.js` creates
+  `<edu-sharing-preview-sidebar>`, and `PreviewNodeComponent` posts the hydrated
+  node on `ready` (`init` → element `.node`, `editorMode='viewer'`). Because that
+  element's `node` input is the Node object (not an id), the sidebar loads the full
+  node via `UploadService.getNode` after a save and keeps it in `previewNode`.
+
+Both host pages build from the **same** single bundle (`npm run build:app-as-component`
+in the edu-sharing frontend → `dist/web-components/app/`, dropped into
+`scripts/webcomponent/`), which registers every element used here
+(`edu-sharing-mds-editor`, `edu-sharing-preview-sidebar`, …).
 
 The editor's own repository calls (MDS definition, value rendering) reuse the login
 session cookie when the user is logged in; as guest it relies on public access.
 
 > The metadata web component is intentionally **not** embedded — the sidebar only
-> renders the `/generate` output. A separate web component will consume it later.
+> renders the `/generate` output. The created node is consumed by the
+> `edu-sharing-preview-sidebar` component on the *Preview node* step.
 
 ## Architecture
 

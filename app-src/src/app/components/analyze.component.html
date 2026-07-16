@@ -109,6 +109,10 @@
     </ng-container>
     <ng-template #noNode><p class="muted">Noch kein Node erstellt.</p></ng-template>
   </section>
+
+  <section class="card" *ngIf="wiz.previewNode() as node">
+    <es-preview-node [node]="node"></es-preview-node>
+  </section>
 </div>
 
 <!-- Step 4: assign -->
