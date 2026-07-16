@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { NodeService } from 'ngx-edu-sharing-api';
+import { Node, NodeService } from 'ngx-edu-sharing-api';
 
 export interface UploadedNode {
   nodeId: string;
@@ -36,10 +36,11 @@ export class UploadService {
     return { nodeId: node.ref.id, name: node.name };
   }
 
-  // Load a node's current properties (for re-editing).
-  async getNodeMetadata(nodeId: string): Promise<Record<string, string[]>> {
-    const node = await firstValueFrom(this.nodes.getNode(nodeId));
-    return (node.properties ?? {}) as Record<string, string[]>;
+  // Load the full (hydrated) node. Its `properties` re-seed the MDS editor for
+  // re-editing, and the node object itself feeds the preview web component (whose
+  // `node` input is the Node object rather than an id).
+  getNode(nodeId: string): Promise<Node> {
+    return firstValueFrom(this.nodes.getNode(nodeId));
   }
 
   // Coerce editor values to string[] and ensure a node name (cm:name).
