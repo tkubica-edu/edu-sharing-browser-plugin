@@ -1,11 +1,8 @@
-import {
-  Component, ElementRef, EventEmitter, HostListener, Output, ViewChild, inject
-} from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, EventEmitter, Output, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import browser from 'webextension-polyfill';
 
 import { AuthService } from '../services/auth.service';
+import { EduBundleService } from '../services/edu-bundle.service';
 import { toApiRootUrl } from '../config';
 
 /** A collection the user picked in the selector. */
@@ -14,57 +11,60 @@ export interface CollectionChoice {
   name: string;
 }
 
-// Hosts the edu-sharing-nodes-selector web component in a same-origin iframe and
-// relays the collection the user confirms back to the sidebar. Same iframe approach
-// as the MDS editor / preview: the bundle ships its own Angular runtime, so it
-// cannot share this app's document.
+/** Minimal shape of the edu-sharing Node objects the selector hands back. */
+interface NodeLike {
+  ref?: { id?: string };
+  name?: string;
+}
+
+// Embeds <edu-sharing-nodes-selector> as a REAL custom element (no iframe), configured
+// as a collection picker (Collections tab). The bundle is loaded once by
+// EduBundleService.
+//
+// Rendered behind `@if (option)` (a synchronous guard) rather than gated on the async
+// bundle load: the element's `option` must be present when it connects (a computed reads
+// option().optionConfig unguarded on first render), so it's rendered with option set.
 @Component({
   selector: 'es-collection-selector',
   standalone: true,
   imports: [CommonModule],
   templateUrl: './collection-selector.component.html',
-  styleUrl: './collection-selector.component.scss'
+  styleUrl: './collection-selector.component.scss',
+  schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class CollectionSelectorComponent {
-  private readonly sanitizer = inject(DomSanitizer);
   private readonly auth = inject(AuthService);
+  private readonly bundle = inject(EduBundleService);
 
   // Emits the collection(s) the user confirmed via the selector's apply button.
   @Output() choose = new EventEmitter<CollectionChoice[]>();
 
-  @ViewChild('frame') private frame?: ElementRef<HTMLIFrameElement>;
+  readonly error = signal<string | null>(null);
 
-  readonly frameSrc: SafeResourceUrl;
+  // Restrict the selector to the Collections tab.
+  readonly tabBlacklist = ['search', 'workspace', 'upload'];
 
-  private ready = false;
+  readonly option = {
+    optionConfig: {
+      state: 'collections',
+      applyLabel: 'In Sammlung einfügen',
+      autoClose: false,
+      // Enable the apply button only once a collection is picked.
+      applyCallback: (nodes: unknown[]) => Array.isArray(nodes) && nodes.length > 0,
+      // Confirm hook → emit the chosen collection(s) to the sidebar.
+      onNodesChoosen: (e: { nodes?: NodeLike[] }) => this.choose.emit(this.toChoice(e?.nodes))
+    }
+  };
 
   constructor() {
     const api = toApiRootUrl(this.auth.state().repositoryUrl);
-    const base = browser?.runtime?.getURL
-      ? browser.runtime.getURL('webcomponent/collection-selector.html')
-      : 'webcomponent/collection-selector.html';
-    const url = base + '?api=' + encodeURIComponent(api);
-    this.frameSrc = this.sanitizer.bypassSecurityTrustResourceUrl(url);
+    this.bundle.load(api).catch((e: unknown) => this.error.set(String((e as Error)?.message || e)));
   }
 
-  @HostListener('window:message', ['$event'])
-  onMessage(event: MessageEvent): void {
-    if (event.origin !== location.origin) return;
-    const msg = event.data || {};
-    if (msg.source !== 'nodes-selector') return;
-    switch (msg.type) {
-      case 'ready':
-        this.ready = true;
-        this.post('init', { applyLabel: 'In Sammlung einfügen' });
-        break;
-      case 'choose':
-        this.choose.emit((msg.detail ?? []) as CollectionChoice[]);
-        break;
-    }
-  }
-
-  private post(type: string, detail: unknown): void {
-    const win = this.frame?.nativeElement?.contentWindow;
-    if (win) win.postMessage({ target: 'nodes-selector', type, detail }, location.origin);
+  // Reduce Node objects to the minimal shape needed to add a collection reference.
+  private toChoice(nodes?: NodeLike[]): CollectionChoice[] {
+    return (nodes ?? [])
+      .map((n) => ({ id: n?.ref?.id ?? '', name: n?.name ?? '' }))
+      .filter((c) => !!c.id);
   }
 }

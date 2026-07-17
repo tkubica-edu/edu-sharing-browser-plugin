@@ -2,11 +2,8 @@
 
 .selector-wrap { display: flex; flex-direction: column; }
 
-.selector-frame {
+edu-sharing-nodes-selector {
+  display: block;
   width: 100%;
   min-height: 560px;
-  height: 70vh;
-  border: none;
-  display: block;
-  background: #fff;
 }

@@ -2,12 +2,9 @@
 
 .nodes-wrap { display: flex; flex-direction: column; height: 100%; }
 
-.nodes-frame {
-  width: 100%;
-  min-height: 520px;
-  height: 100%;
-  flex: 1 1 auto;
-  border: none;
+edu-sharing-nodes-selector {
   display: block;
-  background: #fff;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 520px;
 }

@@ -1,3 +1,13 @@
 <div class="nodes-wrap">
-  <iframe #frame class="nodes-frame" [src]="frameSrc" title="Suche nach Inhalten"></iframe>
+  @if (error()) {
+    <p class="error">Suche konnte nicht geladen werden: {{ error() }}</p>
+  }
+
+  @if (option) {
+    <edu-sharing-nodes-selector
+      [option]="option"
+      [tabBlacklist]="tabBlacklist"
+      [primaryMode]="'activity'"
+    ></edu-sharing-nodes-selector>
+  }
 </div>

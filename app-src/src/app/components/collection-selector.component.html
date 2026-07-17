@@ -1,3 +1,13 @@
 <div class="selector-wrap">
-  <iframe #frame class="selector-frame" [src]="frameSrc" title="Sammlung auswählen"></iframe>
+  @if (error()) {
+    <p class="error">Sammlungen konnten nicht geladen werden: {{ error() }}</p>
+  }
+
+  @if (option) {
+    <edu-sharing-nodes-selector
+      [option]="option"
+      [tabBlacklist]="tabBlacklist"
+      [primaryMode]="'collections'"
+    ></edu-sharing-nodes-selector>
+  }
 </div>
