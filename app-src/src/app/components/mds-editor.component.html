@@ -2,7 +2,13 @@
   <p class="muted" *ngIf="!ready() && !error()">Editor wird geladen…</p>
   <p class="error" *ngIf="error()">Editor konnte nicht geladen werden: {{ error() }}</p>
 
-  <!-- The wrapper element is created imperatively into this host (props set before append). -->
+  <!--
+    <edu-sharing-mds-editor-wrapper> is created imperatively (see mount()) instead of
+    used as a template tag: as an @angular/elements custom element its ngOnInit runs on
+    connect (appendChild) and THROWS unless `embedded`/`currentValues` are already set.
+    Template property bindings are applied only AFTER connect, so they'd be too late.
+    Creating it and setting inputs before appending guarantees they're there in time.
+  -->
   <div #host class="mds-host"></div>
 
   <div class="mds-actions" *ngIf="ready()">
