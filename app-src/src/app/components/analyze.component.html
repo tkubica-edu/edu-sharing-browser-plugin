@@ -72,7 +72,8 @@
       </div>
     </div>
     <es-mds-editor *ngIf="wiz.editorMetadata() as md"
-                   [metadata]="md" groupId="io" (save)="onSave($event)"></es-mds-editor>
+                   [metadata]="md" [resetMetadata]="gen.last()?.parsed?.raw"
+                   groupId="io" (save)="onSave($event)"></es-mds-editor>
   </section>
 
   <section class="card upload" *ngIf="wiz.saving() || wiz.saveError() || wiz.createdNode()">

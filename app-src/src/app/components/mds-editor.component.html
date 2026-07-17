@@ -1,3 +1,12 @@
 <div class="mds-wrap">
-  <iframe #frame class="mds-frame" [src]="frameSrc" title="Metadaten-Editor"></iframe>
+  <p class="muted" *ngIf="!ready() && !error()">Editor wird geladen…</p>
+  <p class="error" *ngIf="error()">Editor konnte nicht geladen werden: {{ error() }}</p>
+
+  <!-- The wrapper element is created imperatively into this host (props set before append). -->
+  <div #host class="mds-host"></div>
+
+  <div class="mds-actions" *ngIf="ready()">
+    <button class="btn-save" type="button" (click)="onSave()">Speichern</button>
+    <button class="btn-reset" type="button" (click)="onReset()">Zurücksetzen</button>
+  </div>
 </div>

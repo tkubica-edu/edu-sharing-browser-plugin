@@ -2,11 +2,35 @@
 
 .mds-wrap { display: flex; flex-direction: column; }
 
-.mds-frame {
-  width: 100%;
-  min-height: 520px;
-  height: 60vh;
-  border: none;
-  display: block;
-  background: #fff;
+.mds-host { display: block; width: 100%; }
+
+.mds-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-top: 12px;
 }
+
+// Matches the sidebar's tab/step look: blue primary, bordered secondary, rounded.
+.btn-save,
+.btn-reset {
+  border-radius: 6px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-save {
+  background: var(--es-blue);
+  color: #fff;
+  border: 1px solid var(--es-blue);
+}
+.btn-save:hover { background: var(--es-blue-600); border-color: var(--es-blue-600); }
+
+.btn-reset {
+  background: var(--es-surface);
+  color: var(--es-muted);
+  border: 1px solid var(--es-border);
+}
+.btn-reset:hover { color: var(--es-blue); border-color: var(--es-blue); }
