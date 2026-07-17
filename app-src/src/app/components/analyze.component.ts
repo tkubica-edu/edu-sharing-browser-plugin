@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -23,16 +23,18 @@ export class AnalyzeComponent {
 
   username = '';
   password = '';
-  loggingIn = false;
+  // Signal so the "Anmelden…" state refreshes under zoneless change detection
+  // (it is toggled after an await, outside any template event or signal write).
+  readonly loggingIn = signal(false);
 
   async login(): Promise<void> {
     if (!this.username || !this.password || this.auth.state().needsReload) return;
-    this.loggingIn = true;
+    this.loggingIn.set(true);
     try {
       const ok = await this.auth.login(this.username, this.password);
       if (ok) this.password = '';
     } finally {
-      this.loggingIn = false;
+      this.loggingIn.set(false);
     }
   }
 

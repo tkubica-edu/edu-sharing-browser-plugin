@@ -1,3 +1,7 @@
 <div class="preview-wrap">
-  <iframe #frame class="preview-frame" [src]="frameSrc" title="Node-Vorschau"></iframe>
+  <p class="muted" *ngIf="!ready() && !error()">Vorschau wird geladen…</p>
+  <p class="error" *ngIf="error()">Vorschau konnte nicht geladen werden: {{ error() }}</p>
+
+  <edu-sharing-preview-sidebar *ngIf="ready()"
+                               [node]="node" [editorMode]="'viewer'"></edu-sharing-preview-sidebar>
 </div>

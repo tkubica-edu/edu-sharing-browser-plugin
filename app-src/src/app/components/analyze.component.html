@@ -31,8 +31,8 @@
       <p class="error" *ngIf="auth.state().error">{{ auth.state().error }}</p>
       <div class="row">
         <button class="btn btn-tonal" (click)="login()"
-                [disabled]="loggingIn || !username || !password || auth.state().needsReload">
-          {{ loggingIn ? 'Anmelden…' : 'Anmelden' }}
+                [disabled]="loggingIn() || !username || !password || auth.state().needsReload">
+          {{ loggingIn() ? 'Anmelden…' : 'Anmelden' }}
         </button>
         <span class="muted">Anmeldung ist für die Erschließung erforderlich.</span>
       </div>
