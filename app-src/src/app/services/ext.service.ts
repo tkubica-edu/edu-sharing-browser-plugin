@@ -56,6 +56,15 @@ export class ExtService {
     } catch (e) { console.warn('[edu-sharing][ext.service] insertNodes failed (cross-origin parent?)', e); }
   }
 
+  /** Tell the host page the sidebar app has booted, so it can replay a buffered inbound event. */
+  signalReady(): void {
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'edusharing-sidebar-ready' }, '*');
+      }
+    } catch { /* cross-origin parent — ignore */ }
+  }
+
   /** Close the injected panel by messaging the host page; fall back to closing a tab. */
   closePanel(): void {
     try {

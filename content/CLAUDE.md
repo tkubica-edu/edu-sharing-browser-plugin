@@ -1,187 +1,181 @@
-# Event Documentation — Browser Extension → Host Application
+# Event Documentation — Browser Extension ↔ Host Application
 
-This file documents every event/message fired on the path from the sidebar selection
-(`edu-sharing-nodes-selector`) to the **host application**: **which** events exist,
-**when/how/where** they fire, and **what data structure** they carry.
+This file documents every event/message exchanged between the extension's sidebar and the
+**host application** the extension is embedded in, in **both directions**: **which** events
+exist, **when/how/where** they fire, and **what data structure** they carry.
 
-The outward-facing event (`INSERT_NODE`) is deliberately **application-agnostic**: the
-extension does not know which page it is embedded in. Any web application can consume it by
-listening to the contract described below. OnlyOffice is just **one concrete example** — the
-same works for H5P editors, CMS editors, custom web apps, etc.
+The public events are deliberately **application-agnostic**: the extension does not know which
+page it is embedded in. Any web application can integrate by using the contracts below.
+OnlyOffice is just **one concrete example** — the same works for H5P editors, CMS editors,
+custom web apps, etc.
 
-The final, outward-facing station is `content/panel-host.js` (it fires the `INSERT_NODE`
-envelope into all frames). The hops before it are internal intermediate steps.
+Two public events cross the extension ↔ host boundary:
+
+| Direction | Event | Meaning |
+|-----------|-------|---------|
+| **Extension → host** | `INSERT_NODE` | user picked node(s) in the selector ("Gewählten Inhalt kopieren") |
+| **Host → extension** | `PREVIEW_NODE` | host asks the extension to preview/edit a node (e.g. user double-clicked an inserted object) |
+
+`content/panel-host.js` (the content script on the host page) is the relay hub for both
+directions. It fires `INSERT_NODE` into all frames, and relays inbound `PREVIEW_NODE` into the
+sidebar iframe.
 
 ---
 
 ## Frame / Context Map
 
 ```
-Host page (any web application) ── content script: panel-host.js   (fires INSERT_NODE)
+Host page (any web application) ── content script: panel-host.js   (relay hub, both directions)
  ├─ Sidebar iframe (sidebar/index.html, extension origin) ── Angular app
- │    (search.component.ts, ext.service.ts)
- │   └─ Nodes-selector iframe (webcomponent/nodes-selector.html)
- │        (nodes-selector-bridge.js + <edu-sharing-nodes-selector>)
+ │    (app.component.ts, ext.service.ts, search.component.ts + <edu-sharing-nodes-selector>)
  └─ (optional) arbitrarily nested, possibly cross-origin iframes
-      └─ consuming application  ── listens for INSERT_NODE   (e.g. OnlyOffice plugin)
+      └─ integrating application  ── sends PREVIEW_NODE / listens for INSERT_NODE
+                                      (e.g. the OnlyOffice edu-sharing plugin)
 ```
 
-The receiver may sit **on the top page itself** or in an **arbitrarily nested, cross-origin
-iframe**. That is why the event is broadcast into *all* frames (see event 4). Each level is a
-separate JS context with its own console. Debug logs carry the prefix `[edu-sharing][<station>]`.
+Note: since the earlier iframe/bridge design, the selector (`<edu-sharing-nodes-selector>`) is
+mounted as a **real custom element directly in the sidebar document** (loaded by
+`EduBundleService`) — there is no longer a separate nodes-selector iframe or postMessage bridge.
+
+The integrating app may sit **on the top page itself** or in an **arbitrarily nested,
+cross-origin iframe**. That is why `INSERT_NODE` is broadcast into *all* frames, and why
+`PREVIEW_NODE` is expected on `window.top`. Each level is a separate JS context with its own
+console. Debug logs carry the prefix `[edu-sharing][<station>]`.
 
 ---
 
-## Event Chain Overview
+## Direction 1 — Extension → Host: `INSERT_NODE`
 
+Fired when the user selects content in the sidebar and clicks **"Gewählten Inhalt kopieren"**.
+
+### Internal chain
 | # | From → To | Transport | Identifier | Payload |
 |---|-----------|-----------|-----------|---------|
-| 0 | Sidebar → Bridge | `iframe.postMessage` | `{target:'nodes-selector', type:'init'}` | selector config |
-| 1 | Bridge → Sidebar | `parent.postMessage` | `{source:'nodes-selector', type:'ready'\|'mounted'}` | `null` |
-| 2 | Bridge → Sidebar | `parent.postMessage` | `{source:'nodes-selector', type:'copy'}` | `{nodes, connectorId}` |
-| 3 | Sidebar → Host top | `window.parent.postMessage` | `{type:'edusharing-insert-node'}` | `{nodes}` |
-| 4 | **Host top → all frames** | `postMessage` + `CustomEvent` | **`INSERT_NODE` envelope** | `{nodes}` |
+| 1 | `<edu-sharing-nodes-selector>` → `search.component.ts` | `option.optionConfig.onNodesChoosen` callback (same JS context) | — | `{nodes, connectorId, window}` |
+| 2 | `search.component.ts` → host top | `window.parent.postMessage` (via `ext.insertNodes`) | `{type:'edusharing-insert-node'}` | `{nodes}` |
+| 3 | **`panel-host.js` → all frames** | `postMessage` + `CustomEvent` | **`INSERT_NODE` envelope** | `{nodes}` |
 
-Events 0–3 are **internal** (extension origin) and irrelevant to integrators. The **public
-integration point is exclusively event 4 (`INSERT_NODE`)**.
+- There is **no DOM "copy" event** on the element; the only hook is the
+  `option.optionConfig.onNodesChoosen` callback, set in `search.component.ts`. Precondition:
+  `parent` is not set (otherwise the selector copies internally and fires nothing).
+- Step 3 broadcasts into every frame via `broadcastToFrames(window.top, envelope)`
+  (recursive `frame.postMessage(envelope, '*')`), because the receiver may be in a nested,
+  cross-origin iframe. A `CustomEvent` fallback is also dispatched (same-frame only).
+
+### Public contract (what the host listens for)
+```js
+const SOURCE = "edu-sharing-browser-plugin";   // marker for extension → host messages
+
+window.addEventListener("message", (e) => {
+  const env = e.data;
+  if (!env || env.source !== SOURCE) return;    // foreign message → silently ignore
+  if (env.event === "INSERT_NODE") {
+    const nodes = env.data.nodes;               // array of full node objects (see below)
+    // ... insert into your application
+  }
+});
+```
+Envelope: `{ source: "edu-sharing-browser-plugin", event: "INSERT_NODE", data: { nodes: Node[] } }`.
 
 ---
 
-## Public Contract (for host applications)
+## Direction 2 — Host → Extension: `PREVIEW_NODE`
 
-A host application integrates the extension by listening for the `INSERT_NODE` envelope. It
-arrives over **two** transports (use at least `message`):
+Fired by the host application to ask the extension to show a node (e.g. the user double-clicked
+an inserted edu-sharing object in the editor). The extension loads it into the Erschließung
+wizard — Vorschau (preview) with editable Metadaten — the same view as selecting a Verlauf entry.
 
+### What the host sends
 ```js
-const SOURCE  = "edu-sharing-browser-plugin";   // marker; ignore anything without it
-const CHANNEL = "edu-sharing-browser-plugin";    // name of the CustomEvent
+window.top.postMessage({
+  source: "edu-sharing-onlyoffice-plugin",   // NOTE: different marker than the extension→host source
+  event:  "PREVIEW_NODE",
+  data:   { id, url, nodeWidth, nodeHeight, nodeTitle, nodeCaption, nodePermaLink, nodeMimeType, nodeRepo }
+}, "*");
+```
+All `data` values are strings. **The extension only requires `data.id`** — it hydrates the full
+node from the configured repository (`UploadService.getNode(id)`) and renders the preview via the
+bundle, authenticated by the repository **session cookie**. The other fields (url, dimensions,
+mimetype…) are currently ignored. No ticket needs to be sent (the spec's `?ticket=` note only
+applies if the raw `data.url` image is loaded manually, which the extension does not do).
 
-function parse(raw) {
-  let p = raw;
-  if (typeof p === "string") { try { p = JSON.parse(p); } catch { return null; } }
-  if (!p || typeof p !== "object") return null;
-  if (p.source !== SOURCE || !p.event) return null;   // foreign message → silently ignore
-  return p;
+### Internal chain
+| # | From → To | Transport | Identifier | Payload |
+|---|-----------|-----------|-----------|---------|
+| 1 | integrating app → host top | `window.top.postMessage` | `{source:'edu-sharing-onlyoffice-plugin', event:'PREVIEW_NODE'}` | `{id, …}` |
+| 2 | `panel-host.js` → sidebar iframe | `iframe.contentWindow.postMessage` (+ buffer in memory & `storage.local`) | same envelope | `{id, …}` |
+| 3 | sidebar `app.component.ts` | `@HostListener('window:message')`, filter `data.source` | — | `{id, …}` |
+| 4 | `CurationService.loadFromNode(id)` → `UploadService.getNode(id)` → wizard step 3 + switch to Erschließung tab | — | — | full `Node` |
+
+- **Filter by `data.source`, not `event.origin`** — the sender is a cross-origin frame, so the
+  relayed `event.origin` is the host page origin, not the extension origin.
+- **Buffering** (panel closed/booting): `panel-host.js` keeps the last inbound message in memory
+  and persists it to `storage.local` (`eduSharingPendingPreview`). The sidebar, on boot, posts
+  `edusharing-sidebar-ready` (→ panel-host replays the buffered message) and also reads+clears the
+  persisted entry. `app.component.ts` dedupes duplicate deliveries (storage replay + live relay).
+- **Limitation:** if the panel was **never opened** (no content script injected) when the host
+  fired `PREVIEW_NODE`, there is no relay running and the event is lost. Capturing that would
+  require a persistent `all_frames` content script.
+- **Login:** hydration needs a logged-in session. If logged out on receive, the sidebar shows the
+  login gate and loads the node automatically once the user logs in.
+
+---
+
+## `Node` Data Structure (elements in `INSERT_NODE`'s `nodes`)
+
+The `nodes` are edu-sharing repository node objects as held by the `edu-sharing` web-component
+bundle from the REST API (no TS class defined in this repo; the shape comes from the repository).
+Typical, reliably present fields:
+
+```jsonc
+{
+  "ref":  { "repo": "<repo-id>", "id": "<node-uuid>" },   // unique reference
+  "aspects": ["ccm:..."],
+  "type": "ccm:io",                                        // node type
+  "name": "example.pdf",
+  "title": "Example",
+  "isDirectory": false,
+  "mimetype": "application/pdf",
+  "size": 12345,
+  "properties": { "cclom:title": ["…"], "cm:name": ["…"], /* … */ },
+  "preview": { "url": "https://…" },
+  "downloadUrl": "https://…",
+  "content": { "url": "https://…" }
 }
-
-function handle(envelope) {
-  if (envelope.event === "INSERT_NODE") {
-    const nodes = envelope.data.nodes;   // array of selected node objects
-    // ... insert into your own application
-  }
-}
-
-// Transport 1: window.postMessage (crosses frame boundaries, cross-origin)
-window.addEventListener("message", (e) => { const env = parse(e.data); if (env) handle(env); });
-
-// Transport 2: CustomEvent (only if the listener runs in the same frame as the sender)
-const onCE = (e) => { const env = parse(e.detail); if (env) handle(env); };
-window.addEventListener(CHANNEL, onCE);
-document.addEventListener(CHANNEL, onCE);
 ```
 
-**Extensibility:** new actions simply get a new `event` name inside the same envelope
-(`{source, event, data}`). The `source` marker cleanly separates these events from other
-`postMessage` channels on the host page.
-
----
-
-## Event Details
-
-### 0. `init` — sidebar configures the selector *(internal)*
-- **Where:** `search.component.ts` → `post('init', …)`; received in `nodes-selector-bridge.js`.
-- **When:** right after the bridge reports `ready` (once).
-- **How:** `iframe.contentWindow.postMessage(msg, extensionOrigin)`.
-- **Structure:**
-  ```js
-  { target: 'nodes-selector', type: 'init', detail: {
-      tabBlacklist: ['collections', 'upload'],
-      option: { option: 'SORT_INTO', trap: false, optionConfig: { state: 'search' } },
-      primaryMode: 'activity'
-      // parent deliberately NOT set → enables the emit branch on copy
-  }}
-  ```
-- The bridge adds the `onNodesChoosen` callback into `option.optionConfig` (functions do not
-  survive `postMessage`, so this is done here in the target context).
-
-### 1. `ready` / `mounted` — bridge lifecycle *(internal)*
-- **Where:** `nodes-selector-bridge.js` → `send('ready'|'mounted')`; received in `search.component.ts`.
-- **When:** `ready` as soon as the custom element is registered; `mounted` after the element
-  is appended to the DOM.
-- **Structure:** `{ source: 'nodes-selector', type: 'ready'|'mounted', detail: null }`
-
-### 2. `copy` — selection confirmed ("copy selected content") *(internal)*
-- **Where:** `nodes-selector-bridge.js`, inside the injected `option.optionConfig.onNodesChoosen`;
-  received in `search.component.ts` (`msg.type === 'copy'`).
-- **When:** click on **"Gewählten Inhalt kopieren"**. The button internally calls
-  `copyNodes()` → `emitNodes()` → `onNodesChoosen(...)`. **No DOM event** — only this callback
-  (hence no `addEventListener` on the element is possible). Precondition: `parent` is **not**
-  set (otherwise the selector copies internally instead of emitting).
-- **How:** `parent.postMessage({source:'nodes-selector', type:'copy', detail}, extensionOrigin)`.
-- **Structure:**
-  ```js
-  { source: 'nodes-selector', type: 'copy', detail: {
-      nodes: Node[],          // array of selected nodes (see below)
-      connectorId?: string    // optional, from the callback payload
-  }}
-  ```
-  Note: the callback also provides `payload.window` (a Window reference) — it is **dropped**
-  because it is not cloneable across `postMessage`.
-
-### 3. `edusharing-insert-node` — sidebar → host top *(internal)*
-- **Where:** `ext.service.ts` → `insertNodes()`; received in `content/panel-host.js` (`handler`).
-- **When:** right after event 2, in `search.component.ts` via `this.ext.insertNodes(nodes)`.
-- **How:** `window.parent.postMessage(msg, '*')` (sidebar iframe → host top page).
-- **Structure:** `{ type: 'edusharing-insert-node', nodes: Node[] }`
-- `panel-host.js` filters inbound messages via `event.source === iframe.contentWindow` (only
-  its own sidebar), preventing foreign/echo messages.
-
-### 4. `INSERT_NODE` — host top → application *(public)*
-- **Where:** `content/panel-host.js`, branch `type === 'edusharing-insert-node'`.
-- **When:** immediately after event 3.
-- **How:** **broadcast into all frames** via `broadcastToFrames(window.top, envelope)` —
-  recursive `frame.postMessage(envelope, '*')`. Reason: the receiver may sit in a nested,
-  cross-origin iframe; `postMessage`/`CustomEvent` on the top page do **not** propagate there
-  automatically. Additionally (fallback for a listener in the same frame) `window.dispatchEvent`
-  + `document.dispatchEvent` of a `CustomEvent`.
-- **Channel / marker constants:** `source` / `CustomEvent` name = `"edu-sharing-browser-plugin"`.
-- **Envelope structure (the public contract):**
-  ```js
-  { source: "edu-sharing-browser-plugin",   // marker; without it the receiver discards it
-    event:  "INSERT_NODE",                   // event name
-    data:   { nodes: Node[] } }
-  ```
+Which fields a host application needs depends on the use case. For `PREVIEW_NODE` the host sends
+only string fields and the extension re-hydrates from `id`.
 
 ---
 
 ## Things to Watch Out For
 
-- **Only event 4 is public.** Integrators listen exclusively for the `INSERT_NODE` envelope;
-  events 0–3 are internal implementation details.
-- **No DOM event on copy:** internally the selection only arrives via the
-  `option.optionConfig.onNodesChoosen` callback. If `parent` is set, the selector copies
-  internally and fires **nothing**.
-- **Frame boundary:** if the receiver sits in a cross-origin iframe, only the `postMessage`
-  broadcast into all frames reaches it. `CustomEvent` does **not** cross the frame boundary
-  (same-frame fallback only).
-- **Marker required:** without `source: "edu-sharing-browser-plugin"` the receiver must ignore
-  the message — the host page receives many foreign `postMessage`s. Discard foreign messages
-  **silently** (do not warn).
-- **No loop:** self-posts to the top page fail the `event.source !== iframe.contentWindow`
-  guard in `panel-host.js`.
-- **Where the sidebar appears** (trigger pages) is configured separately and is not part of
-  this event contract.
-- **Debug:** log prefix `[edu-sharing][…]`. When debugging in DevTools, select the matching
-  frame context.
+- **Distinct source markers:** extension→host uses `edu-sharing-browser-plugin`; host→extension
+  uses `edu-sharing-onlyoffice-plugin`. They are intentionally different so neither side
+  re-processes its own messages. Filter strictly by `source`.
+- **Frame boundary:** across a cross-origin iframe boundary only `postMessage` works
+  (`CustomEvent` does not cross it). `INSERT_NODE` is broadcast to all frames; `PREVIEW_NODE`
+  targets `window.top`.
+- **Marker required:** discard messages lacking the expected `source` **silently** (the host page
+  receives many foreign `postMessage`s, e.g. the OnlyOffice editor's own internal messages).
+- **No loop:** `panel-host.js` guards inbound-from-sidebar handling with
+  `event.source === iframe.contentWindow`, and inbound-from-plugin handling with the
+  `edu-sharing-onlyoffice-plugin` marker.
+- **Where the sidebar appears** (trigger pages) is configured separately and is not part of these
+  event contracts.
+- **Debug:** log prefix `[edu-sharing][…]`. When debugging in DevTools, select the matching frame
+  context.
 
 ---
 
 ## Files Involved
 
-| File | Role in the event chain |
+| File | Role |
 |---|---|
-| `webcomponent-host/nodes-selector-bridge.js` | injects `onNodesChoosen`, fires `ready`/`mounted`/`copy` |
-| `app-src/src/app/components/search.component.ts` | sends `init`, receives `copy`, calls `insertNodes` |
-| `app-src/src/app/services/ext.service.ts` | fires `edusharing-insert-node` to the top page |
-| `content/panel-host.js` | fires the `INSERT_NODE` envelope into all frames |
-| *(host-side, external)* | any application listening for `INSERT_NODE` (e.g. OnlyOffice plugin) |
+| `app-src/src/app/components/search.component.ts` | selector's `onNodesChoosen` → `ext.insertNodes` (outbound) |
+| `app-src/src/app/services/ext.service.ts` | `insertNodes` (outbound), `signalReady` (ready handshake) |
+| `content/panel-host.js` | relay hub: broadcasts `INSERT_NODE`; relays/buffers inbound `PREVIEW_NODE` |
+| `app-src/src/app/app.component.ts` | receives `PREVIEW_NODE`, routes it into the wizard |
+| `app-src/src/app/services/curation.service.ts` | `loadFromNode(id)` — hydrate + open in wizard (preview + editable) |
+| *(host-side, external)* | app that listens for `INSERT_NODE` / sends `PREVIEW_NODE` (e.g. OnlyOffice plugin) |

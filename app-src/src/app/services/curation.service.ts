@@ -87,15 +87,7 @@ export class CurationService {
   // be fetched — the caller surfaces the error (state stays untouched on failure).
   async loadFromHistory(entry: HistoryEntry): Promise<void> {
     const full = await this.upload.getNode(entry.nodeId);
-    this.resetNodeState();
-    const base = this.auth.state().repositoryUrl.replace(/\/+$/, '');
-    this.createdNode.set({
-      nodeId: entry.nodeId,
-      name: full.name ?? entry.title,
-      link: `${base}/components/render/${entry.nodeId}`
-    });
-    this.previewNode.set(full);
-    this.nodeMetadata.set((full.properties ?? {}) as Record<string, string[]>);
+    this.applyLoadedNode(entry.nodeId, full, full.name ?? entry.title);
     // Keep the stored parsed result so step 2's raw/field views and the source line show.
     this.gen.last.set({
       ok: true,
@@ -103,6 +95,28 @@ export class CurationService {
       source: { url: entry.url, title: entry.title, favIconUrl: entry.favIconUrl }
     });
     this.step.set(3);
+  }
+
+  // Load a live node by its id into the wizard — same behaviour as loadFromHistory, but for
+  // an externally-received node (e.g. a PREVIEW_NODE event from the OnlyOffice plugin) where
+  // there is no stored /generate result. Opens Vorschau (step 3) with editable Metadaten.
+  // Throws if the node can't be fetched (caller surfaces the error; state stays untouched).
+  async loadFromNode(nodeId: string): Promise<void> {
+    const full = await this.upload.getNode(nodeId);
+    this.applyLoadedNode(nodeId, full, full.name ?? nodeId);
+    // No /generate result for an externally-received node; step-2 raw/field views hide.
+    this.gen.last.set(null);
+    this.step.set(3);
+  }
+
+  // Shared core of loadFromHistory/loadFromNode: reset state and seed the created node,
+  // preview, and editor metadata from the hydrated node.
+  private applyLoadedNode(nodeId: string, full: Node, name: string): void {
+    this.resetNodeState();
+    const base = this.auth.state().repositoryUrl.replace(/\/+$/, '');
+    this.createdNode.set({ nodeId, name, link: `${base}/components/render/${nodeId}` });
+    this.previewNode.set(full);
+    this.nodeMetadata.set((full.properties ?? {}) as Record<string, string[]>);
   }
 
   private resetNodeState(): void {

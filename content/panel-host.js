@@ -185,6 +185,19 @@
     const EDU_PLUGIN_SOURCE = 'edu-sharing-browser-plugin';
     const EDU_PLUGIN_CHANNEL = 'edu-sharing-browser-plugin';
 
+    // Inbound direction: the OnlyOffice plugin (a nested, cross-origin iframe) posts events
+    // to window.top with this source marker. We relay them into our sidebar iframe. The
+    // sidebar's own extension origin is the safe target for that relay.
+    const EDU_ONLYOFFICE_SOURCE = 'edu-sharing-onlyoffice-plugin';
+    const sidebarOrigin = (() => { try { return new URL(iframe.src).origin; } catch (_) { return '*'; } })();
+    // Buffer the last inbound plugin message so it can be replayed once the sidebar app is
+    // ready (covers the panel-open / app-boot race). Also persisted to storage so a reload
+    // of the sidebar still picks it up.
+    let lastInbound = null;
+    function relayInbound(data) {
+      try { iframe.contentWindow.postMessage(data, sidebarOrigin); } catch (_) { /* ignore */ }
+    }
+
     // OnlyOffice loads its plugins in a nested, cross-origin iframe (top → editor iframe →
     // plugin iframe). A postMessage/CustomEvent on the top page does NOT propagate into
     // child frames, so we must post the envelope into every frame of the tree. postMessage
@@ -206,8 +219,26 @@
     //    (e.g. OnlyOffice). Re-emitted into the page's main world via both transports so
     //    the page plugin can catch either a window message or a named CustomEvent.
     const handler = (event) => {
+      const data = event.data;
+      // Inbound plugin → sidebar. Comes from a cross-origin plugin iframe (NOT our sidebar),
+      // so it must be handled BEFORE the `event.source !== iframe.contentWindow` guard below.
+      if (data && data.source === EDU_ONLYOFFICE_SOURCE) {
+        console.log('[edu-sharing][panel-host] ⬅ received from OnlyOffice plugin:', data.event, data.data);
+        lastInbound = data;
+        relayInbound(data);
+        try { api.storage.local.set({ eduSharingPendingPreview: { data: data, t: Date.now() } }); } catch (_) { /* ignore */ }
+        return;
+      }
       if (event.source !== iframe.contentWindow) return;
-      const type = event.data && event.data.type;
+      const type = data && data.type;
+      if (type === 'edusharing-sidebar-ready') {
+        // Sidebar app has booted → replay any buffered inbound message.
+        if (lastInbound) {
+          console.log('[edu-sharing][panel-host] ➡ sidebar ready → replaying buffered inbound', lastInbound.event);
+          relayInbound(lastInbound);
+        }
+        return;
+      }
       if (type === 'edusharing-panel-close') {
         closePanel();
       } else if (type === 'edusharing-insert-node') {
