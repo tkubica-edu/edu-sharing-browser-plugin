@@ -6,10 +6,10 @@
 
 <es-status-bar></es-status-bar>
 
-<!-- Workflow-step header: current step title + back to the options menu. Hidden on the
-     menu itself (there is no step to name and nowhere further back to go). -->
-<div class="step-header" *ngIf="nav.showBack()">
-  <button class="back-btn" (click)="nav.openMenu()"
+<!-- Workflow-step header: always shows the current view's title for consistency; the
+     back-to-menu button appears on every view except the menu itself. -->
+<div class="step-header">
+  <button class="back-btn" *ngIf="nav.showBack()" (click)="nav.openMenu()"
           title="Zurück zu Aktionen & Optionen" aria-label="Zurück zu Aktionen & Optionen">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>

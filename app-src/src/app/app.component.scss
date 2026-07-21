@@ -33,8 +33,8 @@
 .step-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
+  gap: 8px;
+  padding: 10px 14px;
   background: var(--es-surface);
   border-bottom: 1px solid var(--es-border);
   flex: 0 0 auto;
@@ -43,7 +43,8 @@
   background: none;
   border: none;
   color: var(--es-text);
-  width: 30px; height: 30px;
+  width: 28px; height: 28px;
+  margin-left: -6px;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;

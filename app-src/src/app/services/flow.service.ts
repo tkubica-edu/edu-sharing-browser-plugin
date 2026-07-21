@@ -60,8 +60,8 @@ export class FlowService {
       case 'vorschau':
         // With a node open, offer the logical next actions as a choice (not a forced chain).
         return [
-          { label: 'Metadaten editieren', kind: 'option', disabled: false, run: () => this.nav.go('metadaten') },
-          { label: 'Sammlung zuordnen', kind: 'option', disabled: false, run: () => this.nav.go('einsortieren') }
+          { label: 'Metadaten editieren', kind: 'primary', disabled: false, run: () => this.nav.go('metadaten') },
+          { label: 'Sammlung zuordnen', kind: 'primary', disabled: false, run: () => this.nav.go('einsortieren') }
         ];
 
       // These screens own their own primary action (selector insert, login form, etc.).
