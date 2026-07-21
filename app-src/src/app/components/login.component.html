@@ -1,25 +1,25 @@
 <!-- Logged out: credential form. Logged in: compact status + logout. -->
 <ng-container *ngIf="!auth.state().loggedIn; else loggedIn">
-  <section class="card">
-    <div class="card-head">
+  <section class="es-card">
+    <div class="es-card-head">
       <h2>Anmeldung</h2>
-      <span class="badge badge-guest">Nicht angemeldet</span>
+      <span class="es-badge es-badge--guest">Nicht angemeldet</span>
     </div>
 
-    <input type="text" class="input" [(ngModel)]="username" placeholder="Benutzername" autocomplete="username" />
-    <input type="password" class="input" [(ngModel)]="password" placeholder="Passwort"
+    <input type="text" class="es-input" [(ngModel)]="username" placeholder="Benutzername" autocomplete="username" />
+    <input type="password" class="es-input" [(ngModel)]="password" placeholder="Passwort"
            autocomplete="current-password" (keyup.enter)="login()" />
-    <p class="error" *ngIf="auth.state().error">{{ auth.state().error }}</p>
+    <p class="es-error" *ngIf="auth.state().error">{{ auth.state().error }}</p>
 
-    <div class="row">
-      <button class="btn btn-primary" (click)="login()"
+    <div class="es-row">
+      <button class="es-btn es-btn--primary" (click)="login()"
               [disabled]="loggingIn() || !username || !password || auth.state().needsReload">
         {{ loggingIn() ? 'Anmelden…' : 'Anmelden' }}
       </button>
-      <span class="muted">Anmeldung ist erforderlich.</span>
+      <span class="es-muted">Anmeldung ist erforderlich.</span>
     </div>
 
-    <p class="hint" *ngIf="auth.state().needsReload">
+    <p class="es-hint" *ngIf="auth.state().needsReload">
       Repository geändert – bitte in „Einstellungen" übernehmen, um dich anzumelden.
     </p>
   </section>
@@ -27,8 +27,8 @@
 
 <ng-template #loggedIn>
   <div class="status">
-    <span class="badge badge-user">Angemeldet</span>
-    <span class="muted">als <strong>{{ auth.state().username }}</strong></span>
-    <button class="btn-text" (click)="logout()">Abmelden</button>
+    <span class="es-badge es-badge--user">Angemeldet</span>
+    <span class="es-muted">als <strong>{{ auth.state().username }}</strong></span>
+    <button class="es-btn es-btn--text logout" (click)="logout()">Abmelden</button>
   </div>
 </ng-template>

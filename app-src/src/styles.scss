@@ -1,15 +1,5 @@
-:root {
-  --es-blue: #003b7c;
-  --es-blue-600: #0a4f9e;
-  --es-bg: #f5f7fa;
-  --es-surface: #ffffff;
-  --es-border: #dfe3e8;
-  --es-text: #1c2733;
-  --es-muted: #63707e;
-  --es-danger: #c0392b;
-  --es-success: #1e8e5a;
-  --es-radius: 8px;
-}
+@use 'tokens';
+@use 'mixins' as m;
 
 * { box-sizing: border-box; }
 
@@ -27,3 +17,38 @@ button {
   font-family: inherit;
   cursor: pointer;
 }
+
+// ---- Shared, define-once primitives (namespaced `es-*` — see _mixins.scss) --
+.es-card { @include m.card; }
+.es-hint-card { @include m.hint-card; }
+.es-card-head {
+  @include m.card-head;
+  h2 { font-size: 14px; margin: 0; }
+}
+
+.es-input { @include m.input; }
+.es-field-label { @include m.field-label; }
+.es-req { color: var(--es-danger); }
+
+.es-btn { @include m.btn; }
+.es-btn--primary { @include m.btn-primary; }
+.es-btn--tonal { @include m.btn-tonal; }
+.es-btn--text { @include m.btn-text; }
+.es-btn--small { @include m.btn-small; }
+.es-btn--large { @include m.btn-large; }
+
+.es-badge { @include m.badge; }
+.es-badge--guest { @include m.badge-guest; }
+.es-badge--user { @include m.badge-user; }
+
+.es-chip { @include m.chip; }
+.es-notice { @include m.notice; }
+
+.es-muted { @include m.muted; }
+.es-error { @include m.error; }
+.es-hint { @include m.hint; }
+
+.es-row { display: flex; align-items: center; gap: var(--es-space-3); flex-wrap: wrap; margin-top: var(--es-space-2); }
+
+// Section heading used inside cards
+.es-card h2, .es-hint-card h2 { font-size: 14px; margin: 0 0 var(--es-space-2); }

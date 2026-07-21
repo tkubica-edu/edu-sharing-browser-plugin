@@ -1,0 +1,35 @@
+<div class="screen-body">
+  <section class="es-hint-card">
+    <p class="es-muted">
+      Prüfe und ergänze die Metadaten und speichere sie anschließend über „Speichern".
+    </p>
+    <p class="src-title" *ngIf="gen.last()?.source as s" [title]="s.url">{{ s.title || s.url }}</p>
+    <div class="result-sub" *ngIf="gen.last()?.parsed as p">
+      <span class="es-chip">{{ p.fieldsExtracted ?? '–' }} / {{ p.fieldsTotal ?? '–' }} Felder</span>
+      <span class="es-chip" *ngIf="curation.createdNode()">Node: {{ curation.createdNode()?.name }}</span>
+    </div>
+  </section>
+
+  <section class="es-card" *ngIf="curation.editorMetadata() as md">
+    <es-mds-editor [metadata]="md" groupId="io" (save)="onSave($event)"></es-mds-editor>
+  </section>
+
+  <section class="es-card" *ngIf="curation.saveError()">
+    <p class="es-error">Speichern fehlgeschlagen: {{ curation.saveError() }}</p>
+  </section>
+
+  <details class="es-card raw" *ngIf="gen.last()?.parsed as p">
+    <summary>Extrahierte Felder ({{ p.fields.length }})</summary>
+    <dl class="fields">
+      <ng-container *ngFor="let f of p.fields">
+        <dt>{{ f.key }}</dt>
+        <dd><span class="val" *ngFor="let v of f.values">{{ v }}</span></dd>
+      </ng-container>
+    </dl>
+  </details>
+
+  <details class="es-card raw" *ngIf="gen.last()?.parsed as p">
+    <summary>Rohdaten (JSON)</summary>
+    <pre>{{ p.raw | json }}</pre>
+  </details>
+</div>

@@ -1,0 +1,19 @@
+<div class="menu">
+  <ul class="menu-list">
+    <li *ngFor="let o of nav.visibleOptions()">
+      <button class="menu-item" (click)="nav.go(o.id)">
+        <span class="mi-icon" [innerHTML]="icon(o.icon)"></span>
+        <span class="mi-main">
+          <span class="mi-title">
+            {{ o.label }}
+            <span class="count" *ngIf="o.id === 'verlauf' && history.entries().length">{{ history.entries().length }}</span>
+            <span class="dot" *ngIf="o.id === 'einstellungen' && auth.state().needsReload" title="Änderung übernehmen"></span>
+          </span>
+          <span class="mi-desc">{{ o.description }}</span>
+        </span>
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+      </button>
+    </li>
+  </ul>
+</div>

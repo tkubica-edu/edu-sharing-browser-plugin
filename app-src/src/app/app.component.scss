@@ -16,55 +16,43 @@
 }
 .logo { width: 22px; height: 22px; border-radius: 4px; background: #fff; }
 .title { font-weight: 600; font-size: 14px; flex: 1; }
+
 .close {
-  background: rgba(255,255,255,0.15);
+  background: rgba(255, 255, 255, 0.15);
   border: none;
   color: #fff;
   width: 26px; height: 26px;
   border-radius: 6px;
   font-size: 13px;
   line-height: 1;
+  flex: 0 0 auto;
 }
-.close:hover { background: rgba(255,255,255,0.3); }
+.close:hover { background: rgba(255, 255, 255, 0.3); }
 
-.tabs {
+// Workflow-step header (below the status bar): back-to-menu button + current step title.
+.step-header {
   display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
   background: var(--es-surface);
   border-bottom: 1px solid var(--es-border);
   flex: 0 0 auto;
 }
-.tab {
-  flex: 1;
-  min-width: 0;
+.back-btn {
   background: none;
   border: none;
-  padding: 11px 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--es-muted);
-  border-bottom: 2px solid transparent;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--es-text);
+  width: 30px; height: 30px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
 }
-.tab.active { color: var(--es-blue); border-bottom-color: var(--es-blue); }
-.count {
-  display: inline-block;
-  margin-left: 5px;
-  background: var(--es-blue);
-  color: #fff;
-  font-size: 10px;
-  border-radius: 999px;
-  padding: 1px 6px;
-}
-.dot {
-  display: inline-block;
-  margin-left: 5px;
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: #e0a800;
-  vertical-align: middle;
-}
+.back-btn svg { width: 18px; height: 18px; }
+.back-btn:hover { background: #eef1f4; }
+.step-title { font-size: 16px; font-weight: 600; margin: 0; color: var(--es-text); }
 
 .content {
   flex: 1 1 auto;

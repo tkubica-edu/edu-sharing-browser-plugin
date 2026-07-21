@@ -1,0 +1,195 @@
+// Shared UI primitives, defined ONCE. Two consumption paths:
+//   1. Generic primitives are emitted as global `.es-*` classes in styles.scss and used
+//      directly in component templates (works despite emulated encapsulation because
+//      global class *rules* still apply to component DOM).
+//   2. Chrome-specific patterns (menu-item, status-chip, action bar) are `@include`d in
+//      the owning component's scoped .scss, keeping their DOM-specific layout local while
+//      the look lives here.
+//
+// Namespacing everything under `es-*` also sidesteps the edu-sharing web-component
+// bundle, which injects a GLOBAL `.card { background: …!important }` — our `.es-card`
+// never matches it, so no `!important` hack is needed anymore.
+
+// ---- Cards -----------------------------------------------------------------
+@mixin card {
+  background: var(--es-surface);
+  border: 1px solid var(--es-border);
+  border-radius: var(--es-radius);
+  padding: var(--es-space-4);
+  margin-bottom: 12px;
+}
+
+@mixin hint-card {
+  @include card;
+  background: var(--es-hint-bg);
+}
+
+@mixin card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--es-space-2);
+}
+
+// ---- Form controls ---------------------------------------------------------
+@mixin input {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--es-border);
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: var(--es-space-2);
+  background: #fff;
+  color: var(--es-text);
+
+  &:focus { outline: none; border-color: var(--es-blue); box-shadow: 0 0 0 2px rgba(0, 59, 124, 0.12); }
+  &.invalid { border-color: var(--es-danger); }
+  &:last-child { margin-bottom: 0; }
+}
+
+@mixin field-label { display: block; font-weight: 600; margin-bottom: 6px; }
+
+// ---- Buttons ---------------------------------------------------------------
+@mixin btn {
+  border: none;
+  border-radius: 6px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 600;
+
+  &[disabled] { opacity: 0.55; cursor: not-allowed; }
+}
+@mixin btn-primary {
+  background: var(--es-blue);
+  color: #fff;
+  &:hover:not([disabled]) { background: var(--es-blue-600); }
+}
+@mixin btn-tonal { background: #e6edf6; color: var(--es-blue); }
+@mixin btn-text {
+  background: none;
+  border: none;
+  color: var(--es-blue);
+  font-size: 13px;
+  padding: 4px;
+}
+@mixin btn-small { padding: 6px 10px; font-size: 12px; }
+@mixin btn-large { width: 100%; padding: 12px; font-size: 14px; margin-bottom: 12px; }
+
+// ---- Small inline elements -------------------------------------------------
+@mixin badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+@mixin badge-guest { background: #eef1f4; color: var(--es-muted); }
+@mixin badge-user { background: #e2f0e8; color: var(--es-success); }
+
+@mixin chip {
+  font-size: 11px;
+  background: #fff;
+  border: 1px solid var(--es-border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  color: var(--es-muted);
+}
+
+@mixin notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--es-space-2);
+  margin-top: var(--es-space-2);
+  padding: var(--es-space-2) var(--es-space-3);
+  background: #fff7e6;
+  border: 1px solid #f0d492;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #7a5b00;
+}
+
+@mixin muted { color: var(--es-muted); font-size: 12px; font-weight: 400; }
+@mixin error { color: var(--es-danger); font-size: 13px; margin: 6px 0; }
+@mixin hint { color: var(--es-danger); font-size: 12px; margin: 2px 0 0; }
+
+// ---- Lists / menu ----------------------------------------------------------
+@mixin list-reset { list-style: none; margin: 0; padding: 0; }
+
+@mixin list-item {
+  background: var(--es-surface);
+  border: 1px solid var(--es-border);
+  border-radius: var(--es-radius);
+  margin-bottom: var(--es-space-2);
+  overflow: hidden;
+}
+
+// A full-width clickable menu row: leading icon, title + description block, trailing
+// chevron. Basis for the "Aktionen & Optionen" list.
+@mixin menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  background: var(--es-surface);
+  border: none;
+  text-align: left;
+  color: var(--es-text);
+
+  &:hover:not([disabled]) { background: #f0f4f9; }
+  &[disabled] { opacity: 0.5; cursor: not-allowed; }
+}
+
+// ---- Status chip (persistent condition indicators) -------------------------
+@mixin status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: #eef1f4;
+  color: var(--es-muted);
+  border: 1px solid transparent;
+
+  &.is-on { background: #e2ecf8; color: var(--es-blue); border-color: #c5daf3; }
+}
+
+// ---- Action bar (persistent footer) ----------------------------------------
+@mixin action-bar {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--es-space-3);
+  padding: var(--es-space-3) var(--es-space-4);
+  background: var(--es-surface);
+  border-top: 1px solid var(--es-border);
+  box-shadow: 0 -2px 8px rgba(15, 23, 32, 0.06);
+}
+
+@mixin fbtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+
+  .ico { width: 15px; height: 15px; flex: 0 0 auto; }
+  &[disabled] { opacity: 0.45; cursor: not-allowed; }
+}
+@mixin fbtn-primary {
+  background: var(--es-blue);
+  color: #fff;
+  border-color: var(--es-blue);
+  &:hover:not([disabled]) { background: var(--es-blue-600); border-color: var(--es-blue-600); }
+}
+@mixin fbtn-ghost {
+  background: var(--es-surface);
+  color: var(--es-blue);
+  border-color: var(--es-border);
+  &:hover:not([disabled]) { border-color: var(--es-blue); }
+}

@@ -1,0 +1,12 @@
+<div class="screen-body">
+  <section class="es-hint-card">
+    <p class="es-muted">
+      Analysiert die aktuelle Webseite und erzeugt daraus Metadaten. Anschließend kannst du
+      sie prüfen, speichern und einer Sammlung zuordnen.
+    </p>
+  </section>
+
+  <section class="es-card" *ngIf="gen.last() as o">
+    <p class="es-error" *ngIf="!o.ok">{{ o.error }}</p>
+  </section>
+</div>

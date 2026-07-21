@@ -1,0 +1,13 @@
+<div class="screen-body">
+  <section class="es-hint-card">
+    <ng-container *ngIf="curation.createdNode() as n; else noNode">
+      <p class="es-muted">Node: <strong>{{ n.name }}</strong></p>
+      <a class="upload-link" [href]="n.link" target="_blank" rel="noopener noreferrer">Node öffnen</a>
+    </ng-container>
+    <ng-template #noNode><p class="es-muted">Noch kein Node vorhanden.</p></ng-template>
+  </section>
+
+  <section class="es-card" *ngIf="curation.previewNode() as node">
+    <es-preview-node [node]="node"></es-preview-node>
+  </section>
+</div>

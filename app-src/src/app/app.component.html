@@ -4,26 +4,29 @@
   <button class="close" title="Schließen" aria-label="Schließen" (click)="close()">✕</button>
 </header>
 
-<nav class="tabs">
-  <button class="tab" [class.active]="tab() === 'analyze'" (click)="tab.set('analyze')">
-    Erschließung
-  </button>
-  <button class="tab" *ngIf="showSearch()" [class.active]="tab() === 'search'" (click)="tab.set('search')">
-    Inhalt suchen
-  </button>
-  <button class="tab" [class.active]="tab() === 'history'" (click)="tab.set('history')">
-    Verlauf
-    <span class="count" *ngIf="history.entries().length">{{ history.entries().length }}</span>
-  </button>
-  <button class="tab" [class.active]="tab() === 'settings'" (click)="tab.set('settings')">
-    Einstellungen
-    <span class="dot" *ngIf="auth.state().needsReload" title="Änderung übernehmen"></span>
-  </button>
-</nav>
+<es-status-bar></es-status-bar>
 
-<main class="content" [ngSwitch]="tab()">
-  <es-analyze *ngSwitchCase="'analyze'" [onEduSharing]="onEduSharing()"></es-analyze>
-  <es-search *ngSwitchCase="'search'" [contextUrl]="activeUrl()"></es-search>
-  <es-history *ngSwitchCase="'history'" (open)="openInWizard($event)"></es-history>
-  <es-settings *ngSwitchCase="'settings'"></es-settings>
+<!-- Workflow-step header: current step title + back to the options menu. Hidden on the
+     menu itself (there is no step to name and nowhere further back to go). -->
+<div class="step-header" *ngIf="nav.showBack()">
+  <button class="back-btn" (click)="nav.openMenu()"
+          title="Zurück zu Aktionen & Optionen" aria-label="Zurück zu Aktionen & Optionen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+  </button>
+  <h2 class="step-title">{{ nav.title() }}</h2>
+</div>
+
+<main class="content" [ngSwitch]="nav.view()">
+  <es-menu *ngSwitchCase="'menu'"></es-menu>
+  <es-login *ngSwitchCase="'login'"></es-login>
+  <es-erschliessen-screen *ngSwitchCase="'erschliessen'"></es-erschliessen-screen>
+  <es-metadaten-screen *ngSwitchCase="'metadaten'"></es-metadaten-screen>
+  <es-vorschau-screen *ngSwitchCase="'vorschau'"></es-vorschau-screen>
+  <es-einsortieren-screen *ngSwitchCase="'einsortieren'"></es-einsortieren-screen>
+  <es-search *ngSwitchCase="'suchen'" [contextUrl]="ui.activeUrl()"></es-search>
+  <es-history *ngSwitchCase="'verlauf'" (open)="openInWizard($event)"></es-history>
+  <es-settings *ngSwitchCase="'einstellungen'"></es-settings>
 </main>
+
+<es-action-bar></es-action-bar>

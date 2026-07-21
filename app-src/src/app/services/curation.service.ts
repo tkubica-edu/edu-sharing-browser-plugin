@@ -12,13 +12,13 @@ export interface AssignedCollection {
   name: string;
 }
 
-export type WizardStep = 1 | 2 | 3 | 4;
-
 export interface CreatedNode extends UploadedNode {
   link: string;
 }
 
-// State + actions for the multi-step curation flow.
+// Node state + actions for the curation options (Erschließen / Metadaten / Vorschau /
+// Einsortieren). Navigation between options lives in NavigationService/FlowService — this
+// service only owns the node and its side-effecting operations.
 @Injectable({ providedIn: 'root' })
 export class CurationService {
   private readonly auth = inject(AuthService);
@@ -27,14 +27,10 @@ export class CurationService {
   private readonly history = inject(HistoryService);
   private readonly assign = inject(AssignService);
 
-  readonly step = signal<WizardStep>(1);
   readonly createdNode = signal<CreatedNode | null>(null);
   readonly nodeMetadata = signal<Record<string, string[]> | null>(null);
-  // The full hydrated node, fed to the preview web component (step 3).
+  // The full hydrated node, fed to the preview web component.
   readonly previewNode = signal<Node | null>(null);
-  // True once the user has advanced PAST Vorschau to Zuordnen → marks step 3 done.
-  // (Merely visiting Vorschau does not count.)
-  readonly previewConfirmed = signal(false);
   readonly saving = signal(false);
   readonly saveError = signal<string | null>(null);
 
@@ -45,12 +41,12 @@ export class CurationService {
 
   readonly running = this.gen.running;
 
-  // Step 2 available once there is a /generate result or a created node.
+  // A /generate result or a created node exists.
   readonly hasResult = computed(() => this.gen.last()?.ok === true || this.createdNode() !== null);
-  // Steps 3 & 4 available once a node was created.
+  // A node has been created/loaded.
   readonly hasNode = computed(() => this.createdNode() !== null);
 
-  // A long-running action is in flight — freeze sub-tab navigation while it runs.
+  // A long-running action is in flight.
   readonly busy = computed(() => this.running() || this.saving() || this.assigning());
 
   // There is a generated result that has not yet been saved to a node — loading
@@ -66,47 +62,35 @@ export class CurationService {
     return payload;
   });
 
-  goTo(step: WizardStep): void {
-    if (this.busy()) return; // no jumping between steps while an action runs
-    if (step === 2 && !this.hasResult()) return;
-    if ((step === 3 || step === 4) && !this.hasNode()) return;
-    // Vorschau (step 3) is "done" only once the user moves forward from it to Zuordnen.
-    if (this.step() === 3 && step === 4) this.previewConfirmed.set(true);
-    this.step.set(step);
-  }
-
-  // Clear the whole flow and return to step 1 for a fresh Erschließung.
+  // Clear the whole flow for a fresh Erschließung.
   startNew(): void {
     this.gen.last.set(null);
     this.resetNodeState();
-    this.step.set(1);
   }
 
-  // Load a saved node (from Verlauf) by its node id: retrieve the live node, open its
-  // Vorschau (step 3), and leave Metadaten (step 2) editable. Throws if the node can't
-  // be fetched — the caller surfaces the error (state stays untouched on failure).
+  // Load a saved node (from Verlauf) by its node id: retrieve the live node and seed the
+  // active-node state (Vorschau + editable Metadaten). Navigation is driven by the caller.
+  // Throws if the node can't be fetched — the caller surfaces the error (state untouched).
   async loadFromHistory(entry: HistoryEntry): Promise<void> {
     const full = await this.upload.getNode(entry.nodeId);
     this.applyLoadedNode(entry.nodeId, full, full.name ?? entry.title);
-    // Keep the stored parsed result so step 2's raw/field views and the source line show.
+    // Keep the stored parsed result so the Metadaten raw/field views and source line show.
     this.gen.last.set({
       ok: true,
       parsed: entry.parsed,
       source: { url: entry.url, title: entry.title, favIconUrl: entry.favIconUrl }
     });
-    this.step.set(3);
   }
 
-  // Load a live node by its id into the wizard — same behaviour as loadFromHistory, but for
-  // an externally-received node (e.g. a PREVIEW_NODE event from the OnlyOffice plugin) where
-  // there is no stored /generate result. Opens Vorschau (step 3) with editable Metadaten.
+  // Load a live node by its id — same behaviour as loadFromHistory, but for an externally-
+  // received node (e.g. a PREVIEW_NODE event from the OnlyOffice plugin) where there is no
+  // stored /generate result. Seeds the active-node state with editable Metadaten.
   // Throws if the node can't be fetched (caller surfaces the error; state stays untouched).
   async loadFromNode(nodeId: string): Promise<void> {
     const full = await this.upload.getNode(nodeId);
     this.applyLoadedNode(nodeId, full, full.name ?? nodeId);
-    // No /generate result for an externally-received node; step-2 raw/field views hide.
+    // No /generate result for an externally-received node; the raw/field views hide.
     this.gen.last.set(null);
-    this.step.set(3);
   }
 
   // Shared core of loadFromHistory/loadFromNode: reset state and seed the created node,
@@ -123,27 +107,25 @@ export class CurationService {
     this.createdNode.set(null);
     this.nodeMetadata.set(null);
     this.previewNode.set(null);
-    this.previewConfirmed.set(false);
     this.saveError.set(null);
     this.assignError.set(null);
     this.assignedCollections.set([]);
   }
 
-  // Step 1 "Erschließen": drop any previous node, run /generate, advance to step 2.
-  // Nothing is written to the Verlauf here — an entry is recorded only once a node is
-  // actually saved (see save()), so the Verlauf holds saved nodes only.
-  async run(): Promise<void> {
-    if (!this.auth.state().loggedIn) return;
+  // "Inhalt erschließen": drop any previous node and run /generate. Returns true on success
+  // so the footer can advance to the Metadaten screen. Nothing is written to the Verlauf
+  // here — an entry is recorded only once a node is actually saved (see save()).
+  async run(): Promise<boolean> {
+    if (!this.auth.state().loggedIn) return false;
     this.resetNodeState();
     const o = await this.gen.run('de');
-    if (o.ok && o.parsed && o.source) {
-      this.step.set(2);
-    }
+    return o.ok && !!o.parsed && !!o.source;
   }
 
-  // Step 2 "Save": create the node the first time, otherwise update it in place.
-  async save(values: Record<string, string[]>): Promise<void> {
-    if (!this.auth.state().loggedIn) return;
+  // "Metadaten" save: create the node the first time, otherwise update it in place.
+  // Returns true on success so the Metadaten screen can advance to Vorschau.
+  async save(values: Record<string, string[]>): Promise<boolean> {
+    if (!this.auth.state().loggedIn) return false;
     this.saving.set(true);
     this.saveError.set(null);
     try {
@@ -176,12 +158,12 @@ export class CurationService {
           parsed
         });
       }
-      // The footer's step-2 primary action is "Speichern"; every successful save
-      // (first create AND later updates) advances to Vorschau (step 3), matching the
-      // forward flow of the other steps' actions.
-      this.step.set(3);
+      // Navigation after a successful save (→ Vorschau) is driven by the Metadaten screen,
+      // not here, so save() stays purely about persisting the node.
+      return true;
     } catch (e: unknown) {
       this.saveError.set(String((e as Error)?.message || e));
+      return false;
     } finally {
       this.saving.set(false);
     }

@@ -1,0 +1,25 @@
+@use 'mixins' as m;
+
+.status-bar {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 8px var(--es-space-4);
+  background: var(--es-bg);
+  border-bottom: 1px solid var(--es-border);
+  overflow-x: auto;
+}
+
+.status-chip {
+  @include m.status-chip;
+
+  .d {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.55;
+    flex: 0 0 auto;
+  }
+}

@@ -19,6 +19,7 @@
             "tsConfig": "tsconfig.app.json",
             "assets": [],
             "styles": ["src/styles.scss"],
+            "stylePreprocessorOptions": { "includePaths": ["src/styles"] },
             "scripts": [],
             "baseHref": "./",
             "outputHashing": "none",

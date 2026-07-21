@@ -1,0 +1,24 @@
+<div class="status-bar">
+  <!-- Login: always shown so the primary condition is never ambiguous. -->
+  <span class="status-chip" [class.is-on]="ui.loggedIn()"
+        [title]="ui.loggedIn() ? ('Angemeldet als ' + (auth.state().username || '')) : 'Nicht angemeldet'">
+    <span class="d"></span>{{ ui.loggedIn() ? ('Angemeldet: ' + (auth.state().username || '–')) : 'Abgemeldet' }}
+  </span>
+
+  <span class="status-chip is-on" *ngIf="ui.onlyOfficePresent()" title="OnlyOffice erkannt">
+    <span class="d"></span>OnlyOffice
+  </span>
+
+  <span class="status-chip is-on" *ngIf="ui.onEduSharing()" title="Edu-Sharing-Seite erkannt">
+    <span class="d"></span>Edu-Sharing-Seite
+  </span>
+
+  <span class="status-chip is-on" *ngIf="ui.hasActiveNode()"
+        [title]="'Aktiver Inhalt: ' + (curation.createdNode()?.name || '')">
+    <span class="d"></span>Aktiver Inhalt: {{ curation.createdNode()?.name }}
+  </span>
+
+  <span class="status-chip is-on" *ngIf="ui.editMode()" title="Metadaten werden bearbeitet">
+    <span class="d"></span>Bearbeitung
+  </span>
+</div>

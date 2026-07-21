@@ -1,0 +1,17 @@
+<div class="screen-body">
+  <section class="es-hint-card">
+    <p class="es-muted">Sammlung auswählen und den Inhalt per „In Sammlung einfügen" hinzufügen.</p>
+    <div class="result-sub" *ngIf="curation.assignedCollections().length">
+      <span class="es-chip" *ngFor="let c of curation.assignedCollections()">✓ {{ c.name }}</span>
+    </div>
+  </section>
+
+  <section class="es-card" *ngIf="curation.assigning() || curation.assignError()">
+    <p class="es-muted" *ngIf="curation.assigning()">Wird hinzugefügt…</p>
+    <p class="es-error" *ngIf="curation.assignError()">Hinzufügen fehlgeschlagen: {{ curation.assignError() }}</p>
+  </section>
+
+  <section class="es-card" *ngIf="curation.createdNode()">
+    <es-collection-selector (choose)="onAssign($event)"></es-collection-selector>
+  </section>
+</div>

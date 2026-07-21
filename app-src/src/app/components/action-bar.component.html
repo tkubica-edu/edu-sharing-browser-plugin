@@ -1,0 +1,10 @@
+<footer class="action-bar" *ngIf="flow.nextActions().length">
+  <button *ngFor="let a of flow.nextActions()"
+          class="fbtn"
+          [class.fbtn-primary]="a.kind === 'primary'"
+          [class.fbtn-ghost]="a.kind === 'option'"
+          [disabled]="a.disabled"
+          (click)="a.run()">
+    <span>{{ a.label }}</span>
+  </button>
+</footer>

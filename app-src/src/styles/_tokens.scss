@@ -1,0 +1,25 @@
+// Global design tokens. Emitted once (via `@use 'tokens'` in styles.scss) as CSS custom
+// properties so they stay runtime-overridable and inheritable into every component
+// (including the emulated-encapsulation shadow-less component DOM).
+:root {
+  // Brand / surface colours
+  --es-blue: #003b7c;
+  --es-blue-600: #0a4f9e;
+  --es-bg: #f5f7fa;
+  --es-surface: #ffffff;
+  --es-border: #dfe3e8;
+  --es-text: #1c2733;
+  --es-muted: #63707e;
+  --es-danger: #c0392b;
+  --es-success: #1e8e5a;
+
+  // Tinted hint-card background (used across intro/description cards)
+  --es-hint-bg: #f0f4f9;
+
+  // Radius + spacing scale (mirrors the paddings the components used before the refactor)
+  --es-radius: 8px;
+  --es-space-1: 4px;
+  --es-space-2: 8px;
+  --es-space-3: 10px;
+  --es-space-4: 14px;
+}

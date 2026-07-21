@@ -1,31 +1,35 @@
-import { Component, HostListener, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, HostListener, OnInit, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { AuthService } from './services/auth.service';
 import { HistoryEntry, HistoryService } from './services/history.service';
 import { CurationService } from './services/curation.service';
 import { ExtService } from './services/ext.service';
+import { UiStateService } from './services/ui-state.service';
+import { NavigationService } from './services/navigation.service';
 import { APP_CONFIG } from './config';
-import { AnalyzeComponent } from './components/analyze.component';
+
+import { StatusBarComponent } from './components/status-bar.component';
+import { ActionBarComponent } from './components/action-bar.component';
+import { MenuComponent } from './components/menu.component';
+import { LoginComponent } from './components/login.component';
 import { HistoryComponent } from './components/history.component';
 import { SettingsComponent } from './components/settings.component';
 import { SearchComponent } from './components/search.component';
-
-type Tab = 'analyze' | 'search' | 'history' | 'settings';
-
-// URL pattern that reveals the "Inhalt suchen" tab (e.g. OnlyOffice editor).
-const SEARCH_URL_PATTERN = /\/src\/tools\/onlyoffice/;
-
-/** Host of a URL, lower-cased; '' when it cannot be parsed. */
-function hostOf(url: string | null | undefined): string {
-  if (!url) return '';
-  try { return new URL(url).host.toLowerCase(); } catch { return ''; }
-}
+import { ErschliessenScreenComponent } from './components/screens/erschliessen-screen.component';
+import { MetadatenScreenComponent } from './components/screens/metadaten-screen.component';
+import { VorschauScreenComponent } from './components/screens/vorschau-screen.component';
+import { EinsortierenScreenComponent } from './components/screens/einsortieren-screen.component';
 
 @Component({
   selector: 'es-root',
   standalone: true,
-  imports: [CommonModule, AnalyzeComponent, HistoryComponent, SettingsComponent, SearchComponent],
+  imports: [
+    CommonModule,
+    StatusBarComponent, ActionBarComponent, MenuComponent,
+    LoginComponent, HistoryComponent, SettingsComponent, SearchComponent,
+    ErschliessenScreenComponent, MetadatenScreenComponent, VorschauScreenComponent, EinsortierenScreenComponent
+  ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
@@ -34,13 +38,11 @@ export class AppComponent implements OnInit {
   private readonly ext = inject(ExtService);
   readonly history = inject(HistoryService);
   private readonly wiz = inject(CurationService);
-
-  readonly tab = signal<Tab>('analyze');
-  readonly activeUrl = signal<string | null>(null);
-  readonly showSearch = computed(() => SEARCH_URL_PATTERN.test(this.activeUrl() ?? ''));
+  readonly ui = inject(UiStateService);
+  readonly nav = inject(NavigationService);
 
   // A node id received from the OnlyOffice plugin (PREVIEW_NODE) while logged out — loaded
-  // into the wizard once the user logs in.
+  // once the user logs in.
   private readonly pendingPreviewId = signal<string | null>(null);
   // Dedupe: the same delivery can arrive via both the storage replay and a live relay.
   private lastPreviewId: string | null = null;
@@ -57,25 +59,17 @@ export class AppComponent implements OnInit {
     });
   }
 
-  // True when the active tab already lives on the configured repository host — there
-  // "Erschließen" makes no sense (the page is Edu-Sharing itself). The Erschließung
-  // tab stays visible but shows a context note instead of the wizard, so the panel is
-  // never left without a primary tab.
-  readonly onEduSharing = computed(() => {
-    const repoHost = hostOf(this.auth.state().repositoryUrl);
-    return !!repoHost && hostOf(this.activeUrl()) === repoHost;
-  });
-
   async ngOnInit(): Promise<void> {
     await this.auth.init();
     await this.history.load();
     try {
       const tab = await this.ext.getActiveTab();
-      this.activeUrl.set(tab?.url ?? null);
+      this.ui.activeUrl.set(tab?.url ?? null);
     } catch { /* ignore */ }
-    // Land on the tab that actually applies to the current page: on an OnlyOffice
-    // editor the user came to insert content, so open "Inhalt suchen" directly.
-    if (this.showSearch()) this.tab.set('search');
+
+    // Land on the view that fits the current page (search on an OnlyOffice editor, the
+    // login gate when logged out, otherwise the options menu).
+    this.nav.land();
 
     // Tell the host page we're ready so it can replay a buffered PREVIEW_NODE, and consume
     // any preview that was persisted while the sidebar was closed/booting.
@@ -108,8 +102,8 @@ export class AppComponent implements OnInit {
     } catch { /* ignore */ }
   }
 
-  // Route a received preview node into the Erschließung wizard, exactly like a Verlauf
-  // selection. Dedupes rapid duplicate deliveries (storage replay + live relay).
+  // Route a received preview node into the curation flow (opens at Vorschau). Dedupes rapid
+  // duplicate deliveries (storage replay + live relay).
   private async receivePreview(data: { id?: string } | null | undefined): Promise<void> {
     const id = data?.id;
     if (!id) return;
@@ -125,17 +119,17 @@ export class AppComponent implements OnInit {
     if (!this.auth.state().loggedIn) {
       // Not logged in yet → show the login gate; the effect loads it after login.
       this.pendingPreviewId.set(id);
-      this.tab.set('analyze');
+      this.nav.land(); // → login
       return;
     }
     await this.loadPreviewNode(id);
   }
 
-  // Hydrate + open the node in the wizard (Vorschau, editable), then switch to the tab.
+  // Hydrate + open the node in the curation flow (Vorschau), then land there.
   private async loadPreviewNode(id: string): Promise<void> {
     try {
       await this.wiz.loadFromNode(id);
-      this.tab.set('analyze');
+      this.nav.land({ nodeJustLoaded: true });
     } catch (e: unknown) {
       alert('Der Node konnte nicht geladen werden: ' + String((e as Error)?.message || e));
     }
@@ -145,8 +139,8 @@ export class AppComponent implements OnInit {
     this.ext.closePanel();
   }
 
-  // Load a saved node (from Verlauf) into the Erschließung wizard at Vorschau. If there
-  // is unsaved work (a generated result never saved to a node), confirm before discarding.
+  // Load a saved node (from Verlauf) into the curation flow at Vorschau. If there is
+  // unsaved work (a generated result never saved to a node), confirm before discarding.
   async openInWizard(entry: HistoryEntry): Promise<void> {
     if (this.wiz.hasUnsavedWork() &&
         !confirm('Es gibt eine noch nicht gespeicherte Erschließung. Trotzdem laden und die aktuelle verwerfen?')) {
@@ -154,7 +148,7 @@ export class AppComponent implements OnInit {
     }
     try {
       await this.wiz.loadFromHistory(entry);
-      this.tab.set('analyze');
+      this.nav.land({ nodeJustLoaded: true });
     } catch (e: unknown) {
       alert('Der Node konnte nicht geladen werden: ' + String((e as Error)?.message || e));
     }
