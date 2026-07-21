@@ -1,35 +1,117 @@
-:host { display: block; padding: 14px; }
+/* Fill the panel so the sub-tabs pin to the top, the body scrolls, and the footer
+   floats at the bottom. */
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
 
-/* Sub-step navigation */
+.info-wrap { padding: 14px; }
+
+/* Login gate / compact status row above the sub-tabs. */
+.wizard-top { flex: 0 0 auto; padding: 14px 14px 0; }
+
+/* Sticky sub-step navigation — stays under the main tabs while the body scrolls. */
 .steps {
+  flex: 0 0 auto;
   display: flex;
   gap: 4px;
-  margin-bottom: 12px;
+  padding: 10px 14px;
+  background: var(--es-bg);
+  border-bottom: 1px solid var(--es-border);
   overflow-x: auto;
 }
 .steps .step {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   white-space: nowrap;
   background: var(--es-surface);
   border: 1px solid var(--es-border);
   border-radius: 6px;
-  padding: 7px 8px;
+  padding: 6px 6px;
   font-size: 12px;
   font-weight: 600;
   color: var(--es-muted);
 }
 .steps .step.active { background: var(--es-blue); border-color: var(--es-blue); color: #fff; }
-.steps .step[disabled] { opacity: 0.45; cursor: not-allowed; }
+.steps .step[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+/* Progress mark: numbered circle → check when done → lock when unavailable. */
+.steps .mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 1;
+  background: var(--es-border);
+  color: var(--es-muted);
+}
+.steps .mark .glyph { font-size: 9px; }
+.steps .step.is-done .mark { background: var(--es-success); color: #fff; }
+.steps .step.active .mark { background: rgba(255, 255, 255, 0.25); color: #fff; }
+.steps .step.active.is-done .mark { background: var(--es-success); color: #fff; }
+
+/* Scrolling step body. */
+.step-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+/* Persistent floating footer with balanced back / next buttons. */
+.wizard-footer {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--es-surface);
+  border-top: 1px solid var(--es-border);
+  box-shadow: 0 -2px 8px rgba(15, 23, 32, 0.06);
+}
+.fbtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.fbtn .ico { width: 15px; height: 15px; flex: 0 0 auto; }
+.fbtn-primary { background: var(--es-blue); color: #fff; border-color: var(--es-blue); }
+.fbtn-primary:hover:not([disabled]) { background: var(--es-blue-600); border-color: var(--es-blue-600); }
+.fbtn-ghost { background: var(--es-surface); color: var(--es-blue); border-color: var(--es-border); }
+.fbtn-ghost:hover:not([disabled]) { border-color: var(--es-blue); }
+.fbtn[disabled] { opacity: 0.45; cursor: not-allowed; }
 
 h2 { font-size: 14px; margin: 0 0 8px; }
 
+// The loaded edu-sharing web-component bundle injects a GLOBAL `.card { background-
+// color: var(--backgroundColor) !important }` into the document, which otherwise
+// overrides our card backgrounds once the MDS editor mounts. We therefore assert our
+// own backgrounds with !important on a more specific selector so they always win.
 .card {
-  background: var(--es-surface);
+  background: var(--es-surface) !important;
   border: 1px solid var(--es-border);
   border-radius: var(--es-radius);
   padding: 14px;
   margin-bottom: 12px;
 }
+
+/* Intro / description hint cards (steps 1–4): same detached card + heading as
+   elsewhere, tinted so all hints read alike. */
+.card.hint-card { background: #f0f4f9 !important; }
 
 .card-head {
   display: flex;
@@ -62,8 +144,6 @@ h2 { font-size: 14px; margin: 0 0 8px; }
 .hint.center { text-align: center; }
 .error { color: var(--es-danger); font-size: 13px; margin: 6px 0; }
 
-.upload { padding: 12px 14px; }
-.upload-ok { color: var(--es-success); margin: 0 0 6px; }
 .upload-link { color: var(--es-blue); font-weight: 600; font-size: 13px; }
 
 .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
@@ -88,10 +168,12 @@ h2 { font-size: 14px; margin: 0 0 8px; }
   font-size: 12px; color: #7a5b00;
 }
 
-.result { padding: 0; overflow: hidden; }
-.result-head { padding: 12px 14px; background: #f0f4f9; border-bottom: 1px solid var(--es-border); }
-.result-title { font-weight: 600; word-break: break-word; }
-.result-sub { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+/* Context note shown when the active tab is Edu-Sharing itself. */
+.info h2 { margin-bottom: 6px; }
+.info .muted { font-size: 13px; line-height: 1.5; }
+
+.src-title { font-weight: 600; word-break: break-word; margin: 8px 0 0; }
+.result-sub { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
 .chip { font-size: 11px; background: #fff; border: 1px solid var(--es-border); border-radius: 999px; padding: 2px 8px; color: var(--es-muted); }
 
 .fields { margin: 8px 0 0; }

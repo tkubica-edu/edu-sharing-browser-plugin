@@ -1,4 +1,9 @@
-<div class="nodes-wrap">
+<!-- Login required to search the repository — reuse the shared gate. -->
+<div class="login-gate" *ngIf="!auth.state().loggedIn">
+  <es-login></es-login>
+</div>
+
+<div class="nodes-wrap" *ngIf="auth.state().loggedIn">
   @if (error()) {
     <p class="error">Suche konnte nicht geladen werden: {{ error() }}</p>
   }

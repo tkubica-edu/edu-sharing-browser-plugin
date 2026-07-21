@@ -9,7 +9,7 @@
     Erschließung
   </button>
   <button class="tab" *ngIf="showSearch()" [class.active]="tab() === 'search'" (click)="tab.set('search')">
-    Suche nach Inhalten
+    Inhalt suchen
   </button>
   <button class="tab" [class.active]="tab() === 'history'" (click)="tab.set('history')">
     Verlauf
@@ -22,8 +22,8 @@
 </nav>
 
 <main class="content" [ngSwitch]="tab()">
-  <es-analyze *ngSwitchCase="'analyze'"></es-analyze>
+  <es-analyze *ngSwitchCase="'analyze'" [onEduSharing]="onEduSharing()"></es-analyze>
   <es-search *ngSwitchCase="'search'" [contextUrl]="activeUrl()"></es-search>
-  <es-history *ngSwitchCase="'history'"></es-history>
+  <es-history *ngSwitchCase="'history'" (open)="openInWizard($event)"></es-history>
   <es-settings *ngSwitchCase="'settings'"></es-settings>
 </main>

@@ -4,7 +4,7 @@ import { Node } from 'ngx-edu-sharing-api';
 import { AssignService } from './assign.service';
 import { AuthService } from './auth.service';
 import { GenerateService } from './generate.service';
-import { HistoryService } from './history.service';
+import { HistoryEntry, HistoryService } from './history.service';
 import { UploadService, UploadedNode } from './upload.service';
 
 export interface AssignedCollection {
@@ -32,6 +32,9 @@ export class CurationService {
   readonly nodeMetadata = signal<Record<string, string[]> | null>(null);
   // The full hydrated node, fed to the preview web component (step 3).
   readonly previewNode = signal<Node | null>(null);
+  // True once the user has advanced PAST Vorschau to Zuordnen → marks step 3 done.
+  // (Merely visiting Vorschau does not count.)
+  readonly previewConfirmed = signal(false);
   readonly saving = signal(false);
   readonly saveError = signal<string | null>(null);
 
@@ -47,6 +50,13 @@ export class CurationService {
   // Steps 3 & 4 available once a node was created.
   readonly hasNode = computed(() => this.createdNode() !== null);
 
+  // A long-running action is in flight — freeze sub-tab navigation while it runs.
+  readonly busy = computed(() => this.running() || this.saving() || this.assigning());
+
+  // There is a generated result that has not yet been saved to a node — loading
+  // another entry would discard it, so the caller confirms first.
+  readonly hasUnsavedWork = computed(() => this.gen.last()?.ok === true && this.createdNode() === null);
+
   // Metadata fed to the editor: the created node's metadata if present, else the
   // /generate payload. Falls back to the payload while the node metadata loads, so
   // the editor never briefly unmounts.
@@ -57,30 +67,62 @@ export class CurationService {
   });
 
   goTo(step: WizardStep): void {
+    if (this.busy()) return; // no jumping between steps while an action runs
     if (step === 2 && !this.hasResult()) return;
     if ((step === 3 || step === 4) && !this.hasNode()) return;
+    // Vorschau (step 3) is "done" only once the user moves forward from it to Zuordnen.
+    if (this.step() === 3 && step === 4) this.previewConfirmed.set(true);
     this.step.set(step);
   }
 
-  // Step 1 "Erschließen": drop any previous node, run /generate, advance to step 2.
-  async run(): Promise<void> {
-    if (!this.auth.state().loggedIn) return;
+  // Clear the whole flow and return to step 1 for a fresh Erschließung.
+  startNew(): void {
+    this.gen.last.set(null);
+    this.resetNodeState();
+    this.step.set(1);
+  }
+
+  // Load a saved node (from Verlauf) by its node id: retrieve the live node, open its
+  // Vorschau (step 3), and leave Metadaten (step 2) editable. Throws if the node can't
+  // be fetched — the caller surfaces the error (state stays untouched on failure).
+  async loadFromHistory(entry: HistoryEntry): Promise<void> {
+    const full = await this.upload.getNode(entry.nodeId);
+    this.resetNodeState();
+    const base = this.auth.state().repositoryUrl.replace(/\/+$/, '');
+    this.createdNode.set({
+      nodeId: entry.nodeId,
+      name: full.name ?? entry.title,
+      link: `${base}/components/render/${entry.nodeId}`
+    });
+    this.previewNode.set(full);
+    this.nodeMetadata.set((full.properties ?? {}) as Record<string, string[]>);
+    // Keep the stored parsed result so step 2's raw/field views and the source line show.
+    this.gen.last.set({
+      ok: true,
+      parsed: entry.parsed,
+      source: { url: entry.url, title: entry.title, favIconUrl: entry.favIconUrl }
+    });
+    this.step.set(3);
+  }
+
+  private resetNodeState(): void {
     this.createdNode.set(null);
     this.nodeMetadata.set(null);
     this.previewNode.set(null);
+    this.previewConfirmed.set(false);
     this.saveError.set(null);
     this.assignError.set(null);
     this.assignedCollections.set([]);
+  }
+
+  // Step 1 "Erschließen": drop any previous node, run /generate, advance to step 2.
+  // Nothing is written to the Verlauf here — an entry is recorded only once a node is
+  // actually saved (see save()), so the Verlauf holds saved nodes only.
+  async run(): Promise<void> {
+    if (!this.auth.state().loggedIn) return;
+    this.resetNodeState();
     const o = await this.gen.run('de');
     if (o.ok && o.parsed && o.source) {
-      await this.history.add({
-        url: o.source.url,
-        title: o.source.title,
-        favIconUrl: o.source.favIconUrl,
-        fieldsExtracted: o.parsed.fieldsExtracted,
-        fieldsTotal: o.parsed.fieldsTotal,
-        parsed: o.parsed
-      });
       this.step.set(2);
     }
   }
@@ -106,7 +148,24 @@ export class CurationService {
       } catch {
         /* keep editor/preview as-is if the reload fails */
       }
-      if (!existing) this.step.set(3); // first create → Preview shows the link
+      // Record the saved node in the Verlauf (only saved nodes are kept there).
+      const src = this.gen.last()?.source;
+      const parsed = this.gen.last()?.parsed;
+      if (parsed) {
+        await this.history.add({
+          nodeId: node.nodeId,
+          url: src?.url ?? '',
+          title: src?.title ?? node.name,
+          favIconUrl: src?.favIconUrl,
+          fieldsExtracted: parsed.fieldsExtracted,
+          fieldsTotal: parsed.fieldsTotal,
+          parsed
+        });
+      }
+      // The footer's step-2 primary action is "Speichern"; every successful save
+      // (first create AND later updates) advances to Vorschau (step 3), matching the
+      // forward flow of the other steps' actions.
+      this.step.set(3);
     } catch (e: unknown) {
       this.saveError.set(String((e as Error)?.message || e));
     } finally {

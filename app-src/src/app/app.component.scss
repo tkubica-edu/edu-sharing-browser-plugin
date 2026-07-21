@@ -35,13 +35,17 @@
 }
 .tab {
   flex: 1;
+  min-width: 0;
   background: none;
   border: none;
-  padding: 11px 8px;
+  padding: 11px 6px;
   font-size: 13px;
   font-weight: 600;
   color: var(--es-muted);
   border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .tab.active { color: var(--es-blue); border-bottom-color: var(--es-blue); }
 .count {
@@ -64,5 +68,6 @@
 
 .content {
   flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
 }

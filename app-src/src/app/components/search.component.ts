@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import { AuthService } from '../services/auth.service';
 import { ExtService } from '../services/ext.service';
 import { EduBundleService } from '../services/edu-bundle.service';
+import { LoginComponent } from './login.component';
 import { toApiRootUrl } from '../config';
 
 // Embeds <edu-sharing-nodes-selector> as a REAL custom element (no iframe), opening on
@@ -17,13 +18,13 @@ import { toApiRootUrl } from '../config';
 @Component({
   selector: 'es-search',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LoginComponent],
   templateUrl: './search.component.html',
   styleUrl: './search.component.scss',
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class SearchComponent {
-  private readonly auth = inject(AuthService);
+  readonly auth = inject(AuthService);
   private readonly ext = inject(ExtService);
   private readonly bundle = inject(EduBundleService);
 

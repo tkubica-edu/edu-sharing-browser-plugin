@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HistoryService, HistoryEntry } from '../services/history.service';
 
@@ -12,6 +12,9 @@ import { HistoryService, HistoryEntry } from '../services/history.service';
 export class HistoryComponent {
   readonly history = inject(HistoryService);
   readonly expanded = signal<string | null>(null);
+
+  // Request to load a past entry into the Erschließung wizard (handled by the shell).
+  @Output() open = new EventEmitter<HistoryEntry>();
 
   toggle(e: HistoryEntry): void {
     this.expanded.set(this.expanded() === e.id ? null : e.id);

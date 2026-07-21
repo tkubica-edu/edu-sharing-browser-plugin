@@ -1,9 +1,9 @@
 <div class="head">
-  <p class="subtitle">Bereits erschlossene Seiten</p>
+  <p class="subtitle">Gespeicherte Inhalte</p>
   <button class="btn-text" (click)="clear()" *ngIf="history.entries().length">Leeren</button>
 </div>
 
-<p class="empty" *ngIf="!history.entries().length">Noch keine Erschließungen.</p>
+<p class="empty" *ngIf="!history.entries().length">Noch keine gespeicherten Inhalte.</p>
 
 <ul class="list">
   <li class="item" *ngFor="let e of history.entries()">
@@ -16,7 +16,10 @@
       <span class="chip">{{ e.fieldsExtracted ?? '–' }}/{{ e.fieldsTotal ?? '–' }}</span>
     </button>
     <div class="item-body" *ngIf="expanded() === e.id">
-      <div class="meta-line">{{ e.timestamp | date:'dd.MM.yyyy HH:mm' }}</div>
+      <div class="body-head">
+        <span class="meta-line">{{ e.timestamp | date:'dd.MM.yyyy HH:mm' }}</span>
+        <button class="btn-load" (click)="open.emit(e)">In Erschließung laden</button>
+      </div>
       <dl class="fields">
         <ng-container *ngFor="let f of e.parsed.fields">
           <dt>{{ f.key }}</dt>

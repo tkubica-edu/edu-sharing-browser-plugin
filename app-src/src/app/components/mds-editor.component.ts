@@ -29,9 +29,9 @@ interface MdsWrapperElement extends HTMLElement {
 // imperatively and set all inputs as properties BEFORE appending it (the same order
 // the old iframe bridge used).
 //
-// In embedded mode the wrapper renders WITHOUT its own Save/Cancel — those belong to
-// the extension, so this component provides them. Angular Elements only proxy
-// inputs/outputs (not methods), so edited metadata is read from the
+// In embedded mode the wrapper renders WITHOUT its own Save/Cancel. Saving is driven
+// by the wizard footer, which calls commit() on this component. Angular Elements only
+// proxy inputs/outputs (not methods), so edited metadata is read from the
 // `currentValuesChange` output (kept in `latestValues`).
 @Component({
   selector: 'es-mds-editor',
@@ -53,13 +53,9 @@ export class MdsEditorComponent implements OnDestroy {
   @Input() repository = HOME_REPOSITORY;
   /** MDS set id; `-default-` resolves to the repository's default set. */
   @Input() setId = DEFAULT;
-  /** Values to reload on reset — the originally fetched (generated) metadata. */
-  @Input() resetMetadata: unknown;
 
-  /** Emits the current edited values when the user clicks Speichern. */
+  /** Emits the current edited values when the wizard footer triggers a save. */
   @Output() save = new EventEmitter<Record<string, string[]>>();
-  /** Emits when the user resets the editor to the fetched metadata. */
-  @Output() reset = new EventEmitter<void>();
 
   @ViewChild('host', { static: true }) private hostRef!: ElementRef<HTMLElement>;
 
@@ -90,7 +86,9 @@ export class MdsEditorComponent implements OnDestroy {
     this.unmount();
   }
 
-  onSave(): void {
+  // Called by the wizard footer's "Speichern" button (Angular Elements don't proxy
+  // methods, so the host reaches in here rather than into the wrapped element).
+  commit(): void {
     const values: Record<string, string[]> = { ...(this.latestValues ?? {}) };
     // Workaround (only this case): the io form has no title/name widget, so a save
     // can come back without a cm:name. When that happens and the generated metadata
@@ -101,15 +99,6 @@ export class MdsEditorComponent implements OnDestroy {
       values['cclom:title'] = title;
     }
     this.save.emit(values);
-  }
-
-  onReset(): void {
-    // Re-mount the editor with the originally fetched (generated) metadata,
-    // discarding both edits and any later node-derived values.
-    this.latestValues = null;
-    this.unmount();
-    this.mount(this.resetMetadata ?? this.metadata);
-    this.reset.emit();
   }
 
   // Create the element, set every input as a property, THEN append (so `embedded` is

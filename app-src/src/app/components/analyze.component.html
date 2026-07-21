@@ -1,137 +1,169 @@
-<!-- Sub-step navigation -->
-<nav class="steps">
-  <button class="step" [class.active]="wiz.step() === 1" (click)="wiz.goTo(1)">
-    1. Erschließen
-  </button>
-  <button class="step" [class.active]="wiz.step() === 2" [disabled]="!wiz.hasResult()" (click)="wiz.goTo(2)">
-    2. Metadaten
-  </button>
-  <button class="step" [class.active]="wiz.step() === 3" [disabled]="!wiz.hasNode()" (click)="wiz.goTo(3)">
-    3. Preview node
-  </button>
-  <button class="step" [class.active]="wiz.step() === 4" [disabled]="!wiz.hasNode()" (click)="wiz.goTo(4)">
-    4. Zuordnen
-  </button>
-</nav>
+<!-- On Edu-Sharing itself: Erschließen doesn't apply. Keep the tab, show a note —
+     unless there is active wizard work (e.g. a Verlauf entry was loaded). -->
+<div class="info-wrap" *ngIf="onEduSharing && !wiz.hasResult(); else wizard">
+  <section class="card info">
+    <h2>Bereits auf Edu-Sharing</h2>
+    <p class="muted">
+      Du befindest dich bereits auf Edu-Sharing – „Erschließen" ist hier nicht nötig.
+      Öffne eine andere Webseite, um deren Inhalt zu erschließen.
+    </p>
+  </section>
+</div>
 
-<!-- Step 1: login (required) + start -->
-<div [hidden]="wiz.step() !== 1">
-  <section class="card">
-    <div class="card-head">
-      <h2>Anmeldung</h2>
-      <span class="badge" [class.badge-user]="auth.state().loggedIn" [class.badge-guest]="!auth.state().loggedIn">
-        {{ auth.state().loggedIn ? auth.state().username : 'Nicht angemeldet' }}
-      </span>
+<ng-template #wizard>
+  <!-- Shared login gate (form when logged out, compact status when logged in). -->
+  <div class="wizard-top">
+    <es-login></es-login>
+  </div>
+
+  <ng-container *ngIf="auth.state().loggedIn">
+    <!-- Sticky sub-step navigation with progress marks (done / available / locked). -->
+    <nav class="steps">
+      <button *ngFor="let s of stepDefs" class="step"
+              [class.active]="wiz.step() === s.n"
+              [ngClass]="'is-' + stepStatus(s.n)"
+              [disabled]="stepStatus(s.n) === 'locked' || wiz.busy()"
+              (click)="wiz.goTo(s.n)">
+        <span class="mark" [ngSwitch]="stepStatus(s.n)">
+          <span *ngSwitchCase="'done'" class="glyph">✓</span>
+          <span *ngSwitchCase="'locked'" class="glyph">🔒</span>
+          <span *ngSwitchDefault>{{ s.n }}</span>
+        </span>
+        {{ s.label }}
+      </button>
+    </nav>
+
+    <!-- Scrolling step body -->
+    <div class="step-body">
+      <!-- Step 1: intro; the action lives in the footer -->
+      <div [hidden]="wiz.step() !== 1">
+        <section class="card hint-card">
+          <h2>Erschließung starten</h2>
+          <p class="muted">
+            Analysiert die aktuelle Webseite und erzeugt daraus Metadaten. Anschließend
+            kannst du sie prüfen, speichern und einer Sammlung zuordnen.
+          </p>
+        </section>
+        <section class="card" *ngIf="gen.last() as o">
+          <p class="error" *ngIf="!o.ok">{{ o.error }}</p>
+        </section>
+      </div>
+
+      <!-- Step 2: edit metadata (saved via the footer) -->
+      <div [hidden]="wiz.step() !== 2">
+        <section class="card hint-card">
+          <h2>Metadaten</h2>
+          <p class="muted">
+            Prüfe und ergänze die erzeugten Metadaten und speichere sie anschließend über „Speichern".
+          </p>
+          <p class="src-title" *ngIf="gen.last()?.source as s" [title]="s.url">{{ s.title || s.url }}</p>
+          <div class="result-sub" *ngIf="gen.last()?.parsed as p">
+            <span class="chip">{{ p.fieldsExtracted ?? '–' }} / {{ p.fieldsTotal ?? '–' }} Felder</span>
+            <span class="chip" *ngIf="wiz.createdNode()">Node: {{ wiz.createdNode()?.name }}</span>
+          </div>
+        </section>
+
+        <section class="card" *ngIf="wiz.editorMetadata() as md">
+          <es-mds-editor [metadata]="md" groupId="io" (save)="onSave($event)"></es-mds-editor>
+        </section>
+
+        <section class="card" *ngIf="wiz.saveError()">
+          <p class="error">Speichern fehlgeschlagen: {{ wiz.saveError() }}</p>
+        </section>
+
+        <details class="card raw" *ngIf="gen.last()?.parsed as p">
+          <summary>Extrahierte Felder ({{ p.fields.length }})</summary>
+          <dl class="fields">
+            <ng-container *ngFor="let f of p.fields">
+              <dt>{{ f.key }}</dt>
+              <dd><span class="val" *ngFor="let v of f.values">{{ v }}</span></dd>
+            </ng-container>
+          </dl>
+        </details>
+
+        <details class="card raw" *ngIf="gen.last()?.parsed as p">
+          <summary>Rohdaten (JSON)</summary>
+          <pre>{{ p.raw | json }}</pre>
+        </details>
+      </div>
+
+      <!-- Step 3: preview -->
+      <div [hidden]="wiz.step() !== 3">
+        <section class="card hint-card">
+          <h2>Vorschau</h2>
+          <ng-container *ngIf="wiz.createdNode() as n; else noNode">
+            <p class="muted">Node: <strong>{{ n.name }}</strong></p>
+            <a class="upload-link" [href]="n.link" target="_blank" rel="noopener noreferrer">Node öffnen</a>
+          </ng-container>
+          <ng-template #noNode><p class="muted">Noch kein Node erstellt.</p></ng-template>
+        </section>
+
+        <section class="card" *ngIf="wiz.previewNode() as node">
+          <es-preview-node [node]="node"></es-preview-node>
+        </section>
+      </div>
+
+      <!-- Step 4: assign into a collection -->
+      <div [hidden]="wiz.step() !== 4">
+        <section class="card hint-card">
+          <h2>Zuordnen</h2>
+          <p class="muted">Sammlung auswählen und den Node per „In Sammlung einfügen" hinzufügen.</p>
+        </section>
+
+        <section class="card" *ngIf="wiz.assigning() || wiz.assignError()">
+          <p class="muted" *ngIf="wiz.assigning()">Wird hinzugefügt…</p>
+          <p class="error" *ngIf="wiz.assignError()">Hinzufügen fehlgeschlagen: {{ wiz.assignError() }}</p>
+        </section>
+
+        <section class="card" *ngIf="wiz.createdNode()">
+          <es-collection-selector (choose)="onAssign($event)"></es-collection-selector>
+        </section>
+      </div>
     </div>
 
-    <ng-container *ngIf="!auth.state().loggedIn; else loggedIn">
-      <input type="text" class="input" [(ngModel)]="username" placeholder="Benutzername" autocomplete="username" />
-      <input type="password" class="input" [(ngModel)]="password" placeholder="Passwort"
-             autocomplete="current-password" (keyup.enter)="login()" />
-      <p class="error" *ngIf="auth.state().error">{{ auth.state().error }}</p>
-      <div class="row">
-        <button class="btn btn-tonal" (click)="login()"
-                [disabled]="loggingIn() || !username || !password || auth.state().needsReload">
-          {{ loggingIn() ? 'Anmelden…' : 'Anmelden' }}
+    <!-- Persistent floating footer: the current step's primary action(s). -->
+    <footer class="wizard-footer" [ngSwitch]="wiz.step()">
+      <!-- Step 1: single full-width action -->
+      <button *ngSwitchCase="1" class="fbtn fbtn-primary" (click)="start()" [disabled]="wiz.running()">
+        <span *ngIf="!wiz.running()">Erschließung starten</span>
+        <span *ngIf="wiz.running()">Erschließe… (kann etwas dauern)</span>
+      </button>
+
+      <!-- Step 2: back + save -->
+      <ng-container *ngSwitchCase="2">
+        <button class="fbtn fbtn-ghost" [disabled]="wiz.busy()" (click)="wiz.goTo(1)">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+          <span>Zurück</span>
         </button>
-        <span class="muted">Anmeldung ist für die Erschließung erforderlich.</span>
-      </div>
-      <p class="hint" *ngIf="auth.state().needsReload">
-        Repository geändert – bitte in „Einstellungen" übernehmen, um dich anzumelden.
-      </p>
-    </ng-container>
-    <ng-template #loggedIn>
-      <div class="row">
-        <span class="muted">Angemeldet als <strong>{{ auth.state().username }}</strong></span>
-        <button class="btn-text" (click)="logout()">Abmelden</button>
-      </div>
-    </ng-template>
-  </section>
-
-  <button class="btn btn-primary btn-large" (click)="start()"
-          [disabled]="wiz.running() || !auth.state().loggedIn">
-    <span *ngIf="!wiz.running()">Erschließung starten</span>
-    <span *ngIf="wiz.running()">Erschließe… (kann etwas dauern)</span>
-  </button>
-  <p class="hint center" *ngIf="!auth.state().loggedIn">Bitte zuerst anmelden.</p>
-  <section class="card" *ngIf="gen.last() as o">
-    <p class="error" *ngIf="!o.ok">{{ o.error }}</p>
-  </section>
-</div>
-
-<!-- Step 2: edit metadata + save -->
-<div [hidden]="wiz.step() !== 2">
-  <section class="card result" *ngIf="gen.last()?.parsed as p">
-    <div class="result-head">
-      <div class="result-title" [title]="gen.last()?.source?.url">
-        {{ gen.last()?.source?.title || gen.last()?.source?.url }}
-      </div>
-      <div class="result-sub">
-        <span class="chip">{{ p.fieldsExtracted ?? '–' }} / {{ p.fieldsTotal ?? '–' }} Felder</span>
-        <span class="chip" *ngIf="wiz.createdNode()">Node: {{ wiz.createdNode()?.name }}</span>
-      </div>
-    </div>
-    <es-mds-editor *ngIf="wiz.editorMetadata() as md"
-                   [metadata]="md" [resetMetadata]="gen.last()?.parsed?.raw"
-                   groupId="io" (save)="onSave($event)"></es-mds-editor>
-  </section>
-
-  <section class="card upload" *ngIf="wiz.saving() || wiz.saveError() || wiz.createdNode()">
-    <p class="muted" *ngIf="wiz.saving()">Wird gespeichert…</p>
-    <p class="error" *ngIf="wiz.saveError()">Speichern fehlgeschlagen: {{ wiz.saveError() }}</p>
-    <p class="upload-ok" *ngIf="!wiz.saving() && !wiz.saveError() && wiz.createdNode() as n">
-      ✓ Gespeichert: <strong>{{ n.name }}</strong>
-    </p>
-  </section>
-
-  <details class="card raw" *ngIf="gen.last()?.parsed as p">
-    <summary>Extrahierte Felder ({{ p.fields.length }})</summary>
-    <dl class="fields">
-      <ng-container *ngFor="let f of p.fields">
-        <dt>{{ f.key }}</dt>
-        <dd><span class="val" *ngFor="let v of f.values">{{ v }}</span></dd>
+        <button class="fbtn fbtn-primary" [disabled]="!canSave()" (click)="saveFromEditor()">
+          {{ wiz.saving() ? 'Speichern…' : 'Speichern' }}
+        </button>
       </ng-container>
-    </dl>
-  </details>
 
-  <details class="card raw" *ngIf="gen.last()?.parsed as p">
-    <summary>Rohdaten (JSON)</summary>
-    <pre>{{ p.raw | json }}</pre>
-  </details>
-</div>
+      <!-- Step 3: back + next -->
+      <ng-container *ngSwitchCase="3">
+        <button class="fbtn fbtn-ghost" [disabled]="wiz.busy()" (click)="wiz.goTo(2)">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+          <span>Zurück</span>
+        </button>
+        <button class="fbtn fbtn-primary" (click)="wiz.goTo(4)">
+          <span>Weiter</span>
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+        </button>
+      </ng-container>
 
-<!-- Step 3: preview -->
-<div [hidden]="wiz.step() !== 3">
-  <section class="card">
-    <h2>Preview node</h2>
-    <ng-container *ngIf="wiz.createdNode() as n; else noNode">
-      <p class="muted">Node: <strong>{{ n.name }}</strong></p>
-      <a class="upload-link" [href]="n.link" target="_blank" rel="noopener noreferrer">Node öffnen</a>
-    </ng-container>
-    <ng-template #noNode><p class="muted">Noch kein Node erstellt.</p></ng-template>
-  </section>
-
-  <section class="card" *ngIf="wiz.previewNode() as node">
-    <es-preview-node [node]="node"></es-preview-node>
-  </section>
-</div>
-
-<!-- Step 4: assign into a collection -->
-<div [hidden]="wiz.step() !== 4">
-  <section class="card">
-    <h2>Zuordnen</h2>
-    <p class="muted">Sammlung auswählen und den Node per „In Sammlung einfügen" hinzufügen.</p>
-  </section>
-
-  <section class="card upload" *ngIf="wiz.assigning() || wiz.assignError() || wiz.assignedCollections().length">
-    <p class="muted" *ngIf="wiz.assigning()">Wird hinzugefügt…</p>
-    <p class="error" *ngIf="wiz.assignError()">Hinzufügen fehlgeschlagen: {{ wiz.assignError() }}</p>
-    <p class="upload-ok" *ngFor="let c of wiz.assignedCollections()">
-      ✓ Hinzugefügt zu: <strong>{{ c.name || c.id }}</strong>
-    </p>
-  </section>
-
-  <section class="card" *ngIf="wiz.createdNode()">
-    <es-collection-selector (choose)="onAssign($event)"></es-collection-selector>
-  </section>
-</div>
+      <!-- Step 4: back + restart -->
+      <ng-container *ngSwitchCase="4">
+        <button class="fbtn fbtn-ghost" [disabled]="wiz.busy()" (click)="wiz.goTo(3)">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+          <span>Zurück</span>
+        </button>
+        <button class="fbtn fbtn-primary" (click)="wiz.startNew()">Neue Erschließung</button>
+      </ng-container>
+    </footer>
+  </ng-container>
+</ng-template>

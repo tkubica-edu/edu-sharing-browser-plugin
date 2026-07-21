@@ -5,6 +5,8 @@ import { ParsedResult } from './generate.service';
 
 export interface HistoryEntry {
   id: string;
+  /** The created edu-sharing node — the Verlauf only holds saved nodes. */
+  nodeId: string;
   url: string;
   title: string;
   favIconUrl?: string;
@@ -23,7 +25,11 @@ export class HistoryService {
   async load(): Promise<void> {
     if (!this.ext.available) return;
     const list = await this.ext.storageGet<HistoryEntry[]>(APP_CONFIG.storageKeys.history, []);
-    this.entries.set(Array.isArray(list) ? list : []);
+    const raw = Array.isArray(list) ? list : [];
+    // Keep only entries that carry a node id (drops legacy pre-node entries).
+    const valid = raw.filter((e) => !!e?.nodeId);
+    this.entries.set(valid);
+    if (valid.length !== raw.length) await this.persist();
   }
 
   async add(entry: Omit<HistoryEntry, 'id' | 'timestamp'> & { timestamp?: number }): Promise<void> {
@@ -32,7 +38,9 @@ export class HistoryService {
       id: this.makeId(),
       timestamp: entry.timestamp ?? Date.now()
     };
-    const next = [full, ...this.entries()].slice(0, APP_CONFIG.maxHistory);
+    // De-dupe by node id: a re-saved node moves to the top rather than piling up.
+    const rest = this.entries().filter((e) => e.nodeId !== full.nodeId);
+    const next = [full, ...rest].slice(0, APP_CONFIG.maxHistory);
     this.entries.set(next);
     await this.persist();
   }

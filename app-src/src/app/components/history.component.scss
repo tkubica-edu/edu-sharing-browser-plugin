@@ -18,7 +18,20 @@
 .chip { font-size: 11px; background: #eef2f7; border-radius: 999px; padding: 2px 8px; color: var(--es-muted); flex: 0 0 auto; }
 
 .item-body { padding: 4px 12px 12px; border-top: 1px solid var(--es-border); }
-.meta-line { font-size: 11px; color: var(--es-muted); margin: 8px 0; }
+.body-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 0; }
+.meta-line { font-size: 11px; color: var(--es-muted); }
+.btn-load {
+  flex: 0 0 auto;
+  background: #e6edf6;
+  color: var(--es-blue);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-load:hover { border-color: var(--es-blue); }
 .fields { margin: 0; }
 .fields dt { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--es-blue); margin-top: 8px; }
 .fields dd { margin: 3px 0 0; display: flex; flex-direction: column; gap: 3px; }
