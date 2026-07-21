@@ -7,3 +7,5 @@ app-src/.angular/
 .DS_Store
 .idea
 scripts/webcomponent/
+
+sidebar/main.js

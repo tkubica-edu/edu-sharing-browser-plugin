@@ -18,7 +18,7 @@
     <div class="item-body" *ngIf="expanded() === e.id">
       <div class="body-head">
         <span class="meta-line">{{ e.timestamp | date:'dd.MM.yyyy HH:mm' }}</span>
-        <button class="btn-load" (click)="open.emit(e)">In Erschließung laden</button>
+        <button class="btn-load" (click)="open.emit(e)">In Vorschau öffnen</button>
       </div>
       <dl class="fields">
         <ng-container *ngFor="let f of e.parsed.fields">
