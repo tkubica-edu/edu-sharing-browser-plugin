@@ -41,8 +41,14 @@
   function closePanel() {
     const el = document.getElementById(PANEL_ID);
     if (el) el.remove();
-    root.style.marginRight = root.dataset.eduSharingPrevMarginRight || '';
+    // Restore the page exactly as before: drop our reserved margin + overflow clip, then
+    // put back any inline values the site had.
+    root.style.removeProperty('margin-right');
+    root.style.removeProperty('overflow-x');
+    if (root.dataset.eduSharingPrevMarginRight) root.style.marginRight = root.dataset.eduSharingPrevMarginRight;
+    if (root.dataset.eduSharingPrevOverflowX) root.style.overflowX = root.dataset.eduSharingPrevOverflowX;
     delete root.dataset.eduSharingPrevMarginRight;
+    delete root.dataset.eduSharingPrevOverflowX;
     if (window.__eduSharingPanelMsgHandler) {
       window.removeEventListener('message', window.__eduSharingPanelMsgHandler);
       window.__eduSharingPanelMsgHandler = null;
@@ -128,17 +134,23 @@
     root.appendChild(container);
 
     // Shift page content aside so the panel does not cover it (best-effort — some
-    // fixed-layout sites won't shift, in which case the panel simply overlays).
+    // fixed-layout sites, e.g. OnlyOffice, won't shift, in which case the panel overlays).
+    // `overflow-x: hidden` suppresses the phantom horizontal scrollbar a root-element
+    // margin would otherwise add to the viewport's scroll width (the reserved area is
+    // empty and covered by the panel, so clipping it is harmless). `important` makes both
+    // win over the site's own html styles.
     if (root.dataset.eduSharingPrevMarginRight === undefined) {
       root.dataset.eduSharingPrevMarginRight = root.style.marginRight || '';
+      root.dataset.eduSharingPrevOverflowX = root.style.overflowX || '';
     }
     root.style.transition = 'margin-right 0.2s ease';
-    root.style.marginRight = panelWidth + 'px';
+    root.style.setProperty('margin-right', panelWidth + 'px', 'important');
+    root.style.setProperty('overflow-x', 'hidden', 'important');
 
     function applyWidth(w) {
       panelWidth = clampWidth(w);
       container.style.width = panelWidth + 'px';
-      root.style.marginRight = panelWidth + 'px';
+      root.style.setProperty('margin-right', panelWidth + 'px', 'important');
     }
 
     // ---- Resize interaction -------------------------------------------------
