@@ -38,17 +38,25 @@
     } catch (_) { /* ignore persistence failures */ }
   }
 
+  // Nudge JS-driven, resize-listening layouts (e.g. the OnlyOffice editor) to re-measure
+  // against the changed root width.
+  function dispatchResize() {
+    try { window.dispatchEvent(new Event('resize')); } catch (_) { /* ignore */ }
+  }
+
   function closePanel() {
     const el = document.getElementById(PANEL_ID);
     if (el) el.remove();
-    // Restore the page exactly as before: drop our reserved margin + overflow clip, then
+    // Restore the page exactly as before: drop our reserved width + overflow clip, then
     // put back any inline values the site had.
-    root.style.removeProperty('margin-right');
+    root.style.removeProperty('width');
     root.style.removeProperty('overflow-x');
-    if (root.dataset.eduSharingPrevMarginRight) root.style.marginRight = root.dataset.eduSharingPrevMarginRight;
+    if (root.dataset.eduSharingPrevWidth) root.style.width = root.dataset.eduSharingPrevWidth;
     if (root.dataset.eduSharingPrevOverflowX) root.style.overflowX = root.dataset.eduSharingPrevOverflowX;
-    delete root.dataset.eduSharingPrevMarginRight;
+    delete root.dataset.eduSharingPrevWidth;
     delete root.dataset.eduSharingPrevOverflowX;
+    // Let the page expand back to full width.
+    dispatchResize();
     if (window.__eduSharingPanelMsgHandler) {
       window.removeEventListener('message', window.__eduSharingPanelMsgHandler);
       window.__eduSharingPanelMsgHandler = null;
@@ -133,28 +141,29 @@
     container.appendChild(handle);
     root.appendChild(container);
 
-    // Shift page content aside so the panel does not cover it (best-effort — some
-    // fixed-layout sites, e.g. OnlyOffice, won't shift, in which case the panel overlays).
-    // `overflow-x: hidden` suppresses the phantom horizontal scrollbar a root-element
-    // margin would otherwise add to the viewport's scroll width (the reserved area is
-    // empty and covered by the panel, so clipping it is harmless). `important` makes both
-    // win over the site's own html styles.
-    if (root.dataset.eduSharingPrevMarginRight === undefined) {
-      root.dataset.eduSharingPrevMarginRight = root.style.marginRight || '';
+    // Reserve space for the panel by CONSTRAINING THE ROOT WIDTH (not a margin): a
+    // margin-right leaves width:100%/100vw layouts (e.g. the OnlyOffice editor) at full
+    // width, so the panel would only overlay them. Setting `html { width: calc(100% - W) }`
+    // actually shrinks the content box, so a width:100% body/iframe follows. `overflow-x:
+    // hidden` clips any leftover 100vw children (no phantom scrollbar). `important` beats
+    // the site's own html styles. A synthetic resize nudges JS editors to re-layout.
+    if (root.dataset.eduSharingPrevWidth === undefined) {
+      root.dataset.eduSharingPrevWidth = root.style.width || '';
       root.dataset.eduSharingPrevOverflowX = root.style.overflowX || '';
     }
-    root.style.transition = 'margin-right 0.2s ease';
-    root.style.setProperty('margin-right', panelWidth + 'px', 'important');
+    root.style.setProperty('width', 'calc(100% - ' + panelWidth + 'px)', 'important');
     root.style.setProperty('overflow-x', 'hidden', 'important');
+    dispatchResize();
 
     function applyWidth(w) {
       panelWidth = clampWidth(w);
       container.style.width = panelWidth + 'px';
-      root.style.setProperty('margin-right', panelWidth + 'px', 'important');
+      root.style.setProperty('width', 'calc(100% - ' + panelWidth + 'px)', 'important');
     }
 
     // ---- Resize interaction -------------------------------------------------
     let dragging = false;
+    let dragShield = null;
     function onPointerMove(e) {
       if (!dragging) return;
       // Width = distance from the pointer to the right edge of the viewport.
@@ -164,23 +173,36 @@
     function onPointerUp() {
       if (!dragging) return;
       dragging = false;
-      // Restore normal interaction and the smooth margin transition.
+      // Restore normal interaction and drop the drag shield.
       iframe.style.pointerEvents = '';
+      if (dragShield) { dragShield.remove(); dragShield = null; }
       document.body && (document.body.style.userSelect = savedUserSelect);
-      root.style.transition = 'margin-right 0.2s ease';
       grip.style.background = 'rgba(0,59,124,0.25)';
       window.removeEventListener('pointermove', onPointerMove, true);
       window.removeEventListener('pointerup', onPointerUp, true);
+      // Let JS editors re-layout to the final width, then persist it.
+      dispatchResize();
       storageSet({ [STORAGE_KEY]: panelWidth });
     }
     let savedUserSelect = '';
     handle.addEventListener('pointerdown', (e) => {
       dragging = true;
       grip.style.background = 'rgba(0,59,124,0.8)';
-      // During the drag: kill the iframe's pointer capture and text selection,
-      // and disable the margin transition for 1:1 tracking.
+      // During the drag: kill our iframe's pointer capture and text selection, and lay a
+      // transparent full-viewport shield over the page so pointermove keeps reaching the
+      // top document even when the pointer is over a host iframe (e.g. the OnlyOffice
+      // editor iframe, which would otherwise swallow the events). Below the panel's
+      // z-index so the panel stays on top.
       iframe.style.pointerEvents = 'none';
-      root.style.transition = 'none';
+      dragShield = document.createElement('div');
+      Object.assign(dragShield.style, {
+        position: 'fixed',
+        top: '0', left: '0', right: '0', bottom: '0',
+        zIndex: '2147483646',
+        cursor: 'col-resize',
+        background: 'transparent'
+      });
+      root.appendChild(dragShield);
       savedUserSelect = document.body ? document.body.style.userSelect : '';
       if (document.body) document.body.style.userSelect = 'none';
       window.addEventListener('pointermove', onPointerMove, true);
