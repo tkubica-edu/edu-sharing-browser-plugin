@@ -1,6 +1,9 @@
 <div class="status-bar">
   <!-- Login: always shown so the primary condition is never ambiguous. -->
-  <span class="status-chip" [class.is-on]="ui.loggedIn()"
+  <span class="status-chip" *ngIf="auth.state().restoring" title="Anmeldung wird geprüft">
+    <span class="d"></span>Anmeldung wird geprüft…
+  </span>
+  <span class="status-chip" *ngIf="!auth.state().restoring" [class.is-on]="ui.loggedIn()"
         [title]="ui.loggedIn() ? ('Angemeldet als ' + (auth.state().username || '')) : 'Nicht angemeldet'">
     <span class="d"></span>{{ ui.loggedIn() ? ('Angemeldet: ' + (auth.state().username || '–')) : 'Abgemeldet' }}
   </span>

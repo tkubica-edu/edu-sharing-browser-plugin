@@ -59,6 +59,16 @@ Authentication against an edu-sharing repository uses the official
 [`ngx-edu-sharing-api`](https://www.npmjs.com/package/ngx-edu-sharing-api) library.
 The repository session is shared, so signing in on either primary tab unblocks both.
 
+**Session restore.** Login is cookie-based: Basic auth is sent only on the login
+request, the server sets a session cookie, and every later request carries it
+(`withCredentials`). That cookie outlives sidebar reloads, so on startup `AuthService.init`
+revalidates it (`observeLoginInfo()`, 8s timeout) and, if a valid non-guest session is
+still active, restores the logged-in state before the shell lands on a view — you don't
+re-enter credentials when reopening the panel or switching pages, and **no password is
+stored**. While it checks, the status bar shows "Anmeldung wird geprüft…". If the cookie
+is gone (browser restart, explicit logout, or Safari ITP blocking the third-party cookie)
+it resolves to guest and the login gate appears.
+
 ## The MDS editor (edu-sharing web component)
 
 The pre-built edu-sharing web-component bundle lives in `scripts/webcomponent/`

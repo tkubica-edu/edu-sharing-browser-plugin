@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import { AuthenticationService, LoginInfo } from 'ngx-edu-sharing-api';
 
 import { APP_CONFIG, toApiRootUrl } from '../config';
@@ -14,6 +14,8 @@ export interface AuthState {
   error: string | null;
   /** True when the repo URL was edited to differ from the bootstrapped one. */
   needsReload: boolean;
+  /** True while an existing session is being revalidated on startup. */
+  restoring: boolean;
 }
 
 // Login against a user-supplied edu-sharing repository via ngx-edu-sharing-api.
@@ -32,18 +34,45 @@ export class AuthService {
     guest: true,
     username: null,
     error: null,
-    needsReload: false
+    needsReload: false,
+    restoring: true
   });
 
   readonly loggedIn = computed(() => this.state().loggedIn);
 
-  /** Load the persisted repository URL (or default) into the UI state. */
+  /** Load the persisted repository URL (or default), then revalidate any session. */
   async init(): Promise<void> {
     let repoUrl = APP_CONFIG.defaultRepositoryUrl;
     if (this.ext.available) {
       repoUrl = await this.ext.storageGet(APP_CONFIG.storageKeys.repositoryUrl, APP_CONFIG.defaultRepositoryUrl);
     }
     this.state.update((s) => ({ ...s, repositoryUrl: repoUrl, needsReload: false }));
+    await this.restoreSession();
+  }
+
+  // Restore an existing repository session on startup. The library authenticates via a
+  // session cookie — Basic auth is sent only on the login request; every later request
+  // carries the cookie (withCredentials). That cookie survives sidebar reloads, so we
+  // ask the backend for the current login info and, if a valid non-guest session is
+  // still active, mark the user logged in. No credentials are stored; if the cookie is
+  // gone (browser restart, Safari ITP, server logout) this simply resolves to guest.
+  private async restoreSession(): Promise<void> {
+    try {
+      const info = (await firstValueFrom(this.auth.observeLoginInfo().pipe(timeout(8000)))) as LoginInfo;
+      if (info?.isValidLogin && !info?.isGuest) {
+        this.state.update((s) => ({
+          ...s,
+          loggedIn: true,
+          guest: false,
+          username: info.authorityName || s.username,
+          error: null
+        }));
+      }
+    } catch {
+      /* no active session (or unreachable) — stay logged out */
+    } finally {
+      this.state.update((s) => ({ ...s, restoring: false }));
+    }
   }
 
   // Persist the repository base; flag needsReload if it differs from the booted URL.
