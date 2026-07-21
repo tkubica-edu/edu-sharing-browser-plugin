@@ -88,9 +88,22 @@ export class CurationService {
   // Throws if the node can't be fetched (caller surfaces the error; state stays untouched).
   async loadFromNode(nodeId: string): Promise<void> {
     const full = await this.upload.getNode(nodeId);
-    this.applyLoadedNode(nodeId, full, full.name ?? nodeId);
+    const name = full.name ?? nodeId;
+    this.applyLoadedNode(nodeId, full, name);
     // No /generate result for an externally-received node; the raw/field views hide.
     this.gen.last.set(null);
+    // A node opened from OnlyOffice (double-click → PREVIEW_NODE) is recorded in the Verlauf,
+    // so it can be reopened later. Its "parsed" view is derived from the node's own
+    // properties (there is no /generate payload). add() de-dupes by nodeId.
+    const parsed = this.gen.parse((full.properties ?? {}) as Record<string, unknown>);
+    await this.history.add({
+      nodeId,
+      url: this.createdNode()?.link ?? '',
+      title: name,
+      fieldsExtracted: parsed.fieldsExtracted,
+      fieldsTotal: parsed.fieldsTotal,
+      parsed
+    });
   }
 
   // Shared core of loadFromHistory/loadFromNode: reset state and seed the created node,
