@@ -2,7 +2,10 @@
   <ul class="menu-list">
     <li *ngFor="let o of nav.visibleOptions()">
       <button class="menu-item" (click)="nav.go(o.id)">
-        <span class="mi-icon" [innerHTML]="icon(o.icon)"></span>
+        <span class="mi-icon">
+          <img *ngIf="iconUrl(o) as src; else svgIcon" [src]="src" alt="" />
+          <ng-template #svgIcon><span [innerHTML]="iconHtml(o)"></span></ng-template>
+        </span>
         <span class="mi-main">
           <span class="mi-title">
             {{ o.label }}

@@ -1,4 +1,4 @@
-import { Component, HostListener, OnInit, effect, inject, signal } from '@angular/core';
+import { Component, HostListener, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { AuthService } from './services/auth.service';
@@ -7,6 +7,9 @@ import { CurationService } from './services/curation.service';
 import { ExtService } from './services/ext.service';
 import { UiStateService } from './services/ui-state.service';
 import { NavigationService } from './services/navigation.service';
+import { OptionsRegistryService } from './services/options-registry.service';
+import { AdditionalWebComponentService } from './services/additional-webcomponent.service';
+import { AppOption } from './model/options';
 import { APP_CONFIG } from './config';
 
 import { StatusBarComponent } from './components/status-bar.component';
@@ -20,6 +23,7 @@ import { ErschliessenScreenComponent } from './components/screens/erschliessen-s
 import { MetadatenScreenComponent } from './components/screens/metadaten-screen.component';
 import { VorschauScreenComponent } from './components/screens/vorschau-screen.component';
 import { EinsortierenScreenComponent } from './components/screens/einsortieren-screen.component';
+import { ExtensionViewHostComponent } from './components/extension-view-host.component';
 
 @Component({
   selector: 'es-root',
@@ -28,7 +32,8 @@ import { EinsortierenScreenComponent } from './components/screens/einsortieren-s
     CommonModule,
     StatusBarComponent, ActionBarComponent, MenuComponent,
     LoginComponent, HistoryComponent, SettingsComponent, SearchComponent,
-    ErschliessenScreenComponent, MetadatenScreenComponent, VorschauScreenComponent, EinsortierenScreenComponent
+    ErschliessenScreenComponent, MetadatenScreenComponent, VorschauScreenComponent, EinsortierenScreenComponent,
+    ExtensionViewHostComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
@@ -40,6 +45,24 @@ export class AppComponent implements OnInit {
   private readonly wiz = inject(CurationService);
   readonly ui = inject(UiStateService);
   readonly nav = inject(NavigationService);
+  private readonly registry = inject(OptionsRegistryService);
+  private readonly additionalWc = inject(AdditionalWebComponentService);
+
+  // The option resolved for the current view (built-in or contributed).
+  readonly currentOption = computed<AppOption | undefined>(() => {
+    const v = this.nav.view();
+    return v === 'menu' ? undefined : this.registry.get(v);
+  });
+
+  // The ngSwitch key for the shell's <main>: 'menu', a built-in component id, or
+  // 'extension' when the current option carries a custom (element/iframe) view — which
+  // also covers a contributed option that REPLACED a built-in id.
+  readonly dispatchKey = computed<string>(() => {
+    const v = this.nav.view();
+    if (v === 'menu') return 'menu';
+    const kind = this.currentOption()?.view?.kind;
+    return kind === 'element' || kind === 'iframe' ? 'extension' : v;
+  });
 
   // A node id received from the OnlyOffice plugin (PREVIEW_NODE) while logged out — loaded
   // once the user logs in.
@@ -70,6 +93,11 @@ export class AppComponent implements OnInit {
     // Land on the view that fits the current page (search on an OnlyOffice editor, the
     // login gate when logged out, otherwise the options menu).
     this.nav.land();
+
+    // Detect + load any externally configured web component (additionalWebComponentUrl).
+    // Fire-and-forget: first paint must not wait on the network probe; contributions and
+    // login-optional apply asynchronously and re-land if needed.
+    void this.additionalWc.init();
 
     // Tell the host page we're ready so it can replay a buffered PREVIEW_NODE, and consume
     // any preview that was persisted while the sidebar was closed/booting.

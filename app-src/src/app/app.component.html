@@ -17,7 +17,10 @@
   <h2 class="step-title">{{ nav.title() }}</h2>
 </div>
 
-<main class="content" [ngSwitch]="nav.view()">
+<!-- Dispatch on dispatchKey(): 'menu', a built-in screen id, or 'extension' when the
+     current option carries a custom (element/iframe) view — the latter also covers a
+     contributed option that replaced a built-in id. -->
+<main class="content" [ngSwitch]="dispatchKey()">
   <es-menu *ngSwitchCase="'menu'"></es-menu>
   <es-login *ngSwitchCase="'login'"></es-login>
   <es-erschliessen-screen *ngSwitchCase="'erschliessen'"></es-erschliessen-screen>
@@ -27,6 +30,7 @@
   <es-search *ngSwitchCase="'suchen'" [contextUrl]="ui.activeUrl()"></es-search>
   <es-history *ngSwitchCase="'verlauf'" (open)="openInWizard($event)"></es-history>
   <es-settings *ngSwitchCase="'einstellungen'"></es-settings>
+  <es-extension-view-host *ngSwitchCase="'extension'" [option]="currentOption()!"></es-extension-view-host>
 </main>
 
 <es-action-bar></es-action-bar>

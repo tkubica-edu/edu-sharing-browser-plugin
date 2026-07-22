@@ -47,6 +47,10 @@ export class UiStateService {
 
   readonly loggedIn = computed(() => this.auth.state().loggedIn);
 
+  // The inverse of loggedIn, exposed so a guest-visible (bypassLogin) option can reason
+  // about auth state without being gated by it.
+  readonly guest = computed(() => !this.auth.state().loggedIn);
+
   // An active node exists when a node has been created/loaded — true for both an
   // erschlossener Inhalt and a node received from OnlyOffice / opened from the Verlauf.
   readonly hasActiveNode = computed(() => this.curation.createdNode() !== null);
@@ -60,6 +64,7 @@ export class UiStateService {
     onlyOfficePresent: this.onlyOfficePresent(),
     onEduSharing: this.onEduSharing(),
     loggedIn: this.loggedIn(),
+    guest: this.guest(),
     hasActiveNode: this.hasActiveNode(),
     hasEditableMetadata: this.hasEditableMetadata(),
     editMode: this.editMode()

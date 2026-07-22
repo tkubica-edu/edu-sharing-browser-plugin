@@ -42,6 +42,6 @@
   ],
 
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https: http:; connect-src 'self' https: http:; frame-ancestors *; object-src 'none'; base-uri 'self'; form-action 'self'"
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https: http:; connect-src 'self' https: http:; frame-src 'self' https:; child-src 'self' https:; frame-ancestors *; object-src 'none'; base-uri 'self'; form-action 'self'"
   }
 }

@@ -1,10 +1,11 @@
-import { Component, inject } from '@angular/core';
+import { Component, SecurityContext, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
 import { NavigationService } from '../services/navigation.service';
 import { HistoryService } from '../services/history.service';
 import { AuthService } from '../services/auth.service';
+import { AppOption, OptionIcon } from '../model/options';
 
 // Full-width, stroke-style option icons (24×24). Keyed by AppOption.icon.
 const ICONS: Record<string, string> = {
@@ -43,12 +44,33 @@ export class MenuComponent {
 
   private readonly iconCache = new Map<string, SafeHtml>();
 
-  icon(key: string): SafeHtml {
-    let svg = this.iconCache.get(key);
-    if (!svg) {
-      svg = this.sanitizer.bypassSecurityTrustHtml(ICONS[key] ?? '');
-      this.iconCache.set(key, svg);
+  // Normalize the icon field: a bare string is a built-in ICONS key (back-compat).
+  private descriptor(o: AppOption): OptionIcon {
+    return typeof o.icon === 'string' ? { kind: 'builtin', key: o.icon } : o.icon;
+  }
+
+  /** The image URL for a `url`-kind icon (rendered via <img>), otherwise null. */
+  iconUrl(o: AppOption): string | null {
+    const d = this.descriptor(o);
+    return d.kind === 'url' ? d.url : null;
+  }
+
+  /** Inline SVG markup for a built-in or contributed `svg` icon (rendered via [innerHTML]).
+   *  Built-in markup is trusted; contributed SVG is sanitized (never blindly trusted). */
+  iconHtml(o: AppOption): SafeHtml {
+    const d = this.descriptor(o);
+    if (d.kind === 'builtin') {
+      const key = d.key;
+      let cached = this.iconCache.get(key);
+      if (!cached) {
+        cached = this.sanitizer.bypassSecurityTrustHtml(ICONS[key] ?? '');
+        this.iconCache.set(key, cached);
+      }
+      return cached;
     }
-    return svg;
+    if (d.kind === 'svg') {
+      return this.sanitizer.sanitize(SecurityContext.HTML, d.svg) ?? '';
+    }
+    return '';
   }
 }

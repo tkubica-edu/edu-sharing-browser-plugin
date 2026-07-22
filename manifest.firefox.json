@@ -11,5 +11,8 @@
       "id": "edu-sharing-erschliessung@edu-sharing.com",
       "strict_min_version": "128.0"
     }
+  },
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self' http://localhost:*; style-src 'self' 'unsafe-inline' http://localhost:* https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: http:; connect-src 'self' https: http:; frame-src 'self' https: http://localhost:*; child-src 'self' https: http://localhost:*; frame-ancestors *; object-src 'none'; base-uri 'self'; form-action 'self'"
   }
 }
