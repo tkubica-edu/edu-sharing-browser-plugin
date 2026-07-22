@@ -6,6 +6,10 @@
   <span class="status-chip" *ngIf="!auth.state().restoring" [class.is-on]="ui.loggedIn()"
         [title]="ui.loggedIn() ? ('Angemeldet als ' + (auth.state().username || '')) : 'Nicht angemeldet'">
     <span class="d"></span>{{ ui.loggedIn() ? ('Angemeldet: ' + (auth.state().username || '–')) : 'Abgemeldet' }}
+    <button class="chip-action" *ngIf="ui.loggedIn()" (click)="logout()" title="Abmelden" aria-label="Abmelden">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+           stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+    </button>
   </span>
 
   <span class="status-chip is-on" *ngIf="ui.onlyOfficePresent()" title="OnlyOffice erkannt">
@@ -19,6 +23,11 @@
   <span class="status-chip is-on" *ngIf="ui.hasActiveNode()"
         [title]="'Aktiver Inhalt: ' + (curation.createdNode()?.name || '')">
     <span class="d"></span>Aktiver Inhalt: {{ curation.createdNode()?.name }}
+    <button class="chip-action" (click)="clearActiveContent()"
+            title="Aktiven Inhalt entfernen" aria-label="Aktiven Inhalt entfernen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"
+           stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
   </span>
 
   <span class="status-chip is-on" *ngIf="ui.editMode()" title="Metadaten werden bearbeitet">

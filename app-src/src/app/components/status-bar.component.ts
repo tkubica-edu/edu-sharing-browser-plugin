@@ -19,4 +19,14 @@ export class StatusBarComponent {
   readonly ui = inject(UiStateService);
   readonly auth = inject(AuthService);
   readonly curation = inject(CurationService);
+
+  logout(): void {
+    void this.auth.logout();
+  }
+
+  // Remove the active content from the extension state (deselect). Does NOT delete the
+  // repository node. Node-dependent options disappear and the nav guard re-lands.
+  clearActiveContent(): void {
+    this.curation.startNew();
+  }
 }

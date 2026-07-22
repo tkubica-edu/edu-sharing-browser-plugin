@@ -23,3 +23,20 @@
     flex: 0 0 auto;
   }
 }
+
+// Small inline action icon inside a chip (logout / clear active content).
+.chip-action {
+  border: none;
+  background: none;
+  padding: 0;
+  margin-left: 2px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  color: currentColor;
+  opacity: 0.7;
+  flex: 0 0 auto;
+
+  svg { width: 14px; height: 14px; }
+  &:hover { opacity: 1; }
+}
