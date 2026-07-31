@@ -1,31 +1,46 @@
 <div class="head">
   <p class="subtitle">Gespeicherte Inhalte</p>
-  <button class="btn-text" (click)="clear()" *ngIf="history.entries().length">Leeren</button>
+  @if (history.entries().length) {
+    <button class="btn-text" (click)="clear()">Leeren</button>
+  }
 </div>
 
-<p class="empty" *ngIf="!history.entries().length">Noch keine gespeicherten Inhalte.</p>
+@if (!history.entries().length) {
+  <p class="empty">Noch keine gespeicherten Inhalte.</p>
+}
 
 <ul class="list">
-  <li class="item" *ngFor="let e of history.entries()">
-    <button class="item-head" (click)="toggle(e)">
-      <img class="favicon" *ngIf="e.favIconUrl" [src]="e.favIconUrl" alt="" (error)="onImgError($event)" />
-      <span class="item-main">
-        <span class="item-title">{{ e.title || e.url }}</span>
-        <span class="item-url">{{ e.url }}</span>
-      </span>
-      <span class="chip">{{ e.fieldsExtracted ?? '–' }}/{{ e.fieldsTotal ?? '–' }}</span>
-    </button>
-    <div class="item-body" *ngIf="expanded() === e.id">
-      <div class="body-head">
-        <span class="meta-line">{{ e.timestamp | date:'dd.MM.yyyy HH:mm' }}</span>
-        <button class="btn-load" (click)="open.emit(e)">In Vorschau öffnen</button>
-      </div>
-      <dl class="fields">
-        <ng-container *ngFor="let f of e.parsed.fields">
-          <dt>{{ f.key }}</dt>
-          <dd><span class="val" *ngFor="let v of f.values">{{ v }}</span></dd>
-        </ng-container>
-      </dl>
-    </div>
-  </li>
+  @for (entry of history.entries(); track entry.id) {
+    <li class="item">
+      <button class="item-head" (click)="toggle(entry)">
+        @if (entry.favIconUrl) {
+          <img class="favicon" [src]="entry.favIconUrl" alt="" (error)="hideBrokenIcon($event)" />
+        }
+        <span class="item-main">
+          <span class="item-title">{{ entry.title || entry.url }}</span>
+          <span class="item-url">{{ entry.url }}</span>
+        </span>
+        <span class="chip">{{ entry.fieldsExtracted ?? '–' }}/{{ entry.fieldsTotal ?? '–' }}</span>
+      </button>
+
+      @if (expandedId() === entry.id) {
+        <div class="item-body">
+          <div class="body-head">
+            <span class="meta-line">{{ entry.timestamp | date: 'dd.MM.yyyy HH:mm' }}</span>
+            <button class="btn-load" (click)="open.emit(entry)">In Vorschau öffnen</button>
+          </div>
+          <dl class="fields">
+            @for (field of entry.parsed.fields; track field.key) {
+              <dt>{{ field.key }}</dt>
+              <dd>
+                @for (value of field.values; track $index) {
+                  <span class="val">{{ value }}</span>
+                }
+              </dd>
+            }
+          </dl>
+        </div>
+      }
+    </li>
+  }
 </ul>

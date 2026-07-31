@@ -1,13 +1,7 @@
-<div class="selector-wrap">
-  @if (error()) {
-    <p class="error">Sammlungen konnten nicht geladen werden: {{ error() }}</p>
-  }
-
-  @if (option) {
-    <edu-sharing-nodes-selector
-      [option]="option"
-      [tabBlacklist]="tabBlacklist"
-      [primaryMode]="'collections'"
-    ></edu-sharing-nodes-selector>
-  }
-</div>
+<es-nodes-selector
+  [option]="option"
+  [tabBlacklist]="hiddenTabs"
+  [primaryMode]="'collections'"
+  [allowCollectionSelection]="true"
+  errorLabel="Sammlungen konnten nicht geladen werden"
+></es-nodes-selector>

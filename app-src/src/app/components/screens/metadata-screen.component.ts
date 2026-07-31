@@ -1,55 +1,63 @@
-import { Component, OnDestroy, OnInit, effect, inject, viewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, viewChild } from '@angular/core';
+import { JsonPipe } from '@angular/common';
 
-import { GenerateService } from '../../services/generate.service';
+import { MdsValues } from '../../util/mds-values';
+import { ActionBarService, SaveHandler } from '../../services/action-bar.service';
+import { AdditionalWebComponentService } from '../../services/additional-web-component.service';
+import { ConditionsService } from '../../services/conditions.service';
 import { CurationService } from '../../services/curation.service';
-import { FlowService } from '../../services/flow.service';
+import { MetadataAgentService } from '../../services/metadata-agent.service';
 import { NavigationService } from '../../services/navigation.service';
-import { UiStateService } from '../../services/ui-state.service';
 import { MdsEditorComponent } from '../mds-editor.component';
+import { MetadataEditor } from '../metadata-editor';
+import { WloCanvasComponent } from '../wlo-canvas.component';
 
-// "Metadaten editieren": embeds the MDS editor and bridges its commit()/ready() to the
-// shell footer (FlowService), which owns the "Speichern" button. On a successful save it
-// advances to Vorschau.
+// "Metadaten editieren": embeds a metadata editor and hands its commit()/ready() to the footer
+// (ActionBarService), which owns the save button. On a successful save it advances to the preview.
+//
+// Which editor is embedded depends on the repository config: the WLO canvas replaces the
+// edu-sharing MDS editor while the additional web component is enabled. Both implement
+// MetadataEditor, so everything else on this screen is identical either way.
 @Component({
   selector: 'es-metadata-screen',
-  standalone: true,
-  imports: [CommonModule, MdsEditorComponent],
+  imports: [JsonPipe, MdsEditorComponent, WloCanvasComponent],
   templateUrl: './metadata-screen.component.html',
-  styleUrl: './metadata-screen.component.scss'
+  styleUrl: './metadata-screen.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MetadataScreenComponent implements OnInit, OnDestroy {
-  readonly gen = inject(GenerateService);
-  readonly curation = inject(CurationService);
-  private readonly flow = inject(FlowService);
-  private readonly nav = inject(NavigationService);
-  private readonly ui = inject(UiStateService);
+  protected readonly metadataAgent = inject(MetadataAgentService);
+  protected readonly curation = inject(CurationService);
+  protected readonly additionalWebComponent = inject(AdditionalWebComponentService);
+  private readonly actionBar = inject(ActionBarService);
+  private readonly navigation = inject(NavigationService);
+  private readonly conditions = inject(ConditionsService);
 
-  // Signal query (NOT @ViewChild): reading it in the effect tracks both the query result
-  // AND the editor's `ready` signal, so `flow.canPrimary` stays in sync once the editor
-  // mounts — the same reason analyze.component used a signal viewChild for canSave.
+  // Signal queries, so `canSave` tracks both which editor is rendered AND its ready() state.
   private readonly mdsEditor = viewChild(MdsEditorComponent);
+  private readonly wloCanvas = viewChild(WloCanvasComponent);
 
-  // Stable handler so registerPrimary/clearPrimary pair up.
-  private readonly commit = () => this.mdsEditor()?.commit();
+  private readonly editor = computed<MetadataEditor | undefined>(
+    () => this.wloCanvas() ?? this.mdsEditor(),
+  );
 
-  constructor() {
-    // Mirror the editor's ready() into the footer's enabled state.
-    effect(() => this.flow.canPrimary.set(!!this.mdsEditor()?.ready()));
-  }
+  /** Stable object, so register/clear pair up by identity. */
+  private readonly saveHandler: SaveHandler = {
+    save: () => this.editor()?.commit(),
+    canSave: computed(() => !!this.editor()?.ready())
+  };
 
   ngOnInit(): void {
-    this.ui.editMode.set(true);
-    this.flow.registerPrimary(this.commit);
+    this.conditions.editMode.set(true);
+    this.actionBar.registerSaveHandler(this.saveHandler);
   }
 
   ngOnDestroy(): void {
-    this.ui.editMode.set(false);
-    this.flow.clearPrimary(this.commit);
+    this.conditions.editMode.set(false);
+    this.actionBar.clearSaveHandler(this.saveHandler);
   }
 
-  async onSave(values: Record<string, string[]>): Promise<void> {
-    const ok = await this.curation.save(values);
-    if (ok) this.nav.go('preview');
+  protected async save(values: MdsValues): Promise<void> {
+    if (await this.curation.save(values)) this.navigation.go('preview');
   }
 }

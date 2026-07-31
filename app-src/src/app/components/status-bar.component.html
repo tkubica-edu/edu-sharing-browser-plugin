@@ -1,36 +1,45 @@
 <div class="status-bar">
   <!-- Login: always shown so the primary condition is never ambiguous. -->
-  <span class="status-chip" *ngIf="auth.state().restoring" title="Anmeldung wird geprüft">
-    <span class="d"></span>Anmeldung wird geprüft…
-  </span>
-  <span class="status-chip" *ngIf="!auth.state().restoring" [class.is-on]="ui.loggedIn()"
-        [title]="ui.loggedIn() ? ('Angemeldet als ' + (auth.state().username || '')) : 'Nicht angemeldet'">
-    <span class="d"></span>{{ ui.loggedIn() ? ('Angemeldet: ' + (auth.state().username || '–')) : 'Abgemeldet' }}
-    <button class="chip-action" *ngIf="ui.loggedIn()" (click)="logout()" title="Abmelden" aria-label="Abmelden">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-           stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
-    </button>
-  </span>
+  @if (auth.restoring()) {
+    <span class="status-chip" title="Anmeldung wird geprüft">
+      <span class="d"></span>Anmeldung wird geprüft…
+    </span>
+  } @else if (auth.loggedIn()) {
+    <span class="status-chip is-on" [title]="'Angemeldet als ' + (auth.username() || '')">
+      <span class="d"></span>Angemeldet: {{ auth.username() || '–' }}
+      <button class="chip-action" (click)="logout()" title="Abmelden" aria-label="Abmelden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+      </button>
+    </span>
+  } @else {
+    <span class="status-chip" title="Nicht angemeldet"><span class="d"></span>Abgemeldet</span>
+  }
 
-  <span class="status-chip is-on" *ngIf="ui.onlyOfficePresent()" title="OnlyOffice erkannt">
-    <span class="d"></span>OnlyOffice
-  </span>
+  @if (conditions.onlyOfficePresent()) {
+    <span class="status-chip is-on" title="OnlyOffice erkannt"><span class="d"></span>OnlyOffice</span>
+  }
 
-  <span class="status-chip is-on" *ngIf="ui.onEduSharing()" title="Edu-Sharing-Seite erkannt">
-    <span class="d"></span>Edu-Sharing-Seite
-  </span>
+  @if (conditions.onEduSharing()) {
+    <span class="status-chip is-on" title="Edu-Sharing-Seite erkannt">
+      <span class="d"></span>Edu-Sharing-Seite
+    </span>
+  }
 
-  <span class="status-chip is-on" *ngIf="ui.hasActiveNode()"
-        [title]="'Aktiver Inhalt: ' + (curation.createdNode()?.name || '')">
-    <span class="d"></span>Aktiver Inhalt: {{ curation.createdNode()?.name }}
-    <button class="chip-action" (click)="clearActiveContent()"
-            title="Aktiven Inhalt entfernen" aria-label="Aktiven Inhalt entfernen">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"
-           stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-    </button>
-  </span>
+  @if (curation.activeNode(); as node) {
+    <span class="status-chip is-on" [title]="'Aktiver Inhalt: ' + node.name">
+      <span class="d"></span>Aktiver Inhalt: {{ node.name }}
+      <button class="chip-action" (click)="clearActiveContent()"
+              title="Aktiven Inhalt entfernen" aria-label="Aktiven Inhalt entfernen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </span>
+  }
 
-  <span class="status-chip is-on" *ngIf="ui.editMode()" title="Metadaten werden bearbeitet">
-    <span class="d"></span>Bearbeitung
-  </span>
+  @if (conditions.editMode()) {
+    <span class="status-chip is-on" title="Metadaten werden bearbeitet">
+      <span class="d"></span>Bearbeitung
+    </span>
+  }
 </div>

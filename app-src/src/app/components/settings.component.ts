@@ -1,35 +1,38 @@
-import { Component, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { AuthService } from '../services/auth.service';
 import { APP_CONFIG } from '../config';
+import { AuthService } from '../services/auth.service';
 
+// Repository configuration. Changing the URL requires a reload, because the API library freezes
+// its rootUrl at bootstrap (see AuthService).
 @Component({
   selector: 'es-settings',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './settings.component.html',
-  styleUrl: './settings.component.scss'
+  styleUrl: './settings.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SettingsComponent {
-  readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
 
-  repoUrl = this.auth.state().repositoryUrl;
-  touched = false;
+  protected readonly repositoryUrl = signal(this.auth.repositoryUrl());
+  /** True once the field was edited, so the "required" hint only shows after a change. */
+  protected readonly touched = signal(false);
 
-  onRepoChange(): void {
-    this.touched = true;
-    this.auth.setRepositoryUrl(this.repoUrl.trim());
+  protected readonly missingUrl = computed(() => this.touched() && !this.repositoryUrl().trim());
+
+  protected apply(url: string): void {
+    this.repositoryUrl.set(url);
+    this.touched.set(true);
+    this.auth.setRepositoryUrl(url);
   }
 
-  applyRepo(): void {
+  protected resetToDefault(): void {
+    this.apply(APP_CONFIG.defaultRepositoryUrl);
+  }
+
+  protected reload(): void {
     this.auth.applyRepositoryChange();
-  }
-
-  resetDefault(): void {
-    this.repoUrl = APP_CONFIG.defaultRepositoryUrl;
-    this.touched = true;
-    this.auth.setRepositoryUrl(this.repoUrl);
   }
 }

@@ -6,7 +6,9 @@
     </p>
   </section>
 
-  <section class="es-card" *ngIf="gen.last() as o">
-    <p class="es-error" *ngIf="!o.ok">{{ o.error }}</p>
-  </section>
+  @if (metadataAgent.lastRun(); as run) {
+    @if (!run.ok) {
+      <section class="es-card"><p class="es-error">{{ run.error }}</p></section>
+    }
+  }
 </div>

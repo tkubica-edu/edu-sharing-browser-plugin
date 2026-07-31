@@ -1,74 +1,56 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal } from '@angular/core';
 
+import { errorMessage } from '../../util/errors';
 import { AuthService } from '../../services/auth.service';
 import { CurationService } from '../../services/curation.service';
 import { NavigationService } from '../../services/navigation.service';
-import { EduBundleService } from '../../services/edu-bundle.service';
+import { loadWebComponentBundle } from '../../services/web-component-bundle.service';
 import { LoginComponent } from '../login.component';
-import { toApiRootUrl } from '../../config';
 
-// "Neues OnlyOffice-Dokument": embeds <edu-sharing-add-with-connector> as a REAL custom
-// element (no iframe). Mounting the element opens the OnlyOffice create-dialog immediately
-// and, on confirm, opens the OnlyOffice editor window. The bundle is loaded once by
-// EduBundleService and authenticates via the shared repository session cookie (no ticket —
-// same as <edu-sharing-nodes-selector> in es-search).
-//
-// As in es-search, the tag is rendered behind a synchronous guard (`@if (ready())`) so its
-// inputs are in place before the bundle upgrades the element on connect.
+const CONNECTOR_TAG = 'edu-sharing-add-with-connector';
+
+// "Neues OnlyOffice-Dokument": embeds <edu-sharing-add-with-connector> as a REAL custom element
+// (no iframe). Mounting the element opens the OnlyOffice create-dialog immediately and, on
+// confirm, opens the OnlyOffice editor window. It authenticates via the shared repository session
+// cookie, like the nodes selector.
 @Component({
   selector: 'es-new-document-screen',
-  standalone: true,
-  imports: [CommonModule, LoginComponent],
+  imports: [LoginComponent],
   templateUrl: './new-document-screen.component.html',
   styleUrl: './new-document-screen.component.scss',
-  schemas: [CUSTOM_ELEMENTS_SCHEMA]
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class NewDocumentScreenComponent {
-  readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   private readonly curation = inject(CurationService);
-  private readonly nav = inject(NavigationService);
-  private readonly bundle = inject(EduBundleService);
+  private readonly navigation = inject(NavigationService);
 
-  readonly error = signal<string | null>(null);
-  // Gates the custom element until the bundle finished loading (mirrors es-search's
-  // `@if (option)` guard: the element must have its inputs before it upgrades).
-  readonly ready = signal(false);
+  // The element is rendered only once its tag is defined — mounting it opens the dialog, so it
+  // must not appear before the bundle can drive it.
+  protected readonly bundle = loadWebComponentBundle('edu', CONNECTOR_TAG);
 
-  constructor() {
-    const api = toApiRootUrl(this.auth.state().repositoryUrl);
-    this.bundle
-      .load(api)
-      .then(() => this.ready.set(true))
-      .catch((e: unknown) => this.error.set(String((e as Error)?.message || e)));
-  }
+  protected readonly error = signal<string | null>(null);
 
-  // Fired once the IO node exists and the OnlyOffice editor window has been opened. Hydrate
-  // the new node into the curation flow (records it in the Verlauf) and land on Vorschau.
-  onNodeCreated(ev: Event): void {
-    const detail = (ev as CustomEvent).detail as unknown;
-    const id = this.extractNodeId(detail);
-    if (!id) return;
+  /** Fired once the node exists and the OnlyOffice editor window has been opened. */
+  protected onNodeCreated(event: Event): void {
+    const detail = (event as CustomEvent).detail as { ref?: { id?: string }; id?: string } | null;
+    const nodeId = detail?.ref?.id ?? detail?.id;
+    if (!nodeId) return;
+    // Hydrate the new node into the flow (records it in the history) and land on the preview.
     void this.curation
-      .loadFromNode(id)
-      .then(() => this.nav.land({ nodeJustLoaded: true }))
-      .catch((e: unknown) => this.error.set(String((e as Error)?.message || e)));
+      .openNode(nodeId)
+      .then(() => this.navigation.land({ nodeJustLoaded: true }))
+      .catch((cause: unknown) => this.error.set(errorMessage(cause)));
   }
 
-  // Fired when the dialog closes; detail is null if the user cancelled. On cancel, return to
-  // the options menu (a create was handled by onNodeCreated).
-  onDialogClosed(ev: Event): void {
-    if ((ev as CustomEvent).detail == null) this.nav.openMenu();
+  /** Fired when the dialog closes; a null detail means the user cancelled. */
+  protected onDialogClosed(event: Event): void {
+    if ((event as CustomEvent).detail == null) this.navigation.openMenu();
   }
 
-  onFailed(ev: Event): void {
-    const detail = (ev as CustomEvent).detail;
+  protected onFailed(event: Event): void {
+    const detail = (event as CustomEvent).detail;
     this.error.set('Das Dokument konnte nicht erstellt werden: ' + String(detail ?? ''));
-  }
-
-  // The nodeCreated detail carries the created node; tolerate the shapes the bundle may emit.
-  private extractNodeId(detail: unknown): string | null {
-    const d = detail as { ref?: { id?: string }; id?: string } | null | undefined;
-    return d?.ref?.id ?? d?.id ?? null;
   }
 }

@@ -1,42 +1,37 @@
 <header class="topbar">
-  <img class="logo" src="../icons/32.png" alt="" (error)="onLogoError($event)" />
+  <img class="logo" src="../icons/32.png" alt="" (error)="hideBrokenLogo($event)" />
   <span class="title">Edu-Sharing</span>
   <button class="close" title="Schließen" aria-label="Schließen" (click)="close()">✕</button>
 </header>
 
 <es-status-bar></es-status-bar>
 
-<!-- Workflow-step header: always shows the current view's title for consistency; the
-     back-to-menu button appears on every view except the menu itself. -->
+<!-- Always shows the current view's title; the back-to-menu button appears on every view
+     except the menu itself. -->
 <div class="step-header">
-  <button class="back-btn" *ngIf="nav.showBack()" (click)="nav.openMenu()"
-          title="Zurück zu Aktionen & Optionen" aria-label="Zurück zu Aktionen & Optionen">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
-  </button>
-  <h2 class="step-title">{{ nav.title() }}</h2>
+  @if (navigation.showBack()) {
+    <button class="back-btn" (click)="navigation.openMenu()"
+            title="Zurück zu Aktionen & Optionen" aria-label="Zurück zu Aktionen & Optionen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+    </button>
+  }
+  <h2 class="step-title">{{ navigation.title() }}</h2>
 </div>
 
 <main class="content">
-  <!-- Extension screen wins when registered for this view (adds custom views AND lets an
-       extension override a built-in one). Otherwise the built-in switch renders. -->
-  <es-ext-screen *ngIf="hasExtScreen(); else builtinViews" [view]="nav.view()"></es-ext-screen>
-  <ng-template #builtinViews>
-    <ng-container [ngSwitch]="nav.view()">
-      <es-menu *ngSwitchCase="'menu'"></es-menu>
-      <es-login *ngSwitchCase="'login'"></es-login>
-      <es-analyze-screen *ngSwitchCase="'analyze'"></es-analyze-screen>
-      <es-new-document-screen *ngSwitchCase="'new-document'"></es-new-document-screen>
-      <es-metadata-screen *ngSwitchCase="'metadata'"></es-metadata-screen>
-      <es-preview-screen *ngSwitchCase="'preview'"></es-preview-screen>
-      <es-collections-screen *ngSwitchCase="'collections'"></es-collections-screen>
-      <es-search *ngSwitchCase="'search'" [contextUrl]="ui.activeUrl()"></es-search>
-      <es-history *ngSwitchCase="'history'" (open)="openInWizard($event)"></es-history>
-      <es-settings *ngSwitchCase="'settings'"></es-settings>
-      <!-- Custom option ids that only add a view (no built-in case) render here. -->
-      <es-ext-screen *ngSwitchDefault [view]="nav.view()"></es-ext-screen>
-    </ng-container>
-  </ng-template>
+  @switch (navigation.view()) {
+    @case ('menu') { <es-menu></es-menu> }
+    @case ('login') { <es-login></es-login> }
+    @case ('analyze') { <es-analyze-screen></es-analyze-screen> }
+    @case ('new-document') { <es-new-document-screen></es-new-document-screen> }
+    @case ('metadata') { <es-metadata-screen></es-metadata-screen> }
+    @case ('preview') { <es-preview-screen></es-preview-screen> }
+    @case ('collections') { <es-collections-screen></es-collections-screen> }
+    @case ('search') { <es-search></es-search> }
+    @case ('history') { <es-history (open)="openFromHistory($event)"></es-history> }
+    @case ('settings') { <es-settings></es-settings> }
+  }
 </main>
 
 <es-action-bar></es-action-bar>

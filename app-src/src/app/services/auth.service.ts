@@ -4,49 +4,43 @@ import { AuthenticationService, LoginInfo } from 'ngx-edu-sharing-api';
 
 import { APP_CONFIG, toApiRootUrl } from '../config';
 import { BOOT_ROOT_URL } from '../app.config';
-import { ExtService } from './ext.service';
+import { BrowserExtensionService } from './browser-extension.service';
 
-export interface AuthState {
-  repositoryUrl: string;
-  loggedIn: boolean;
-  guest: boolean;
-  username: string | null;
-  error: string | null;
-  /** True when the repo URL was edited to differ from the bootstrapped one. */
-  needsReload: boolean;
-  /** True while an existing session is being revalidated on startup. */
-  restoring: boolean;
-}
+/** How long to wait for the session check on startup. */
+const RESTORE_TIMEOUT_MS = 8000;
 
 // Login against a user-supplied edu-sharing repository via ngx-edu-sharing-api.
 // The library freezes rootUrl at bootstrap, so switching repositories reloads the
 // sidebar (persist URL → reload → main.ts re-bootstraps).
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly auth = inject(AuthenticationService);
-  private readonly ext = inject(ExtService);
+  private readonly authentication = inject(AuthenticationService);
+  private readonly browserExtension = inject(BrowserExtensionService);
   private readonly bootRootUrl = inject(BOOT_ROOT_URL);
 
-  // Signal so login/state changes update the UI immediately.
-  readonly state = signal<AuthState>({
-    repositoryUrl: this.bootRootUrl.replace(/\/rest$/, ''),
-    loggedIn: false,
-    guest: true,
-    username: null,
-    error: null,
-    needsReload: false,
-    restoring: true
-  });
+  /** The repository base URL (`…/edu-sharing`) the user configured. */
+  readonly repositoryUrl = signal(this.bootRootUrl.replace(/\/rest$/, ''));
+  /** True for a valid, non-guest repository session. */
+  readonly loggedIn = signal(false);
+  readonly username = signal<string | null>(null);
+  readonly error = signal<string | null>(null);
+  /** True when the repository URL was edited to differ from the bootstrapped one. */
+  readonly needsReload = signal(false);
+  /** True while an existing session is being revalidated on startup. */
+  readonly restoring = signal(true);
 
-  readonly loggedIn = computed(() => this.state().loggedIn);
+  /** The library's rootUrl for the configured repository (`…/edu-sharing/rest`). */
+  readonly apiRootUrl = computed(() => toApiRootUrl(this.repositoryUrl()));
 
   /** Load the persisted repository URL (or default), then revalidate any session. */
   async init(): Promise<void> {
-    let repoUrl = APP_CONFIG.defaultRepositoryUrl;
-    if (this.ext.available) {
-      repoUrl = await this.ext.storageGet(APP_CONFIG.storageKeys.repositoryUrl, APP_CONFIG.defaultRepositoryUrl);
-    }
-    this.state.update((s) => ({ ...s, repositoryUrl: repoUrl, needsReload: false }));
+    this.repositoryUrl.set(
+      await this.browserExtension.storageGet(
+        APP_CONFIG.storageKeys.repositoryUrl,
+        APP_CONFIG.defaultRepositoryUrl,
+      ),
+    );
+    this.needsReload.set(false);
     await this.restoreSession();
   }
 
@@ -58,33 +52,24 @@ export class AuthService {
   // gone (browser restart, Safari ITP, server logout) this simply resolves to guest.
   private async restoreSession(): Promise<void> {
     try {
-      const info = (await firstValueFrom(this.auth.observeLoginInfo().pipe(timeout(8000)))) as LoginInfo;
-      if (info?.isValidLogin && !info?.isGuest) {
-        this.state.update((s) => ({
-          ...s,
-          loggedIn: true,
-          guest: false,
-          username: info.authorityName || s.username,
-          error: null
-        }));
-      }
+      const info = await firstValueFrom(
+        this.authentication.observeLoginInfo().pipe(timeout(RESTORE_TIMEOUT_MS)),
+      );
+      if (this.isValidUser(info)) this.applyLogin(info.authorityName ?? this.username());
     } catch {
       /* no active session (or unreachable) — stay logged out */
     } finally {
-      this.state.update((s) => ({ ...s, restoring: false }));
+      this.restoring.set(false);
     }
   }
 
-  // Persist the repository base; flag needsReload if it differs from the booted URL.
+  /** Persist the repository base; flag needsReload if it differs from the booted URL. */
   setRepositoryUrl(repositoryBase: string): void {
-    const base = (repositoryBase || '').trim();
-    this.state.update((s) => ({
-      ...s,
-      repositoryUrl: base,
-      needsReload: !!base && toApiRootUrl(base) !== this.bootRootUrl
-    }));
-    if (base && this.ext.available) {
-      void this.ext.storageSet(APP_CONFIG.storageKeys.repositoryUrl, base);
+    const base = repositoryBase.trim();
+    this.repositoryUrl.set(base);
+    this.needsReload.set(!!base && toApiRootUrl(base) !== this.bootRootUrl);
+    if (base) {
+      void this.browserExtension.storageSet(APP_CONFIG.storageKeys.repositoryUrl, base);
     }
   }
 
@@ -95,38 +80,50 @@ export class AuthService {
 
   /** Log in with username/password. Returns true on a valid, non-guest login. */
   async login(username: string, password: string): Promise<boolean> {
-    this.state.update((s) => ({ ...s, error: null }));
+    this.error.set(null);
     try {
-      const info = (await firstValueFrom(this.auth.login(username, password))) as LoginInfo;
-      const valid = !!info?.isValidLogin && !info?.isGuest;
-      if (!valid) {
-        this.state.update((s) => ({ ...s, loggedIn: false, guest: true, username: null, error: 'Ungültige Anmeldedaten.' }));
+      const info = await firstValueFrom(this.authentication.login(username, password));
+      if (!this.isValidUser(info)) {
+        this.applyLogout('Ungültige Anmeldedaten.');
         return false;
       }
-      this.state.update((s) => ({
-        ...s,
-        loggedIn: true,
-        guest: false,
-        username: info?.authorityName || username,
-        error: null
-      }));
+      this.applyLogin(info.authorityName ?? username);
       return true;
-    } catch (e: unknown) {
-      this.state.update((s) => ({ ...s, loggedIn: false, guest: true, username: null, error: this.describeError(e) }));
+    } catch (cause: unknown) {
+      this.applyLogout(this.describeError(cause));
       return false;
     }
   }
 
   async logout(): Promise<void> {
-    try { await firstValueFrom(this.auth.logout()); } catch { /* best-effort */ }
-    this.state.update((s) => ({ ...s, loggedIn: false, guest: true, username: null }));
+    try {
+      await firstValueFrom(this.authentication.logout());
+    } catch {
+      /* best-effort — drop the local session either way */
+    }
+    this.applyLogout(null);
   }
 
-  private describeError(e: unknown): string {
-    const err = e as { status?: number; message?: string };
-    if (err?.status === 0) return 'Verbindung zum Repository fehlgeschlagen (CORS/Netzwerk). URL prüfen.';
-    if (err?.status === 401 || err?.status === 403) return 'Ungültige Anmeldedaten.';
-    if (typeof err?.message === 'string') return err.message;
-    return 'Login fehlgeschlagen.';
+  private isValidUser(info: LoginInfo | undefined): info is LoginInfo {
+    return !!info?.isValidLogin && !info.isGuest;
+  }
+
+  private applyLogin(username: string | null): void {
+    this.loggedIn.set(true);
+    this.username.set(username);
+    this.error.set(null);
+  }
+
+  private applyLogout(error: string | null): void {
+    this.loggedIn.set(false);
+    this.username.set(null);
+    this.error.set(error);
+  }
+
+  private describeError(cause: unknown): string {
+    const { status, message } = (cause ?? {}) as { status?: number; message?: string };
+    if (status === 0) return 'Verbindung zum Repository fehlgeschlagen (CORS/Netzwerk). URL prüfen.';
+    if (status === 401 || status === 403) return 'Ungültige Anmeldedaten.';
+    return message ? String(message) : 'Login fehlgeschlagen.';
   }
 }

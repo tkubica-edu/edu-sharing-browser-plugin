@@ -1,41 +1,39 @@
-import { Component, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { AuthService } from '../services/auth.service';
 
-// Shared login gate used by BOTH primary features (Erschließen, Inhalt suchen).
-// Renders the credential form while logged out and a compact status row once
-// logged in. The repository session is shared, so signing in here immediately
-// unblocks every tab. Login/logout state lives in AuthService.
+// The shared login gate: the credential form while logged out, a compact status row once logged
+// in. The repository session is shared, so signing in here unblocks every screen.
 @Component({
   selector: 'es-login',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './login.component.html',
-  styleUrl: './login.component.scss'
+  styleUrl: './login.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LoginComponent {
-  readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
 
-  username = '';
-  password = '';
-  // Signal so the "Anmelden…" state refreshes under zoneless change detection
-  // (it is toggled after an await, outside any template event or signal write).
-  readonly loggingIn = signal(false);
+  protected readonly username = signal('');
+  protected readonly password = signal('');
+  protected readonly loggingIn = signal(false);
 
-  async login(): Promise<void> {
-    if (!this.username || !this.password || this.auth.state().needsReload) return;
+  protected readonly canSubmit = computed(
+    () => !!this.username() && !!this.password() && !this.auth.needsReload() && !this.loggingIn(),
+  );
+
+  protected async login(): Promise<void> {
+    if (!this.canSubmit()) return;
     this.loggingIn.set(true);
     try {
-      const ok = await this.auth.login(this.username, this.password);
-      if (ok) this.password = '';
+      if (await this.auth.login(this.username(), this.password())) this.password.set('');
     } finally {
       this.loggingIn.set(false);
     }
   }
 
-  async logout(): Promise<void> {
-    await this.auth.logout();
+  protected logout(): Promise<void> {
+    return this.auth.logout();
   }
 }

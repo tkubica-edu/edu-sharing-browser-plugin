@@ -1,7 +1,9 @@
 <div class="preview-wrap">
-  <p class="muted" *ngIf="!ready() && !error()">Vorschau wird geladen…</p>
-  <p class="error" *ngIf="error()">Vorschau konnte nicht geladen werden: {{ error() }}</p>
-
-  <edu-sharing-preview-sidebar *ngIf="ready()"
-                               [node]="node" [editorMode]="'viewer'"></edu-sharing-preview-sidebar>
+  @if (bundle.error()) {
+    <p class="error">Vorschau konnte nicht geladen werden: {{ bundle.error() }}</p>
+  } @else if (!bundle.ready()) {
+    <p class="muted">Vorschau wird geladen…</p>
+  } @else {
+    <edu-sharing-preview-sidebar [node]="node()" [editorMode]="'viewer'"></edu-sharing-preview-sidebar>
+  }
 </div>

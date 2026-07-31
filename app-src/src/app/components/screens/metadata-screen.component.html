@@ -3,33 +3,55 @@
     <p class="es-muted">
       Prüfe und ergänze die Metadaten und speichere sie anschließend über „Speichern".
     </p>
-    <p class="src-title" *ngIf="gen.last()?.source as s" [title]="s.url">{{ s.title || s.url }}</p>
-    <div class="es-result-sub" *ngIf="gen.last()?.parsed as p">
-      <span class="es-chip">{{ p.fieldsExtracted ?? '–' }} / {{ p.fieldsTotal ?? '–' }} Felder</span>
-      <span class="es-chip" *ngIf="curation.createdNode()">Node: {{ curation.createdNode()?.name }}</span>
-    </div>
+
+    @if (metadataAgent.lastRun()?.source; as source) {
+      <p class="src-title" [title]="source.url">{{ source.title || source.url }}</p>
+    }
+
+    @if (metadataAgent.lastRun()?.parsed; as parsed) {
+      <div class="es-result-sub">
+        <span class="es-chip">{{ parsed.fieldsExtracted ?? '–' }} / {{ parsed.fieldsTotal ?? '–' }} Felder</span>
+        @if (curation.activeNode(); as node) {
+          <span class="es-chip">Node: {{ node.name }}</span>
+        }
+      </div>
+    }
   </section>
 
-  <section class="es-card" *ngIf="curation.editorMetadata() as md">
-    <es-mds-editor [metadata]="md" groupId="io" (save)="onSave($event)"></es-mds-editor>
-  </section>
+  @if (curation.editorMetadata(); as metadata) {
+    <section class="es-card">
+      <!-- The WLO canvas replaces the edu-sharing MDS editor while the repository config
+           enables it; both implement the same MetadataEditor contract. -->
+      @if (additionalWebComponent.enabled()) {
+        <es-wlo-canvas [metadata]="metadata" (save)="save($event)"></es-wlo-canvas>
+      } @else {
+        <es-mds-editor [metadata]="metadata" (save)="save($event)"></es-mds-editor>
+      }
+    </section>
+  }
 
-  <section class="es-card" *ngIf="curation.saveError()">
-    <p class="es-error">Speichern fehlgeschlagen: {{ curation.saveError() }}</p>
-  </section>
+  @if (curation.saveError(); as error) {
+    <section class="es-card"><p class="es-error">Speichern fehlgeschlagen: {{ error }}</p></section>
+  }
 
-  <details class="es-card raw" *ngIf="gen.last()?.parsed as p">
-    <summary>Extrahierte Felder ({{ p.fields.length }})</summary>
-    <dl class="fields">
-      <ng-container *ngFor="let f of p.fields">
-        <dt>{{ f.key }}</dt>
-        <dd><span class="val" *ngFor="let v of f.values">{{ v }}</span></dd>
-      </ng-container>
-    </dl>
-  </details>
+  @if (metadataAgent.lastRun()?.parsed; as parsed) {
+    <details class="es-card raw">
+      <summary>Extrahierte Felder ({{ parsed.fields.length }})</summary>
+      <dl class="fields">
+        @for (field of parsed.fields; track field.key) {
+          <dt>{{ field.key }}</dt>
+          <dd>
+            @for (value of field.values; track $index) {
+              <span class="val">{{ value }}</span>
+            }
+          </dd>
+        }
+      </dl>
+    </details>
 
-  <details class="es-card raw" *ngIf="gen.last()?.parsed as p">
-    <summary>Rohdaten (JSON)</summary>
-    <pre>{{ p.raw | json }}</pre>
-  </details>
+    <details class="es-card raw">
+      <summary>Rohdaten (JSON)</summary>
+      <pre>{{ parsed.raw | json }}</pre>
+    </details>
+  }
 </div>

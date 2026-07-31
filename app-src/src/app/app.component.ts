@@ -1,174 +1,168 @@
-import { Component, HostListener, OnInit, computed, effect, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, OnInit, effect, inject, signal } from '@angular/core';
 
-import { AuthService } from './services/auth.service';
-import { HistoryEntry, HistoryService } from './services/history.service';
-import { CurationService } from './services/curation.service';
-import { ExtService } from './services/ext.service';
-import { UiStateService } from './services/ui-state.service';
-import { NavigationService } from './services/navigation.service';
-import { ExtensionService } from './extension/extension.service';
-import { ExtScreenComponent } from './extension/ext-screen.component';
 import { APP_CONFIG } from './config';
+import { errorMessage } from './util/errors';
+import { AdditionalWebComponentService } from './services/additional-web-component.service';
+import { AuthService } from './services/auth.service';
+import { BrowserExtensionService } from './services/browser-extension.service';
+import { ConditionsService } from './services/conditions.service';
+import { CurationService } from './services/curation.service';
+import { HistoryEntry, HistoryService } from './services/history.service';
+import { NavigationService } from './services/navigation.service';
 
-import { StatusBarComponent } from './components/status-bar.component';
 import { ActionBarComponent } from './components/action-bar.component';
-import { MenuComponent } from './components/menu.component';
-import { LoginComponent } from './components/login.component';
 import { HistoryComponent } from './components/history.component';
-import { SettingsComponent } from './components/settings.component';
+import { LoginComponent } from './components/login.component';
+import { MenuComponent } from './components/menu.component';
 import { SearchComponent } from './components/search.component';
+import { SettingsComponent } from './components/settings.component';
+import { StatusBarComponent } from './components/status-bar.component';
 import { AnalyzeScreenComponent } from './components/screens/analyze-screen.component';
-import { NewDocumentScreenComponent } from './components/screens/new-document-screen.component';
-import { MetadataScreenComponent } from './components/screens/metadata-screen.component';
-import { PreviewScreenComponent } from './components/screens/preview-screen.component';
 import { CollectionsScreenComponent } from './components/screens/collections-screen.component';
+import { MetadataScreenComponent } from './components/screens/metadata-screen.component';
+import { NewDocumentScreenComponent } from './components/screens/new-document-screen.component';
+import { PreviewScreenComponent } from './components/screens/preview-screen.component';
+
+/** Sender id of the OnlyOffice plugin messages relayed by content/panel-host.js. */
+const PLUGIN_SOURCE = 'edu-sharing-onlyoffice-plugin';
+
+/** Window in which the same node delivery is treated as a duplicate. */
+const DUPLICATE_WINDOW_MS = 3000;
+
+const DISCARD_PROMPT =
+  'Es gibt eine noch nicht gespeicherte Erschließung. Trotzdem laden und die aktuelle verwerfen?';
 
 @Component({
   selector: 'es-root',
-  standalone: true,
   imports: [
-    CommonModule,
-    StatusBarComponent, ActionBarComponent, MenuComponent,
-    LoginComponent, HistoryComponent, SettingsComponent, SearchComponent,
-    AnalyzeScreenComponent, NewDocumentScreenComponent, MetadataScreenComponent, PreviewScreenComponent, CollectionsScreenComponent,
-    ExtScreenComponent
+    StatusBarComponent, ActionBarComponent, MenuComponent, LoginComponent, HistoryComponent,
+    SettingsComponent, SearchComponent, AnalyzeScreenComponent, NewDocumentScreenComponent,
+    MetadataScreenComponent, PreviewScreenComponent, CollectionsScreenComponent
   ],
   templateUrl: './app.component.html',
-  styleUrl: './app.component.scss'
+  styleUrl: './app.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    // A PREVIEW_NODE relayed from the OnlyOffice plugin. The sender is a cross-origin frame, so
+    // it is filtered by data.source, never by event.origin.
+    '(window:message)': 'onWindowMessage($event)'
+  }
 })
 export class AppComponent implements OnInit {
-  readonly auth = inject(AuthService);
-  private readonly ext = inject(ExtService);
-  private readonly extensionService = inject(ExtensionService);
-  readonly history = inject(HistoryService);
-  private readonly wiz = inject(CurationService);
-  readonly ui = inject(UiStateService);
-  readonly nav = inject(NavigationService);
+  protected readonly auth = inject(AuthService);
+  protected readonly navigation = inject(NavigationService);
+  protected readonly conditions = inject(ConditionsService);
 
-  // True when an extension provides (or overrides) the screen for the current view — the
-  // shell renders that instead of the built-in switch case.
-  readonly hasExtScreen = computed(() =>
-    !!this.extensionService.getRendering('screen', this.nav.view(), this.ui.conditions()),
-  );
+  private readonly browserExtension = inject(BrowserExtensionService);
+  private readonly additionalWebComponent = inject(AdditionalWebComponentService);
+  private readonly curation = inject(CurationService);
+  private readonly history = inject(HistoryService);
 
-  // A node id received from the OnlyOffice plugin (PREVIEW_NODE) while logged out — loaded
-  // once the user logs in.
-  private readonly pendingPreviewId = signal<string | null>(null);
-  // Dedupe: the same delivery can arrive via both the storage replay and a live relay.
-  private lastPreviewId: string | null = null;
-  private lastPreviewAt = 0;
+  /** A node received while logged out — opened once the user logs in. */
+  private readonly pendingNodeId = signal<string | null>(null);
+
+  /** Dedupe: the same delivery can arrive via both the storage replay and a live relay. */
+  private lastNodeId: string | null = null;
+  private lastNodeAt = 0;
 
   constructor() {
-    // Once logged in, load any node that was received while logged out.
     effect(() => {
-      const id = this.pendingPreviewId();
-      if (id && this.auth.state().loggedIn) {
-        this.pendingPreviewId.set(null);
-        void this.loadPreviewNode(id);
+      const nodeId = this.pendingNodeId();
+      if (nodeId && this.auth.loggedIn()) {
+        this.pendingNodeId.set(null);
+        void this.openNode(() => this.curation.openNode(nodeId));
       }
     });
   }
 
   async ngOnInit(): Promise<void> {
-    // Boot the extension point: it only activates when the repository config provides
-    // `additionalWebComponent`; otherwise this is a no-op and the default app is used.
-    this.extensionService.initialize();
+    // Only activates when the repository config enables `additionalWebComponent`.
+    this.additionalWebComponent.initialize();
     await this.auth.init();
     await this.history.load();
-    try {
-      const tab = await this.ext.getActiveTab();
-      this.ui.activeUrl.set(tab?.url ?? null);
-    } catch { /* ignore */ }
+    const tab = await this.browserExtension.getActiveTab().catch(() => null);
+    this.conditions.activeUrl.set(tab?.url ?? null);
 
-    // Land on the view that fits the current page (search on an OnlyOffice editor, the
-    // login gate when logged out, otherwise the options menu).
-    this.nav.land();
+    // Land on the view that fits the current page (search on an OnlyOffice editor, the login
+    // gate when logged out, otherwise the options menu).
+    this.navigation.land();
 
-    // Tell the host page we're ready so it can replay a buffered PREVIEW_NODE, and consume
-    // any preview that was persisted while the sidebar was closed/booting.
-    this.ext.signalReady();
-    await this.consumePendingPreview();
+    // Tell the host page we're ready so it can replay a buffered PREVIEW_NODE, then consume any
+    // node that was persisted while the sidebar was closed or booting.
+    this.browserExtension.signalReady();
+    await this.consumePendingNode();
   }
 
-  // A PREVIEW_NODE relayed from the OnlyOffice plugin (via content/panel-host.js). The
-  // sender is a cross-origin frame, so filter by data.source, never by event.origin.
-  @HostListener('window:message', ['$event'])
-  onWindowMessage(event: MessageEvent): void {
-    const msg = event.data;
-    if (!msg || msg.source !== 'edu-sharing-onlyoffice-plugin') return;
-    if (msg.event === 'PREVIEW_NODE') {
-      console.log('[edu-sharing][app] ⬅ received PREVIEW_NODE:', msg.data);
-      void this.receivePreview(msg.data);
+  protected onWindowMessage(event: MessageEvent): void {
+    const message = event.data as { source?: string; event?: string; data?: { id?: string } } | null;
+    if (message?.source !== PLUGIN_SOURCE || message.event !== 'PREVIEW_NODE') return;
+    void this.receiveNode(message.data?.id);
+  }
+
+  protected close(): void {
+    this.browserExtension.closePanel();
+  }
+
+  /** Open a saved node from the history (requested by the history screen). */
+  protected async openFromHistory(entry: HistoryEntry): Promise<void> {
+    if (!this.confirmDiscardUnsaved()) return;
+    await this.openNode(() => this.curation.openFromHistory(entry));
+  }
+
+  protected hideBrokenLogo(event: Event): void {
+    (event.target as HTMLImageElement).style.visibility = 'hidden';
+  }
+
+  /** Read and clear the node persisted by panel-host while the sidebar was closed or booting. */
+  private async consumePendingNode(): Promise<void> {
+    const pending = await this.browserExtension
+      .storageGet<{ data?: { data?: { id?: string } } } | null>(
+        APP_CONFIG.storageKeys.pendingPreview,
+        null,
+      )
+      .catch(() => null);
+    const nodeId = pending?.data?.data?.id;
+    if (!nodeId) return;
+    await this.browserExtension.storageSet(APP_CONFIG.storageKeys.pendingPreview, null);
+    await this.receiveNode(nodeId);
+  }
+
+  /** Route a received node into the flow, deduping rapid duplicate deliveries. */
+  private async receiveNode(nodeId: string | undefined): Promise<void> {
+    if (!nodeId || this.isDuplicate(nodeId)) return;
+    if (!this.confirmDiscardUnsaved()) return;
+    if (!this.auth.loggedIn()) {
+      // Not logged in yet → show the login gate; the effect opens the node after login.
+      this.pendingNodeId.set(nodeId);
+      this.navigation.land();
+      return;
+    }
+    await this.openNode(() => this.curation.openNode(nodeId));
+  }
+
+  /**
+   * Load a node into the flow and land on its preview; surface a failure to the user. Callers
+   * confirm discarding unsaved work first (see {@link confirmDiscardUnsaved}).
+   */
+  private async openNode(load: () => Promise<void>): Promise<void> {
+    try {
+      await load();
+      this.navigation.land({ nodeJustLoaded: true });
+    } catch (cause: unknown) {
+      alert('Der Node konnte nicht geladen werden: ' + errorMessage(cause));
     }
   }
 
-  // Read + clear the node persisted by panel-host while the sidebar was closed/booting.
-  private async consumePendingPreview(): Promise<void> {
-    try {
-      const pending = await this.ext.storageGet<{ data?: { data?: { id?: string } } } | null>(
-        APP_CONFIG.storageKeys.pendingPreview, null);
-      const id = pending?.data?.data?.id;
-      if (id) {
-        await this.ext.storageSet(APP_CONFIG.storageKeys.pendingPreview, null);
-        await this.receivePreview({ id });
-      }
-    } catch { /* ignore */ }
+  /** Ask before discarding a generated result that was never saved to a node. */
+  private confirmDiscardUnsaved(): boolean {
+    return !this.curation.hasUnsavedWork() || confirm(DISCARD_PROMPT);
   }
 
-  // Route a received preview node into the curation flow (opens at Vorschau). Dedupes rapid
-  // duplicate deliveries (storage replay + live relay).
-  private async receivePreview(data: { id?: string } | null | undefined): Promise<void> {
-    const id = data?.id;
-    if (!id) return;
+  private isDuplicate(nodeId: string): boolean {
     const now = Date.now();
-    if (id === this.lastPreviewId && now - this.lastPreviewAt < 3000) return;
-    this.lastPreviewId = id;
-    this.lastPreviewAt = now;
-
-    if (this.wiz.hasUnsavedWork() &&
-        !confirm('Es gibt eine noch nicht gespeicherte Erschließung. Trotzdem laden und die aktuelle verwerfen?')) {
-      return;
-    }
-    if (!this.auth.state().loggedIn) {
-      // Not logged in yet → show the login gate; the effect loads it after login.
-      this.pendingPreviewId.set(id);
-      this.nav.land(); // → login
-      return;
-    }
-    await this.loadPreviewNode(id);
-  }
-
-  // Hydrate + open the node in the curation flow (Vorschau), then land there.
-  private async loadPreviewNode(id: string): Promise<void> {
-    try {
-      await this.wiz.loadFromNode(id);
-      this.nav.land({ nodeJustLoaded: true });
-    } catch (e: unknown) {
-      alert('Der Node konnte nicht geladen werden: ' + String((e as Error)?.message || e));
-    }
-  }
-
-  close(): void {
-    this.ext.closePanel();
-  }
-
-  // Load a saved node (from Verlauf) into the curation flow at Vorschau. If there is
-  // unsaved work (a generated result never saved to a node), confirm before discarding.
-  async openInWizard(entry: HistoryEntry): Promise<void> {
-    if (this.wiz.hasUnsavedWork() &&
-        !confirm('Es gibt eine noch nicht gespeicherte Erschließung. Trotzdem laden und die aktuelle verwerfen?')) {
-      return;
-    }
-    try {
-      await this.wiz.loadFromHistory(entry);
-      this.nav.land({ nodeJustLoaded: true });
-    } catch (e: unknown) {
-      alert('Der Node konnte nicht geladen werden: ' + String((e as Error)?.message || e));
-    }
-  }
-
-  onLogoError(ev: Event): void {
-    (ev.target as HTMLImageElement).style.visibility = 'hidden';
+    const duplicate = nodeId === this.lastNodeId && now - this.lastNodeAt < DUPLICATE_WINDOW_MS;
+    this.lastNodeId = nodeId;
+    this.lastNodeAt = now;
+    return duplicate;
   }
 }

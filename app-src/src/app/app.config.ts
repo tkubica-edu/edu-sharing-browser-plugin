@@ -15,7 +15,7 @@ export function buildAppConfig(rootUrl: string): ApplicationConfig {
     providers: [
       // The sidebar app is zoneless (signal-driven). zone.js is NOT loaded for the
       // app; the edu-sharing web-component bundle loads its own zone.js on demand
-      // (see EduBundleService), since that bundle is a zone-based Angular app.
+      // (see WebComponentBundleService), since that bundle is a zone-based Angular app.
       provideZonelessChangeDetection(),
       { provide: BOOT_ROOT_URL, useValue: rootUrl },
       provideHttpClient(withInterceptorsFromDi()),

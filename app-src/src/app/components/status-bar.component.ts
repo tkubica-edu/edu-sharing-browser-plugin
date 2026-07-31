@@ -1,32 +1,30 @@
-import { Component, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
-import { UiStateService } from '../services/ui-state.service';
 import { AuthService } from '../services/auth.service';
+import { ConditionsService } from '../services/conditions.service';
 import { CurationService } from '../services/curation.service';
 
-// The persistent condition bar. Always visible, independent of the options — it shows the
-// states the options' visibility is derived from (login, insert host, Edu-Sharing page,
-// active node, edit mode) so the user can always see why options appear/disappear.
+// The persistent condition bar. Always visible, independent of the options — it shows the states
+// the options' visibility is derived from (login, insert host, Edu-Sharing page, active node,
+// edit mode) so the user can always see why options appear or disappear.
 @Component({
   selector: 'es-status-bar',
-  standalone: true,
-  imports: [CommonModule],
   templateUrl: './status-bar.component.html',
-  styleUrl: './status-bar.component.scss'
+  styleUrl: './status-bar.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StatusBarComponent {
-  readonly ui = inject(UiStateService);
-  readonly auth = inject(AuthService);
-  readonly curation = inject(CurationService);
+  protected readonly conditions = inject(ConditionsService);
+  protected readonly auth = inject(AuthService);
+  protected readonly curation = inject(CurationService);
 
-  logout(): void {
+  protected logout(): void {
     void this.auth.logout();
   }
 
-  // Remove the active content from the extension state (deselect). Does NOT delete the
-  // repository node. Node-dependent options disappear and the nav guard re-lands.
-  clearActiveContent(): void {
+  // Drop the active content from the app state (deselect). Does NOT delete the repository node;
+  // node-dependent options disappear and the navigation guard re-lands.
+  protected clearActiveContent(): void {
     this.curation.startNew();
   }
 }

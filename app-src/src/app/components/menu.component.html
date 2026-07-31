@@ -1,39 +1,25 @@
 <div class="menu">
   <ul class="menu-list">
-    <li *ngFor="let it of items()">
-      <!-- Extension-provided menu item (template or custom element); falls back to the
-           default row below when no rendering is registered for this option. -->
-      <ng-container *ngIf="it.rendering as r; else defaultItem">
-        <ng-container
-          *ngIf="r.templateRef; else elementItem"
-          [ngTemplateOutlet]="r.templateRef"
-          [ngTemplateOutletContext]="{ option: it.option, conditions: ui.conditions(), slot: 'menuItem' }"
-        ></ng-container>
-        <ng-template #elementItem>
-          <button *ngIf="r.element" class="menu-item" (click)="nav.go(it.option.id)">
-            <es-ext-element
-              [tag]="r.element"
-              [data]="{ option: it.option, conditions: ui.conditions(), slot: 'menuItem' }"
-            ></es-ext-element>
-          </button>
-        </ng-template>
-      </ng-container>
-
-      <ng-template #defaultItem>
-        <button class="menu-item" (click)="nav.go(it.option.id)">
-          <span class="mi-icon" [innerHTML]="icon(it.option.icon)"></span>
+    @for (option of navigation.visibleOptions(); track option.id) {
+      <li>
+        <button class="menu-item" (click)="navigation.go(option.id)">
+          <span class="mi-icon" [innerHTML]="icon(option.id)"></span>
           <span class="mi-main">
             <span class="mi-title">
-              {{ it.option.label }}
-              <span class="count" *ngIf="it.option.id === 'history' && history.entries().length">{{ history.entries().length }}</span>
-              <span class="dot" *ngIf="it.option.id === 'settings' && auth.state().needsReload" title="Änderung übernehmen"></span>
+              {{ option.label }}
+              @if (option.id === 'history' && history.entries().length) {
+                <span class="count">{{ history.entries().length }}</span>
+              }
+              @if (option.id === 'settings' && auth.needsReload()) {
+                <span class="dot" title="Änderung übernehmen"></span>
+              }
             </span>
-            <span class="mi-desc">{{ it.option.description }}</span>
+            <span class="mi-desc">{{ option.description }}</span>
           </span>
           <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
         </button>
-      </ng-template>
-    </li>
+      </li>
+    }
   </ul>
 </div>

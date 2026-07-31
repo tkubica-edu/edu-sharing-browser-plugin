@@ -1,0 +1,9 @@
+:host { display: block; }
+
+.canvas-wrap { display: flex; flex-direction: column; }
+
+metadata-agent-canvas {
+  display: block;
+  width: 100%;
+  min-height: 400px;
+}

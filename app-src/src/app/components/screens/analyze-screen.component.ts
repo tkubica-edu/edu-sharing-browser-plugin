@@ -1,17 +1,16 @@
-import { Component, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
-import { GenerateService } from '../../services/generate.service';
+import { MetadataAgentService } from '../../services/metadata-agent.service';
 
-// "Inhalt erschließen": intro/description only. The action ("Erschließung starten") lives
-// in the footer action bar (FlowService), which runs /generate and advances to Metadaten.
+// "Inhalt erschließen": intro and last-run error only. The action ("Erschließung starten") lives
+// in the footer (ActionBarService), which runs the metadata agent and advances to the metadata
+// screen.
 @Component({
   selector: 'es-analyze-screen',
-  standalone: true,
-  imports: [CommonModule],
   templateUrl: './analyze-screen.component.html',
-  styleUrl: './analyze-screen.component.scss'
+  styleUrl: './analyze-screen.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AnalyzeScreenComponent {
-  readonly gen = inject(GenerateService);
+  protected readonly metadataAgent = inject(MetadataAgentService);
 }

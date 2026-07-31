@@ -1,10 +1,14 @@
 <!doctype html>
 <html lang="de">
-<head>
+<head><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <meta charset="utf-8">
   <title>Edu-Sharing</title>
   <base href="./">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Material Icons for the embedded edu-sharing / wlo web components: their stylesheets style
+       `.material-icons` / `.material-icons-outlined` but ship no font. Loaded from Google, which
+       the extension CSP allows (style-src fonts.googleapis.com, font-src fonts.gstatic.com). -->
+  <style>@font-face{font-family:'Material Icons';font-style:normal;font-weight:400;src:url(https://fonts.gstatic.com/s/materialicons/v145/flUhRq6tzZclQEJ-Vdg-IuiaDsNc.woff2) format('woff2');}@font-face{font-family:'Material Icons Outlined';font-style:normal;font-weight:400;src:url(https://fonts.gstatic.com/s/materialiconsoutlined/v110/gok-H7zzDkdnRel8-DQ6KAXJ69wP1tGnf4ZGhUce.woff2) format('woff2');}.material-icons{font-family:'Material Icons';font-weight:normal;font-style:normal;font-size:24px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;-webkit-font-feature-settings:'liga';-webkit-font-smoothing:antialiased;}.material-icons-outlined{font-family:'Material Icons Outlined';font-weight:normal;font-style:normal;font-size:24px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;-webkit-font-feature-settings:'liga';-webkit-font-smoothing:antialiased;}</style>
 <link rel="stylesheet" href="styles.css"></head>
 <body>
   <es-root></es-root>

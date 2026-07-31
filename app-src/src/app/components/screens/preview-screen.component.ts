@@ -1,18 +1,17 @@
-import { Component, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
 import { CurationService } from '../../services/curation.service';
 import { PreviewNodeComponent } from '../preview-node.component';
 
-// "Vorschau": shows the active node with the embedded preview element. The footer's next
-// step (Metadaten bearbeiten / Einsortieren) is chosen by FlowService from the state.
+// "Vorschau": shows the active node with the embedded preview element. The footer's next steps
+// (edit metadata / add to a collection) come from ActionBarService.
 @Component({
   selector: 'es-preview-screen',
-  standalone: true,
-  imports: [CommonModule, PreviewNodeComponent],
+  imports: [PreviewNodeComponent],
   templateUrl: './preview-screen.component.html',
-  styleUrl: './preview-screen.component.scss'
+  styleUrl: './preview-screen.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PreviewScreenComponent {
-  readonly curation = inject(CurationService);
+  protected readonly curation = inject(CurationService);
 }

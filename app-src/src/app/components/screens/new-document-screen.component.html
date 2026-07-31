@@ -1,24 +1,24 @@
 <!-- Login required to create a document in the repository — reuse the shared gate. -->
-<div class="login-gate" *ngIf="!auth.state().loggedIn">
-  <es-login></es-login>
-</div>
+@if (auth.loggedIn()) {
+  <div class="connector-wrap">
+    @if (error() || bundle.error(); as message) {
+      <p class="es-error">{{ message }}</p>
+    }
 
-<div class="connector-wrap" *ngIf="auth.state().loggedIn">
-  @if (error()) {
-    <p class="error">{{ error() }}</p>
-  }
-
-  @if (ready()) {
-    <!-- Mounting the element opens the OnlyOffice create-dialog immediately. -->
-    <edu-sharing-add-with-connector
-      connector-id="ONLY_OFFICE"
-      parent="-userhome-"
-      name="Neues Dokument"
-      (nodeCreated)="onNodeCreated($event)"
-      (dialogClosed)="onDialogClosed($event)"
-      (failed)="onFailed($event)"
-    ></edu-sharing-add-with-connector>
-  } @else if (!error()) {
-    <p class="es-muted loading">OnlyOffice-Dialog wird geladen …</p>
-  }
-</div>
+    @if (bundle.ready()) {
+      <!-- Mounting the element opens the OnlyOffice create-dialog immediately. -->
+      <edu-sharing-add-with-connector
+        connector-id="ONLY_OFFICE"
+        parent="-userhome-"
+        name="Neues Dokument"
+        (nodeCreated)="onNodeCreated($event)"
+        (dialogClosed)="onDialogClosed($event)"
+        (failed)="onFailed($event)"
+      ></edu-sharing-add-with-connector>
+    } @else if (!bundle.error()) {
+      <p class="es-muted">OnlyOffice-Dialog wird geladen …</p>
+    }
+  </div>
+} @else {
+  <div class="login-gate"><es-login></es-login></div>
+}

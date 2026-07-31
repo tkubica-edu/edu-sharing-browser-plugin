@@ -1,60 +1,56 @@
 # Edu-Sharing — Browser-Extension
 
 Cross-browser (Chrome, Edge, Firefox, Safari) WebExtension. It opens a resizable
-sidebar. Tab labels never wrap (`nowrap` + ellipsis), and on open the sidebar lands
-on the tab that fits the current page (OnlyOffice → *Inhalt suchen*).
+sidebar that shows a list of **Aktionen & Optionen** and lands on the option that fits the
+current page (an OnlyOffice editor → *Inhalt suchen*, logged out → the login gate).
 
-- **Erschließung** — a 4-step wizard (sub-tabs you can jump between once unlocked).
-  Login is **required** and provided by a shared **`es-login`** gate rendered at the
-  top of the tab (the same gate is reused by *Inhalt suchen*); the wizard is hidden
-  until logged in. When the active tab is Edu-Sharing itself (its host matches the
-  configured Repository-URL) the wizard is replaced by a short context note, since
-  there is nothing to erschließen — the tab still exists so the panel never ends up
-  without a primary tab. The wizard is a fixed-height column: the sub-tabs pin under
-  the main tabs, the step body scrolls, and a **persistent floating footer** holds the
-  current step's action(s) and scrolls the body to the top on each step change, so the
-  flow no longer depends on scroll position. Each sub-tab carries a **progress mark**
-  (numbered → ✓ once that step is complete → 🔒 while locked); a step counts as
-  complete once its result exists (1: generated, 2: node saved, 4: assigned) or, for
-  *Vorschau*, once you advance from it to *Zuordnen*. Locked steps can't be opened,
-  and while an action runs the sub-tabs and *Zurück* are frozen, so you can only move
-  between steps you've actually reached.
-  1. *Erschließen* — the footer shows a single full-width **Erschließung starten**,
-     which reads the current tab, calls `POST {apiUrl}/generate`, and advances to
-     Metadaten (a new run via the footer's *Neue Erschließung* on step 4 discards the
-     prior created node).
-  2. *Metadaten* — loads the result into the **`edu-sharing-mds-editor`**, which in
-     embedded mode renders **without any buttons of its own**. The footer's
-     **Speichern** (right of *← Zurück*) reaches into the editor (`commit()`), creates
-     a new `ccm:io` node in the **INBOX** the first time (`NodeService.createChild`)
-     or updates it thereafter (`editNodeMetadata`), and advances to Vorschau;
-     re-entering the step edits the node's stored metadata. Raw fields/JSON stay in
-     collapsibles.
-  3. *Vorschau* — the created node's name + link, plus a live preview rendered by the
-     **`edu-sharing-preview-sidebar`** web component (unlocked once a node exists).
-     Its `node` input takes the full hydrated node (loaded after save).
-  4. *Zuordnen* — the **`edu-sharing-nodes-selector`** web component (Collections
-     tab) lets you pick a collection; on its apply ("In Sammlung einfügen") button
-     the sidebar adds the created node to that collection. The selector's contract
-     is callback-based (`option.optionConfig.onNodesChoosen`), so the bridge owns
-     the callback and posts only the chosen collection back; the add itself runs in
-     the sidebar via ngx-edu-sharing-api's `CollectionServiceUnwrapped.addToCollection`
-     (the generated `CollectionV1Service`, exported under that alias since 10.0.2 — the
-     `CollectionService` wrapper is read-only).
-     The footer's *Neue Erschließung* button resets the flow.
-- **Inhalt suchen** — a main tab shown only when the active tab URL matches
-  `/src/tools/onlyoffice`. Login-gated by the shared `es-login`; once logged in it
-  embeds the **`edu-sharing-nodes-selector`** (search mode) to pick content and post
-  it back to the host page.
-- **Verlauf** — lists **saved nodes** (expandable); an entry is recorded only when a
-  node is actually saved (`save()`), so every row carries a `nodeId` (legacy pre-node
-  entries are dropped on load, and re-saving a node moves its row to the top instead
-  of duplicating). Each entry has an *In Erschließung laden* button that fetches the
-  live node by its id (`CurationService.loadFromHistory` → `UploadService.getNode`),
-  opens its *Vorschau* (step 3) with *Metadaten* (step 2) editable, and switches to the
-  Erschließung tab; if there is unsaved work (a generated result never saved to a node)
-  the shell confirms first, and a failed fetch is surfaced via an alert.
-- **Einstellungen** — the Repository-URL (used for login and the MDS editor).
+The app has no wizard and no fixed step order: every option is offered whenever its
+preconditions hold. `ConditionsService` collects those facts (login, OnlyOffice page,
+Edu-Sharing page, active node, editable metadata, edit mode) and each option in
+`model/options.ts` decides its own visibility from that snapshot. The **status bar** shows the
+same facts as chips, so it is always visible why an option appears or disappears — and it can
+drop the active content again. The **back button** always returns to the menu.
+
+The footer (`ActionBarService`) contributes the current view's next steps: *Erschließung
+starten* on the analyze screen, *Speichern* on the metadata screen, and the choice between
+*Metadaten editieren* / *Sammlung zuordnen* on the preview. Screens that own their own action
+(the selectors, login, settings) get no footer.
+
+The options:
+
+- **Login** — the shared `es-login` gate; shown while logged out and reused inline by the
+  screens that need a session.
+- **Inhalt erschließen** — reads the active tab, calls `POST {apiUrl}/generate` through the
+  background worker and advances to the metadata screen. Hidden on Edu-Sharing itself and on
+  an insert host, where the intent is searching instead.
+- **Neues OnlyOffice-Dokument** — mounts `edu-sharing-add-with-connector`, which opens the
+  OnlyOffice create dialog; the new node is hydrated into the flow and opens in the preview.
+- **Metadaten editieren** — loads the metadata into `edu-sharing-mds-editor-wrapper`. Saving
+  creates a `ccm:io` node in the **inbox** the first time (`NodeService.createChild`) and
+  updates it in place thereafter (`editNodeMetadata`), then advances to the preview. Available
+  for an active node or a fresh result that was never saved. Extracted fields and the raw JSON
+  stay in collapsibles.
+- **Vorschau** — the node's name and link plus a live `edu-sharing-preview-sidebar`. Its `node`
+  input takes the full hydrated node, so the node is (re)loaded after a save.
+- **Einsortieren in Sammlungen** — `edu-sharing-nodes-selector` as a collection picker. Its
+  contract is callback-based (`option.optionConfig.onNodesChoosen`), so the component owns the
+  callback and the add itself runs in the sidebar via ngx-edu-sharing-api's
+  `CollectionServiceUnwrapped.addToCollection` (the generated `CollectionV1Service`, exported
+  under that alias since 10.0.2 — the `CollectionService` wrapper is read-only).
+- **Inhalt suchen** — only on an insert host (URL matches `/src/tools/onlyoffice`): the same
+  selector in search mode, posting the chosen nodes to the host page.
+- **Verlauf** — the **saved nodes**, newest first. An entry is recorded only when a node is
+  actually saved, so every row carries a `nodeId` (legacy pre-node entries are dropped on load,
+  and re-saving a node moves its row to the top instead of duplicating). *In Vorschau öffnen*
+  fetches the live node by id (`CurationService.openFromHistory` → `RepositoryNodeService.get`)
+  and opens it; if there is unsaved work the shell confirms first, and a failed fetch is
+  surfaced via an alert.
+- **Einstellungen** — the Repository-URL (used for login and every embedded element).
+- **WLO Metadaten-Agent** — only when the repository config enables it, see below.
+
+A node double-clicked in the OnlyOffice plugin arrives as a `PREVIEW_NODE` message (relayed by
+`content/panel-host.js`, or replayed from storage if the sidebar was closed) and opens in the
+preview; while logged out it is held until the login succeeds.
 
 Authentication against an edu-sharing repository uses the official
 [`ngx-edu-sharing-api`](https://www.npmjs.com/package/ngx-edu-sharing-api) library.
@@ -70,41 +66,63 @@ stored**. While it checks, the status bar shows "Anmeldung wird geprüft…". If
 is gone (browser restart, explicit logout, or Safari ITP blocking the third-party cookie)
 it resolves to guest and the login gate appears.
 
-## The MDS editor (edu-sharing web component)
+## Direct web-component embedding
 
-The pre-built edu-sharing web-component bundle lives in `scripts/edu/` (packaged as
-`edu/` in the built extension; registers `edu-sharing-mds-editor`, among others).
-A second bundle, `scripts/wlo/` → `wlo/`, backs the menu extension point (see
-`app-src/src/app/extension/README.md`). Because that bundle ships its
-own full Angular runtime (zone.js + DI), it cannot share a document with this
-sidebar's Angular app. So it is hosted in a **same-origin iframe**:
+The pre-built edu-sharing bundle lives in `scripts/edu/` (packaged as `edu/` in the built
+extension). It is built from the edu-sharing frontend (`npm run build:app-as-component`
+→ `dist/web-components/app/`) and registers every element used here:
+`edu-sharing-mds-editor-wrapper`, `edu-sharing-preview-sidebar`,
+`edu-sharing-nodes-selector`, `edu-sharing-add-with-connector`. A second bundle,
+`scripts/wlo/` → `wlo/`, provides the optional `metadata-agent-canvas` (see below).
 
-- `webcomponent-host/{mds-editor.html, preview.html, mds-env.js, mds-bridge.js,
-  preview-bridge.js}` are overlaid onto the bundle at build time
-  (→ `dist/<t>/edu/`). `mds-env.js` (shared by both host pages) sets
-  `window.__env.EDU_SHARING_API_URL` from the iframe's `?api=` param (an inline
-  script would violate the CSP); `mds-bridge.js` creates `<edu-sharing-mds-editor>`
-  and relays `save`/`valuesChange`/`cancel` back to the sidebar via `postMessage`.
-- The sidebar's `MdsEditorComponent` embeds that iframe, and on the bridge's `ready`
-  handshake posts the generated metadata (`init` → element `.metadata`), plus
-  `groupId='io'` and `editorMode='form'`.
-- The same pattern hosts the node preview: `preview-bridge.js` creates
-  `<edu-sharing-preview-sidebar>`, and `PreviewNodeComponent` posts the hydrated
-  node on `ready` (`init` → element `.node`, `editorMode='viewer'`). Because that
-  element's `node` input is the Node object (not an id), the sidebar loads the full
-  node via `UploadService.getNode` after a save and keeps it in `previewNode`.
+The elements are used as **real custom elements in the sidebar document — no iframes**.
+`WebComponentBundleService` owns that: it injects each bundle's stylesheet and scripts once,
+sets `window.__env.EDU_SHARING_API_URL` before the edu bundle boots (its HttpClient freezes
+the value), and loads a bundle's `polyfills` (zone.js) only if no other bundle brought a Zone
+already. Components declare what they need as a field:
 
-Both host pages build from the **same** single bundle (`npm run build:app-as-component`
-in the edu-sharing frontend → `dist/web-components/app/`, dropped into
-`scripts/edu/`), which registers every element used here
-(`edu-sharing-mds-editor`, `edu-sharing-preview-sidebar`, …).
+```ts
+protected readonly bundle = loadWebComponentBundle('edu', 'edu-sharing-preview-sidebar');
+```
 
-The editor's own repository calls (MDS definition, value rendering) reuse the login
-session cookie when the user is logged in; as guest it relies on public access.
+and gate the tag on `bundle.ready()` / show `bundle.error()`. Pass the tag when the element
+must be defined before it renders; omit it when the element is created imperatively or must
+carry its inputs as it upgrades (the nodes selector reads `option.optionConfig` on connect,
+so `NodesSelectorComponent` renders the tag immediately and only reports load errors).
 
-> The metadata web component is intentionally **not** embedded — the sidebar only
-> renders the `/generate` output. The created node is consumed by the
-> `edu-sharing-preview-sidebar` component on the *Preview node* step.
+`MdsEditorComponent` is the one element created imperatively: the wrapper throws in its
+`ngOnInit` unless `embedded`/`currentValues` are already set, and Angular applies template
+bindings only *after* connect — so the element is built with every input assigned, then
+appended. In embedded mode it renders no buttons of its own; the footer's save action calls
+`commit()`, and edited values arrive via its `currentValuesChange` event.
+
+The elements' own repository calls (MDS definition, value rendering) reuse the login session
+cookie when the user is logged in; as guest they rely on public access.
+
+## The optional WLO metadata editor
+
+`AdditionalWebComponentService` watches the repository config for the boolean variable
+**`additionalWebComponent`**. While it is enabled, the **metadata screen** embeds
+`WloCanvasComponent` — `<metadata-agent-canvas>` from the packaged `wlo/` bundle — instead of the
+edu-sharing MDS editor. Nothing else changes: *Inhalt erschließen* still runs the metadata agent
+through the background worker, its result is loaded into the editor, and saving still creates or
+updates the repository node and records it in the Verlauf.
+
+Both editors implement the same `MetadataEditor` contract (`ready` + `commit()`), so the footer
+owns "Speichern" either way and the screen only picks which one to render.
+
+The canvas is configured for embedded use — `layout="plugin"`, no status bar, no AI
+highlighting — with its own save/upload buttons hidden (the footer saves) and page mode off
+(*Inhalt erschließen* is the app's own extraction path). Seeding is direct: its `importJsonData`
+reads `metadata || <the payload>` plus `metadataset` / `_origins` / `_source_text` /
+`preview_image_url`, which is exactly the agent payload shape, so an analysis result and a node's
+stored properties both load as-is. Edits arrive continuously via `metadataChange`; on save the
+namespaced field values are kept and the envelope is dropped, since it is not node metadata.
+
+The bundle reads `window.__ENV.agentUrl` at bootstrap (falling back to its own hardcoded
+default), so `WebComponentBundleService` publishes the configured `APP_CONFIG.apiUrl` there
+before the scripts run — mirroring `window.__env.EDU_SHARING_API_URL` for the edu bundle.
+`wlo/`'s file names are content-hashed, so its entry points are read from its own `index.html`.
 
 ## Architecture
 
@@ -158,53 +176,48 @@ xcrun safari-web-extension-converter dist/safari
 Open the generated Xcode project and Run.
 
 ### Manual test checklist
-1. Toolbar click → sidebar docks on the right; drag its left edge to resize; the ✕
-   button closes it. Tabs: Erschließung, Verlauf, Einstellungen (plus *Inhalt suchen*
-   on OnlyOffice pages). On an Edu-Sharing page the Erschließung tab shows a context
-   note instead of the wizard.
-2. **Einstellungen**: Repository URL defaults to
-   `https://repository.staging.openeduhub.net/edu-sharing` and is required. Changing
-   it shows an *Übernehmen* button that reloads the sidebar so the library
-   re-initializes against the new repository (a dot marks the tab until applied).
-3. **Login** (shared `es-login` gate, top of Erschließung / Inhalt suchen): required —
-   the wizard/selector stays hidden until logged in. Enter staging credentials →
-   status flips to a compact "Angemeldet als …" row and both tabs unlock. If the repo
-   URL was changed, login is blocked until it is applied in Einstellungen.
-4. **Analyze + save**: click *Erschließung starten* on a content page → shows
-   `fields_extracted / fields_total` and loads the `edu-sharing-mds-editor` with the
-   generated metadata. Edit, then the footer's **Speichern** → a node is created in
-   your INBOX and the flow advances to *Vorschau* (scrolled to the top); the sub-tab
-   marks flip to ✓ as each step completes. *If the editor iframe stays blank*, open
-   its devtools
-   (right-click → “This Frame”) and check for CSP or repository-CORS errors.
-5. **Verlauf**: each *saved node* is appended (nothing is recorded until you save);
-   entries expand to show fields and an *In Erschließung laden* button that reloads
-   the node from the repository into *Vorschau*; *Leeren* clears.
-
-While an action is running (Erschließung, Speichern, Zuordnen) the sub-tabs and *Zurück*
-are frozen, so you can't switch steps mid-action. Inline success confirmations were
-dropped — the sub-tab progress marks (✓) are the source of truth.
+1. Toolbar click → the sidebar docks on the right; drag its left edge to resize; the ✕ button
+   closes it. The menu lists the options visible for the current page, and the status bar shows
+   the matching chips.
+2. **Einstellungen**: the Repository-URL defaults to
+   `https://repository.staging.openeduhub.net/edu-sharing` and is required. Changing it shows an
+   *Übernehmen* button that reloads the sidebar so the library re-initializes against the new
+   repository (a dot marks the option until applied).
+3. **Login**: required for everything except *Einstellungen*. Enter staging credentials → the
+   status bar flips to "Angemeldet: …" and the login option disappears while the rest appear.
+   If the repository URL was changed, login is blocked until it is applied in *Einstellungen*.
+4. **Erschließen + speichern**: *Inhalt erschließen* on a content page → the metadata screen
+   shows `fields_extracted / fields_total` and loads the MDS editor with the generated
+   metadata. Edit, then the footer's **Speichern** → a node is created in your inbox and the
+   preview opens. The status bar gains an "Aktiver Inhalt" chip, which also clears it again.
+5. **Vorschau → Sammlungen**: from the preview, *Sammlung zuordnen* → pick a collection and
+   confirm with *In Sammlung einfügen*; the screen lists what was added.
+6. **Verlauf**: every *saved* node is listed (nothing is recorded until you save); entries
+   expand to show their fields and offer *In Vorschau öffnen*, which reloads the node from the
+   repository; *Leeren* clears the list.
+7. If an embedded element stays blank, check the sidebar frame's console for CSP or
+   repository-CORS errors — the elements run in this document, so their errors show up there.
 
 ## Known issues / caveats
 - **Safari**: the `host_permissions` CORS bypass for extension pages is unreliable,
-  and ITP may block the repository session cookie in the injected-iframe context.
+  and ITP may block the repository session cookie in the injected-panel context.
   Guest Erschließung (via the background worker) is unaffected; logged-in auth needs
   verification on Safari and may require a background auth fallback.
-- **`ngx-edu-sharing-api`** is Angular-only and declares peer deps of Angular 14–18,
-  while the app runs Angular 21. Its compiled output links fine under the newer
-  compiler, but the peer mismatch requires `legacy-peer-deps=true` (set in
-  `app-src/.npmrc`). Its build (mid-2025) also means it may lag future Angular;
-  it is also inactively maintained. It is used purely for the login call.
+- **`ngx-edu-sharing-api`** (10.0.10) is Angular-only and declares a peer dep of Angular
+  >= 18, while the app runs Angular 21, so installing needs `legacy-peer-deps=true` (set in
+  `app-src/.npmrc`). It is used for login, node create/update/read, and adding collection
+  references; the last one goes through `CollectionServiceUnwrapped`, since the exported
+  `CollectionService` wrapper is read-only.
 - **Broad permissions** (`host_permissions: https://*/*`, `connect-src https:`) are
   required because the repository URL is user-editable; expect stricter store review.
 - The repository URL cannot be changed at runtime without reloading the sidebar —
   the library freezes `rootUrl` at bootstrap and does not export its config classes.
-- **MDS editor rendering is not yet verified in a real browser.** Two things must
-  hold: (1) the vendored bundle boots under the extension CSP (`script-src 'self'` —
-  its core has no `eval`; only unused PDF/Monaco/Cordova *assets* do), and (2) the
-  editor can fetch the MDS definition from the repository (CORS/auth). Load the
-  unpacked extension and run an Erschließung to confirm; if the iframe is blank,
-  inspect that frame's console.
+- **MDS editor rendering needs verification in a real browser.** Two things must hold:
+  (1) the vendored bundle boots under the extension CSP (`script-src 'self'` — its core has no
+  `eval`; only unused PDF/Monaco/Cordova *assets* do), and (2) the editor can fetch the MDS
+  definition from the repository (CORS/auth). Load the unpacked extension and run an
+  Erschließung to confirm; the elements run in the sidebar document, so any failure shows up
+  in the sidebar frame's console.
 - **Bundle size**: `scripts/edu/` is ~22 MB (unpacked target ~77 MB) because
   it includes unused lazy assets (`assets/monaco`, `assets/pdf.*`, `assets/cordova`)
   and the `pdf-metadata-page` chunk. These are runtime-fetched only, so pruning them

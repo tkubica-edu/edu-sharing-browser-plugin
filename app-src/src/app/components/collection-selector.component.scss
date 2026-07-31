@@ -1,9 +1,3 @@
 :host { display: block; }
 
-.selector-wrap { display: flex; flex-direction: column; }
-
-edu-sharing-nodes-selector {
-  display: block;
-  width: 100%;
-  min-height: 560px;
-}
+es-nodes-selector ::ng-deep edu-sharing-nodes-selector { min-height: 560px; }

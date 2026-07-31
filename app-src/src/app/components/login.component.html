@@ -1,34 +1,37 @@
 <!-- Logged out: credential form. Logged in: compact status + logout. -->
-<ng-container *ngIf="!auth.state().loggedIn; else loggedIn">
+@if (auth.loggedIn()) {
+  <div class="status">
+    <span class="es-badge es-badge--user">Angemeldet</span>
+    <span class="es-muted">als <strong>{{ auth.username() }}</strong></span>
+    <button class="es-btn es-btn--text logout" (click)="logout()">Abmelden</button>
+  </div>
+} @else {
   <section class="es-card">
     <div class="es-card-head">
       <h2>Anmeldung</h2>
       <span class="es-badge es-badge--guest">Nicht angemeldet</span>
     </div>
 
-    <input type="text" class="es-input" [(ngModel)]="username" placeholder="Benutzername" autocomplete="username" />
-    <input type="password" class="es-input" [(ngModel)]="password" placeholder="Passwort"
-           autocomplete="current-password" (keyup.enter)="login()" />
-    <p class="es-error" *ngIf="auth.state().error">{{ auth.state().error }}</p>
+    <input type="text" class="es-input" placeholder="Benutzername" autocomplete="username"
+           [ngModel]="username()" (ngModelChange)="username.set($event)" />
+    <input type="password" class="es-input" placeholder="Passwort" autocomplete="current-password"
+           [ngModel]="password()" (ngModelChange)="password.set($event)" (keyup.enter)="login()" />
+
+    @if (auth.error()) {
+      <p class="es-error">{{ auth.error() }}</p>
+    }
 
     <div class="es-row">
-      <button class="es-btn es-btn--primary" (click)="login()"
-              [disabled]="loggingIn() || !username || !password || auth.state().needsReload">
+      <button class="es-btn es-btn--primary" [disabled]="!canSubmit()" (click)="login()">
         {{ loggingIn() ? 'Anmelden…' : 'Anmelden' }}
       </button>
       <span class="es-muted">Anmeldung ist erforderlich.</span>
     </div>
 
-    <p class="es-hint" *ngIf="auth.state().needsReload">
-      Repository geändert – bitte in „Einstellungen" übernehmen, um dich anzumelden.
-    </p>
+    @if (auth.needsReload()) {
+      <p class="es-hint">
+        Repository geändert – bitte in „Einstellungen" übernehmen, um dich anzumelden.
+      </p>
+    }
   </section>
-</ng-container>
-
-<ng-template #loggedIn>
-  <div class="status">
-    <span class="es-badge es-badge--user">Angemeldet</span>
-    <span class="es-muted">als <strong>{{ auth.state().username }}</strong></span>
-    <button class="es-btn es-btn--text logout" (click)="logout()">Abmelden</button>
-  </div>
-</ng-template>
+}

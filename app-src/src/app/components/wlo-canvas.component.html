@@ -1,0 +1,27 @@
+<div class="canvas-wrap">
+  @if (bundle.error()) {
+    <p class="es-error">WLO-Editor konnte nicht geladen werden: {{ bundle.error() }}</p>
+  } @else if (!bundle.ready()) {
+    <p class="es-muted">WLO-Editor wird geladen…</p>
+  }
+
+  <!--
+    Rendered inside the @if so the element's inputs are applied before it is inserted and
+    upgraded (see NodesSelectorComponent for what happens otherwise). `metadataInput` seeds the
+    canvas; its own save/upload buttons stay off because the footer owns saving.
+  -->
+  @if (bundle.ready()) {
+    <metadata-agent-canvas
+      [metadataInput]="metadata()"
+      [layout]="'plugin'"
+      [language]="'de'"
+      [highlightAi]="false"
+      [showStatusBar]="false"
+      [showSaveButton]="false"
+      [showUploadButton]="false"
+      [showPageMode]="false"
+      (metadataChange)="onMetadataChange($event)"
+      (metadataSubmit)="onMetadataSubmit($event)"
+    ></metadata-agent-canvas>
+  }
+</div>

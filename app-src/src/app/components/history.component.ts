@@ -1,31 +1,36 @@
-import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { HistoryService, HistoryEntry } from '../services/history.service';
+import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 
+import { HistoryEntry, HistoryService } from '../services/history.service';
+
+// The saved nodes, newest first. Each entry can be expanded to show its metadata, or reopened —
+// loading it is the shell's job, so this component only reports the request.
 @Component({
   selector: 'es-history',
-  standalone: true,
-  imports: [CommonModule],
+  imports: [DatePipe],
   templateUrl: './history.component.html',
-  styleUrl: './history.component.scss'
+  styleUrl: './history.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class HistoryComponent {
-  readonly history = inject(HistoryService);
-  readonly expanded = signal<string | null>(null);
+  protected readonly history = inject(HistoryService);
 
-  // Request to load a past entry into the Erschließung wizard (handled by the shell).
-  @Output() open = new EventEmitter<HistoryEntry>();
+  /** Request to reopen a past entry. */
+  readonly open = output<HistoryEntry>();
 
-  toggle(e: HistoryEntry): void {
-    this.expanded.set(this.expanded() === e.id ? null : e.id);
+  /** Id of the expanded entry, if any. */
+  protected readonly expandedId = signal<string | null>(null);
+
+  protected toggle(entry: HistoryEntry): void {
+    this.expandedId.update((id) => (id === entry.id ? null : entry.id));
   }
 
-  clear(): void {
+  protected clear(): void {
     void this.history.clear();
-    this.expanded.set(null);
+    this.expandedId.set(null);
   }
 
-  onImgError(ev: Event): void {
-    (ev.target as HTMLImageElement).style.display = 'none';
+  protected hideBrokenIcon(event: Event): void {
+    (event.target as HTMLImageElement).style.display = 'none';
   }
 }

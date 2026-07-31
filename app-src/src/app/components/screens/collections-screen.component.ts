@@ -1,23 +1,21 @@
-import { Component, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
-import { CurationService } from '../../services/curation.service';
-import { CollectionChoice, CollectionSelectorComponent } from '../collection-selector.component';
+import { Collection, CurationService } from '../../services/curation.service';
+import { CollectionSelectorComponent } from '../collection-selector.component';
 
-// "Einsortieren in Sammlungen": the collection selector owns its apply action ("In Sammlung
-// einfügen"), so there is no footer primary — this screen just wires the selection through
-// to CurationService.
+// "Einsortieren in Sammlungen": the selector owns its apply action ("In Sammlung einfügen"), so
+// there is no footer action — this screen only wires the selection through to CurationService.
 @Component({
   selector: 'es-collections-screen',
-  standalone: true,
-  imports: [CommonModule, CollectionSelectorComponent],
+  imports: [CollectionSelectorComponent],
   templateUrl: './collections-screen.component.html',
-  styleUrl: './collections-screen.component.scss'
+  styleUrl: './collections-screen.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CollectionsScreenComponent {
-  readonly curation = inject(CurationService);
+  protected readonly curation = inject(CurationService);
 
-  onAssign(collections: CollectionChoice[]): Promise<void> {
-    return this.curation.assignToCollection(collections);
+  protected assign(collections: Collection[]): Promise<void> {
+    return this.curation.assignToCollections(collections);
   }
 }

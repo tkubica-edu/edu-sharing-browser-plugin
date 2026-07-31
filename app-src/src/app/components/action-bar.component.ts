@@ -1,18 +1,15 @@
-import { Component, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
-import { FlowService } from '../services/flow.service';
+import { ActionBarService } from '../services/action-bar.service';
 
-// The persistent footer. Renders the current screen's "logical next step" (FlowService.next):
-// an optional labeled back button + a primary action button. Hidden when there is no next
-// step (screens that own their own action, e.g. Einsortieren / Suchen).
+// The persistent footer: renders the current view's next steps (ActionBarService.actions).
+// Hidden when there is none, e.g. on screens that own their own action.
 @Component({
   selector: 'es-action-bar',
-  standalone: true,
-  imports: [CommonModule],
   templateUrl: './action-bar.component.html',
-  styleUrl: './action-bar.component.scss'
+  styleUrl: './action-bar.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ActionBarComponent {
-  readonly flow = inject(FlowService);
+  protected readonly actionBar = inject(ActionBarService);
 }

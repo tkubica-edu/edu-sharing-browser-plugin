@@ -213,9 +213,3 @@
   border-color: var(--es-blue);
   &:hover:not([disabled]) { background: var(--es-blue-600); border-color: var(--es-blue-600); }
 }
-@mixin fbtn-ghost {
-  background: var(--es-surface);
-  color: var(--es-blue);
-  border-color: var(--es-border);
-  &:hover:not([disabled]) { border-color: var(--es-blue); }
-}

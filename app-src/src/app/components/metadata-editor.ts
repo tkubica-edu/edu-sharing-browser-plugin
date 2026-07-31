@@ -1,0 +1,21 @@
+import { Signal } from '@angular/core';
+
+import { MdsValues } from '../util/mds-values';
+
+/**
+ * The contract the metadata screen's footer drives, implemented by every embedded metadata
+ * editor (MdsEditorComponent, WloCanvasComponent). Both render without a save button of their
+ * own: the footer owns "Speichern" and calls {@link commit}, which emits the current values.
+ */
+export interface MetadataEditor {
+  /** True once the editor is mounted and can be committed. */
+  readonly ready: Signal<boolean>;
+  /** Emit the current values through the component's `save` output. */
+  commit(): void;
+}
+
+/** What an editor is seeded with: a metadata-agent payload or a node's stored properties. */
+export type MetadataSeed = Record<string, unknown>;
+
+/** Re-exported for editors implementing the contract. */
+export type { MdsValues };
