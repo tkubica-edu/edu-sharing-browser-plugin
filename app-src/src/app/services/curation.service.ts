@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { Node } from 'ngx-edu-sharing-api';
+import { CollectionServiceUnwrapped, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
+import { firstValueFrom } from 'rxjs';
 
-import { AssignService } from './assign.service';
 import { AuthService } from './auth.service';
 import { GenerateService } from './generate.service';
 import { HistoryEntry, HistoryService } from './history.service';
@@ -25,7 +25,9 @@ export class CurationService {
   private readonly gen = inject(GenerateService);
   private readonly upload = inject(UploadService);
   private readonly history = inject(HistoryService);
-  private readonly assign = inject(AssignService);
+  // The generated CollectionV1Service (exported as CollectionServiceUnwrapped) — the read-only
+  // CollectionService wrapper does not cover adding a node.
+  private readonly collectionService = inject(CollectionServiceUnwrapped);
 
   readonly createdNode = signal<CreatedNode | null>(null);
   readonly nodeMetadata = signal<Record<string, string[]> | null>(null);
@@ -190,7 +192,13 @@ export class CurationService {
     this.assignError.set(null);
     try {
       for (const c of collections) {
-        await this.assign.addToCollection(c.id, node.nodeId);
+        await firstValueFrom(
+          this.collectionService.addToCollection({
+            repository: HOME_REPOSITORY,
+            collection: c.id,
+            node: node.nodeId
+          })
+        );
         // Track it once, avoiding duplicates on repeated inserts.
         this.assignedCollections.update((list) =>
           list.some((x) => x.id === c.id) ? list : [...list, c]

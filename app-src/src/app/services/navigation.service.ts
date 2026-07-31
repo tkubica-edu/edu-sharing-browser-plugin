@@ -1,7 +1,8 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 
 import { UiStateService } from './ui-state.service';
-import { AppOption, OptionId, OPTIONS, optionById } from '../model/options';
+import { AppOption, OptionId, OPTIONS } from '../model/options';
+import { ExtensionService } from '../extension/extension.service';
 
 export type View = 'menu' | OptionId;
 
@@ -11,6 +12,10 @@ export type View = 'menu' | OptionId;
 @Injectable({ providedIn: 'root' })
 export class NavigationService {
   private readonly ui = inject(UiStateService);
+  // Extension hook: the option list, titles, and guards resolve through the extension
+  // registry so extensions can add/replace options. Removing the feature = drop this
+  // injection and use OPTIONS directly again.
+  private readonly extensionService = inject(ExtensionService);
 
   readonly view = signal<View>('menu');
 
@@ -20,13 +25,13 @@ export class NavigationService {
   /** Title shown in the topbar for the current view. */
   readonly title = computed(() => {
     const v = this.view();
-    return v === 'menu' ? 'Aktionen & Optionen' : optionById(v).label;
+    return v === 'menu' ? 'Aktionen & Optionen' : this.option(v)?.label ?? '';
   });
 
   /** The visible options for the current conditions (drives the menu). */
   readonly visibleOptions = computed<AppOption[]>(() => {
     const c = this.ui.conditions();
-    return OPTIONS.filter((o) => o.visible(c));
+    return this.extensionService.applyOptions(OPTIONS).filter((o) => o.visible(c));
   });
 
   constructor() {
@@ -35,15 +40,22 @@ export class NavigationService {
     effect(() => {
       const v = this.view();
       if (v === 'menu') return;
-      if (!optionById(v).visible(this.ui.conditions())) {
+      const o = this.option(v);
+      if (!o || !o.visible(this.ui.conditions())) {
         this.land();
       }
     });
   }
 
+  /** Resolve an option id against the extension-merged option set. */
+  private option(id: OptionId): AppOption | undefined {
+    return this.extensionService.applyOptions(OPTIONS).find((o) => o.id === id);
+  }
+
   /** Navigate to an option, if currently visible. */
   go(id: OptionId): void {
-    if (!optionById(id).visible(this.ui.conditions())) return;
+    const o = this.option(id);
+    if (!o || !o.visible(this.ui.conditions())) return;
     this.view.set(id);
   }
 
@@ -55,9 +67,10 @@ export class NavigationService {
   // load (PREVIEW_NODE / Verlauf) which should win over the OnlyOffice default.
   land(opts?: { nodeJustLoaded?: boolean }): void {
     const c = this.ui.conditions();
-    if (!c.loggedIn) { this.view.set('login'); return; }
-    if (opts?.nodeJustLoaded && c.hasActiveNode) { this.view.set('vorschau'); return; }
-    if (c.onlyOfficePresent) { this.view.set('suchen'); return; }
+    // Login gate — unless an extension has declared login not required as a first step.
+    if (this.extensionService.loginRequired() && !c.loggedIn) { this.view.set('login'); return; }
+    if (opts?.nodeJustLoaded && c.hasActiveNode) { this.view.set('preview'); return; }
+    if (c.onlyOfficePresent) { this.view.set('search'); return; }
     this.view.set('menu');
   }
 }

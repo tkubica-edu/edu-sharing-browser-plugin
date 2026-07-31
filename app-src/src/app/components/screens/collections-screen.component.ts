@@ -8,13 +8,13 @@ import { CollectionChoice, CollectionSelectorComponent } from '../collection-sel
 // einfügen"), so there is no footer primary — this screen just wires the selection through
 // to CurationService.
 @Component({
-  selector: 'es-einsortieren-screen',
+  selector: 'es-collections-screen',
   standalone: true,
   imports: [CommonModule, CollectionSelectorComponent],
-  templateUrl: './einsortieren-screen.component.html',
-  styleUrl: './screen.scss'
+  templateUrl: './collections-screen.component.html',
+  styleUrl: './collections-screen.component.scss'
 })
-export class EinsortierenScreenComponent {
+export class CollectionsScreenComponent {
   readonly curation = inject(CurationService);
 
   onAssign(collections: CollectionChoice[]): Promise<void> {

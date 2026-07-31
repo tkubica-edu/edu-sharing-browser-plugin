@@ -1,4 +1,4 @@
-import { Component, HostListener, OnInit, effect, inject, signal } from '@angular/core';
+import { Component, HostListener, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { AuthService } from './services/auth.service';
@@ -7,6 +7,8 @@ import { CurationService } from './services/curation.service';
 import { ExtService } from './services/ext.service';
 import { UiStateService } from './services/ui-state.service';
 import { NavigationService } from './services/navigation.service';
+import { ExtensionService } from './extension/extension.service';
+import { ExtScreenComponent } from './extension/ext-screen.component';
 import { APP_CONFIG } from './config';
 
 import { StatusBarComponent } from './components/status-bar.component';
@@ -16,10 +18,11 @@ import { LoginComponent } from './components/login.component';
 import { HistoryComponent } from './components/history.component';
 import { SettingsComponent } from './components/settings.component';
 import { SearchComponent } from './components/search.component';
-import { ErschliessenScreenComponent } from './components/screens/erschliessen-screen.component';
-import { MetadatenScreenComponent } from './components/screens/metadaten-screen.component';
-import { VorschauScreenComponent } from './components/screens/vorschau-screen.component';
-import { EinsortierenScreenComponent } from './components/screens/einsortieren-screen.component';
+import { AnalyzeScreenComponent } from './components/screens/analyze-screen.component';
+import { NewDocumentScreenComponent } from './components/screens/new-document-screen.component';
+import { MetadataScreenComponent } from './components/screens/metadata-screen.component';
+import { PreviewScreenComponent } from './components/screens/preview-screen.component';
+import { CollectionsScreenComponent } from './components/screens/collections-screen.component';
 
 @Component({
   selector: 'es-root',
@@ -28,7 +31,8 @@ import { EinsortierenScreenComponent } from './components/screens/einsortieren-s
     CommonModule,
     StatusBarComponent, ActionBarComponent, MenuComponent,
     LoginComponent, HistoryComponent, SettingsComponent, SearchComponent,
-    ErschliessenScreenComponent, MetadatenScreenComponent, VorschauScreenComponent, EinsortierenScreenComponent
+    AnalyzeScreenComponent, NewDocumentScreenComponent, MetadataScreenComponent, PreviewScreenComponent, CollectionsScreenComponent,
+    ExtScreenComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
@@ -36,10 +40,17 @@ import { EinsortierenScreenComponent } from './components/screens/einsortieren-s
 export class AppComponent implements OnInit {
   readonly auth = inject(AuthService);
   private readonly ext = inject(ExtService);
+  private readonly extensionService = inject(ExtensionService);
   readonly history = inject(HistoryService);
   private readonly wiz = inject(CurationService);
   readonly ui = inject(UiStateService);
   readonly nav = inject(NavigationService);
+
+  // True when an extension provides (or overrides) the screen for the current view — the
+  // shell renders that instead of the built-in switch case.
+  readonly hasExtScreen = computed(() =>
+    !!this.extensionService.getRendering('screen', this.nav.view(), this.ui.conditions()),
+  );
 
   // A node id received from the OnlyOffice plugin (PREVIEW_NODE) while logged out — loaded
   // once the user logs in.
@@ -60,6 +71,9 @@ export class AppComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
+    // Boot the extension point: it only activates when the repository config provides
+    // `additionalWebComponent`; otherwise this is a no-op and the default app is used.
+    this.extensionService.initialize();
     await this.auth.init();
     await this.history.load();
     try {

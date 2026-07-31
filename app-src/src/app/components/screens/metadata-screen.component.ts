@@ -12,13 +12,13 @@ import { MdsEditorComponent } from '../mds-editor.component';
 // shell footer (FlowService), which owns the "Speichern" button. On a successful save it
 // advances to Vorschau.
 @Component({
-  selector: 'es-metadaten-screen',
+  selector: 'es-metadata-screen',
   standalone: true,
   imports: [CommonModule, MdsEditorComponent],
-  templateUrl: './metadaten-screen.component.html',
-  styleUrl: './screen.scss'
+  templateUrl: './metadata-screen.component.html',
+  styleUrl: './metadata-screen.component.scss'
 })
-export class MetadatenScreenComponent implements OnInit, OnDestroy {
+export class MetadataScreenComponent implements OnInit, OnDestroy {
   readonly gen = inject(GenerateService);
   readonly curation = inject(CurationService);
   private readonly flow = inject(FlowService);
@@ -50,6 +50,6 @@ export class MetadatenScreenComponent implements OnInit, OnDestroy {
 
   async onSave(values: Record<string, string[]>): Promise<void> {
     const ok = await this.curation.save(values);
-    if (ok) this.nav.go('vorschau');
+    if (ok) this.nav.go('preview');
   }
 }

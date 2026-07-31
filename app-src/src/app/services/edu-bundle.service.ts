@@ -28,19 +28,37 @@ export class EduBundleService {
   }
 
   private async doLoad(apiRootUrl: string): Promise<void> {
+    // EDU_SHARING_API_URL MUST be absolute. The bundle passes it through unchanged only
+    // when it starts with http(s):// (getAbsoluteEndpointUrl); a relative value (e.g. the
+    // sample index.html's '/edu-sharing/rest') would be resolved against THIS document's
+    // origin — the extension — so the top-level connector navigation
+    // (…/eduservlet/connector) would resolve to chrome-extension://ID/… and never load.
+    // Refuse to boot with a clear error rather than silently producing that broken URL.
+    if (!/^https?:\/\//i.test(apiRootUrl)) {
+      throw new Error(
+        `EDU_SHARING_API_URL must be an absolute http(s) URL, got "${apiRootUrl}". ` +
+          `Configure the repository as a full URL (…/edu-sharing) so it normalizes to …/edu-sharing/rest.`
+      );
+    }
+
     const win = window as unknown as { __env?: Record<string, string> };
     win.__env = { ...(win.__env ?? {}), EDU_SHARING_API_URL: apiRootUrl };
 
     this.addLink(this.url('styles.css'));                // global Angular Material styles
     await this.addScript(this.url('scripts.js'), false);  // jQuery + globals (classic)
-    await this.addScript(this.url('polyfills.js'), true);  // zone.js — the bundle needs it; sidebar is zoneless
+    // zone.js — the bundle needs it; sidebar is zoneless. Skipped when the wlo extension
+    // bundle already brought its own Zone: zone.js throws "Zone already loaded" on a
+    // second load, and either copy serves both bundles.
+    if (!(window as unknown as { Zone?: unknown }).Zone) {
+      await this.addScript(this.url('polyfills.js'), true);
+    }
     await this.addScript(this.url('main.js'), true);       // Angular bundle (module) → registers the elements
   }
 
   private url(file: string): string {
     return browser?.runtime?.getURL
-      ? browser.runtime.getURL('webcomponent/' + file)
-      : 'webcomponent/' + file;
+      ? browser.runtime.getURL('edu/' + file)
+      : 'edu/' + file;
   }
 
   private addLink(href: string): void {

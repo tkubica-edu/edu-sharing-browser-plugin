@@ -38,8 +38,9 @@ on the tab that fits the current page (OnlyOffice → *Inhalt suchen*).
      the sidebar adds the created node to that collection. The selector's contract
      is callback-based (`option.optionConfig.onNodesChoosen`), so the bridge owns
      the callback and posts only the chosen collection back; the add itself runs in
-     the sidebar (`PUT …/collection/v1/collections/{repo}/{collection}/references/{node}`
-     via `HttpClient`, since ngx-edu-sharing-api does not export `CollectionV1Service`).
+     the sidebar via ngx-edu-sharing-api's `CollectionServiceUnwrapped.addToCollection`
+     (the generated `CollectionV1Service`, exported under that alias since 10.0.2 — the
+     `CollectionService` wrapper is read-only).
      The footer's *Neue Erschließung* button resets the flow.
 - **Inhalt suchen** — a main tab shown only when the active tab URL matches
   `/src/tools/onlyoffice`. Login-gated by the shared `es-login`; once logged in it
@@ -71,14 +72,16 @@ it resolves to guest and the login gate appears.
 
 ## The MDS editor (edu-sharing web component)
 
-The pre-built edu-sharing web-component bundle lives in `scripts/webcomponent/`
-(registers `edu-sharing-mds-editor`, among others). Because that bundle ships its
+The pre-built edu-sharing web-component bundle lives in `scripts/edu/` (packaged as
+`edu/` in the built extension; registers `edu-sharing-mds-editor`, among others).
+A second bundle, `scripts/wlo/` → `wlo/`, backs the menu extension point (see
+`app-src/src/app/extension/README.md`). Because that bundle ships its
 own full Angular runtime (zone.js + DI), it cannot share a document with this
 sidebar's Angular app. So it is hosted in a **same-origin iframe**:
 
 - `webcomponent-host/{mds-editor.html, preview.html, mds-env.js, mds-bridge.js,
   preview-bridge.js}` are overlaid onto the bundle at build time
-  (→ `dist/<t>/webcomponent/`). `mds-env.js` (shared by both host pages) sets
+  (→ `dist/<t>/edu/`). `mds-env.js` (shared by both host pages) sets
   `window.__env.EDU_SHARING_API_URL` from the iframe's `?api=` param (an inline
   script would violate the CSP); `mds-bridge.js` creates `<edu-sharing-mds-editor>`
   and relays `save`/`valuesChange`/`cancel` back to the sidebar via `postMessage`.
@@ -93,7 +96,7 @@ sidebar's Angular app. So it is hosted in a **same-origin iframe**:
 
 Both host pages build from the **same** single bundle (`npm run build:app-as-component`
 in the edu-sharing frontend → `dist/web-components/app/`, dropped into
-`scripts/webcomponent/`), which registers every element used here
+`scripts/edu/`), which registers every element used here
 (`edu-sharing-mds-editor`, `edu-sharing-preview-sidebar`, …).
 
 The editor's own repository calls (MDS definition, value rendering) reuse the login
@@ -202,7 +205,7 @@ dropped — the sub-tab progress marks (✓) are the source of truth.
   editor can fetch the MDS definition from the repository (CORS/auth). Load the
   unpacked extension and run an Erschließung to confirm; if the iframe is blank,
   inspect that frame's console.
-- **Bundle size**: `scripts/webcomponent/` is ~22 MB (unpacked target ~77 MB) because
+- **Bundle size**: `scripts/edu/` is ~22 MB (unpacked target ~77 MB) because
   it includes unused lazy assets (`assets/monaco`, `assets/pdf.*`, `assets/cordova`)
   and the `pdf-metadata-page` chunk. These are runtime-fetched only, so pruning them
   would slim the package and clear the `FILE_TOO_LARGE` web-ext lint error — do this

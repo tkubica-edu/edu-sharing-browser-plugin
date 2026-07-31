@@ -7,12 +7,12 @@ import { PreviewNodeComponent } from '../preview-node.component';
 // "Vorschau": shows the active node with the embedded preview element. The footer's next
 // step (Metadaten bearbeiten / Einsortieren) is chosen by FlowService from the state.
 @Component({
-  selector: 'es-vorschau-screen',
+  selector: 'es-preview-screen',
   standalone: true,
   imports: [CommonModule, PreviewNodeComponent],
-  templateUrl: './vorschau-screen.component.html',
-  styleUrl: './screen.scss'
+  templateUrl: './preview-screen.component.html',
+  styleUrl: './preview-screen.component.scss'
 })
-export class VorschauScreenComponent {
+export class PreviewScreenComponent {
   readonly curation = inject(CurationService);
 }

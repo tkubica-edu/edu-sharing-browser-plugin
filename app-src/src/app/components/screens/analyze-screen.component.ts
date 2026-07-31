@@ -6,12 +6,12 @@ import { GenerateService } from '../../services/generate.service';
 // "Inhalt erschließen": intro/description only. The action ("Erschließung starten") lives
 // in the footer action bar (FlowService), which runs /generate and advances to Metadaten.
 @Component({
-  selector: 'es-erschliessen-screen',
+  selector: 'es-analyze-screen',
   standalone: true,
   imports: [CommonModule],
-  templateUrl: './erschliessen-screen.component.html',
-  styleUrl: './screen.scss'
+  templateUrl: './analyze-screen.component.html',
+  styleUrl: './analyze-screen.component.scss'
 })
-export class ErschliessenScreenComponent {
+export class AnalyzeScreenComponent {
   readonly gen = inject(GenerateService);
 }

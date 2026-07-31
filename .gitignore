@@ -6,6 +6,6 @@ app-src/.angular/
 *.log
 .DS_Store
 .idea
-scripts/webcomponent/
+scripts/edu/
 
 sidebar/main.js

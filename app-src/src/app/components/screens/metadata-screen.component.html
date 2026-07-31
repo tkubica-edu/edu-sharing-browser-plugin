@@ -1,10 +1,10 @@
-<div class="screen-body">
+<div class="es-screen-body">
   <section class="es-hint-card">
     <p class="es-muted">
       Prüfe und ergänze die Metadaten und speichere sie anschließend über „Speichern".
     </p>
     <p class="src-title" *ngIf="gen.last()?.source as s" [title]="s.url">{{ s.title || s.url }}</p>
-    <div class="result-sub" *ngIf="gen.last()?.parsed as p">
+    <div class="es-result-sub" *ngIf="gen.last()?.parsed as p">
       <span class="es-chip">{{ p.fieldsExtracted ?? '–' }} / {{ p.fieldsTotal ?? '–' }} Felder</span>
       <span class="es-chip" *ngIf="curation.createdNode()">Node: {{ curation.createdNode()?.name }}</span>
     </div>

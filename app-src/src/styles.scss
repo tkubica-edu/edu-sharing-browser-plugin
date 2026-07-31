@@ -50,5 +50,10 @@ button {
 
 .es-row { display: flex; align-items: center; gap: var(--es-space-3); flex-wrap: wrap; margin-top: var(--es-space-2); }
 
+// Screen layout shared by the option screens (components/screens/); the screen-specific
+// bits live in each screen's own .scss.
+.es-screen-body { @include m.screen-body; }
+.es-result-sub { @include m.result-sub; }
+
 // Section heading used inside cards
 .es-card h2, .es-hint-card h2 { font-size: 14px; margin: 0 0 var(--es-space-2); }

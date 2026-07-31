@@ -17,16 +17,26 @@
   <h2 class="step-title">{{ nav.title() }}</h2>
 </div>
 
-<main class="content" [ngSwitch]="nav.view()">
-  <es-menu *ngSwitchCase="'menu'"></es-menu>
-  <es-login *ngSwitchCase="'login'"></es-login>
-  <es-erschliessen-screen *ngSwitchCase="'erschliessen'"></es-erschliessen-screen>
-  <es-metadaten-screen *ngSwitchCase="'metadaten'"></es-metadaten-screen>
-  <es-vorschau-screen *ngSwitchCase="'vorschau'"></es-vorschau-screen>
-  <es-einsortieren-screen *ngSwitchCase="'einsortieren'"></es-einsortieren-screen>
-  <es-search *ngSwitchCase="'suchen'" [contextUrl]="ui.activeUrl()"></es-search>
-  <es-history *ngSwitchCase="'verlauf'" (open)="openInWizard($event)"></es-history>
-  <es-settings *ngSwitchCase="'einstellungen'"></es-settings>
+<main class="content">
+  <!-- Extension screen wins when registered for this view (adds custom views AND lets an
+       extension override a built-in one). Otherwise the built-in switch renders. -->
+  <es-ext-screen *ngIf="hasExtScreen(); else builtinViews" [view]="nav.view()"></es-ext-screen>
+  <ng-template #builtinViews>
+    <ng-container [ngSwitch]="nav.view()">
+      <es-menu *ngSwitchCase="'menu'"></es-menu>
+      <es-login *ngSwitchCase="'login'"></es-login>
+      <es-analyze-screen *ngSwitchCase="'analyze'"></es-analyze-screen>
+      <es-new-document-screen *ngSwitchCase="'new-document'"></es-new-document-screen>
+      <es-metadata-screen *ngSwitchCase="'metadata'"></es-metadata-screen>
+      <es-preview-screen *ngSwitchCase="'preview'"></es-preview-screen>
+      <es-collections-screen *ngSwitchCase="'collections'"></es-collections-screen>
+      <es-search *ngSwitchCase="'search'" [contextUrl]="ui.activeUrl()"></es-search>
+      <es-history *ngSwitchCase="'history'" (open)="openInWizard($event)"></es-history>
+      <es-settings *ngSwitchCase="'settings'"></es-settings>
+      <!-- Custom option ids that only add a view (no built-in case) render here. -->
+      <es-ext-screen *ngSwitchDefault [view]="nav.view()"></es-ext-screen>
+    </ng-container>
+  </ng-template>
 </main>
 
 <es-action-bar></es-action-bar>

@@ -15,10 +15,13 @@ const DIST = path.join(ROOT, 'dist');
 const VENDOR = path.join(ROOT, 'vendor');
 const APP_SRC = path.join(ROOT, 'app-src');
 const SIDEBAR = path.join(ROOT, 'sidebar');
-// Pre-built edu-sharing web component bundle (registers <edu-sharing-mds-editor>)
-// and the small host files (html/env/bridge) overlaid on top of it.
-const WEBCOMPONENT_SRC = path.join(ROOT, 'scripts', 'webcomponent');
-const WEBCOMPONENT_HOST = path.join(ROOT, 'webcomponent-host');
+// Pre-built web-component bundles, each copied verbatim into the target under its own
+// folder name:
+//   scripts/edu → edu/  — edu-sharing bundle (edu-sharing-mds-editor, …), loaded by
+//                         EduBundleService.
+//   scripts/wlo → wlo/  — WLO bundle (metadata-agent-canvas, …), loaded by
+//                         ExtensionService when the extension point is enabled.
+const BUNDLE_DIRS = ['edu', 'wlo'];
 
 const TARGETS = ['chrome', 'firefox', 'safari'];
 
@@ -124,14 +127,14 @@ async function assembleTarget(target) {
     if (existsSync(src)) await fs.copyFile(src, path.join(outDir, f));
   }
 
-  // edu-sharing web component bundle → outDir/webcomponent, with the host overlay
-  // (mds-editor.html, mds-env.js, mds-bridge.js) copied on top.
-  if (existsSync(WEBCOMPONENT_SRC)) {
-    const wcOut = path.join(outDir, 'webcomponent');
-    await fs.cp(WEBCOMPONENT_SRC, wcOut, { recursive: true });
-    if (existsSync(WEBCOMPONENT_HOST)) await fs.cp(WEBCOMPONENT_HOST, wcOut, { recursive: true });
-  } else {
-    log(`⚠ ${rel(WEBCOMPONENT_SRC)} not found — MDS editor will not be packaged.`);
+  // Web-component bundles → outDir/<name>, keeping the folder name the app loads them by.
+  for (const name of BUNDLE_DIRS) {
+    const src = path.join(ROOT, 'scripts', name);
+    if (existsSync(src)) {
+      await fs.cp(src, path.join(outDir, name), { recursive: true });
+    } else {
+      log(`⚠ ${rel(src)} not found — the ${name} web components will not be packaged.`);
+    }
   }
 
   const base = await readJson(path.join(ROOT, 'manifest.base.json'));

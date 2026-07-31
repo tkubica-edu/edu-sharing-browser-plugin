@@ -1,0 +1,20 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.login-gate { padding: 14px; }
+
+.connector-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 14px;
+}
+
+.loading { color: var(--es-muted, #6b7280); }
+
+.error {
+  color: #b91c1c;
+  padding: 8px 0;
+}

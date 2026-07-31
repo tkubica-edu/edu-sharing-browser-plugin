@@ -2,15 +2,21 @@
 // the current conditions — no option is "owned" by a flow. The same registry feeds the
 // options menu, the navigation guards, and the landing logic.
 
-export type OptionId =
+// The built-in option ids. Extensions may contribute additional ids (see app/extension/),
+// so OptionId stays open to any string while keeping the built-ins for autocomplete and
+// exhaustiveness on the core paths.
+export type BuiltinOptionId =
   | 'login'
-  | 'erschliessen'
-  | 'metadaten'
-  | 'vorschau'
-  | 'einsortieren'
-  | 'suchen'
-  | 'verlauf'
-  | 'einstellungen';
+  | 'analyze'
+  | 'new-document'
+  | 'metadata'
+  | 'preview'
+  | 'collections'
+  | 'search'
+  | 'history'
+  | 'settings';
+
+export type OptionId = BuiltinOptionId | (string & {});
 
 // A snapshot of the world an option's visibility is decided against.
 export interface Conditions {
@@ -53,54 +59,61 @@ export const OPTIONS: AppOption[] = [
     visible: (c) => !c.loggedIn
   },
   {
-    id: 'erschliessen',
+    id: 'analyze',
     label: 'Inhalt erschließen',
     description: 'Aus der aktuellen Webseite Metadaten erzeugen',
-    icon: 'erschliessen',
+    icon: 'analyze',
     // Not on Edu-Sharing itself, and not on an insert host (there the intent is "suchen").
     visible: requiresLogin((c) => !c.onEduSharing && !c.onlyOfficePresent)
   },
   {
-    id: 'metadaten',
+    id: 'new-document',
+    label: 'Neues OnlyOffice-Dokument',
+    description: 'Ein neues OnlyOffice-Dokument im Repository anlegen',
+    icon: 'new-document',
+    visible: requiresLogin()
+  },
+  {
+    id: 'metadata',
     label: 'Metadaten editieren',
     description: 'Die Metadaten des Inhalts prüfen und bearbeiten',
-    icon: 'metadaten',
+    icon: 'metadata',
     // Available for an active node OR a fresh /generate result (saved on first Speichern).
     visible: requiresLogin((c) => c.hasEditableMetadata)
   },
   {
-    id: 'vorschau',
+    id: 'preview',
     label: 'Vorschau',
     description: 'Eine Vorschau des Inhalts inkl. der wichtigsten Metadaten anzeigen',
-    icon: 'vorschau',
+    icon: 'preview',
     visible: requiresLogin((c) => c.hasActiveNode)
   },
   {
-    id: 'einsortieren',
+    id: 'collections',
     label: 'Einsortieren in Sammlungen',
     description: 'Den Inhalt einer oder mehreren Sammlungen hinzufügen',
-    icon: 'einsortieren',
+    icon: 'collections',
     visible: requiresLogin((c) => c.hasActiveNode)
   },
   {
-    id: 'suchen',
+    id: 'search',
     label: 'Inhalt suchen',
     description: 'Inhalte suchen und in OnlyOffice einfügen',
-    icon: 'suchen',
+    icon: 'search',
     visible: requiresLogin((c) => c.onlyOfficePresent)
   },
   {
-    id: 'verlauf',
+    id: 'history',
     label: 'Verlauf',
     description: 'Zuletzt erstellte oder bearbeitete Inhalte erneut öffnen',
-    icon: 'verlauf',
+    icon: 'history',
     visible: requiresLogin()
   },
   {
-    id: 'einstellungen',
+    id: 'settings',
     label: 'Einstellungen',
     description: 'Repository-Adresse und Verbindung konfigurieren',
-    icon: 'einstellungen',
+    icon: 'settings',
     visible: () => true
   }
 ];

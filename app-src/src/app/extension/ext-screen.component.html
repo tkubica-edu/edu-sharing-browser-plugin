@@ -1,0 +1,10 @@
+<ng-container *ngIf="rendering() as rendering">
+  <ng-container
+    *ngIf="rendering.templateRef; else asElement"
+    [ngTemplateOutlet]="rendering.templateRef"
+    [ngTemplateOutletContext]="context()"
+  ></ng-container>
+  <ng-template #asElement>
+    <es-ext-element *ngIf="rendering.element" [tag]="rendering.element" [data]="context()"></es-ext-element>
+  </ng-template>
+</ng-container>

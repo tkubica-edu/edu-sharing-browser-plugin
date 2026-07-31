@@ -1,7 +1,7 @@
-<div class="screen-body">
+<div class="es-screen-body">
   <section class="es-hint-card">
     <p class="es-muted">Sammlung auswählen und den Inhalt per „In Sammlung einfügen" hinzufügen.</p>
-    <div class="result-sub" *ngIf="curation.assignedCollections().length">
+    <div class="es-result-sub" *ngIf="curation.assignedCollections().length">
       <span class="es-chip" *ngFor="let c of curation.assignedCollections()">✓ {{ c.name }}</span>
     </div>
   </section>

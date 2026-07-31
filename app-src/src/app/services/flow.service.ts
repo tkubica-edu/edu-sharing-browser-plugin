@@ -24,7 +24,7 @@ export class FlowService {
   private readonly nav = inject(NavigationService);
 
   // --- editor-commit bridge -------------------------------------------------
-  // The metadaten screen registers its primary handler (→ mdsEditor.commit()) on mount and
+  // The metadata screen registers its primary handler (→ mdsEditor.commit()) on mount and
   // keeps `canPrimary` synced to the editor's ready() state. The footer invokes the handler
   // without referencing the editor directly.
   private primaryHandler: (() => void) | null = null;
@@ -38,18 +38,18 @@ export class FlowService {
 
   readonly nextActions = computed<NextAction[]>(() => {
     switch (this.nav.view()) {
-      case 'erschliessen':
+      case 'analyze':
         return [{
           label: this.curation.running() ? 'Erschließe… (kann etwas dauern)' : 'Erschließung starten',
           kind: 'primary',
           disabled: this.curation.running(),
           run: async () => {
             const ok = await this.curation.run();
-            if (ok) this.nav.go('metadaten');
+            if (ok) this.nav.go('metadata');
           }
         }];
 
-      case 'metadaten':
+      case 'metadata':
         return [{
           label: this.curation.saving() ? 'Speichern…' : 'Speichern',
           kind: 'primary',
@@ -57,18 +57,18 @@ export class FlowService {
           run: () => this.primaryHandler?.()
         }];
 
-      case 'vorschau':
+      case 'preview':
         // With a node open, offer the logical next actions as a choice (not a forced chain).
         return [
-          { label: 'Metadaten editieren', kind: 'primary', disabled: false, run: () => this.nav.go('metadaten') },
-          { label: 'Sammlung zuordnen', kind: 'primary', disabled: false, run: () => this.nav.go('einsortieren') }
+          { label: 'Metadaten editieren', kind: 'primary', disabled: false, run: () => this.nav.go('metadata') },
+          { label: 'Sammlung zuordnen', kind: 'primary', disabled: false, run: () => this.nav.go('collections') }
         ];
 
       // These screens own their own primary action (selector insert, login form, etc.).
-      case 'einsortieren':
-      case 'suchen':
-      case 'verlauf':
-      case 'einstellungen':
+      case 'collections':
+      case 'search':
+      case 'history':
+      case 'settings':
       case 'login':
       case 'menu':
       default:

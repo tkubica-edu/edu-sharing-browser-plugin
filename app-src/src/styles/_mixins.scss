@@ -107,6 +107,32 @@
 @mixin error { color: var(--es-danger); font-size: 13px; margin: 6px 0; }
 @mixin hint { color: var(--es-danger); font-size: 12px; margin: 2px 0 0; }
 
+// ---- Screen layout ---------------------------------------------------------
+// Scroll-container padding shared by every option screen (see components/screens/).
+@mixin screen-body { padding: var(--es-space-4); }
+
+// Row of chips under a hint card ("x / y Felder", "Node: …", assigned collections).
+@mixin result-sub {
+  margin-top: var(--es-space-2);
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+// Key/value list of extracted metadata fields — used by the Metadata screen and the
+// Verlauf entries.
+@mixin field-list {
+  dt {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    color: var(--es-blue);
+    margin-top: 10px;
+  }
+  dd { margin: 3px 0 0; display: flex; flex-direction: column; gap: 3px; }
+}
+
+@mixin field-value { font-size: 13px; word-break: break-word; }
+
 // ---- Lists / menu ----------------------------------------------------------
 @mixin list-reset { list-style: none; margin: 0; padding: 0; }
 

@@ -36,7 +36,7 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["sidebar/*", "webcomponent/*"],
+      "resources": ["sidebar/*", "edu/*", "wlo/*"],
       "matches": ["https://*/*", "http://*/*"]
     }
   ],
