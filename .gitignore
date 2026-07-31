@@ -8,6 +8,6 @@ app-src/.angular/
 .claude
 .agents
 .idea
-scripts/edu/
+scripts/
 
 sidebar/main.js

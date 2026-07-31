@@ -1,15 +1,19 @@
 # Edu-Sharing — Browser-Extension
 
 Cross-browser (Chrome, Edge, Firefox, Safari) WebExtension. It opens a resizable
-sidebar that shows a list of **Aktionen & Optionen** and lands on the option that fits the
-current page (an OnlyOffice editor → *Inhalt suchen*, logged out → the login gate).
+sidebar whose start view is always the list of **Aktionen & Optionen** — only being logged out
+(→ the login gate) or an explicitly loaded node (→ its Vorschau) opens something else. No option
+opens itself from a page match: what the current page offers stays visible instead of being
+decided for the user.
 
 The app has no wizard and no fixed step order: every option is offered whenever its
 preconditions hold. `ConditionsService` collects those facts (login, OnlyOffice page,
 Edu-Sharing page, active node, editable metadata, edit mode) and each option in
-`model/options.ts` decides its own visibility from that snapshot. The **status bar** shows the
-same facts as chips, so it is always visible why an option appears or disappears — and it can
-drop the active content again. The **back button** always returns to the menu.
+`model/options.ts` decides its own visibility from that snapshot. The list order is the
+registry's, with one context rule in `NavigationService.visibleOptions`: on an OnlyOffice page
+*Inhalt suchen* leads the menu. The **status bar** shows the same facts as chips, so it is always
+visible why an option appears or disappears — and it can drop the active content again. The
+**back button** always returns to the menu.
 
 The footer (`ActionBarService`) contributes the current view's next steps: *Erschließung
 starten* on the analyze screen, *Speichern* on the metadata screen, and the choice between
@@ -23,8 +27,14 @@ The options:
 - **Inhalt erschließen** — reads the active tab, calls `POST {apiUrl}/generate` through the
   background worker and advances to the metadata screen. Hidden on Edu-Sharing itself and on
   an insert host, where the intent is searching instead.
-- **Neues OnlyOffice-Dokument** — mounts `edu-sharing-add-with-connector`, which opens the
-  OnlyOffice create dialog; the new node is hydrated into the flow and opens in the preview.
+- **Metadaten anreichern** — only on an OnlyOffice page: the same erschließen flow, but the
+  content comes from the **edited document** instead of the page. The sidebar asks the page-side
+  plugin for the document content (`REQUEST_DOCUMENT_CONTENT` → `DOCUMENT_CONTENT`, correlated by
+  `requestId` and bounded by a timeout, see `content/CLAUDE.md`), sends the answer's `markdown`
+  through the background worker to `POST {apiUrl}/generate` and opens the result in the metadata
+  editor. The answer's `document` makes the edited document the **active node**, so **Speichern**
+  writes the enriched metadata onto that node (`editNodeMetadata`) rather than creating a new one
+  in the inbox — the node's name is kept, so the document is never renamed.
 - **Metadaten editieren** — loads the metadata into `edu-sharing-mds-editor-wrapper`. Saving
   creates a `ccm:io` node in the **inbox** the first time (`NodeService.createChild`) and
   updates it in place thereafter (`editNodeMetadata`), then advances to the preview. Available
@@ -37,6 +47,8 @@ The options:
   callback and the add itself runs in the sidebar via ngx-edu-sharing-api's
   `CollectionServiceUnwrapped.addToCollection` (the generated `CollectionV1Service`, exported
   under that alias since 10.0.2 — the `CollectionService` wrapper is read-only).
+- **Neues OnlyOffice-Dokument** — mounts `edu-sharing-add-with-connector`, which opens the
+  OnlyOffice create dialog; the new node is hydrated into the flow and opens in the preview.
 - **Inhalt suchen** — only on an insert host (URL matches `/src/tools/onlyoffice`): the same
   selector in search mode, posting the chosen nodes to the host page.
 - **Verlauf** — the **saved nodes**, newest first. An entry is recorded only when a node is
@@ -149,7 +161,7 @@ before the scripts run — mirroring `window.__env.EDU_SHARING_API_URL` for the 
 ### Network legs & CORS
 | Leg | Where it runs | Why |
 |-----|---------------|-----|
-| `POST /generate` (Metadata-Agent API) | background service worker | background fetch is gated by `host_permissions`, not CORS/page-CSP — portable everywhere |
+| `POST /generate` (Metadata-Agent API) | background service worker | background fetch is gated by `host_permissions`, not CORS/page-CSP — portable everywhere (`analyze.run` for a tab, `analyze.text` for the OnlyOffice document's markdown) |
 | Page content extraction | `scripting.executeScript` (background) | no cross-origin fetch |
 | Repository login | Angular `HttpClient` (library) | the library owns the call; relies on `host_permissions` bypassing CORS on Chrome/Edge/Firefox |
 
@@ -199,12 +211,20 @@ Open the generated Xcode project and Run.
    shows `fields_extracted / fields_total` and loads the MDS editor with the generated
    metadata. Edit, then the footer's **Speichern** → a node is created in your inbox and the
    preview opens. The status bar gains an "Aktiver Inhalt" chip, which also clears it again.
-5. **Vorschau → Sammlungen**: from the preview, *Sammlung zuordnen* → pick a collection and
+5. **Metadaten anreichern** (OnlyOffice): open a document in the OnlyOffice editor with the
+   edu-sharing plugin active, open the panel → the option appears and names the detected document.
+   The footer's **Metadaten anreichern** reads the document and lands on the metadata screen with
+   the generated metadata, the status bar showing the document as *Aktiver Inhalt*. **Speichern**
+   must update **that** node — check in the repository that the document's metadata changed, that
+   its name/extension is unchanged, and that no new node appeared in the inbox. With the page-side
+   plugin switched off (*Plugins im Hintergrund*) the screen must report the timeout instead of
+   hanging.
+6. **Vorschau → Sammlungen**: from the preview, *Sammlung zuordnen* → pick a collection and
    confirm with *In Sammlung einfügen*; the screen lists what was added.
-6. **Verlauf**: every *saved* node is listed (nothing is recorded until you save); entries
+7. **Verlauf**: every *saved* node is listed (nothing is recorded until you save); entries
    expand to show their fields and offer *In Vorschau öffnen*, which reloads the node from the
    repository; *Leeren* clears the list.
-7. If an embedded element stays blank, check the sidebar frame's console for CSP or
+8. If an embedded element stays blank, check the sidebar frame's console for CSP or
    repository-CORS errors — the elements run in this document, so their errors show up there.
 
 ## Known issues / caveats

@@ -7,6 +7,7 @@ import { errorMessage } from '../util/errors';
 import { AuthService } from './auth.service';
 import { HistoryEntry, HistoryService } from './history.service';
 import { MetadataAgentService } from './metadata-agent.service';
+import { DocumentIdentity } from './onlyoffice-document.service';
 import { NodeSummary, RepositoryNodeService } from './repository-node.service';
 
 /** A collection the content was added to. */
@@ -48,18 +49,21 @@ export class CurationService {
 
   readonly running = this.metadataAgent.running;
 
+  /** Set while a generated result still waits to be saved; see {@link hasUnsavedWork}. */
+  private readonly resultPending = signal(false);
+
   /** A metadata-agent result or an active node exists. */
   readonly hasEditableMetadata = computed(
     () => this.metadataAgent.lastRun()?.ok === true || this.activeNode() !== null,
   );
 
   /**
-   * There is a generated result that has not yet been saved to a node — loading another entry
-   * would discard it, so the caller confirms first.
+   * A generated result that has not been written to a node yet — loading another entry would
+   * discard it, so the caller confirms first. Tracked explicitly rather than derived from "no
+   * active node", because an enrichment of the open OnlyOffice document already *has* its target
+   * node while still being unsaved.
    */
-  readonly hasUnsavedWork = computed(
-    () => this.metadataAgent.lastRun()?.ok === true && this.activeNode() === null,
-  );
+  readonly hasUnsavedWork = this.resultPending.asReadonly();
 
   /**
    * Metadata fed to the editor: the active node's properties if present, else the agent
@@ -86,7 +90,25 @@ export class CurationService {
     if (!this.auth.loggedIn()) return false;
     this.resetNodeState();
     const outcome = await this.metadataAgent.run();
-    return outcome.ok && !!outcome.parsed && !!outcome.source;
+    const ok = outcome.ok && !!outcome.parsed && !!outcome.source;
+    this.resultPending.set(ok);
+    return ok;
+  }
+
+  /**
+   * Like {@link analyze}, but the content comes from the document the host page has open (the
+   * OnlyOffice editor) instead of the page — and that document *is* a repository node, so it
+   * becomes the active node: saving writes the enriched metadata onto it instead of creating a
+   * new node in the inbox.
+   */
+  async enrichOpenDocument(): Promise<boolean> {
+    if (!this.auth.loggedIn()) return false;
+    this.resetNodeState();
+    const outcome = await this.metadataAgent.runForOpenDocument();
+    if (!outcome.ok || !outcome.parsed) return false;
+    this.resultPending.set(true);
+    await this.adoptDocumentAsActiveNode(outcome.document);
+    return true;
   }
 
   /**
@@ -138,10 +160,13 @@ export class CurationService {
     this.saveError.set(null);
     try {
       const existing = this.activeNode();
+      // The current name is passed along so an update never renames the node: generated metadata
+      // carries no `cm:name`, and for a real document that name holds its file name + extension.
       const saved = existing
-        ? await this.repositoryNodes.update(existing.nodeId, values)
+        ? await this.repositoryNodes.update(existing.nodeId, values, existing.name)
         : await this.repositoryNodes.createInInbox(values);
       this.setActiveNode(saved.nodeId, saved.name);
+      this.resultPending.set(false);
       // Load the full hydrated node once: its properties re-seed the editor (so re-editing
       // uses the stored values) and the node itself feeds the preview.
       try {
@@ -188,6 +213,32 @@ export class CurationService {
     }
   }
 
+  /**
+   * Make the enriched document the active node, so {@link save} updates it in place. A collection
+   * reference points at a copy, so `originalId` — the actually edited node — wins over `nodeId`.
+   *
+   * `nodeMetadata` deliberately stays empty here: the editor must show the freshly generated
+   * metadata, not the node's stored properties (see {@link editorMetadata}). Without a node id
+   * (an editor opened with a stale plugin config) the flow falls back to creating a node on save,
+   * so the enrichment is never lost.
+   */
+  private async adoptDocumentAsActiveNode(
+    document: DocumentIdentity | null | undefined,
+  ): Promise<void> {
+    const nodeId = document?.originalId || document?.nodeId;
+    if (!nodeId) return;
+    this.setActiveNode(nodeId, document?.name || document?.title || nodeId);
+    // Hydrate the node for the preview and to carry its real name (with file extension) into the
+    // save. A failure only costs those two — the save target itself stands.
+    try {
+      const node = await this.repositoryNodes.get(nodeId);
+      this.previewNode.set(node);
+      this.setActiveNode(nodeId, node.name ?? nodeId);
+    } catch {
+      /* keep the identity the plugin reported */
+    }
+  }
+
   /** Record a saved node in the history (only saved nodes are kept there). */
   private async recordSaved(saved: NodeSummary): Promise<void> {
     const lastRun = this.metadataAgent.lastRun();
@@ -218,6 +269,7 @@ export class CurationService {
   }
 
   private resetNodeState(): void {
+    this.resultPending.set(false);
     this.activeNode.set(null);
     this.nodeMetadata.set(null);
     this.previewNode.set(null);

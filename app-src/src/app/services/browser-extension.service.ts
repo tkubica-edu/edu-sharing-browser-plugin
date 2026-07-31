@@ -33,6 +33,16 @@ export class BrowserExtensionService {
     return response ?? { success: false, error: 'NO_RESPONSE' };
   }
 
+  /** Ask the background worker to run the metadata agent on text the sidebar already holds. */
+  async analyzeText(text: string, language: string): Promise<AnalyzeResponse> {
+    const response = (await browser.runtime.sendMessage({
+      action: 'analyze.text',
+      text,
+      language,
+    })) as AnalyzeResponse | null;
+    return response ?? { success: false, error: 'NO_RESPONSE' };
+  }
+
   async getActiveTab(): Promise<PageSource | null> {
     const response = (await browser.runtime.sendMessage({ action: 'tabs.getActive' })) as
       | { success?: boolean; tab?: PageSource }
@@ -54,6 +64,21 @@ export class BrowserExtensionService {
   /** Forward selected edu-sharing node(s) to the host page (e.g. OnlyOffice). */
   insertNodes(nodes: unknown[]): void {
     this.postToHost({ type: 'edusharing-insert-node', nodes });
+  }
+
+  /**
+   * Ask the host page for the content of the document it has open (OnlyOffice: the edited
+   * document). The answer arrives asynchronously as a `DOCUMENT_CONTENT` message carrying the
+   * same `requestId` — see OnlyOfficeDocumentService, which owns that correlation. Returns false
+   * when there is no host page to ask.
+   */
+  requestDocumentContent(requestId: string): boolean {
+    return this.postToHost({ type: 'edusharing-request-document-content', requestId });
+  }
+
+  /** Same, for the document's identity only (`DOCUMENT_INFO`, no content payload). */
+  requestDocumentInfo(requestId: string): boolean {
+    return this.postToHost({ type: 'edusharing-request-document-info', requestId });
   }
 
   /** Tell the host page the sidebar has booted, so it can replay a buffered inbound event. */

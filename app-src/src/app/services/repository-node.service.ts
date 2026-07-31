@@ -36,10 +36,14 @@ export class RepositoryNodeService {
     return { nodeId: node.ref.id, name: node.name };
   }
 
-  /** Update an existing node's metadata in place. */
-  async update(nodeId: string, values: MdsValues): Promise<NodeSummary> {
+  /**
+   * Update an existing node's metadata in place. `currentName` keeps the node's name when the
+   * values carry none — generated metadata has no `cm:name`, and inventing one from the title
+   * would **rename the node** (for a real document that means losing its file extension).
+   */
+  async update(nodeId: string, values: MdsValues, currentName?: string): Promise<NodeSummary> {
     const node = await firstValueFrom(
-      this.nodes.editNodeMetadata(nodeId, this.toBody(values), {
+      this.nodes.editNodeMetadata(nodeId, this.toBody(values, currentName), {
         versionComment: 'METADATA_UPDATE'
       })
     );
@@ -55,11 +59,14 @@ export class RepositoryNodeService {
     return firstValueFrom(this.nodes.getNode(nodeId));
   }
 
-  /** Normalize editor values and make sure the node carries a name (`cm:name`). */
-  private toBody(values: MdsValues): MdsValues {
+  /**
+   * Normalize editor values and make sure the node carries a name (`cm:name`): the node's existing
+   * name if there is one, else the title, else a fallback (a node cannot be created without one).
+   */
+  private toBody(values: MdsValues, currentName?: string): MdsValues {
     const body = toMdsValues(values);
     if (!body['cm:name']?.length) {
-      body['cm:name'] = [body['cclom:title']?.[0] || FALLBACK_NAME];
+      body['cm:name'] = [currentName || body['cclom:title']?.[0] || FALLBACK_NAME];
     }
     return body;
   }

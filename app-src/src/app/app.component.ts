@@ -9,6 +9,7 @@ import { ConditionsService } from './services/conditions.service';
 import { CurationService } from './services/curation.service';
 import { HistoryEntry, HistoryService } from './services/history.service';
 import { NavigationService } from './services/navigation.service';
+import { OnlyOfficeDocumentService, PluginEnvelope } from './services/onlyoffice-document.service';
 
 import { ActionBarComponent } from './components/action-bar.component';
 import { HistoryComponent } from './components/history.component';
@@ -18,6 +19,7 @@ import { SearchComponent } from './components/search.component';
 import { SettingsComponent } from './components/settings.component';
 import { StatusBarComponent } from './components/status-bar.component';
 import { AnalyzeScreenComponent } from './components/screens/analyze-screen.component';
+import { EnrichScreenComponent } from './components/screens/enrich-screen.component';
 import { CollectionsScreenComponent } from './components/screens/collections-screen.component';
 import { MetadataScreenComponent } from './components/screens/metadata-screen.component';
 import { NewDocumentScreenComponent } from './components/screens/new-document-screen.component';
@@ -36,15 +38,17 @@ const DISCARD_PROMPT =
   selector: 'es-root',
   imports: [
     StatusBarComponent, ActionBarComponent, MenuComponent, LoginComponent, HistoryComponent,
-    SettingsComponent, SearchComponent, AnalyzeScreenComponent, NewDocumentScreenComponent,
-    MetadataScreenComponent, PreviewScreenComponent, CollectionsScreenComponent
+    SettingsComponent, SearchComponent, AnalyzeScreenComponent, EnrichScreenComponent,
+    NewDocumentScreenComponent, MetadataScreenComponent, PreviewScreenComponent,
+    CollectionsScreenComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    // A PREVIEW_NODE relayed from the OnlyOffice plugin. The sender is a cross-origin frame, so
-    // it is filtered by data.source, never by event.origin.
+    // Events relayed from the OnlyOffice plugin (PREVIEW_NODE, DOCUMENT_INFO, DOCUMENT_CONTENT).
+    // The sender is a cross-origin frame, so they are filtered by data.source, never by
+    // event.origin.
     '(window:message)': 'onWindowMessage($event)'
   }
 })
@@ -57,6 +61,7 @@ export class AppComponent implements OnInit {
   private readonly additionalWebComponent = inject(AdditionalWebComponentService);
   private readonly curation = inject(CurationService);
   private readonly history = inject(HistoryService);
+  private readonly onlyOfficeDocument = inject(OnlyOfficeDocumentService);
 
   /** A node received while logged out — opened once the user logs in. */
   private readonly pendingNodeId = signal<string | null>(null);
@@ -83,8 +88,8 @@ export class AppComponent implements OnInit {
     const tab = await this.browserExtension.getActiveTab().catch(() => null);
     this.conditions.activeUrl.set(tab?.url ?? null);
 
-    // Land on the view that fits the current page (search on an OnlyOffice editor, the login
-    // gate when logged out, otherwise the options menu).
+    // Land on the view that fits the current page: the options menu, or the login gate when
+    // logged out.
     this.navigation.land();
 
     // Tell the host page we're ready so it can replay a buffered PREVIEW_NODE, then consume any
@@ -94,9 +99,13 @@ export class AppComponent implements OnInit {
   }
 
   protected onWindowMessage(event: MessageEvent): void {
-    const message = event.data as { source?: string; event?: string; data?: { id?: string } } | null;
-    if (message?.source !== PLUGIN_SOURCE || message.event !== 'PREVIEW_NODE') return;
-    void this.receiveNode(message.data?.id);
+    const message = event.data as (PluginEnvelope & { source?: string }) | null;
+    if (message?.source !== PLUGIN_SOURCE) return;
+    // DOCUMENT_INFO / DOCUMENT_CONTENT belong to the document bridge, which resolves the
+    // request that is waiting for them.
+    if (this.onlyOfficeDocument.accept(message)) return;
+    if (message.event !== 'PREVIEW_NODE') return;
+    void this.receiveNode((message.data as { id?: string } | undefined)?.id);
   }
 
   protected close(): void {

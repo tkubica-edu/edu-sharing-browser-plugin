@@ -9,16 +9,20 @@ page it is embedded in. Any web application can integrate by using the contracts
 OnlyOffice is just **one concrete example** — the same works for H5P editors, CMS editors,
 custom web apps, etc.
 
-Two public events cross the extension ↔ host boundary:
+These public events cross the extension ↔ host boundary:
 
 | Direction | Event | Meaning |
 |-----------|-------|---------|
 | **Extension → host** | `INSERT_NODE` | user picked node(s) in the selector ("Gewählten Inhalt kopieren") |
+| **Extension → host** | `REQUEST_DOCUMENT_CONTENT` | extension asks for the content of the document the host has open |
+| **Extension → host** | `REQUEST_DOCUMENT_INFO` | extension asks for that document's identity only |
 | **Host → extension** | `PREVIEW_NODE` | host asks the extension to preview/edit a node (e.g. user double-clicked an inserted object) |
+| **Host → extension** | `DOCUMENT_CONTENT` | the answer to `REQUEST_DOCUMENT_CONTENT` (also fired unsolicited by the plugin's toolbar button) |
+| **Host → extension** | `DOCUMENT_INFO` | the answer to `REQUEST_DOCUMENT_INFO` (also announced once on plugin startup) |
 
 `content/panel-host.js` (the content script on the host page) is the relay hub for both
-directions. It fires `INSERT_NODE` into all frames, and relays inbound `PREVIEW_NODE` into the
-sidebar iframe.
+directions. It broadcasts `INSERT_NODE` and the two `REQUEST_*` events into all frames, and
+relays every inbound envelope into the sidebar iframe.
 
 ---
 
@@ -121,6 +125,76 @@ applies if the raw `data.url` image is loaded manually, which the extension does
 
 ---
 
+## Direction 3 — Request/response: the open document's content
+
+Powers **"Metadaten anreichern"**: on an OnlyOffice page the extension enriches the *edited
+document* instead of the page. It asks the host for the document's content and sends the
+`markdown` rendering to the metadata agent (`POST /generate`, text mode), then opens the result in
+the metadata editor. The `document` identity makes the edited document the **active node**, so
+saving writes the enriched metadata **onto that node** (`editNodeMetadata`) instead of creating a
+new one in the inbox.
+
+Unlike the two directions above this is a **correlated pair**: every request carries a
+`requestId`, which the host mirrors into its answer, so parallel requests stay distinguishable.
+
+### What the extension sends
+```js
+// broadcast into every frame by panel-host.js
+{ source: "edu-sharing-browser-plugin", event: "REQUEST_DOCUMENT_CONTENT", data: { requestId } }
+{ source: "edu-sharing-browser-plugin", event: "REQUEST_DOCUMENT_INFO",    data: { requestId } }
+```
+
+### What the host answers
+```js
+{ source: "edu-sharing-onlyoffice-plugin", event: "DOCUMENT_CONTENT",
+  data: { trigger, requestId, editorType, title, text, markdown, elements, html, documentJson, … },
+  document: { nodeId, repoId, originalId, name, title, mimeType, permaLink, contentVersion, editable, documentKey } }
+
+{ source: "edu-sharing-onlyoffice-plugin", event: "DOCUMENT_INFO",
+  data: { document, editorType, trigger, requestId }, document: { … } }
+```
+
+- **`document` rides on every outbound envelope** (envelope level, including `PREVIEW_NODE`) and
+  additionally inside `DOCUMENT_INFO`'s `data`. It is **`null`** when the editor was opened with a
+  stale, cached plugin config — always null-check. `OnlyOfficeDocumentService` then keeps the last
+  known identity instead of dropping it, and an enrichment without any node id falls back to
+  creating a node on save, so the result is never lost.
+- **`originalId` wins over `nodeId`** as the save target: for a collection reference `nodeId` is
+  the reference, `originalId` the node actually being edited.
+- **`editable`** is the user's write permission in this session. The enrich screen warns when it is
+  `false`; the repository rejects the save either way.
+- **Never rename the node:** generated metadata carries no `cm:name`, and the node's name holds the
+  document's file name incl. extension — so `RepositoryNodeService.update` fills `cm:name` from the
+  node's current name (the title fallback applies to *creating* a node only).
+- **Only `markdown` is consumed** by this extension. `html` + `documentJson` are the payload's
+  bulk (megabytes with data-URI images); they are relayed but never read here.
+- **`trigger`**: `"request"` for an answer to one of our requests, `"toolbar"` for the plugin's own
+  toolbar button, `"announce"` for the one `DOCUMENT_INFO` on plugin startup. Unsolicited answers
+  carry no `requestId` — the extension takes only the identity from them.
+- **Error forms** (always with `trigger`/`requestId`/`document`): `{unsupported:true, editorType}`
+  for a non-text editor (spreadsheet, presentation — `DOCUMENT_INFO` works in all types) and
+  `{error:"read-failed"}`.
+- **Every request is bounded by a timeout** (content 15 s, info 10 s): the page-side listener is a
+  *background plugin* the user can switch off, in which case **no answer arrives at all** — not
+  even the startup announce. So the enrich screen requests `DOCUMENT_INFO` on open rather than
+  waiting for the announce, which is lost if the panel opened later.
+- **Not buffered:** `panel-host.js` buffers/persists only `PREVIEW_NODE`. A `DOCUMENT_CONTENT`
+  replay would be stale, and persisting its `html`/`documentJson` would blow the `storage.local`
+  quota.
+
+### Internal chain
+| # | From → To | Transport | Payload |
+|---|-----------|-----------|---------|
+| 1 | footer action → `CurationService.enrichOpenDocument()` → `MetadataAgentService.runForOpenDocument()` | — | — |
+| 2 | `OnlyOfficeDocumentService.requestContent()` → `BrowserExtensionService` → host top | `window.parent.postMessage` | `{type:'edusharing-request-document-content', requestId}` |
+| 3 | `panel-host.js` → all frames | `broadcastToFrames` (a single post to `window.top` would **not** reach the nested plugin frame) | `REQUEST_DOCUMENT_CONTENT` envelope |
+| 4 | plugin → host top → sidebar iframe | `postMessage`, relayed by `panel-host.js` | `DOCUMENT_CONTENT` envelope |
+| 5 | `app.component.ts` → `OnlyOfficeDocumentService.accept()` | filter `data.source`, match `requestId` | resolves the pending promise |
+| 6 | `markdown` → background `analyze.text` → `POST /generate` → metadata screen | `runtime.sendMessage` | agent payload |
+| 7 | `outcome.document` → `CurationService` active node (+ hydrated for the preview) → footer *Speichern* → `editNodeMetadata` | — | the document's own node |
+
+---
+
 ## `Node` Data Structure (elements in `INSERT_NODE`'s `nodes`)
 
 The `nodes` are edu-sharing repository node objects as held by the `edu-sharing` web-component
@@ -155,8 +229,9 @@ only string fields and the extension re-hydrates from `id`.
   uses `edu-sharing-onlyoffice-plugin`. They are intentionally different so neither side
   re-processes its own messages. Filter strictly by `source`.
 - **Frame boundary:** across a cross-origin iframe boundary only `postMessage` works
-  (`CustomEvent` does not cross it). `INSERT_NODE` is broadcast to all frames; `PREVIEW_NODE`
-  targets `window.top`.
+  (`CustomEvent` does not cross it). `INSERT_NODE` and the `REQUEST_DOCUMENT_*` events are
+  broadcast to all frames; the host's events target `window.top`.
+- **Unknown events are ignored silently** on both sides, so adding one breaks nothing.
 - **Marker required:** discard messages lacking the expected `source` **silently** (the host page
   receives many foreign `postMessage`s, e.g. the OnlyOffice editor's own internal messages).
 - **No loop:** `panel-host.js` guards inbound-from-sidebar handling with
@@ -173,9 +248,12 @@ only string fields and the extension re-hydrates from `id`.
 
 | File | Role |
 |---|---|
-| `app-src/src/app/components/search.component.ts` | selector's `onNodesChoosen` → `ext.insertNodes` (outbound) |
-| `app-src/src/app/services/ext.service.ts` | `insertNodes` (outbound), `signalReady` (ready handshake) |
-| `content/panel-host.js` | relay hub: broadcasts `INSERT_NODE`; relays/buffers inbound `PREVIEW_NODE` |
-| `app-src/src/app/app.component.ts` | receives `PREVIEW_NODE`, routes it into the wizard |
-| `app-src/src/app/services/curation.service.ts` | `loadFromNode(id)` — hydrate + open in wizard (preview + editable) |
-| *(host-side, external)* | app that listens for `INSERT_NODE` / sends `PREVIEW_NODE` (e.g. OnlyOffice plugin) |
+| `app-src/src/app/components/search.component.ts` | selector's `onNodesChoosen` → `insertNodes` (outbound) |
+| `app-src/src/app/services/browser-extension.service.ts` | `insertNodes`, `requestDocumentContent`, `requestDocumentInfo` (outbound), `signalReady` (ready handshake), `analyzeText` (→ background `/generate`) |
+| `content/panel-host.js` | relay hub: broadcasts `INSERT_NODE` / `REQUEST_DOCUMENT_*`; relays inbound envelopes, buffers only `PREVIEW_NODE` |
+| `app-src/src/app/app.component.ts` | single `window:message` listener: `DOCUMENT_*` → the document bridge, `PREVIEW_NODE` → the flow |
+| `app-src/src/app/services/onlyoffice-document.service.ts` | the request/response bridge: `requestContent`/`requestInfo` (`requestId` + timeout), `accept(envelope)`, `currentDocument` |
+| `app-src/src/app/services/metadata-agent.service.ts` | `runForOpenDocument()` — document content → `markdown` → agent |
+| `app-src/src/app/services/curation.service.ts` | `openNode(id)` (hydrate + open in the preview), `enrichOpenDocument()` |
+| `background/background.js` | `analyze.text` — `POST /generate` for text the sidebar supplies |
+| *(host-side, external)* | app that listens for `INSERT_NODE` / `REQUEST_DOCUMENT_*` and sends `PREVIEW_NODE` / `DOCUMENT_*` (e.g. OnlyOffice plugin) |

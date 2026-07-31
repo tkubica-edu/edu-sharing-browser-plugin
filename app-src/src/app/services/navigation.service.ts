@@ -18,10 +18,20 @@ export class NavigationService {
   /** Back button is shown on every view except the menu; it always returns to the menu. */
   readonly showBack = computed(() => this.view() !== 'menu');
 
-  /** The options visible for the current conditions (drives the menu). */
-  readonly visibleOptions = computed(() =>
-    OPTIONS.filter((option) => option.visible(this.conditions.snapshot())),
-  );
+  /**
+   * The options visible for the current conditions (drives the menu). The order is the registry's
+   * own, with one context rule: on an insert host, *Inhalt suchen* is the reason the panel is
+   * open, so it leads the list.
+   */
+  readonly visibleOptions = computed(() => {
+    const conditions = this.conditions.snapshot();
+    const visible = OPTIONS.filter((option) => option.visible(conditions));
+    if (!conditions.onlyOfficePresent) return visible;
+    return [
+      ...visible.filter((option) => option.id === 'search'),
+      ...visible.filter((option) => option.id !== 'search')
+    ];
+  });
 
   /** Title shown in the topbar for the current view. */
   readonly title = computed(() => {
@@ -50,14 +60,18 @@ export class NavigationService {
   }
 
   /**
-   * Pick the view that fits the current context. `nodeJustLoaded` marks an explicit node load
-   * (an OnlyOffice preview or a history entry), which wins over the OnlyOffice default.
+   * Pick the view that fits the current context: the options menu, unless the user must log in
+   * first or a node was just loaded explicitly (an OnlyOffice preview or a history entry), which
+   * opens in the preview.
+   *
+   * No option opens itself from a page match — the menu is the start view everywhere, so what the
+   * page offers stays visible instead of being decided for the user. On an insert host that
+   * ordering is expressed in {@link visibleOptions} instead.
    */
   land(options?: { nodeJustLoaded?: boolean }): void {
     const conditions = this.conditions.snapshot();
     if (!conditions.loggedIn) return this.view.set('login');
     if (options?.nodeJustLoaded && conditions.hasActiveNode) return this.view.set('preview');
-    if (conditions.onlyOfficePresent) return this.view.set('search');
     this.view.set('menu');
   }
 

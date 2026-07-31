@@ -1,0 +1,29 @@
+<div class="es-screen-body">
+  <section class="es-hint-card">
+    <p class="es-muted">
+      Liest den Inhalt des geöffneten OnlyOffice-Dokuments aus und erzeugt daraus Metadaten.
+      Sie werden anschließend am Dokument selbst gespeichert.
+    </p>
+
+    @if (onlyOfficeDocument.currentDocument(); as document) {
+      <p class="src-title" [title]="document.permaLink || ''">
+        {{ document.title || document.name || document.nodeId }}
+      </p>
+
+      <!-- Without write permission the save will be rejected by the repository — say so before
+           the user invests the run. -->
+      @if (document.editable === false) {
+        <p class="es-error">
+          Für dieses Dokument fehlt die Schreibberechtigung — die Metadaten können nicht daran
+          gespeichert werden.
+        </p>
+      }
+    }
+  </section>
+
+  @if (metadataAgent.lastRun(); as run) {
+    @if (!run.ok) {
+      <section class="es-card"><p class="es-error">{{ run.error }}</p></section>
+    }
+  }
+</div>

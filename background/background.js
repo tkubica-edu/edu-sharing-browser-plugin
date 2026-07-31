@@ -100,6 +100,19 @@ function buildGenerateBody(pageData, language) {
   };
 }
 
+// Build the /generate request body for text the sidebar already holds (e.g. the markdown of an
+// open OnlyOffice document). Text mode only — there is no URL to fall back to.
+function buildTextGenerateBody(text, language) {
+  return {
+    text,
+    context: 'default',
+    version: 'latest',
+    language: language || 'de',
+    include_core: true,
+    enable_geocoding: true
+  };
+}
+
 async function callGenerate(body) {
   const response = await fetchWithTimeout(
     `${API_URL}/generate`,
@@ -124,7 +137,8 @@ async function callGenerate(body) {
 const ALLOWED_ACTIONS = new Set([
   'tabs.getActive',
   'tabs.extractPageData',
-  'analyze.run'
+  'analyze.run',
+  'analyze.text'
 ]);
 
 browser.runtime.onMessage.addListener((message) => {
@@ -159,6 +173,15 @@ browser.runtime.onMessage.addListener((message) => {
             result,
             source: { url: pageData?.url || tab.url, title: pageData?.title || tab.title, favIconUrl: tab.favIconUrl }
           };
+        }
+
+        // POST text supplied by the sidebar to /generate (no tab involved) — used by the
+        // OnlyOffice enrichment, where the content comes from the editor, not from the page.
+        case 'analyze.text': {
+          const text = typeof message.text === 'string' ? message.text : '';
+          if (text.trim().length < 50) return { success: false, error: 'EMPTY_EXTRACTION' };
+          const result = await callGenerate(buildTextGenerateBody(text, message.language));
+          return { success: true, result };
         }
 
         default:

@@ -6,10 +6,11 @@
 export type OptionId =
   | 'login'
   | 'analyze'
-  | 'new-document'
+  | 'enrich'
   | 'metadata'
   | 'preview'
   | 'collections'
+  | 'new-document'
   | 'search'
   | 'history'
   | 'settings';
@@ -60,10 +61,12 @@ export const OPTIONS: readonly AppOption[] = [
     visible: requiresLogin((c) => !c.onEduSharing && !c.onlyOfficePresent)
   },
   {
-    id: 'new-document',
-    label: 'Neues OnlyOffice-Dokument',
-    description: 'Ein neues OnlyOffice-Dokument im Repository anlegen',
-    visible: requiresLogin()
+    id: 'enrich',
+    label: 'Metadaten anreichern',
+    description: 'Metadaten aus dem geöffneten OnlyOffice-Dokument erzeugen und daran speichern',
+    // The counterpart of `analyze` on an OnlyOffice page: the content comes from the editor, and
+    // the edited document itself is the node the metadata is saved to.
+    visible: requiresLogin((c) => c.onlyOfficePresent)
   },
   {
     id: 'metadata',
@@ -83,6 +86,12 @@ export const OPTIONS: readonly AppOption[] = [
     label: 'Einsortieren in Sammlungen',
     description: 'Den Inhalt einer oder mehreren Sammlungen hinzufügen',
     visible: requiresLogin((c) => c.hasActiveNode)
+  },
+  {
+    id: 'new-document',
+    label: 'Neues OnlyOffice-Dokument',
+    description: 'Ein neues OnlyOffice-Dokument im Repository anlegen',
+    visible: requiresLogin()
   },
   {
     id: 'search',

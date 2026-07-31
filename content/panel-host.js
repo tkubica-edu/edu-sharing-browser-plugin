@@ -257,10 +257,16 @@
       // Inbound plugin → sidebar. Comes from a cross-origin plugin iframe (NOT our sidebar),
       // so it must be handled BEFORE the `event.source !== iframe.contentWindow` guard below.
       if (data && data.source === EDU_ONLYOFFICE_SOURCE) {
-        console.log('[edu-sharing][panel-host] ⬅ received from OnlyOffice plugin:', data.event, data.data);
-        lastInbound = data;
+        console.log('[edu-sharing][panel-host] ⬅ received from OnlyOffice plugin:', data.event);
         relayInbound(data);
-        try { api.storage.local.set({ eduSharingPendingPreview: { data: data, t: Date.now() } }); } catch (_) { /* ignore */ }
+        // Only PREVIEW_NODE is buffered/persisted: it is the one event that must survive a
+        // closed or booting sidebar. DOCUMENT_CONTENT is an answer to a live request (a replay
+        // would be stale) and its html/documentJson payload runs into megabytes, which would
+        // blow the storage.local quota.
+        if (data.event === 'PREVIEW_NODE') {
+          lastInbound = data;
+          try { api.storage.local.set({ eduSharingPendingPreview: { data: data, t: Date.now() } }); } catch (_) { /* ignore */ }
+        }
         return;
       }
       if (event.source !== iframe.contentWindow) return;
@@ -289,6 +295,22 @@
         // all_frames:true (CustomEvent stays within its own frame; harmless otherwise).
         try { window.dispatchEvent(new CustomEvent(EDU_PLUGIN_CHANNEL, { detail: envelope })); } catch (_) { /* ignore */ }
         try { document.dispatchEvent(new CustomEvent(EDU_PLUGIN_CHANNEL, { detail: envelope })); } catch (_) { /* ignore */ }
+      } else if (type === 'edusharing-request-document-content' || type === 'edusharing-request-document-info') {
+        // Ask the page-side plugin for the edited document's content / identity. The answer comes
+        // back as a DOCUMENT_CONTENT / DOCUMENT_INFO envelope through the inbound branch above.
+        // Must be broadcast: the plugin lives in a nested, cross-origin frame, so a single
+        // postMessage to window.top would never reach it.
+        const requestEvent = type === 'edusharing-request-document-info'
+          ? 'REQUEST_DOCUMENT_INFO'
+          : 'REQUEST_DOCUMENT_CONTENT';
+        const envelope = {
+          source: EDU_PLUGIN_SOURCE,
+          event: requestEvent,
+          data: { requestId: data && data.requestId }
+        };
+        const delivered = broadcastToFrames(window.top, envelope);
+        console.log('[edu-sharing][panel-host] ➡ broadcast ' + requestEvent + ' to ' + delivered +
+          ' frame(s), requestId:', data && data.requestId);
       }
     };
     window.__eduSharingPanelMsgHandler = handler;

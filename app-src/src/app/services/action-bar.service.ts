@@ -56,6 +56,19 @@ export class ActionBarService {
           }
         ];
 
+      case 'enrich':
+        return [
+          {
+            label: this.curation.running()
+              ? 'Lese Dokument & erschließe…'
+              : 'Metadaten anreichern',
+            disabled: this.curation.running(),
+            run: async () => {
+              if (await this.curation.enrichOpenDocument()) this.navigation.go('metadata');
+            }
+          }
+        ];
+
       case 'metadata': {
         const handler = this.saveHandler();
         return [
