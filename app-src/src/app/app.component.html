@@ -1,6 +1,23 @@
 <header class="topbar">
   <img class="logo" src="../icons/32.png" alt="" (error)="hideBrokenLogo($event)" />
   <span class="title">Edu-Sharing</span>
+
+  <!-- The utility options (Verlauf, Einstellungen): always reachable, so they sit here as icons
+       next to the close button instead of in the options menu. -->
+  @for (option of navigation.topbarOptions(); track option.id) {
+    <button class="topbar-btn" [class.is-active]="navigation.view() === option.id"
+            [title]="option.label" [attr.aria-label]="option.label"
+            (click)="navigation.go(option.id)">
+      <span class="tb-icon" [innerHTML]="icons.icon(option.id)"></span>
+      @if (option.id === 'history' && history.entries().length) {
+        <span class="count">{{ history.entries().length }}</span>
+      }
+      @if (option.id === 'settings' && auth.needsReload()) {
+        <span class="dot" title="Änderung übernehmen"></span>
+      }
+    </button>
+  }
+
   <button class="close" title="Schließen" aria-label="Schließen" (click)="close()">✕</button>
 </header>
 

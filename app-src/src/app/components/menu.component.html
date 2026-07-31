@@ -3,17 +3,9 @@
     @for (option of navigation.visibleOptions(); track option.id) {
       <li>
         <button class="menu-item" (click)="navigation.go(option.id)">
-          <span class="mi-icon" [innerHTML]="icon(option.id)"></span>
+          <span class="mi-icon" [innerHTML]="icons.icon(option.id)"></span>
           <span class="mi-main">
-            <span class="mi-title">
-              {{ option.label }}
-              @if (option.id === 'history' && history.entries().length) {
-                <span class="count">{{ history.entries().length }}</span>
-              }
-              @if (option.id === 'settings' && auth.needsReload()) {
-                <span class="dot" title="Änderung übernehmen"></span>
-              }
-            </span>
+            <span class="mi-title">{{ option.label }}</span>
             <span class="mi-desc">{{ option.description }}</span>
           </span>
           <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"

@@ -25,13 +25,18 @@ export class NavigationService {
    */
   readonly visibleOptions = computed(() => {
     const conditions = this.conditions.snapshot();
-    const visible = OPTIONS.filter((option) => option.visible(conditions));
+    const visible = OPTIONS.filter((option) => !option.topbar && option.visible(conditions));
     if (!conditions.onlyOfficePresent) return visible;
     return [
       ...visible.filter((option) => option.id === 'search'),
       ...visible.filter((option) => option.id !== 'search')
     ];
   });
+
+  /** The utility options, shown as topbar icons rather than as menu entries. */
+  readonly topbarOptions = computed(() =>
+    OPTIONS.filter((option) => option.topbar && option.visible(this.conditions.snapshot())),
+  );
 
   /** Title shown in the topbar for the current view. */
   readonly title = computed(() => {

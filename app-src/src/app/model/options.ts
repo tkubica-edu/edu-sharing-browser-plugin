@@ -37,6 +37,12 @@ export interface AppOption {
   label: string;
   description: string;
   visible: (conditions: Conditions) => boolean;
+  /**
+   * Offered as an icon in the topbar instead of as a menu entry. For the options that are not
+   * actions on content but always-available utilities (Verlauf, Einstellungen) — they stay in this
+   * registry, so visibility, guards and the view title work exactly like for a menu entry.
+   */
+  topbar?: boolean;
 }
 
 /** All options except login and settings require a valid login. */
@@ -45,7 +51,7 @@ const requiresLogin =
   (conditions: Conditions): boolean =>
     conditions.loggedIn && extra(conditions);
 
-/** Every option, in menu order. */
+/** Every option, in menu order (the `topbar` ones last — they are not part of the menu). */
 export const OPTIONS: readonly AppOption[] = [
   {
     id: 'login',
@@ -103,12 +109,14 @@ export const OPTIONS: readonly AppOption[] = [
     id: 'history',
     label: 'Verlauf',
     description: 'Zuletzt erstellte oder bearbeitete Inhalte erneut öffnen',
-    visible: requiresLogin()
+    visible: requiresLogin(),
+    topbar: true
   },
   {
     id: 'settings',
     label: 'Einstellungen',
     description: 'Repository-Adresse und Verbindung konfigurieren',
-    visible: () => true
+    visible: () => true,
+    topbar: true
   }
 ];

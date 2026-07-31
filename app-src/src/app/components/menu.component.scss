@@ -22,26 +22,7 @@
 }
 
 .mi-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-.mi-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 15px;
-}
+.mi-title { font-weight: 600; font-size: 15px; }
 .mi-desc { font-size: 12px; color: var(--es-muted); line-height: 1.35; }
-
-.count {
-  background: var(--es-blue);
-  color: #fff;
-  font-size: 10px;
-  border-radius: 999px;
-  padding: 1px 6px;
-}
-.dot {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: #e0a800;
-}
 
 .chevron { flex: 0 0 auto; width: 20px; height: 20px; color: var(--es-muted); }

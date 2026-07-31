@@ -17,7 +17,10 @@
 .logo { width: 22px; height: 22px; border-radius: 4px; background: #fff; }
 .title { font-weight: 600; font-size: 14px; flex: 1; }
 
-.close {
+// The topbar's icon buttons: the utility options (Verlauf, Einstellungen) and close, sharing one
+// square shape so they read as one group.
+.close,
+.topbar-btn {
   background: rgba(255, 255, 255, 0.15);
   border: none;
   color: #fff;
@@ -27,7 +30,49 @@
   line-height: 1;
   flex: 0 0 auto;
 }
-.close:hover { background: rgba(255, 255, 255, 0.3); }
+.close:hover,
+.topbar-btn:hover { background: rgba(255, 255, 255, 0.3); }
+
+.topbar-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+// The open view's icon stays highlighted, since these two are reached from anywhere.
+.topbar-btn.is-active { background: rgba(255, 255, 255, 0.45); }
+
+.tb-icon {
+  display: block;
+  width: 16px; height: 16px;
+
+  ::ng-deep svg { width: 16px; height: 16px; display: block; }
+}
+
+// Badges pinned to the icon's top-right corner: the history entry count, and the dot marking a
+// repository-URL change that still needs applying.
+.topbar-btn .count,
+.topbar-btn .dot {
+  position: absolute;
+  top: -3px; right: -3px;
+  border: 1px solid var(--es-blue);
+}
+.topbar-btn .count {
+  background: #fff;
+  color: var(--es-blue);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 14px;
+  padding: 2px 3px;
+  border-radius: 999px;
+}
+.topbar-btn .dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #e0a800;
+}
 
 // Workflow-step header (below the status bar): back-to-menu button + current step title.
 .step-header {

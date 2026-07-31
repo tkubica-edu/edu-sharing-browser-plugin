@@ -10,6 +10,7 @@ import { CurationService } from './services/curation.service';
 import { HistoryEntry, HistoryService } from './services/history.service';
 import { NavigationService } from './services/navigation.service';
 import { OnlyOfficeDocumentService, PluginEnvelope } from './services/onlyoffice-document.service';
+import { OptionIconService } from './services/option-icon.service';
 
 import { ActionBarComponent } from './components/action-bar.component';
 import { HistoryComponent } from './components/history.component';
@@ -56,11 +57,13 @@ export class AppComponent implements OnInit {
   protected readonly auth = inject(AuthService);
   protected readonly navigation = inject(NavigationService);
   protected readonly conditions = inject(ConditionsService);
+  // Both for the topbar's utility icons (Verlauf's count, Einstellungen's pending-change dot).
+  protected readonly history = inject(HistoryService);
+  protected readonly icons = inject(OptionIconService);
 
   private readonly browserExtension = inject(BrowserExtensionService);
   private readonly additionalWebComponent = inject(AdditionalWebComponentService);
   private readonly curation = inject(CurationService);
-  private readonly history = inject(HistoryService);
   private readonly onlyOfficeDocument = inject(OnlyOfficeDocumentService);
 
   /** A node received while logged out — opened once the user logs in. */

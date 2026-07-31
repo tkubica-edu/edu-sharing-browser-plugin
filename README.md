@@ -11,9 +11,12 @@ preconditions hold. `ConditionsService` collects those facts (login, OnlyOffice 
 Edu-Sharing page, active node, editable metadata, edit mode) and each option in
 `model/options.ts` decides its own visibility from that snapshot. The list order is the
 registry's, with one context rule in `NavigationService.visibleOptions`: on an OnlyOffice page
-*Inhalt suchen* leads the menu. The **status bar** shows the same facts as chips, so it is always
-visible why an option appears or disappears — and it can drop the active content again. The
-**back button** always returns to the menu.
+*Inhalt suchen* leads the menu. The two options that are not actions on content but
+always-available utilities — *Verlauf* and *Einstellungen* — are marked `topbar: true` and render
+as **icons in the topbar** next to the close button (`NavigationService.topbarOptions`); they are
+otherwise ordinary options, so visibility, guards and the view title work the same. The **status
+bar** shows the same facts as chips, so it is always visible why an option appears or disappears —
+and it can drop the active content again. The **back button** always returns to the menu.
 
 The footer (`ActionBarService`) contributes the current view's next steps: *Erschließung
 starten* on the analyze screen, *Speichern* on the metadata screen, and the choice between
@@ -51,13 +54,14 @@ The options:
   OnlyOffice create dialog; the new node is hydrated into the flow and opens in the preview.
 - **Inhalt suchen** — only on an insert host (URL matches `/src/tools/onlyoffice`): the same
   selector in search mode, posting the chosen nodes to the host page.
-- **Verlauf** — the **saved nodes**, newest first. An entry is recorded only when a node is
+- **Verlauf** *(topbar icon, with the entry count as a badge)* — the **saved nodes**, newest first. An entry is recorded only when a node is
   actually saved, so every row carries a `nodeId` (legacy pre-node entries are dropped on load,
   and re-saving a node moves its row to the top instead of duplicating). *In Vorschau öffnen*
   fetches the live node by id (`CurationService.openFromHistory` → `RepositoryNodeService.get`)
   and opens it; if there is unsaved work the shell confirms first, and a failed fetch is
   surfaced via an alert.
-- **Einstellungen** — the Repository-URL (used for login and every embedded element).
+- **Einstellungen** *(topbar icon, dotted while a change waits to be applied)* — the
+  Repository-URL (used for login and every embedded element).
 - **WLO Metadaten-Agent** — only when the repository config enables it, see below.
 
 A node double-clicked in the OnlyOffice plugin arrives as a `PREVIEW_NODE` message (relayed by
@@ -198,12 +202,13 @@ Open the generated Xcode project and Run.
 
 ### Manual test checklist
 1. Toolbar click → the sidebar docks on the right; drag its left edge to resize; the ✕ button
-   closes it. The menu lists the options visible for the current page, and the status bar shows
-   the matching chips.
-2. **Einstellungen**: the Repository-URL defaults to
+   closes it. The start view is the menu, which lists the options visible for the current page
+   (on an OnlyOffice page *Inhalt suchen* first, and nothing opens on its own), the status bar
+   shows the matching chips, and the topbar carries the *Verlauf* / *Einstellungen* icons.
+2. **Einstellungen** (topbar icon, reachable while logged out): the Repository-URL defaults to
    `https://repository.staging.openeduhub.net/edu-sharing` and is required. Changing it shows an
    *Übernehmen* button that reloads the sidebar so the library re-initializes against the new
-   repository (a dot marks the option until applied).
+   repository (a dot marks the icon until applied).
 3. **Login**: required for everything except *Einstellungen*. Enter staging credentials → the
    status bar flips to "Angemeldet: …" and the login option disappears while the rest appear.
    If the repository URL was changed, login is blocked until it is applied in *Einstellungen*.
