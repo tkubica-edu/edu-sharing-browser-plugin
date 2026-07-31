@@ -5,6 +5,8 @@ app-src/dist/
 app-src/.angular/
 *.log
 .DS_Store
+.claude
+.agents
 .idea
 scripts/edu/
 

@@ -8,7 +8,15 @@
     }
   </section>
 
-  @if (curation.previewNode(); as node) {
+  <!-- The WLO canvas shows the saved properties read-only while the repository config enables it;
+       otherwise the edu-sharing preview element renders the node itself. -->
+  @if (additionalWebComponent.enabled()) {
+    @if (curation.editorMetadata(); as metadata) {
+      <section class="es-card">
+        <es-wlo-canvas mode="detail" [metadata]="metadata"></es-wlo-canvas>
+      </section>
+    }
+  } @else if (curation.previewNode(); as node) {
     <section class="es-card">
       <es-preview-node [node]="node"></es-preview-node>
     </section>

@@ -102,17 +102,26 @@ cookie when the user is logged in; as guest they rely on public access.
 ## The optional WLO metadata editor
 
 `AdditionalWebComponentService` watches the repository config for the boolean variable
-**`additionalWebComponent`**. While it is enabled, the **metadata screen** embeds
-`WloCanvasComponent` — `<metadata-agent-canvas>` from the packaged `wlo/` bundle — instead of the
-edu-sharing MDS editor. Nothing else changes: *Inhalt erschließen* still runs the metadata agent
-through the background worker, its result is loaded into the editor, and saving still creates or
-updates the repository node and records it in the Verlauf.
+**`additionalWebComponent`**. While it is enabled, `WloCanvasComponent` —
+`<metadata-agent-canvas>` from the packaged `wlo/` bundle — takes over two screens:
+
+- **Metadaten editieren** (`mode="edit"`) instead of the edu-sharing MDS editor,
+- **Vorschau** (`mode="detail"`) instead of `edu-sharing-preview-sidebar`, showing the saved
+  properties read-only. Saving still lands there, so the preview follows the edit as before.
+
+The per-mode settings are the two presets the bundle's own
+`examples/canvas-parameter-demo.html` documents — "Plugin" and "Detail (readonly)" — kept
+verbatim in `CONFIGS` so they stay comparable with that reference.
+
+Nothing else changes: *Inhalt erschließen* still runs the metadata agent through the background
+worker, its result is loaded into the editor, and saving still creates or updates the repository
+node and records it in the Verlauf.
 
 Both editors implement the same `MetadataEditor` contract (`ready` + `commit()`), so the footer
-owns "Speichern" either way and the screen only picks which one to render.
+owns "Speichern" either way and the metadata screen only picks which one to render. In
+`mode="detail"` the canvas is read-only and nothing is committed.
 
-The canvas is configured for embedded use — `layout="plugin"`, no status bar, no AI
-highlighting — with its own save/upload buttons hidden (the footer saves) and page mode off
+Its save/upload buttons stay hidden in both modes (the footer saves) and page mode is off
 (*Inhalt erschließen* is the app's own extraction path). Seeding is direct: its `importJsonData`
 reads `metadata || <the payload>` plus `metadataset` / `_origins` / `_source_text` /
 `preview_image_url`, which is exactly the agent payload shape, so an analysis result and a node's

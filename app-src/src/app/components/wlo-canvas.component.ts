@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, computed, input, output, signal } from '@angular/core';
 
 import { MdsValues, toMdsEditorValues } from '../util/mds-values';
 import { loadWebComponentBundle } from '../services/web-component-bundle.service';
@@ -15,14 +15,66 @@ interface CanvasMetadata {
   [envelopeField: string]: unknown;
 }
 
-// The WLO metadata editor: <metadata-agent-canvas> from the packaged wlo bundle, used as a REAL
-// custom element. Replaces the edu-sharing MDS editor on the metadata screen while the
-// repository config enables the additional web component.
+/** How the canvas is used: editing the metadata, or showing it read-only. */
+export type WloCanvasMode = 'edit' | 'detail';
+
+/** The canvas settings that differ per mode. */
+interface CanvasConfig {
+  layout: string;
+  columns: number;
+  readonly: boolean;
+  borderless: boolean;
+  showInputArea: boolean;
+  showFooter: boolean;
+  showFieldActions: boolean;
+  showFloatingControls: boolean;
+  showContentType: boolean;
+  showContentTypeOnly: boolean;
+  showResetButton: boolean;
+}
+
+/**
+ * The two presets the bundle documents for embedded use (see its own
+ * `examples/canvas-parameter-demo.html`): "Plugin" for editing, "Detail (readonly)" for showing
+ * the properties. Kept verbatim so they stay comparable with that reference.
+ */
+const CONFIGS: Record<WloCanvasMode, CanvasConfig> = {
+  edit: {
+    layout: 'plugin',
+    columns: 1,
+    readonly: false,
+    borderless: true,
+    showInputArea: true,
+    showFooter: false,
+    showFieldActions: true,
+    showFloatingControls: true,
+    showContentType: true,
+    showContentTypeOnly: false,
+    showResetButton: true
+  },
+  detail: {
+    layout: 'detail',
+    columns: 4,
+    readonly: true,
+    borderless: true,
+    showInputArea: false,
+    showFooter: false,
+    showFieldActions: false,
+    showFloatingControls: true,
+    showContentType: true,
+    showContentTypeOnly: true,
+    showResetButton: false
+  }
+};
+
+// The WLO metadata canvas: <metadata-agent-canvas> from the packaged wlo bundle, used as a REAL
+// custom element. While the repository config enables the additional web component it replaces
+// both the edu-sharing MDS editor (mode 'edit', on the metadata screen) and the preview element
+// (mode 'detail', on the preview screen).
 //
-// It is configured for embedded use exactly like the previous WLO browser plugin did
-// (`layout="plugin"`, no status bar, no AI highlighting), except that its own save and upload
-// buttons stay hidden: as with MdsEditorComponent, the footer owns "Speichern" and commit()
-// hands over the current values, which arrive continuously via `metadataChange`.
+// In 'edit' mode its own save and upload buttons stay hidden: as with MdsEditorComponent, the
+// footer owns "Speichern" and commit() hands over the current values, which arrive continuously
+// via `metadataChange`. In 'detail' mode it is read-only and nothing is committed.
 @Component({
   selector: 'es-wlo-canvas',
   templateUrl: './wlo-canvas.component.html',
@@ -39,8 +91,13 @@ export class WloCanvasComponent implements MetadataEditor {
    */
   readonly metadata = input.required<MetadataSeed>();
 
-  /** Emits the current values when the footer triggers a save. */
+  /** Editing (default) or a read-only view of the properties. */
+  readonly mode = input<WloCanvasMode>('edit');
+
+  /** Emits the current values when the footer triggers a save (mode 'edit'). */
   readonly save = output<MdsValues>();
+
+  protected readonly config = computed(() => CONFIGS[this.mode()]);
 
   protected readonly bundle = loadWebComponentBundle('wlo', CANVAS_TAG);
 
