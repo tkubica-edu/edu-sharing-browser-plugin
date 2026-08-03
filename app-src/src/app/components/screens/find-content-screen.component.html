@@ -1,0 +1,48 @@
+<!-- Login required to search the repository — reuse the shared gate. -->
+@if (auth.loggedIn()) {
+  <div class="find-wrap">
+    <section class="es-hint-card">
+      <p class="es-muted">
+        Erzeugt Schlagworte aus dem geöffneten OnlyOffice-Dokument und sucht damit passende
+        Inhalte. Ein Doppelklick auf ein Ergebnis fügt es in das Dokument ein.
+      </p>
+
+      @if (suggestions.running()) {
+        <p class="es-muted">Dokument wird gelesen und ausgewertet…</p>
+      } @else if (suggestions.error(); as error) {
+        <p class="es-error">{{ error }}</p>
+      } @else if (suggestions.keywords().length) {
+        <div class="es-result-sub">
+          @for (keyword of suggestions.keywords(); track keyword) {
+            <span class="es-chip">{{ keyword }}</span>
+          }
+        </div>
+      }
+
+      @if (!suggestions.running()) {
+        <div class="es-row">
+          <button class="es-btn es-btn--text" (click)="refresh()">Neu aus Dokument</button>
+        </div>
+      }
+    </section>
+
+    @if (bundle.error(); as error) {
+      <p class="es-error">Suche konnte nicht geladen werden: {{ error }}</p>
+    }
+
+    <!--
+      Rendered once the keywords exist, so the element searches for them from the start (its own
+      first query runs as soon as the filter widgets initialize). Inside the @if the bindings are
+      applied before the element is inserted and upgraded — see NodesSelectorComponent.
+    -->
+    @if (bundle.ready() && suggestions.searchString(); as searchString) {
+      <edu-sharing-search
+        class="results"
+        [searchString]="searchString"
+        (nodeActivated)="insert($event)"
+      ></edu-sharing-search>
+    }
+  </div>
+} @else {
+  <div class="login-gate"><es-login></es-login></div>
+}

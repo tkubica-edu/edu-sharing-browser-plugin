@@ -1,0 +1,11 @@
+{
+  "OER": {
+    "SEARCH": "Recherche de ressources, de collections et d'outils...",
+    "COLLECTIONS": "Collections susceptibles de vous intéresser",
+    "MATERIALS": "Dernières ressources",
+    "NO_COLLECTION_RESULTS": "Aucune collection trouvée",
+    "NO_MATERIAL_RESULTS": "Aucune ressource trouvée",
+    "HEADING_TITLE": "Recherche",
+    "HEADING_DESCRIPTION": "Trouver les dernières ressources et collections"
+  }
+}

@@ -47,6 +47,17 @@ The options:
   editor. The answer's `document` makes the edited document the **active node**, so **Speichern**
   writes the enriched metadata onto that node (`editNodeMetadata`) rather than creating a new one
   in the inbox — the node's name is kept, so the document is never renamed.
+- **Passende Inhalte finden** — only on an OnlyOffice page: searches the repository for content
+  matching the **edited document**. The search word is not typed but derived — the same
+  `REQUEST_DOCUMENT_CONTENT` → `DOCUMENT_CONTENT` round trip as *Metadaten anreichern*, then
+  `POST {apiUrl}/generate` on the answer's `markdown`, and the generated
+  `cclom:general_keyword` values (title as fallback, deduplicated, capped) become the
+  `search-string` of **`edu-sharing-search`** — the embedded search that adds the metadata filters
+  of the search page to a node list. That run is deliberately *not* kept as the app's last
+  analysis (`ContentSuggestionsService`, not `MetadataAgentService.lastRun`), so it neither shows up
+  in the metadata editor nor counts as unsaved work. Opening the option starts the derivation;
+  *Neu aus Dokument* repeats it after edits. A double-clicked result (`nodeActivated`) is posted to
+  the host page for insertion, like the selector on *Inhalt suchen*.
 - **Metadaten editieren** — loads the metadata into `edu-sharing-mds-editor-wrapper`. Saving
   creates a `ccm:io` node in the **inbox** the first time (`NodeService.createChild`) and
   updates it in place thereafter (`editNodeMetadata`), then advances to the preview. Available
@@ -97,7 +108,7 @@ The pre-built edu-sharing bundle lives in `scripts/edu/` (packaged as `edu/` in 
 extension). It is built from the edu-sharing frontend (`npm run build:app-as-component`
 → `dist/web-components/app/`) and registers every element used here:
 `edu-sharing-mds-editor-wrapper`, `edu-sharing-preview-sidebar`,
-`edu-sharing-nodes-selector`, `edu-sharing-add-with-connector`. A second bundle,
+`edu-sharing-nodes-selector`, `edu-sharing-add-with-connector`, `edu-sharing-search`. A second bundle,
 `scripts/wlo/` → `wlo/`, provides the optional `metadata-agent-canvas` (see below).
 
 The elements are used as **real custom elements in the sidebar document — no iframes**.

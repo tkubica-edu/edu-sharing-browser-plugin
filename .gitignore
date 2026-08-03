@@ -8,7 +8,5 @@ app-src/.angular/
 .claude
 .agents
 .idea
-scripts/edu/
-scripts/wlo/
 
 sidebar/main.js

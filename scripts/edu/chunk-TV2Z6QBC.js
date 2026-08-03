@@ -1,0 +1,1 @@
+var o=()=>{let t=document.body,e=document.documentElement;return Math.max(t.clientHeight,t.scrollHeight,t.offsetHeight,e.clientHeight,e.scrollHeight,e.offsetHeight)},n=t=>{t.scrollIntoView({inline:"start",block:"nearest",behavior:"smooth"})};export{o as a,n as b};

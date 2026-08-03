@@ -21,6 +21,7 @@ import { SettingsComponent } from './components/settings.component';
 import { StatusBarComponent } from './components/status-bar.component';
 import { AnalyzeScreenComponent } from './components/screens/analyze-screen.component';
 import { EnrichScreenComponent } from './components/screens/enrich-screen.component';
+import { FindContentScreenComponent } from './components/screens/find-content-screen.component';
 import { CollectionsScreenComponent } from './components/screens/collections-screen.component';
 import { MetadataScreenComponent } from './components/screens/metadata-screen.component';
 import { NewDocumentScreenComponent } from './components/screens/new-document-screen.component';
@@ -39,7 +40,7 @@ const DISCARD_PROMPT =
   selector: 'es-root',
   imports: [
     StatusBarComponent, ActionBarComponent, MenuComponent, LoginComponent, HistoryComponent,
-    SettingsComponent, SearchComponent, AnalyzeScreenComponent, EnrichScreenComponent,
+    SettingsComponent, SearchComponent, AnalyzeScreenComponent, EnrichScreenComponent, FindContentScreenComponent,
     NewDocumentScreenComponent, MetadataScreenComponent, PreviewScreenComponent,
     CollectionsScreenComponent
   ],

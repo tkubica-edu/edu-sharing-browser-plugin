@@ -12,6 +12,7 @@ export type OptionId =
   | 'collections'
   | 'new-document'
   | 'search'
+  | 'find-content'
   | 'history'
   | 'settings';
 
@@ -72,6 +73,13 @@ export const OPTIONS: readonly AppOption[] = [
     description: 'Metadaten aus dem geöffneten OnlyOffice-Dokument erzeugen und daran speichern',
     // The counterpart of `analyze` on an OnlyOffice page: the content comes from the editor, and
     // the edited document itself is the node the metadata is saved to.
+    visible: requiresLogin((c) => c.onlyOfficePresent)
+  },
+  {
+    id: 'find-content',
+    label: 'Passende Inhalte finden',
+    description: 'Aus dem geöffneten OnlyOffice-Dokument Schlagworte erzeugen und dazu passende Inhalte suchen',
+    // Like `search`, but the search word is not typed: it comes from the edited document.
     visible: requiresLogin((c) => c.onlyOfficePresent)
   },
   {

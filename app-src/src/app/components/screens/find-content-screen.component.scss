@@ -1,0 +1,22 @@
+// "Passende Inhalte finden" — the derived keywords above the embedded search, which fills the
+// rest of the panel and scrolls internally (as its own demo page sizes it).
+:host {
+  display: block;
+  height: 100%;
+}
+
+.login-gate { padding: 14px; }
+
+.find-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--es-space-4);
+  gap: var(--es-space-3);
+}
+
+.results {
+  display: block;
+  flex: 1;
+  min-height: 420px;
+}

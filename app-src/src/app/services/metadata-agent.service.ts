@@ -88,31 +88,35 @@ export class MetadataAgentService {
     this.running.set(true);
     try {
       const content = await this.onlyOfficeDocument.requestContent();
-      const markdown = content.markdown?.trim() ?? '';
-      if (markdown.length < MIN_DOCUMENT_LENGTH) {
-        return this.remember({ ok: false, error: DOCUMENT_EMPTY });
-      }
-      const response = await this.browserExtension.analyzeText(markdown, LANGUAGE);
-      const document = content.document;
-      return this.remember(
-        response.success
-          ? {
-              ok: true,
-              source: {
-                url: this.onlyOfficeDocument.documentPermaLink() ?? '',
-                title:
-                  content.title || this.onlyOfficeDocument.documentTitle() || 'OnlyOffice-Dokument'
-              },
-              parsed: this.parse(response.result),
-              document
-            }
-          : { ok: false, error: this.describeError(response.error) },
-      );
+      const outcome = await this.analyzeText(content.markdown ?? '');
+      if (!outcome.ok) return this.remember(outcome);
+      return this.remember({
+        ...outcome,
+        source: {
+          url: this.onlyOfficeDocument.documentPermaLink() ?? '',
+          title: content.title || this.onlyOfficeDocument.documentTitle() || 'OnlyOffice-Dokument'
+        },
+        document: content.document
+      });
     } catch (cause: unknown) {
       return this.remember({ ok: false, error: errorMessage(cause) });
     } finally {
       this.running.set(false);
     }
+  }
+
+  /**
+   * Run the agent on text the caller already holds and return the outcome **without** storing it
+   * as {@link lastRun} — for flows that only consume the agent's output (deriving search keywords,
+   * see ContentSuggestionsService) instead of opening it for editing.
+   */
+  async analyzeText(text: string): Promise<AnalyzeOutcome> {
+    const trimmed = text.trim();
+    if (trimmed.length < MIN_DOCUMENT_LENGTH) return { ok: false, error: DOCUMENT_EMPTY };
+    const response = await this.browserExtension.analyzeText(trimmed, LANGUAGE);
+    return response.success
+      ? { ok: true, parsed: this.parse(response.result) }
+      : { ok: false, error: this.describeError(response.error) };
   }
 
   /** Split a flat metadata payload into envelope info + sorted display fields. */

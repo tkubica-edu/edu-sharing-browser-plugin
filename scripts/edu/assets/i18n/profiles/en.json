@@ -1,0 +1,35 @@
+{
+  "PROFILES": {
+    "TITLE": "Profile of {{ name }}",
+    "TITLE_NAV": "Profile",
+    "LOAD_ERROR": "Profile could not be found.",
+    "EDIT": "edit",
+    "CANCEL_EDIT": "cancel",
+    "ABOUT_LABEL": "about me",
+    "PERSISTENT_ID_INFO": "With the help of this information, elements created by you can be attributed to your person even across system   boundaries.",
+    "NO_ABOUT": "This user has not created a description yet.",
+    "NO_ABOUT_ME": "Your profile description is empty\nEdit your profile to create a description.",
+    "STATS": {
+      "MATERIALS": "Materials",
+      "COLLECTIONS": "Collections",
+      "MATERIALS_CC": "OER Materials"
+    },
+    "ERROR": {
+      "FIRST_NAME": "Please enter first name",
+      "LAST_NAME": "Please enter last name",
+      "EMAIL": "Please enter e-mail"
+    },
+    "IMG_CHANGE": "change",
+    "REQUEST_GDPR_BUTTON": "Request Data Disclosure / Export",
+    "GDPR": {
+      "TITLE": "Request Disclosure / Export",
+      "EXPORT_HEADING": "data export:",
+      "MESSAGE": "You can request an export of your data or a self-disclosure here.\n\nPlease note that this process may take some time. \nOnce completed, the download will be displayed on this page. If your profile has an email address, you will receive a notification upon completion.",
+      "MESSAGE_OVERWRITE": "Note: The current export will be replaced with the new one",
+      "REQUEST_STARTED": "The request has been received and is being processed",
+      "REQUEST_ONGOING": "There is an ongoing request. Please wait until it is processed",
+      "CREATED": "Created:",
+      "CONTINUE": "Request"
+    }
+  }
+}
