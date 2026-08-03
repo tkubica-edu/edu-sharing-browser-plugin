@@ -73,6 +73,9 @@ export class AppComponent implements OnInit {
   private lastNodeId: string | null = null;
   private lastNodeAt = 0;
 
+  /** Guard: the host's open document is adopted as the active node at most once. */
+  private documentAdopted = false;
+
   constructor() {
     effect(() => {
       const nodeId = this.pendingNodeId();
@@ -80,6 +83,17 @@ export class AppComponent implements OnInit {
         this.pendingNodeId.set(null);
         void this.openNode(() => this.curation.openNode(nodeId));
       }
+    });
+
+    // Make the document the host has open the active node, as soon as its node is loaded. An
+    // effect rather than a `then()` on the request below, because the panel is usually opened
+    // logged out: the id arrives immediately, the node only once a session exists (the service
+    // retries the load after login). A plain field, not a signal, so this never re-triggers itself.
+    effect(() => {
+      const node = this.onlyOfficeDocument.documentNode();
+      if (!node || this.documentAdopted) return;
+      this.documentAdopted = true;
+      this.curation.adoptOpenDocument(node);
     });
   }
 
@@ -99,6 +113,13 @@ export class AppComponent implements OnInit {
     // node that was persisted while the sidebar was closed or booting.
     this.browserExtension.signalReady();
     await this.consumePendingNode();
+
+    // On an OnlyOffice page, ask once for the open document's identity so it becomes the node the
+    // app works on (the effect above adopts it). Fire-and-forget: the plugin is an optional
+    // background plugin, so awaiting it would stall the boot until the timeout.
+    if (this.conditions.onlyOfficePresent() && !this.onlyOfficeDocument.currentDocument()) {
+      void this.onlyOfficeDocument.requestInfo().catch(() => null);
+    }
   }
 
   protected onWindowMessage(event: MessageEvent): void {

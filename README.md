@@ -18,6 +18,15 @@ otherwise ordinary options, so visibility, guards and the view title work the sa
 bar** shows the same facts as chips, so it is always visible why an option appears or disappears —
 and it can drop the active content again. The **back button** always returns to the menu.
 
+On an **OnlyOffice page the edited document is the active node from the start**: the sidebar asks
+the page-side plugin once on boot for its identity (`REQUEST_DOCUMENT_INFO` → `DOCUMENT_INFO`, see
+`content/CLAUDE.md`), loads that node and adopts it (`CurationService.adoptOpenDocument`). So
+*Vorschau*, *Metadaten editieren* and *Einsortieren in Sammlungen* are available immediately,
+without an erschließen run. It is best effort and silent: the plugin is optional and may never
+answer, and when the panel was opened logged out the node is adopted once the user logs in. No
+*Verlauf* entry is written — the user did not pick this node. An explicitly loaded node
+(`PREVIEW_NODE`, a history entry) always wins over it.
+
 The footer (`ActionBarService`) contributes the current view's next steps: *Erschließung
 starten* on the analyze screen, *Speichern* on the metadata screen, and the choice between
 *Metadaten editieren* / *Sammlung zuordnen* on the preview. Screens that own their own action

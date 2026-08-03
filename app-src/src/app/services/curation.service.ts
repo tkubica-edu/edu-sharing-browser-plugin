@@ -162,6 +162,25 @@ export class CurationService {
   }
 
   /**
+   * Adopt the document the host page has open as the active node, so the app works on it from the
+   * start (preview, metadata, collections all target the edited document). Takes the node the
+   * {@link OnlyOfficeDocumentService} already loaded, so it costs no second fetch.
+   *
+   * Unlike {@link openNode} nothing is written to the history — the user did not pick this node,
+   * it is simply what happens to be open. Ignored once anything else is loaded or unsaved, so a
+   * late arrival (the identity is often known only after login) never clobbers the user's work.
+   */
+  adoptOpenDocument(node: Node): void {
+    if (this.activeNode() || this.hasUnsavedWork()) return;
+    // A name is set ONLY when really known — it is written back as `cm:name`, so the node id as a
+    // stand-in would rename the document to its uuid. See {@link ActiveNode}.
+    this.applyLoadedNode(node.ref.id, node, node.name ?? null);
+    // No agent result for a node we merely found open; its parsed view comes from the node's own
+    // properties instead.
+    this.metadataAgent.reset();
+  }
+
+  /**
    * Save the metadata: create the node the first time, otherwise update it in place. Returns
    * true on success so the metadata screen can advance to the preview.
    */
@@ -279,7 +298,7 @@ export class CurationService {
   }
 
   /** Reset the state and seed node, preview and editor metadata from a hydrated node. */
-  private applyLoadedNode(nodeId: string, node: Node, name: string): void {
+  private applyLoadedNode(nodeId: string, node: Node, name: string | null): void {
     this.resetNodeState();
     this.setActiveNode(nodeId, name);
     this.previewNode.set(node);

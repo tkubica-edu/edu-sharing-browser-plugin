@@ -183,8 +183,14 @@ Unlike the two directions above this is a **correlated pair**: every request car
   `{error:"read-failed"}`.
 - **Every request is bounded by a timeout** (content 15 s, info 10 s): the page-side listener is a
   *background plugin* the user can switch off, in which case **no answer arrives at all** — not
-  even the startup announce. So the enrich screen requests `DOCUMENT_INFO` on open rather than
-  waiting for the announce, which is lost if the panel opened later.
+  even the startup announce. So `DOCUMENT_INFO` is requested rather than waited for, since the
+  announce is lost if the panel opened later.
+- **`REQUEST_DOCUMENT_INFO` is sent once on sidebar boot**, gated on `conditions.onlyOfficePresent()`
+  (`app.component.ts`) — without that gate every page would trigger a broadcast into all frames and
+  a 10 s timeout. Its answer makes the edited document the **active node** right away
+  (`CurationService.adoptOpenDocument`, driven by an effect on `documentNode()` so a panel opened
+  logged out adopts it after login). The enrich screen still asks on open, guarded by
+  `!currentDocument()`, as a fallback for a page the URL check does not match.
 - **Not buffered:** `panel-host.js` buffers/persists only `PREVIEW_NODE`. A `DOCUMENT_CONTENT`
   replay would be stale, and persisting its `html`/`documentJson` would blow the `storage.local`
   quota.
@@ -261,6 +267,6 @@ only string fields and the extension re-hydrates from `id`.
 | `app-src/src/app/app.component.ts` | single `window:message` listener: `DOCUMENT_*` → the document bridge, `PREVIEW_NODE` → the flow |
 | `app-src/src/app/services/onlyoffice-document.service.ts` | the request/response bridge: `requestContent`/`requestInfo` (`requestId` + timeout), `accept(envelope)`, `currentDocument` |
 | `app-src/src/app/services/metadata-agent.service.ts` | `runForOpenDocument()` — document content → `markdown` → agent |
-| `app-src/src/app/services/curation.service.ts` | `openNode(id)` (hydrate + open in the preview), `enrichOpenDocument()` |
+| `app-src/src/app/services/curation.service.ts` | `openNode(id)` (hydrate + open in the preview), `adoptOpenDocument(node)` (the open document as active node, no history entry), `enrichOpenDocument()` |
 | `background/background.js` | `analyze.text` — `POST /generate` for text the sidebar supplies |
 | *(host-side, external)* | app that listens for `INSERT_NODE` / `REQUEST_DOCUMENT_*` and sends `PREVIEW_NODE` / `DOCUMENT_*` (e.g. OnlyOffice plugin) |
