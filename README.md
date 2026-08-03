@@ -55,9 +55,18 @@ The options:
   `initial-values` of **`edu-sharing-search`** — the embedded search that adds the metadata filters
   of the search page to a node list. `initial-values` is a map of MDS widget id → values (here
   `{"cclom:general_keyword": [...]}`), i.e. the keywords are used as a **filter**, not as the
-  `search-string`: as one fulltext query they would narrow the results to nothing, as filter values
-  they match the indexed keywords of the nodes. Re-setting them (*Neu aus Dokument*) makes the
-  element rebuild its filter editor, whose init re-runs the query. Results are sorted by relevance
+  `search-string`: `search-string` goes in as an extra `ngsearchword` criterion that is **AND**-ed
+  with the filters, so it only narrows further, while as filter values the keywords are matched
+  against the indexed keywords of the nodes. Re-setting them (*Neu aus Dokument*) makes the
+  element rebuild its filter editor, whose init re-runs the query.
+  Only the **first two** keywords are queried: all values of one widget land in a single criterion
+  whose join narrows the result set, so the full agent-generated list matches nothing while the two
+  most relevant ones still find content. Agent-invented keywords are often carried by no node at
+  all, so the screen watches the element's `totalResults`: an empty result widens the search once
+  (a single keyword), and if that is empty too, a notice offers *Ohne Schlagworte suchen* — the
+  filter is dropped entirely, which shows the repository's content (the user's call, since it is
+  everything). The chips show all derived keywords, struck through where they are not part of the
+  current query. Results are sorted by relevance
   (`sort-properties="score"`, descending); vocabulary widgets would need valuespace keys instead of
   labels, `cclom:general_keyword` is free text so the values go in verbatim. That run is deliberately *not* kept as the app's last
   analysis (`ContentSuggestionsService`, not `MetadataAgentService.lastRun`), so it neither shows up

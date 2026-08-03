@@ -15,6 +15,12 @@
 
 .login-gate { padding: 14px; }
 
+// A keyword that is shown but not part of the query (only the first few are searched).
+.es-chip.is-unused {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
 .find-wrap {
   display: flex;
   flex-direction: column;

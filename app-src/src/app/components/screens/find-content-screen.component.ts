@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  OnInit,
+  inject,
+  signal
+} from '@angular/core';
 import { Node } from 'ngx-edu-sharing-api';
 
 import { AuthService } from '../../services/auth.service';
@@ -30,6 +37,9 @@ export class FindContentScreenComponent implements OnInit {
 
   protected readonly bundle = loadWebComponentBundle('edu', SEARCH_TAG);
 
+  /** What the element's last query found; null until it reported a result. */
+  protected readonly resultCount = signal<number | null>(null);
+
   ngOnInit(): void {
     // Opening the option is the request: read the document and derive its keywords. Skipped when
     // a previous visit already did — "Neu aus Dokument" repeats it explicitly.
@@ -37,7 +47,26 @@ export class FindContentScreenComponent implements OnInit {
   }
 
   protected refresh(): void {
+    this.resultCount.set(null);
     void this.suggestions.deriveFromOpenDocument();
+  }
+
+  /**
+   * The element reports every query's result count. Nothing found means the keywords are carried by
+   * no node, so the search is widened once (fewer keywords match more) — the service's step is the
+   * guard, so a second empty result simply leaves the notice to the template.
+   */
+  protected onTotalResults(event: Event): void {
+    const total = Number((event as CustomEvent).detail ?? 0);
+    // Widening re-runs the query, so the count is unknown again — otherwise the empty-result notice
+    // would flash while the wider search is still running.
+    this.resultCount.set(total === 0 && this.suggestions.relax() ? null : total);
+  }
+
+  /** Offered when even a single keyword found nothing: search the repository unfiltered. */
+  protected searchWithoutKeywords(): void {
+    this.resultCount.set(null);
+    this.suggestions.searchWithoutKeywords();
   }
 
   /** A double-clicked result is inserted into the open document by the host page. */

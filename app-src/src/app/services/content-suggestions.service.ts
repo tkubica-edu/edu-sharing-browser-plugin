@@ -17,8 +17,16 @@ const KEYWORD_WIDGET = 'cclom:general_keyword';
 /** Fallback when the agent found no keywords — a title still searches for something sensible. */
 const TITLE_FIELD = 'cclom:title';
 
-/** More than a handful of words narrows the search to nothing. */
+/** How many of the agent's keywords are kept at all — the list the screen shows. */
 const MAX_KEYWORDS = 8;
+
+/**
+ * How many keywords the search *starts* with. All values of one widget go into a single search
+ * criterion, and the repository's `ngsearch` query template joins them in a way that narrows the
+ * result set — so a long list of agent-invented keywords matches nothing at all, while the first
+ * (most relevant) two still find promising content. See {@link step} for the relaxation from here.
+ */
+const SEARCH_KEYWORDS = 2;
 
 const NO_KEYWORDS =
   'Für das Dokument konnten keine Schlagworte erzeugt werden. Bitte erst mehr Inhalte schreiben.';
@@ -44,16 +52,39 @@ export class ContentSuggestionsService {
   readonly keywords = signal<readonly string[]>([]);
 
   /**
-   * The filters handed to `<edu-sharing-search>` as its `initialValues`: the keywords as values of
-   * the keyword widget, keyed by MDS widget id. Null until keywords exist.
-   *
-   * Deliberately not the element's `searchString`: as a search word the keywords would be one
-   * fulltext query that narrows the result set to nothing, while as filter values they are matched
-   * against the indexed keywords of the nodes — which is what the agent's keywords are for.
+   * How far the search has been relaxed, because keywords the agent invented are often carried by
+   * no node at all: `0` = the first {@link SEARCH_KEYWORDS} keywords, `1` = the first one only,
+   * `2` = no keyword filter. Only ever advances (see {@link relax}), so a query can never
+   * ping-pong between two steps.
    */
-  readonly filters = computed<Record<string, string[]> | null>(() => {
-    const keywords = this.keywords();
-    return keywords.length ? { [KEYWORD_WIDGET]: [...keywords] } : null;
+  private readonly step = signal(0);
+
+  /** The keywords the current step actually searches for — the rest are only shown. */
+  readonly searchKeywords = computed<readonly string[]>(() => {
+    const counts = [SEARCH_KEYWORDS, 1, 0];
+    return this.keywords().slice(0, counts[this.step()]);
+  });
+
+  /** True once the search runs without any keyword filter — nothing is left to widen. */
+  readonly unfiltered = computed(() => this.step() === 2);
+
+  /**
+   * The filters handed to `<edu-sharing-search>` as its `initialValues`: the searched keywords as
+   * values of the keyword widget, keyed by MDS widget id. Empty at the last step.
+   *
+   * Deliberately not the element's `searchString`: that goes in as an extra `ngsearchword`
+   * criterion which is AND-ed with the filters, so it only narrows further — while as filter values
+   * the keywords are matched against the indexed keywords of the nodes, which is what they are for.
+   *
+   * A `computed`, so the object identity only changes when the keywords or the step do: the
+   * element's `initialValues` setter rebuilds its whole filter editor and re-runs the query on
+   * every set, so handing it a fresh object per change detection would search in a loop.
+   */
+  readonly filters = computed<Record<string, string[]>>(() => {
+    const keywords = this.searchKeywords();
+    const filters: Record<string, string[]> = {};
+    if (keywords.length) filters[KEYWORD_WIDGET] = [...keywords];
+    return filters;
   });
 
   /**
@@ -76,6 +107,7 @@ export class ContentSuggestionsService {
         return false;
       }
       this.keywords.set(keywords);
+      this.step.set(0);
       return true;
     } catch (cause: unknown) {
       this.error.set(errorMessage(cause));
@@ -85,10 +117,27 @@ export class ContentSuggestionsService {
     }
   }
 
+  /**
+   * Widen the search by one step, after it found nothing. Returns whether it moved: the automatic
+   * ladder ends at a single keyword — dropping the filter entirely is the user's call
+   * ({@link searchWithoutKeywords}), because it shows the whole repository.
+   */
+  relax(): boolean {
+    if (this.step() !== 0) return false;
+    this.step.set(1);
+    return true;
+  }
+
+  /** Search without any keyword filter, so at least the repository's content is browsable. */
+  searchWithoutKeywords(): void {
+    this.step.set(2);
+  }
+
   /** Forget the derived keywords, so the next visit reads the document again. */
   reset(): void {
     this.keywords.set([]);
     this.error.set(null);
+    this.step.set(0);
   }
 
   /** The keyword fields' values, de-duplicated and capped; the title if there are none. */

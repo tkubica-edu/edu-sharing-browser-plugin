@@ -13,9 +13,15 @@
       } @else if (suggestions.error(); as error) {
         <p class="es-error">{{ error }}</p>
       } @else if (suggestions.keywords().length) {
+        <!-- All derived keywords, with the ones the current query actually filters on highlighted:
+             only the first few are searched, and an empty result widens that further. -->
         <div class="es-result-sub">
           @for (keyword of suggestions.keywords(); track keyword) {
-            <span class="es-chip">{{ keyword }}</span>
+            <span class="es-chip" [class.is-unused]="!suggestions.searchKeywords().includes(keyword)"
+                  [title]="suggestions.searchKeywords().includes(keyword)
+                    ? 'Wird gesucht' : 'Nicht gesucht – zu viele Schlagworte finden nichts'">
+              {{ keyword }}
+            </span>
           }
         </div>
       }
@@ -31,6 +37,17 @@
       <p class="es-error">Suche konnte nicht geladen werden: {{ error }}</p>
     }
 
+    <!-- Even a single keyword found nothing: the agent's keywords are carried by no node here, so
+         the only thing left is dropping the filter — the user's call, it shows everything. -->
+    @if (resultCount() === 0 && !suggestions.unfiltered()) {
+      <div class="es-notice">
+        <span>Zu diesen Schlagworten gibt es keine Inhalte.</span>
+        <button class="es-btn es-btn--text" (click)="searchWithoutKeywords()">
+          Ohne Schlagworte suchen
+        </button>
+      </div>
+    }
+
     <!--
       Rendered once the keywords exist, so the element searches for them from the start (its own
       first query runs as soon as the filter widgets initialize). Inside the @if the bindings are
@@ -38,18 +55,24 @@
 
       The keywords go in as `initialValues` (filter values of the keyword widget), not as
       `searchString` — see ContentSuggestionsService.filters. Re-setting them, as "Neu aus Dokument"
-      does, makes the element rebuild its filter editor and run the query again.
+      and every widening step do, makes the element rebuild its filter editor and run the query
+      again. `filters` is only the first few keywords, and empty once the search runs unfiltered —
+      hence the gate on the keywords rather than on the filters.
+
+      `totalResults` reports every query's result count, which is how an empty result widens the
+      search (onTotalResults) instead of leaving the user on an empty list.
 
       Sorted by relevance (score, descending). The sort inputs are bound as strings because the
       element parses them as comma-separated lists — a real `false` would break its setter.
     -->
-    @if (bundle.ready() && suggestions.filters(); as filters) {
+    @if (bundle.ready() && suggestions.keywords().length) {
       <edu-sharing-search
         class="results"
-        [initialValues]="filters"
+        [initialValues]="suggestions.filters()"
         [contentType]="'FILES'"
         [sortProperties]="'score'"
         [sortAscending]="'false'"
+        (totalResults)="onTotalResults($event)"
         (nodeActivated)="insert($event)"
       ></edu-sharing-search>
     }
