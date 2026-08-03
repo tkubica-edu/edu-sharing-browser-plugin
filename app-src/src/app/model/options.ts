@@ -9,6 +9,7 @@ export type OptionId =
   | 'enrich'
   | 'metadata'
   | 'preview'
+  | 'usages'
   | 'collections'
   | 'new-document'
   | 'search'
@@ -93,6 +94,13 @@ export const OPTIONS: readonly AppOption[] = [
     id: 'preview',
     label: 'Vorschau',
     description: 'Eine Vorschau des Inhalts inkl. der wichtigsten Metadaten anzeigen',
+    visible: requiresLogin((c) => c.hasActiveNode)
+  },
+  {
+    id: 'usages',
+    label: 'Aufrufe & Nutzung',
+    description: 'Aufrufe, Downloads und Verwendungen des Inhalts anzeigen',
+    // Statistics are read off the hydrated node, so the same condition as the preview.
     visible: requiresLogin((c) => c.hasActiveNode)
   },
   {

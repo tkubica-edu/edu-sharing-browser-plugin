@@ -1,0 +1,24 @@
+<div class="es-screen-body">
+  <section class="es-hint-card">
+    @if (curation.activeNode(); as node) {
+      <p class="es-muted">Aufrufe und Verwendungen von <strong>{{ node.name ?? node.nodeId }}</strong>.</p>
+      <a class="upload-link" [href]="node.link" target="_blank" rel="noopener noreferrer">Node öffnen</a>
+    } @else {
+      <p class="es-muted">Noch kein Node vorhanden.</p>
+    }
+  </section>
+
+  @if (nodes().length) {
+    <section class="es-card">
+      <div class="usages-wrap">
+        @if (bundle.error()) {
+          <p class="es-error">Nutzungsdaten konnten nicht geladen werden: {{ bundle.error() }}</p>
+        } @else if (!bundle.ready()) {
+          <p class="es-muted">Nutzungsdaten werden geladen…</p>
+        } @else {
+          <edu-sharing-usages [nodes]="nodes()"></edu-sharing-usages>
+        }
+      </div>
+    </section>
+  }
+</div>

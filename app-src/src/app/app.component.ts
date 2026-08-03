@@ -28,6 +28,7 @@ import { CollectionsScreenComponent } from './components/screens/collections-scr
 import { MetadataScreenComponent } from './components/screens/metadata-screen.component';
 import { NewDocumentScreenComponent } from './components/screens/new-document-screen.component';
 import { PreviewScreenComponent } from './components/screens/preview-screen.component';
+import { UsagesScreenComponent } from './components/screens/usages-screen.component';
 
 /** Window in which the same node delivery is treated as a duplicate. */
 const DUPLICATE_WINDOW_MS = 3000;
@@ -41,7 +42,7 @@ const DISCARD_PROMPT =
     StatusBarComponent, ActionBarComponent, MenuComponent, LoginComponent, HistoryComponent,
     SettingsComponent, SearchComponent, AnalyzeScreenComponent, EnrichScreenComponent, FindContentScreenComponent,
     NewDocumentScreenComponent, MetadataScreenComponent, PreviewScreenComponent,
-    CollectionsScreenComponent
+    CollectionsScreenComponent, UsagesScreenComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',

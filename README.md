@@ -80,6 +80,10 @@ The options:
   stay in collapsibles.
 - **Vorschau** — the node's name and link plus a live `edu-sharing-preview-sidebar`. Its `node`
   input takes the full hydrated node, so the node is (re)loaded after a save.
+- **Aufrufe & Nutzung** — the node's usage statistics, rendered by `edu-sharing-usages` (views,
+  downloads, plays, and the embeddings/collections the node is used in). Its `nodes` input is a
+  *selection*, so the hydrated node goes in as a single-element array; the element fetches the
+  numbers itself through the repository session. Shown for an active node, like the preview.
 - **Einsortieren in Sammlungen** — `edu-sharing-nodes-selector` as a collection picker. Its
   contract is callback-based (`option.optionConfig.onNodesChoosen`), so the component owns the
   callback and the add itself runs in the sidebar via ngx-edu-sharing-api's
@@ -123,7 +127,8 @@ The pre-built edu-sharing bundle lives in `scripts/edu/` (packaged as `edu/` in 
 extension). It is built from the edu-sharing frontend (`npm run build:app-as-component`
 → `dist/web-components/app/`) and registers every element used here:
 `edu-sharing-mds-editor-wrapper`, `edu-sharing-preview-sidebar`,
-`edu-sharing-nodes-selector`, `edu-sharing-add-with-connector`, `edu-sharing-search`. A second bundle,
+`edu-sharing-nodes-selector`, `edu-sharing-add-with-connector`, `edu-sharing-search`,
+`edu-sharing-usages`. A second bundle,
 `scripts/wlo/` → `wlo/`, provides the optional `metadata-agent-canvas` (see below).
 
 The elements are used as **real custom elements in the sidebar document — no iframes**.

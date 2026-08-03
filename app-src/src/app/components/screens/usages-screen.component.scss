@@ -1,0 +1,12 @@
+// "Aufrufe & Nutzung" — the embedded <edu-sharing-usages> brings its own styling; it only needs a
+// light surface and room to lay out its metric tiles and tables.
+:host { display: block; }
+
+.usages-wrap { display: flex; flex-direction: column; }
+
+edu-sharing-usages {
+  display: block;
+  width: 100%;
+  min-height: 320px;
+  background: #fff;
+}
