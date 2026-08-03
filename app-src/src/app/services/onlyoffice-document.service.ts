@@ -1,26 +1,23 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Node, RestConstants } from 'ngx-edu-sharing-api';
 
+import { renderLink } from '../util/repository-links';
+import { AuthService } from './auth.service';
 import { BrowserExtensionService } from './browser-extension.service';
+import { RepositoryNodeService } from './repository-node.service';
 
 /**
  * Identity of the document the host has open, as announced by the OnlyOffice plugin. Present on
  * every inbound envelope (envelope level, `data` for DOCUMENT_INFO) and `null` when the editor
  * was opened with a stale plugin config — so always treat it as optional.
+ *
+ * Deliberately just the node id: everything else the app needs (title, permalink, write
+ * permission) is loaded from the repository, see {@link OnlyOfficeDocumentService.documentNode}.
+ * There is no separate `originalId` either — the connector resolves a collection reference to
+ * its original before it ever reports one, so this id *is* the edited node.
  */
 export interface DocumentIdentity {
   nodeId?: string;
-  repoId?: string;
-  /** For collection references: the real, edited node. */
-  originalId?: string | null;
-  name?: string;
-  title?: string;
-  mimeType?: string;
-  permaLink?: string;
-  contentVersion?: string;
-  /** Whether the user may write in this session. */
-  editable?: boolean;
-  /** OnlyOffice document key = the collaboration session. */
-  documentKey?: string;
 }
 
 /**
@@ -71,10 +68,15 @@ const READ_FAILED = 'Das Dokument konnte nicht ausgelesen werden.';
  *
  * Inbound envelopes are not read here: `AppComponent` owns the single `window:message` listener
  * and hands the DOCUMENT_* events to {@link accept}.
+ *
+ * The plugin only reports the node id, so this service also loads that node once and derives
+ * title, permalink and write permission from it — see {@link documentNode}.
  */
 @Injectable({ providedIn: 'root' })
 export class OnlyOfficeDocumentService {
   private readonly browserExtension = inject(BrowserExtensionService);
+  private readonly repositoryNodes = inject(RepositoryNodeService);
+  private readonly auth = inject(AuthService);
 
   /**
    * Identity of the document currently open in the host, from the plugin's announce on startup
@@ -83,8 +85,53 @@ export class OnlyOfficeDocumentService {
    */
   readonly currentDocument = signal<DocumentIdentity | null>(null);
 
+  private readonly node = signal<Node | null>(null);
+
+  /**
+   * The open document's repository node, loaded from {@link currentDocument}. `null` while it is
+   * unknown — the panel is often opened logged out, and the load is best effort.
+   */
+  readonly documentNode = this.node.asReadonly();
+
+  /** Node id {@link documentNode} was loaded for, so the same node is not fetched twice. */
+  private hydratedFor: string | null = null;
+
+  /** Title for display: the node's, else its file name, else the bare id. */
+  readonly documentTitle = computed(
+    () =>
+      this.node()?.title || this.node()?.name || this.currentDocument()?.nodeId || null,
+  );
+
+  /**
+   * The document's permalink. Falls back to its page in the repository UI while the node is not
+   * loaded, so the source line always links somewhere.
+   */
+  readonly documentPermaLink = computed(() => {
+    const permalink = this.node()?.properties?.['virtual:permalink']?.[0];
+    if (permalink) return permalink;
+    const nodeId = this.currentDocument()?.nodeId;
+    return nodeId ? renderLink(this.auth.repositoryUrl(), nodeId) : null;
+  });
+
+  /**
+   * Whether the metadata may be saved onto the document. **`null` means unknown** (node not
+   * loaded) — callers must not warn about missing permission in that case.
+   */
+  readonly documentWritable = computed(() => {
+    const node = this.node();
+    return node ? node.access.includes(RestConstants.ACCESS_WRITE) : null;
+  });
+
   private readonly pending = new Map<string, (answer: DocumentContent) => void>();
   private requestCounter = 0;
+
+  constructor() {
+    // The panel is usually opened before login, when the node cannot be fetched. Retry as soon
+    // as a session exists.
+    effect(() => {
+      if (this.auth.loggedIn() && this.currentDocument() && !this.node()) this.hydrate();
+    });
+  }
 
   /**
    * Ask for the open document's content and resolve with the plugin's answer. Rejects with a
@@ -122,13 +169,38 @@ export class OnlyOfficeDocumentService {
     // DOCUMENT_INFO. A stale plugin config sends null — then the last known identity is kept,
     // since a null tells us nothing new.
     const document = envelope.document ?? answer.document ?? null;
-    if (document) this.currentDocument.set(document);
+    if (document) {
+      this.currentDocument.set(document);
+      this.hydrate();
+    }
 
     // An unsolicited answer (the plugin's toolbar button, or its startup announce) has no
     // waiting caller — the identity above is all we take from it.
     const resolve = answer.requestId ? this.pending.get(answer.requestId) : undefined;
     if (resolve) resolve({ ...answer, document });
     return true;
+  }
+
+  /**
+   * Load the open document's node, so title, permalink and write permission are available. Best
+   * effort and fire-and-forget: without a session the fetch cannot work, and a failure only
+   * means the derived values fall back to the bare node id.
+   */
+  private hydrate(): void {
+    const nodeId = this.currentDocument()?.nodeId;
+    if (!nodeId || nodeId === this.hydratedFor || !this.auth.loggedIn()) return;
+    this.hydratedFor = nodeId;
+    if (this.node()?.ref.id !== nodeId) this.node.set(null);
+    void this.repositoryNodes
+      .get(nodeId)
+      .then((node) => {
+        // A newer identity may have arrived while this was in flight — that load wins.
+        if (this.hydratedFor === nodeId) this.node.set(node);
+      })
+      .catch(() => {
+        // Allow a later attempt (e.g. after login) to retry this node.
+        if (this.hydratedFor === nodeId) this.hydratedFor = null;
+      });
   }
 
   /** Send a request under a fresh id and wait for its answer, bounded by `timeoutMs`. */

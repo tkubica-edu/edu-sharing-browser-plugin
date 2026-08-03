@@ -12,7 +12,7 @@
       <div class="es-result-sub">
         <span class="es-chip">{{ parsed.fieldsExtracted ?? '–' }} / {{ parsed.fieldsTotal ?? '–' }} Felder</span>
         @if (curation.activeNode(); as node) {
-          <span class="es-chip">Node: {{ node.name }}</span>
+          <span class="es-chip">Node: {{ node.name ?? node.nodeId }}</span>
         }
       </div>
     }

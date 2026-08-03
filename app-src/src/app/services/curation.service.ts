@@ -4,10 +4,11 @@ import { firstValueFrom } from 'rxjs';
 
 import { MdsValues } from '../util/mds-values';
 import { errorMessage } from '../util/errors';
+import { renderLink } from '../util/repository-links';
 import { AuthService } from './auth.service';
 import { HistoryEntry, HistoryService } from './history.service';
 import { MetadataAgentService } from './metadata-agent.service';
-import { DocumentIdentity } from './onlyoffice-document.service';
+import { DocumentIdentity, OnlyOfficeDocumentService } from './onlyoffice-document.service';
 import { NodeSummary, RepositoryNodeService } from './repository-node.service';
 
 /** A collection the content was added to. */
@@ -16,8 +17,17 @@ export interface Collection {
   name: string;
 }
 
-/** The node the app currently works on, plus its link into the repository UI. */
-export interface ActiveNode extends NodeSummary {
+/**
+ * The node the app currently works on, plus its link into the repository UI.
+ *
+ * `name` is **`null` while the node's real name is unknown** (its load failed). It must never be
+ * substituted with the node id: the name carries the document's file name incl. extension and is
+ * written back as `cm:name` on save, so a placeholder would rename the document — see
+ * {@link save} and `RepositoryNodeService.update`.
+ */
+export interface ActiveNode {
+  nodeId: string;
+  name: string | null;
   link: string;
 }
 
@@ -29,6 +39,7 @@ export class CurationService {
   private readonly auth = inject(AuthService);
   private readonly metadataAgent = inject(MetadataAgentService);
   private readonly repositoryNodes = inject(RepositoryNodeService);
+  private readonly onlyOfficeDocument = inject(OnlyOfficeDocumentService);
   private readonly history = inject(HistoryService);
   // The generated CollectionV1Service (exported as CollectionServiceUnwrapped) — the read-only
   // CollectionService wrapper does not cover adding a node.
@@ -162,8 +173,10 @@ export class CurationService {
       const existing = this.activeNode();
       // The current name is passed along so an update never renames the node: generated metadata
       // carries no `cm:name`, and for a real document that name holds its file name + extension.
+      // `null` (name unknown) is passed on as such — update() then sends no `cm:name` at all
+      // rather than inventing one.
       const saved = existing
-        ? await this.repositoryNodes.update(existing.nodeId, values, existing.name)
+        ? await this.repositoryNodes.update(existing.nodeId, values, existing.name ?? undefined)
         : await this.repositoryNodes.createInInbox(values);
       this.setActiveNode(saved.nodeId, saved.name);
       this.resultPending.set(false);
@@ -214,8 +227,9 @@ export class CurationService {
   }
 
   /**
-   * Make the enriched document the active node, so {@link save} updates it in place. A collection
-   * reference points at a copy, so `originalId` — the actually edited node — wins over `nodeId`.
+   * Make the enriched document the active node, so {@link save} updates it in place. The reported
+   * id is already the edited node — the connector resolves a collection reference to its original
+   * before announcing it.
    *
    * `nodeMetadata` deliberately stays empty here: the editor must show the freshly generated
    * metadata, not the node's stored properties (see {@link editorMetadata}). Without a node id
@@ -225,17 +239,26 @@ export class CurationService {
   private async adoptDocumentAsActiveNode(
     document: DocumentIdentity | null | undefined,
   ): Promise<void> {
-    const nodeId = document?.originalId || document?.nodeId;
+    const nodeId = document?.nodeId;
     if (!nodeId) return;
-    this.setActiveNode(nodeId, document?.name || document?.title || nodeId);
-    // Hydrate the node for the preview and to carry its real name (with file extension) into the
-    // save. A failure only costs those two — the save target itself stands.
+    // OnlyOfficeDocumentService already loaded this node when the plugin announced it, so reuse
+    // that instead of fetching it a second time; only fall back to a load of our own if its
+    // hydration did not run or failed.
+    const hydrated = this.onlyOfficeDocument.documentNode();
+    const node = hydrated?.ref.id === nodeId ? hydrated : await this.loadNode(nodeId);
+    if (node) this.previewNode.set(node);
+    // A name is set ONLY when it is really known: it is written back as `cm:name`, so the node id
+    // as a stand-in would rename the document to its uuid and drop the file extension. The save
+    // target itself stands either way.
+    this.setActiveNode(nodeId, node?.name ?? null);
+  }
+
+  /** Load a node for display purposes; `null` when it cannot be fetched. */
+  private async loadNode(nodeId: string): Promise<Node | null> {
     try {
-      const node = await this.repositoryNodes.get(nodeId);
-      this.previewNode.set(node);
-      this.setActiveNode(nodeId, node.name ?? nodeId);
+      return await this.repositoryNodes.get(nodeId);
     } catch {
-      /* keep the identity the plugin reported */
+      return null;
     }
   }
 
@@ -263,9 +286,8 @@ export class CurationService {
     this.nodeMetadata.set(node.properties as MdsValues);
   }
 
-  private setActiveNode(nodeId: string, name: string): void {
-    const base = this.auth.repositoryUrl().replace(/\/+$/, '');
-    this.activeNode.set({ nodeId, name, link: `${base}/components/render/${nodeId}` });
+  private setActiveNode(nodeId: string, name: string | null): void {
+    this.activeNode.set({ nodeId, name, link: renderLink(this.auth.repositoryUrl(), nodeId) });
   }
 
   private resetNodeState(): void {

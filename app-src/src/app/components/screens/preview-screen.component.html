@@ -1,7 +1,7 @@
 <div class="es-screen-body">
   <section class="es-hint-card">
     @if (curation.activeNode(); as node) {
-      <p class="es-muted">Node: <strong>{{ node.name }}</strong></p>
+      <p class="es-muted">Node: <strong>{{ node.name ?? node.nodeId }}</strong></p>
       <a class="upload-link" [href]="node.link" target="_blank" rel="noopener noreferrer">Node öffnen</a>
     } @else {
       <p class="es-muted">Noch kein Node vorhanden.</p>

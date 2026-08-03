@@ -80,9 +80,9 @@ export class MetadataAgentService {
   /**
    * Same as {@link run}, but the content comes from the document the host page has open (the
    * OnlyOffice editor) instead of the page: ask the plugin for the document content and send its
-   * **markdown** rendering to the agent. The document's own title/permalink become the source
-   * line, so the metadata screen shows what was enriched, and its identity is returned in the
-   * outcome — the metadata belongs to that node, so the caller saves onto it.
+   * **markdown** rendering to the agent. The title/permalink of the document's repository node
+   * become the source line, so the metadata screen shows what was enriched, and its identity is
+   * returned in the outcome — the metadata belongs to that node, so the caller saves onto it.
    */
   async runForOpenDocument(): Promise<AnalyzeOutcome> {
     this.running.set(true);
@@ -99,8 +99,9 @@ export class MetadataAgentService {
           ? {
               ok: true,
               source: {
-                url: document?.permaLink ?? '',
-                title: content.title || document?.title || document?.name || 'OnlyOffice-Dokument'
+                url: this.onlyOfficeDocument.documentPermaLink() ?? '',
+                title:
+                  content.title || this.onlyOfficeDocument.documentTitle() || 'OnlyOffice-Dokument'
               },
               parsed: this.parse(response.result),
               document

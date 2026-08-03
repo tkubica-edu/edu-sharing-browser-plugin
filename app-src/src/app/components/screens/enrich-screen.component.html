@@ -5,14 +5,16 @@
       Sie werden anschließend am Dokument selbst gespeichert.
     </p>
 
-    @if (onlyOfficeDocument.currentDocument(); as document) {
-      <p class="src-title" [title]="document.permaLink || ''">
-        {{ document.title || document.name || document.nodeId }}
+    <!-- The plugin only reports the node id; title, permalink and permission come from the node
+         the service loads for it. -->
+    @if (onlyOfficeDocument.currentDocument()) {
+      <p class="src-title" [title]="onlyOfficeDocument.documentPermaLink() || ''">
+        {{ onlyOfficeDocument.documentTitle() }}
       </p>
 
       <!-- Without write permission the save will be rejected by the repository — say so before
-           the user invests the run. -->
-      @if (document.editable === false) {
+           the user invests the run. `null` means the node is not loaded: no claim either way. -->
+      @if (onlyOfficeDocument.documentWritable() === false) {
         <p class="es-error">
           Für dieses Dokument fehlt die Schreibberechtigung — die Metadaten können nicht daran
           gespeichert werden.

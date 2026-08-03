@@ -148,10 +148,10 @@ Unlike the two directions above this is a **correlated pair**: every request car
 ```js
 { source: "edu-sharing-onlyoffice-plugin", event: "DOCUMENT_CONTENT",
   data: { trigger, requestId, editorType, title, text, markdown, elements, html, documentJson, … },
-  document: { nodeId, repoId, originalId, name, title, mimeType, permaLink, contentVersion, editable, documentKey } }
+  document: { nodeId } }
 
 { source: "edu-sharing-onlyoffice-plugin", event: "DOCUMENT_INFO",
-  data: { document, editorType, trigger, requestId }, document: { … } }
+  data: { document, editorType, trigger, requestId }, document: { nodeId } }
 ```
 
 - **`document` rides on every outbound envelope** (envelope level, including `PREVIEW_NODE`) and
@@ -159,10 +159,17 @@ Unlike the two directions above this is a **correlated pair**: every request car
   stale, cached plugin config — always null-check. `OnlyOfficeDocumentService` then keeps the last
   known identity instead of dropping it, and an enrichment without any node id falls back to
   creating a node on save, so the result is never lost.
-- **`originalId` wins over `nodeId`** as the save target: for a collection reference `nodeId` is
-  the reference, `originalId` the node actually being edited.
-- **`editable`** is the user's write permission in this session. The enrich screen warns when it is
-  `false`; the repository rejects the save either way.
+- **`document` is the node id and nothing else.** It used to carry ten fields (title, permalink,
+  mimetype, `editable`, `documentKey`, …) as base64url-JSON in the plugin's URL chain; that was
+  dropped in favour of one plain `docNode` parameter — free-text fields forced the encoding and
+  ended up in the document server's access logs. `OnlyOfficeDocumentService` loads the node once
+  and derives `documentTitle` / `documentPermaLink` / `documentWritable` from it.
+- **There is no `originalId`.** The connector's `OnlyOffice::getNode()` resolves a collection
+  reference (`ccm:collection_io_reference` → `ccm:original`) to the original *before* reporting
+  it, so the reported id already is the edited node — read it and save onto it directly.
+- **Write permission** comes from the loaded node's `access` (`documentWritable`), not from the
+  envelope. It is `null` while the node is unknown, and the enrich screen only warns on an
+  explicit `false`; the repository rejects the save either way.
 - **Never rename the node:** generated metadata carries no `cm:name`, and the node's name holds the
   document's file name incl. extension — so `RepositoryNodeService.update` fills `cm:name` from the
   node's current name (the title fallback applies to *creating* a node only).

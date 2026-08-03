@@ -27,8 +27,8 @@
   }
 
   @if (curation.activeNode(); as node) {
-    <span class="status-chip is-on" [title]="'Aktiver Inhalt: ' + node.name">
-      <span class="d"></span>Aktiver Inhalt: {{ node.name }}
+    <span class="status-chip is-on" [title]="'Aktiver Inhalt: ' + (node.name ?? node.nodeId)">
+      <span class="d"></span>Aktiver Inhalt: {{ node.name ?? node.nodeId }}
       <button class="chip-action" (click)="clearActiveContent()"
               title="Aktiven Inhalt entfernen" aria-label="Aktiven Inhalt entfernen">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"

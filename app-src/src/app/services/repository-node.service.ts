@@ -30,7 +30,7 @@ export class RepositoryNodeService {
         type: 'ccm:io',
         renameIfExists: true,
         versionComment: 'MAIN_FILE_UPLOAD',
-        body: this.toBody(values)
+        body: this.toCreateBody(values)
       })
     );
     return { nodeId: node.ref.id, name: node.name };
@@ -40,12 +40,16 @@ export class RepositoryNodeService {
    * Update an existing node's metadata in place. `currentName` keeps the node's name when the
    * values carry none — generated metadata has no `cm:name`, and inventing one from the title
    * would **rename the node** (for a real document that means losing its file extension).
+   *
+   * When the current name is unknown, no `cm:name` is sent at all. Leaving the property out is
+   * the lesser risk: a wrong one renames the document for certain, whereas the omission at worst
+   * lets the repository re-derive the name it would have derived anyway.
    */
   async update(nodeId: string, values: MdsValues, currentName?: string): Promise<NodeSummary> {
+    const body = toMdsValues(values);
+    if (!body['cm:name']?.length && currentName) body['cm:name'] = [currentName];
     const node = await firstValueFrom(
-      this.nodes.editNodeMetadata(nodeId, this.toBody(values, currentName), {
-        versionComment: 'METADATA_UPDATE'
-      })
+      this.nodes.editNodeMetadata(nodeId, body, { versionComment: 'METADATA_UPDATE' })
     );
     return { nodeId: node.ref.id, name: node.name };
   }
@@ -60,13 +64,15 @@ export class RepositoryNodeService {
   }
 
   /**
-   * Normalize editor values and make sure the node carries a name (`cm:name`): the node's existing
-   * name if there is one, else the title, else a fallback (a node cannot be created without one).
+   * Normalize editor values for a NEW node and make sure it carries a name (`cm:name`): the title
+   * if there is one, else a fallback — a node cannot be created without a name. Creating is the
+   * only case that may invent one; see {@link update} for why an existing node must not be
+   * renamed this way.
    */
-  private toBody(values: MdsValues, currentName?: string): MdsValues {
+  private toCreateBody(values: MdsValues): MdsValues {
     const body = toMdsValues(values);
     if (!body['cm:name']?.length) {
-      body['cm:name'] = [currentName || body['cclom:title']?.[0] || FALLBACK_NAME];
+      body['cm:name'] = [body['cclom:title']?.[0] || FALLBACK_NAME];
     }
     return body;
   }
