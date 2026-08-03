@@ -58,7 +58,9 @@ export class ConditionsService {
     );
   });
 
-  readonly loggedIn = this.auth.loggedIn;
+  // Not the raw session flag but `authorized`: with the additional web component enabled no login
+  // is required, so every option stays reachable and the login gate never appears.
+  readonly loggedIn = this.auth.authorized;
 
   // An active node exists when a node has been created or loaded — true both for curated
   // content and for a node received from OnlyOffice / opened from the history.

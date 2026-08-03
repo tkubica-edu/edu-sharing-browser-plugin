@@ -22,7 +22,7 @@ export interface Conditions {
   onlyOfficePresent: boolean;
   /** The active page is Edu-Sharing itself (host match or `/edu-sharing` path). */
   onEduSharing: boolean;
-  /** A valid, non-guest repository login exists. */
+  /** A valid, non-guest repository login exists — or none is required (see AuthService.authorized). */
   loggedIn: boolean;
   /** An active node exists — a curated content OR a node received from OnlyOffice. */
   hasActiveNode: boolean;

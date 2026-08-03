@@ -80,7 +80,7 @@ export class AppComponent implements OnInit {
   constructor() {
     effect(() => {
       const nodeId = this.pendingNodeId();
-      if (nodeId && this.auth.loggedIn()) {
+      if (nodeId && this.auth.authorized()) {
         this.pendingNodeId.set(null);
         void this.openNode(() => this.curation.openNode(nodeId));
       }
@@ -168,7 +168,7 @@ export class AppComponent implements OnInit {
   private async receiveNode(nodeId: string | undefined): Promise<void> {
     if (!nodeId || this.isDuplicate(nodeId)) return;
     if (!this.confirmDiscardUnsaved()) return;
-    if (!this.auth.loggedIn()) {
+    if (!this.auth.authorized()) {
       // Not logged in yet → show the login gate; the effect opens the node after login.
       this.pendingNodeId.set(nodeId);
       this.navigation.land();

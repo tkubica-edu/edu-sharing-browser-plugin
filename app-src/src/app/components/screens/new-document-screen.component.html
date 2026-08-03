@@ -1,5 +1,5 @@
 <!-- Login required to create a document in the repository — reuse the shared gate. -->
-@if (auth.loggedIn()) {
+@if (auth.authorized()) {
   <div class="connector-wrap">
     @if (error() || bundle.error(); as message) {
       <p class="es-error">{{ message }}</p>

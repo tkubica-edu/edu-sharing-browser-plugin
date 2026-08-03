@@ -99,7 +99,7 @@ export class CurationService {
    * history here — an entry is recorded only once a node is actually saved (see {@link save}).
    */
   async analyze(): Promise<boolean> {
-    if (!this.auth.loggedIn()) return false;
+    if (!this.auth.authorized()) return false;
     this.resetNodeState();
     const outcome = await this.metadataAgent.run();
     const ok = outcome.ok && !!outcome.parsed && !!outcome.source;
@@ -114,7 +114,7 @@ export class CurationService {
    * new node in the inbox.
    */
   async enrichOpenDocument(): Promise<boolean> {
-    if (!this.auth.loggedIn()) return false;
+    if (!this.auth.authorized()) return false;
     this.resetNodeState();
     const outcome = await this.metadataAgent.runForOpenDocument();
     if (!outcome.ok || !outcome.parsed) return false;
@@ -186,7 +186,7 @@ export class CurationService {
    * true on success so the metadata screen can advance to the preview.
    */
   async save(values: MdsValues): Promise<boolean> {
-    if (!this.auth.loggedIn()) return false;
+    if (!this.auth.authorized()) return false;
     this.saving.set(true);
     this.saveError.set(null);
     try {
@@ -222,7 +222,7 @@ export class CurationService {
   /** Add the active node to the given collection(s). */
   async assignToCollections(collections: readonly Collection[]): Promise<void> {
     const node = this.activeNode();
-    if (!node || !this.auth.loggedIn() || !collections.length) return;
+    if (!node || !this.auth.authorized() || !collections.length) return;
     this.assigning.set(true);
     this.assignError.set(null);
     try {

@@ -149,6 +149,17 @@ The per-mode settings are the two presets the bundle's own
 `examples/canvas-parameter-demo.html` documents — "Plugin" and "Detail (readonly)" — kept
 verbatim in `CONFIGS` so they stay comparable with that reference.
 
+It also switches the login off. The variable marks a repository whose embedding host brings the
+session, so no credentials are asked for: `AuthService.authorized` (`loggedIn` **or** the variable)
+is what option visibility, the landing view, the screens' gates and the API-backed actions are
+behind, so the login option and the `es-login` gate never appear and every option is reachable
+without a panel login. `AuthService.loggedIn` stays the plain fact of a repository session, but nothing
+about a login is *reported* either: `AuthService.loginRequired` is false, so the status bar shows
+neither „Abgemeldet" nor „Anmeldung wird geprüft…" (an existing session is still shown, so logging
+out stays reachable). The variables are readable as guest, so the flag
+arrives while the panel is still logged out; the navigation guard then re-lands the boot's login
+view on the options menu.
+
 Nothing else changes: *Inhalt erschließen* still runs the metadata agent through the background
 worker, its result is loaded into the editor, and saving still creates or updates the repository
 node and records it in the Verlauf.

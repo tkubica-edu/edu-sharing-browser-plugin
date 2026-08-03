@@ -99,7 +99,7 @@ export class OnlyOfficeDocumentService {
     // The panel is usually opened before login, when the node cannot be fetched. Retry as soon
     // as a session exists.
     effect(() => {
-      if (this.auth.loggedIn() && this.currentDocument() && !this.node()) this.hydrate();
+      if (this.auth.authorized() && this.currentDocument() && !this.node()) this.hydrate();
     });
   }
 
@@ -152,7 +152,7 @@ export class OnlyOfficeDocumentService {
    */
   private hydrate(): void {
     const nodeId = this.currentDocument()?.nodeId;
-    if (!nodeId || nodeId === this.hydratedFor || !this.auth.loggedIn()) return;
+    if (!nodeId || nodeId === this.hydratedFor || !this.auth.authorized()) return;
     this.hydratedFor = nodeId;
     if (this.node()?.ref.id !== nodeId) this.node.set(null);
     void this.repositoryNodes

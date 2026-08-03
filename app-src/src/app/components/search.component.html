@@ -1,5 +1,5 @@
 <!-- Login required to search the repository — reuse the shared gate. -->
-@if (auth.loggedIn()) {
+@if (auth.authorized()) {
   <div class="nodes-wrap">
     <es-nodes-selector
       [option]="option"

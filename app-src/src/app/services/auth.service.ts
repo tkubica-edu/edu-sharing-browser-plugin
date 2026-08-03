@@ -4,6 +4,7 @@ import { AuthenticationService, LoginInfo } from 'ngx-edu-sharing-api';
 
 import { APP_CONFIG, toApiRootUrl } from '../config';
 import { BOOT_ROOT_URL } from '../app.config';
+import { AdditionalWebComponentService } from './additional-web-component.service';
 import { BrowserExtensionService } from './browser-extension.service';
 
 /** How long to wait for the session check on startup. */
@@ -17,6 +18,7 @@ export class AuthService {
   private readonly authentication = inject(AuthenticationService);
   private readonly browserExtension = inject(BrowserExtensionService);
   private readonly bootRootUrl = inject(BOOT_ROOT_URL);
+  private readonly additionalWebComponent = inject(AdditionalWebComponentService);
 
   /** The repository base URL (`…/edu-sharing`) the user configured. */
   readonly repositoryUrl = signal(this.bootRootUrl.replace(/\/rest$/, ''));
@@ -31,6 +33,23 @@ export class AuthService {
 
   /** The library's rootUrl for the configured repository (`…/edu-sharing/rest`). */
   readonly apiRootUrl = computed(() => toApiRootUrl(this.repositoryUrl()));
+
+  /**
+   * The gate every feature is behind: a real session, OR a repository that enables the additional
+   * web component — there the session is brought by the embedding host, so the panel must never ask
+   * for credentials. {@link loggedIn} stays the plain fact of a repository session and is what the
+   * status bar and the login screen report; everything that only needs to know *whether it may
+   * work* (option visibility, the landing view, the screens' gates, the API-backed actions) uses
+   * this instead.
+   */
+  readonly authorized = computed(() => this.loggedIn() || this.additionalWebComponent.enabled());
+
+  /**
+   * Whether a login applies at all. False with the additional web component enabled: it replaces
+   * the login necessity entirely, so not even the logged-out state is reported (nothing about a
+   * login is shown in the status bar).
+   */
+  readonly loginRequired = computed(() => !this.additionalWebComponent.enabled());
 
   /** Load the persisted repository URL (or default), then revalidate any session. */
   async init(): Promise<void> {

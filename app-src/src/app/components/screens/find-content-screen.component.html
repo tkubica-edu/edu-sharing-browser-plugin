@@ -1,5 +1,6 @@
-<!-- Login required to search the repository — reuse the shared gate. -->
-@if (auth.loggedIn()) {
+<!-- Login required to search the repository — reuse the shared gate. Gated on `authorized`, not on
+     the raw session: with the additional web component enabled no login is asked for. -->
+@if (auth.authorized()) {
   <div class="find-wrap">
     <section class="es-hint-card">
       <p class="es-muted">
