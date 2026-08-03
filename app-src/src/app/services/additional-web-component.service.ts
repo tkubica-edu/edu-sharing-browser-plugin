@@ -29,6 +29,7 @@ export class AdditionalWebComponentService {
     this.config.observeVariables().subscribe((variables) => {
       // `Variables` types every value as string, so a config that delivers the raw string
       // "true" is honoured as well as a real boolean.
+      console.log('variables', variables);
       const value = variables?.[CONFIG_VARIABLE] as unknown;
       const enabled = typeof value === 'boolean' ? value : String(value).trim() === 'true';
       if (enabled) this.enabledState.set(true);

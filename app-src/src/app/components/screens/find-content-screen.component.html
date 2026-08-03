@@ -35,11 +35,21 @@
       Rendered once the keywords exist, so the element searches for them from the start (its own
       first query runs as soon as the filter widgets initialize). Inside the @if the bindings are
       applied before the element is inserted and upgraded — see NodesSelectorComponent.
+
+      The keywords go in as `initialValues` (filter values of the keyword widget), not as
+      `searchString` — see ContentSuggestionsService.filters. Re-setting them, as "Neu aus Dokument"
+      does, makes the element rebuild its filter editor and run the query again.
+
+      Sorted by relevance (score, descending). The sort inputs are bound as strings because the
+      element parses them as comma-separated lists — a real `false` would break its setter.
     -->
-    @if (bundle.ready() && suggestions.searchString(); as searchString) {
+    @if (bundle.ready() && suggestions.filters(); as filters) {
       <edu-sharing-search
         class="results"
-        [searchString]="searchString"
+        [initialValues]="filters"
+        [contentType]="'FILES'"
+        [sortProperties]="'score'"
+        [sortAscending]="'false'"
         (nodeActivated)="insert($event)"
       ></edu-sharing-search>
     }

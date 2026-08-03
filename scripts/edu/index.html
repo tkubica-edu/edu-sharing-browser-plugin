@@ -54,6 +54,12 @@
         height: 700px;
         border: 1px solid #ccc;
       }
+      /* The usages preview grows with its content. */
+      edu-sharing-usages {
+        display: block;
+        border: 1px solid #ccc;
+        padding: 20px;
+      }
     </style>
     <link rel="stylesheet" href="styles.css"/>
   <link rel="stylesheet" href="styles.css"></head>
@@ -68,12 +74,36 @@
     </main>
     <main class="main-container">
       <h2>Search Example (search + metadata filters, no router)</h2>
-      <edu-sharing-search search-string="wasser"></edu-sharing-search>
+      <!-- filter ids are the mds widget ids, same as in the search page's `filters` parameter -->
+      <edu-sharing-search content-type="FILES" sort-properties="score" sort-ascending="false" initial-values="{&quot;cclom:general_keyword&quot;:[&quot;Bremen, Hansestadt&quot;]}"></edu-sharing-search>
       <script>
         const search = document.getElementsByTagName('edu-sharing-search')[0];
         ['nodeClicked', 'nodeActivated', 'totalResults'].forEach((name) =>
           search.addEventListener(name, (event) => console.log(name, event.detail)),
         );
+        // remember the last query and restore it later via the two inputs
+        let lastSearch;
+        search.addEventListener('searchParametersChange', (event) => (lastSearch = event.detail));
+        function restoreLastSearch() {
+          search.searchString = lastSearch.searchString;
+          search.initialValues = lastSearch.filters;
+        }
+      </script>
+    </main>
+    <main class="main-container">
+      <h2>Usages Example (statistics for one or more nodes)</h2>
+      <edu-sharing-usages></edu-sharing-usages>
+      <script>
+        // the element takes resolved nodes – set them as a DOM property
+        fetch(
+          window.__env.EDU_SHARING_API_URL +
+            '/node/v1/nodes/-home-/4940d5da-9b21-4ec0-8824-d16e0409e629/metadata',
+          { headers: { Accept: 'application/json' }, credentials: 'include' },
+        )
+          .then((response) => response.json())
+          .then(({ node }) => {
+            document.getElementsByTagName('edu-sharing-usages')[0].nodes = [node];
+          });
       </script>
     </main>
     <main class="main-container">
@@ -102,5 +132,5 @@
         }, 1000);
       </script>
     </main>
-  <link rel="modulepreload" href="chunk-MYWSKFLM.js"><link rel="modulepreload" href="chunk-IDZFELY7.js"><link rel="modulepreload" href="chunk-AUWHEYHY.js"><link rel="modulepreload" href="chunk-Y73H2HTO.js"><link rel="modulepreload" href="chunk-HYZQWSKA.js"><link rel="modulepreload" href="chunk-G6DQ7ZKO.js"><link rel="modulepreload" href="chunk-VZBF6OYS.js"><link rel="modulepreload" href="chunk-QSX3Z3N5.js"><link rel="modulepreload" href="chunk-K45ZHA5F.js"><link rel="modulepreload" href="chunk-X2K6HHPI.js"><script src="polyfills.js" type="module"></script><script src="scripts.js" defer></script><script src="main.js" type="module"></script></body>
+  <link rel="modulepreload" href="chunk-QQUGV2XG.js"><link rel="modulepreload" href="chunk-IDZFELY7.js"><link rel="modulepreload" href="chunk-AUWHEYHY.js"><link rel="modulepreload" href="chunk-Y73H2HTO.js"><link rel="modulepreload" href="chunk-HYZQWSKA.js"><link rel="modulepreload" href="chunk-G6DQ7ZKO.js"><link rel="modulepreload" href="chunk-VZBF6OYS.js"><link rel="modulepreload" href="chunk-QSX3Z3N5.js"><link rel="modulepreload" href="chunk-CHGUURO2.js"><link rel="modulepreload" href="chunk-X2K6HHPI.js"><script src="polyfills.js" type="module"></script><script src="scripts.js" defer></script><script src="main.js" type="module"></script></body>
 </html>

@@ -1,8 +1,16 @@
-// "Passende Inhalte finden" — the derived keywords above the embedded search, which fills the
-// rest of the panel and scrolls internally (as its own demo page sizes it).
+// "Passende Inhalte finden" — the derived keywords above the embedded search.
+//
+// The screen flows naturally so the panel's own scroll container (`.content` in AppComponent)
+// scrolls it, exactly like every other screen. It must NOT be a height:100% box: `<edu-sharing-search>`
+// scrolls its result list *internally* and only inside the height the embedder gives it (its demo
+// page sizes it with a plain `height`), so as a flex item filling the panel it swallowed the scroll —
+// its own list was clipped to the squeezed box while the panel had nothing left to scroll.
+//
+// So the element gets a definite height of its own (like the demo) and the keyword card above it
+// simply scrolls away with the page: the result list scrolls internally, and anything that does not
+// fit the panel is reachable through the panel's scroll.
 :host {
   display: block;
-  height: 100%;
 }
 
 .login-gate { padding: 14px; }
@@ -10,13 +18,16 @@
 .find-wrap {
   display: flex;
   flex-direction: column;
-  height: 100%;
   padding: var(--es-space-4);
   gap: var(--es-space-3);
 }
 
 .results {
   display: block;
-  flex: 1;
-  min-height: 420px;
+  // Tall enough to work as a result list, bounded so it always has the definite height the
+  // element needs; `flex: none` keeps it at that height instead of being squeezed by the card.
+  flex: none;
+  height: 70vh;
+  min-height: 360px;
+  overflow-y: auto;
 }

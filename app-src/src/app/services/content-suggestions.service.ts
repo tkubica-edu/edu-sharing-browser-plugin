@@ -7,6 +7,13 @@ import { OnlyOfficeDocumentService } from './onlyoffice-document.service';
 /** Agent fields the search words are taken from, in order of preference. */
 const KEYWORD_FIELDS = ['cclom:general_keyword', 'cclom:classification_keyword'];
 
+/**
+ * The MDS widget the keywords are filtered on. `cclom:general_keyword` is a free-text keyword in
+ * the search index, so the agent's values go in verbatim — unlike vocabulary widgets (e.g.
+ * `ccm:educationalcontext`), which would need valuespace keys instead of labels.
+ */
+const KEYWORD_WIDGET = 'cclom:general_keyword';
+
 /** Fallback when the agent found no keywords — a title still searches for something sensible. */
 const TITLE_FIELD = 'cclom:title';
 
@@ -19,7 +26,7 @@ const NO_KEYWORDS =
 /**
  * Derives search words from the document the host page has open, for "Passende Inhalte finden":
  * ask the OnlyOffice plugin for the document content, run the metadata agent on its markdown and
- * keep the keywords it generated. Those become the search word of `<edu-sharing-search>`.
+ * keep the keywords it generated. Those become the keyword filter of `<edu-sharing-search>`.
  *
  * The run deliberately does **not** become the app's {@link MetadataAgentService.lastRun}: this is
  * a search aid, not an erschließen result, so it must not turn up in the metadata editor nor count
@@ -36,8 +43,18 @@ export class ContentSuggestionsService {
   /** The keywords the agent generated for the open document. */
   readonly keywords = signal<readonly string[]>([]);
 
-  /** The search word handed to `<edu-sharing-search>`; empty until keywords exist. */
-  readonly searchString = computed(() => this.keywords().join(' '));
+  /**
+   * The filters handed to `<edu-sharing-search>` as its `initialValues`: the keywords as values of
+   * the keyword widget, keyed by MDS widget id. Null until keywords exist.
+   *
+   * Deliberately not the element's `searchString`: as a search word the keywords would be one
+   * fulltext query that narrows the result set to nothing, while as filter values they are matched
+   * against the indexed keywords of the nodes — which is what the agent's keywords are for.
+   */
+  readonly filters = computed<Record<string, string[]> | null>(() => {
+    const keywords = this.keywords();
+    return keywords.length ? { [KEYWORD_WIDGET]: [...keywords] } : null;
+  });
 
   /**
    * Read the open document, analyze it and keep its keywords. Returns true when a search word

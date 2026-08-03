@@ -48,12 +48,18 @@ The options:
   writes the enriched metadata onto that node (`editNodeMetadata`) rather than creating a new one
   in the inbox — the node's name is kept, so the document is never renamed.
 - **Passende Inhalte finden** — only on an OnlyOffice page: searches the repository for content
-  matching the **edited document**. The search word is not typed but derived — the same
+  matching the **edited document**. The query is not typed but derived — the same
   `REQUEST_DOCUMENT_CONTENT` → `DOCUMENT_CONTENT` round trip as *Metadaten anreichern*, then
   `POST {apiUrl}/generate` on the answer's `markdown`, and the generated
   `cclom:general_keyword` values (title as fallback, deduplicated, capped) become the
-  `search-string` of **`edu-sharing-search`** — the embedded search that adds the metadata filters
-  of the search page to a node list. That run is deliberately *not* kept as the app's last
+  `initial-values` of **`edu-sharing-search`** — the embedded search that adds the metadata filters
+  of the search page to a node list. `initial-values` is a map of MDS widget id → values (here
+  `{"cclom:general_keyword": [...]}`), i.e. the keywords are used as a **filter**, not as the
+  `search-string`: as one fulltext query they would narrow the results to nothing, as filter values
+  they match the indexed keywords of the nodes. Re-setting them (*Neu aus Dokument*) makes the
+  element rebuild its filter editor, whose init re-runs the query. Results are sorted by relevance
+  (`sort-properties="score"`, descending); vocabulary widgets would need valuespace keys instead of
+  labels, `cclom:general_keyword` is free text so the values go in verbatim. That run is deliberately *not* kept as the app's last
   analysis (`ContentSuggestionsService`, not `MetadataAgentService.lastRun`), so it neither shows up
   in the metadata editor nor counts as unsaved work. Opening the option starts the derivation;
   *Neu aus Dokument* repeats it after edits. A double-clicked result (`nodeActivated`) is posted to
