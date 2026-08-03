@@ -1,7 +1,28 @@
-:host { display: block; }
+// The element brings its own internal layout — its host style is
+// `display: flex; flex-direction: column; height: 100%; overflow: hidden`, with the mat-tab-group
+// inside as `flex: 1 1 0; min-height: 0` and the tab body as the scroll container.
+//
+// So NEVER set `display` on it: our rule (`edu-sharing-nodes-selector[_ngcontent-x]`, specificity
+// 0,1,1) outranks theirs (`[_nghost-x]`, 0,1,0), and a `display: block` here replaced their flex
+// column — the tab group then grew to its content height (1700px), got clipped by their
+// `overflow: hidden`, and nothing scrolled.
+//
+// All this component has to do is pass a height through: the host is a flex column, the element
+// the flex item that takes what is left. Callers give the host a definite height, either by
+// filling the panel (search.component.scss) or with an explicit one
+// (collection-selector.component.scss) — without it the element's `height: 100%` has nothing to
+// resolve against and its internal scrolling cannot work.
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.es-error { flex: 0 0 auto; }
 
 edu-sharing-nodes-selector {
-  display: block;
   width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   padding-top: 0;
 }

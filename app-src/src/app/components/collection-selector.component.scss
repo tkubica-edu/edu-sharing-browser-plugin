@@ -1,3 +1,11 @@
 :host { display: block; }
 
-es-nodes-selector ::ng-deep edu-sharing-nodes-selector { min-height: 560px; }
+// Sits inside a screen that scrolls as a page, so the height cannot come from a 100% chain: the
+// element gets a definite height of its own instead, which is what its internal scroll container
+// and footer bar need (see nodes-selector.component.scss). Bounded, so the hint card above it
+// stays reachable through the panel's own scroll.
+es-nodes-selector {
+  display: block;
+  height: 70vh;
+  min-height: 360px;
+}
