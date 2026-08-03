@@ -4,7 +4,7 @@
        reported. An existing session is still shown, so logging out stays reachable. -->
   @if (auth.loggedIn()) {
     <span class="status-chip is-on" [title]="'Angemeldet als ' + (auth.username() || '')">
-      <span class="d"></span>Angemeldet: {{ auth.username() || '–' }}
+      <span class="d"></span><span class="chip-label">Angemeldet: {{ auth.username() || '–' }}</span>
       <button class="chip-action" (click)="logout()" title="Abmelden" aria-label="Abmelden">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
              stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
@@ -41,7 +41,7 @@
 
   @if (curation.activeNode(); as node) {
     <span class="status-chip is-on" [title]="'Aktiver Inhalt: ' + (node.name ?? node.nodeId)">
-      <span class="d"></span>Aktiver Inhalt: {{ node.name ?? node.nodeId }}
+      <span class="d"></span><span class="chip-label">Aktiver Inhalt: {{ node.name ?? node.nodeId }}</span>
       <button class="chip-action" (click)="clearActiveContent()"
               title="Aktiven Inhalt entfernen" aria-label="Aktiven Inhalt entfernen">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"

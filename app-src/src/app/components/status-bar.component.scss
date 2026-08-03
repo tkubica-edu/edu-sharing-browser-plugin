@@ -28,6 +28,16 @@
 // looks like one of the real ones.
 .status-chip.is-debug { background: #fdf0d5; color: #8a5a00; border-color: #f0dcae; }
 
+// Long names (username, active content title) must not push the chip's action button out of the
+// clipped chip — the label truncates instead, the full text stays in the chip's title tooltip.
+.chip-label {
+  min-width: 0;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 // Small inline action icon inside a chip (logout / clear active content).
 .chip-action {
   border: none;
