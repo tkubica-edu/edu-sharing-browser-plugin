@@ -208,6 +208,38 @@ Unlike the two directions above this is a **correlated pair**: every request car
 
 ---
 
+## Debug mode — simulating the host side
+
+`DebugService` (`app-src/src/app/services/debug.service.ts`) stands in for the host-side plugin, so
+the OnlyOffice flows can be developed without an editor. Enabled in *Einstellungen* and persisted in
+`storage.local` (`eduSharingDebugMode`).
+
+| What | Behaviour with debug mode on |
+|---|---|
+| `ConditionsService.onlyOfficePresent` | always true → the OnlyOffice-only options are reachable on any page |
+| `REQUEST_DOCUMENT_CONTENT` | never leaves the sidebar; answered with a `DOCUMENT_CONTENT` envelope carrying a hard-coded German test document (`markdown` + `text`, long enough for the agent's 50-character guard) |
+| `REQUEST_DOCUMENT_INFO` | answered with a `DOCUMENT_INFO` envelope carrying the configured test node id |
+| `PREVIEW_NODE` | nothing requests it → a button in the settings fires one for the test node |
+| `INSERT_NODE` | **unchanged** — only the inbound direction is simulated; the outbound broadcast still goes to the host page |
+
+Two properties make the simulation faithful:
+
+- **Same route.** The answers are not returned from the call: they are posted to the sidebar's own
+  window with the plugin's `edu-sharing-onlyoffice-plugin` marker, so `AppComponent`'s single
+  `window:message` listener and `OnlyOfficeDocumentService.accept()` process them like relayed
+  ones. `requestId` correlation, the timeout, the identity handling and the node hydration all run
+  as in production.
+- **Same envelopes.** Fixtures are typed against the contract in
+  `app-src/src/app/model/onlyoffice-events.ts` — the file both the service and the simulator import
+  (that split exists to keep them free of an import cycle).
+
+The switch is read in `AppComponent.ngOnInit` **before** anything evaluates `onlyOfficePresent()`
+(option visibility, the boot's `REQUEST_DOCUMENT_INFO`). The test node id is editable in the
+settings: the default is deliberately fake, a real id makes even *Speichern* run through.
+Simulated events are logged with the `[edu-sharing][debug]` prefix.
+
+---
+
 ## `Node` Data Structure (elements in `INSERT_NODE`'s `nodes`)
 
 The `nodes` are edu-sharing repository node objects as held by the `edu-sharing` web-component
@@ -265,7 +297,9 @@ only string fields and the extension re-hydrates from `id`.
 | `app-src/src/app/services/browser-extension.service.ts` | `insertNodes`, `requestDocumentContent`, `requestDocumentInfo` (outbound), `signalReady` (ready handshake), `analyzeText` (→ background `/generate`) |
 | `content/panel-host.js` | relay hub: broadcasts `INSERT_NODE` / `REQUEST_DOCUMENT_*`; relays inbound envelopes, buffers only `PREVIEW_NODE` |
 | `app-src/src/app/app.component.ts` | single `window:message` listener: `DOCUMENT_*` → the document bridge, `PREVIEW_NODE` → the flow |
+| `app-src/src/app/model/onlyoffice-events.ts` | the inbound contract: `PLUGIN_SOURCE` marker + `PluginEnvelope` / `DocumentContent` / `DocumentIdentity` payloads |
 | `app-src/src/app/services/onlyoffice-document.service.ts` | the request/response bridge: `requestContent`/`requestInfo` (`requestId` + timeout), `accept(envelope)`, `currentDocument` |
+| `app-src/src/app/services/debug.service.ts` | debug mode: answers the `REQUEST_DOCUMENT_*` events with hard-coded fixtures instead of asking the host page |
 | `app-src/src/app/services/metadata-agent.service.ts` | `runForOpenDocument()` — document content → `markdown` → agent |
 | `app-src/src/app/services/curation.service.ts` | `openNode(id)` (hydrate + open in the preview), `adoptOpenDocument(node)` (the open document as active node, no history entry), `enrichOpenDocument()` |
 | `background/background.js` | `analyze.text` — `POST /generate` for text the sidebar supplies |

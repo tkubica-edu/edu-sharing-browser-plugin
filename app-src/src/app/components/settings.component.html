@@ -21,3 +21,34 @@
     <button class="es-btn es-btn--text" (click)="resetToDefault()">Auf Standard zurücksetzen</button>
   </div>
 </section>
+
+<!-- Entwicklung: ersetzt das OnlyOffice-Plugin durch simulierte Events. -->
+<section class="es-card">
+  <label class="check">
+    <input type="checkbox" [ngModel]="debug.enabled()" (ngModelChange)="setDebug($event)" />
+    <span>Debug-Modus: OnlyOffice-Events simulieren</span>
+  </label>
+
+  <p class="desc">
+    Beantwortet die Anfragen an das OnlyOffice-Plugin sofort mit hartcodierten Testdaten und
+    behandelt jede Seite als OnlyOffice-Seite. Damit lassen sich „Metadaten anreichern“,
+    „Passende Inhalte finden“ und „Inhalt suchen“ ohne Editor testen.
+  </p>
+
+  @if (debug.enabled()) {
+    <label class="es-field-label" for="debug-node">Test-Node-ID</label>
+    <input id="debug-node" type="text" class="es-input" placeholder="Node-ID"
+           [ngModel]="debug.documentNodeId()" (ngModelChange)="setDebugNodeId($event)" />
+    <p class="desc">
+      Node, den das simulierte Dokument als bearbeiteten Node meldet. Mit einer echten Node-ID
+      des Repositoriums läuft auch das Speichern der Metadaten durch — als aktiver Inhalt wird
+      sie beim nächsten Öffnen des Panels übernommen.
+    </p>
+
+    <div class="es-row">
+      <button class="es-btn es-btn--tonal es-btn--small" (click)="simulatePreviewNode()">
+        PREVIEW_NODE simulieren
+      </button>
+    </div>
+  }
+</section>

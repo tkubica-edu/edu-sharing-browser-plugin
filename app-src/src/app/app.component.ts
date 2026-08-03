@@ -1,15 +1,17 @@
 import { ChangeDetectionStrategy, Component, OnInit, effect, inject, signal } from '@angular/core';
 
 import { APP_CONFIG } from './config';
+import { PLUGIN_SOURCE, PluginEnvelope } from './model/onlyoffice-events';
 import { errorMessage } from './util/errors';
 import { AdditionalWebComponentService } from './services/additional-web-component.service';
 import { AuthService } from './services/auth.service';
 import { BrowserExtensionService } from './services/browser-extension.service';
 import { ConditionsService } from './services/conditions.service';
 import { CurationService } from './services/curation.service';
+import { DebugService } from './services/debug.service';
 import { HistoryEntry, HistoryService } from './services/history.service';
 import { NavigationService } from './services/navigation.service';
-import { OnlyOfficeDocumentService, PluginEnvelope } from './services/onlyoffice-document.service';
+import { OnlyOfficeDocumentService } from './services/onlyoffice-document.service';
 import { OptionIconService } from './services/option-icon.service';
 
 import { ActionBarComponent } from './components/action-bar.component';
@@ -26,9 +28,6 @@ import { CollectionsScreenComponent } from './components/screens/collections-scr
 import { MetadataScreenComponent } from './components/screens/metadata-screen.component';
 import { NewDocumentScreenComponent } from './components/screens/new-document-screen.component';
 import { PreviewScreenComponent } from './components/screens/preview-screen.component';
-
-/** Sender id of the OnlyOffice plugin messages relayed by content/panel-host.js. */
-const PLUGIN_SOURCE = 'edu-sharing-onlyoffice-plugin';
 
 /** Window in which the same node delivery is treated as a duplicate. */
 const DUPLICATE_WINDOW_MS = 3000;
@@ -66,6 +65,7 @@ export class AppComponent implements OnInit {
   private readonly additionalWebComponent = inject(AdditionalWebComponentService);
   private readonly curation = inject(CurationService);
   private readonly onlyOfficeDocument = inject(OnlyOfficeDocumentService);
+  private readonly debug = inject(DebugService);
 
   /** A node received while logged out — opened once the user logs in. */
   private readonly pendingNodeId = signal<string | null>(null);
@@ -101,6 +101,9 @@ export class AppComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     // Only activates when the repository config enables `additionalWebComponent`.
     this.additionalWebComponent.initialize();
+    // First of all: the debug flag decides `onlyOfficePresent`, which every option's visibility
+    // and the document request below are gated on.
+    await this.debug.load();
     await this.auth.init();
     await this.history.load();
     const tab = await this.browserExtension.getActiveTab().catch(() => null);

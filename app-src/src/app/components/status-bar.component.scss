@@ -24,6 +24,10 @@
   }
 }
 
+// Debug mode is not a page condition but a development state — warning colours so it never
+// looks like one of the real ones.
+.status-chip.is-debug { background: #fdf0d5; color: #8a5a00; border-color: #f0dcae; }
+
 // Small inline action icon inside a chip (logout / clear active content).
 .chip-action {
   border: none;

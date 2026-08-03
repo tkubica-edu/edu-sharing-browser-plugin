@@ -1,7 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
 
+import { DocumentIdentity } from '../model/onlyoffice-events';
 import { BrowserExtensionService, PageSource } from './browser-extension.service';
-import { DocumentIdentity, OnlyOfficeDocumentService } from './onlyoffice-document.service';
+import { OnlyOfficeDocumentService } from './onlyoffice-document.service';
 import { errorMessage } from '../util/errors';
 
 /** Reserved (non-metadata) top-level keys in the metadata-agent response. */

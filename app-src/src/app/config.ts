@@ -6,7 +6,9 @@ export const APP_CONFIG = {
   storageKeys: {
     repositoryUrl: 'eduSharingRepoUrl',
     history: 'eduSharingHistory',
-    pendingPreview: 'eduSharingPendingPreview'
+    pendingPreview: 'eduSharingPendingPreview',
+    debugMode: 'eduSharingDebugMode',
+    debugDocumentNodeId: 'eduSharingDebugDocumentNodeId'
   },
   maxHistory: 200
 };

@@ -2,13 +2,14 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { CollectionServiceUnwrapped, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 import { firstValueFrom } from 'rxjs';
 
+import { DocumentIdentity } from '../model/onlyoffice-events';
 import { MdsValues } from '../util/mds-values';
 import { errorMessage } from '../util/errors';
 import { renderLink } from '../util/repository-links';
 import { AuthService } from './auth.service';
 import { HistoryEntry, HistoryService } from './history.service';
 import { MetadataAgentService } from './metadata-agent.service';
-import { DocumentIdentity, OnlyOfficeDocumentService } from './onlyoffice-document.service';
+import { OnlyOfficeDocumentService } from './onlyoffice-document.service';
 import { NodeSummary, RepositoryNodeService } from './repository-node.service';
 
 /** A collection the content was added to. */

@@ -2,3 +2,14 @@
 
 // Component-specific: descriptive helper text under the field.
 .desc { color: var(--es-muted); font-size: 12px; margin: 8px 0 0; }
+
+// The only checkbox in the app (debug switch) — label and box on one clickable line.
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--es-space-2);
+  font-weight: 600;
+  cursor: pointer;
+
+  input { margin: 0; accent-color: var(--es-blue); cursor: pointer; }
+}

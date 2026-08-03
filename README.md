@@ -220,6 +220,31 @@ xcrun safari-web-extension-converter dist/safari
 ```
 Open the generated Xcode project and Run.
 
+### Debug mode (OnlyOffice without OnlyOffice)
+
+*Einstellungen* → **Debug-Modus: OnlyOffice-Events simulieren**. With it on, the sidebar behaves
+as if it ran on an OnlyOffice page with the edu-sharing plugin active:
+
+- every page counts as an insert host, so *Metadaten anreichern*, *Passende Inhalte finden* and
+  *Inhalt suchen* are reachable anywhere;
+- each `REQUEST_DOCUMENT_CONTENT` / `REQUEST_DOCUMENT_INFO` is answered immediately with a
+  hard-coded test document (`app-src/src/app/services/debug.service.ts`) instead of being
+  broadcast to a page that would never reply;
+- `PREVIEW_NODE` has no request to answer, so the settings offer a button that fires one;
+- a *Debug* chip in the status bar marks the state, and every simulated event is logged as
+  `[edu-sharing][debug]`.
+
+The answers are injected through the **real** inbound path (a window message carrying the
+plugin's source marker), so `requestId` correlation, identity handling and node hydration run
+exactly as in production. Only the inbound direction is faked — `INSERT_NODE` still goes to the
+host page as usual.
+
+**Test-Node-ID** is what the simulated document reports as the edited node. The default is a fake
+id (the repository load fails silently and the UI falls back to that id); put a real node id in to
+exercise the whole flow including *Speichern*. The flag is persisted in `storage.local`, so it
+survives reloads inside the extension — in a plain `ng serve` there is no extension storage and it
+resets per session.
+
 ### Manual test checklist
 1. Toolbar click → the sidebar docks on the right; drag its left edge to resize; the ✕ button
    closes it. The start view is the menu, which lists the options visible for the current page

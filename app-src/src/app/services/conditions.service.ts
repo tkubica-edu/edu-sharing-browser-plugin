@@ -3,6 +3,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Conditions } from '../model/options';
 import { AuthService } from './auth.service';
 import { CurationService } from './curation.service';
+import { DebugService } from './debug.service';
 
 /** URL pattern that marks an insert host (the OnlyOffice editor) where searching applies. */
 const INSERT_HOST_PATTERN = /\/src\/tools\/onlyoffice/;
@@ -33,6 +34,7 @@ function pathOf(url: string | null | undefined): string {
 export class ConditionsService {
   private readonly auth = inject(AuthService);
   private readonly curation = inject(CurationService);
+  private readonly debug = inject(DebugService);
 
   /** The active browser tab's URL (set by the shell on boot). */
   readonly activeUrl = signal<string | null>(null);
@@ -40,7 +42,11 @@ export class ConditionsService {
   /** True while the metadata editor screen is open. */
   readonly editMode = signal(false);
 
-  readonly onlyOfficePresent = computed(() => INSERT_HOST_PATTERN.test(this.activeUrl() ?? ''));
+  // Debug mode counts as an insert host on any page: it simulates the plugin's answers, so the
+  // OnlyOffice-only options must be reachable without an editor.
+  readonly onlyOfficePresent = computed(
+    () => this.debug.enabled() || INSERT_HOST_PATTERN.test(this.activeUrl() ?? ''),
+  );
 
   // Edu-Sharing page: the active host matches the configured repository host, OR the path
   // contains `/edu-sharing`.

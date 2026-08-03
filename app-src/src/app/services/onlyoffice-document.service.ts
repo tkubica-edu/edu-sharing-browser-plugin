@@ -1,51 +1,17 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { Node, RestConstants } from 'ngx-edu-sharing-api';
 
+import {
+  DocumentContent,
+  DocumentIdentity,
+  DocumentRequestKind,
+  PluginEnvelope,
+} from '../model/onlyoffice-events';
 import { renderLink } from '../util/repository-links';
 import { AuthService } from './auth.service';
 import { BrowserExtensionService } from './browser-extension.service';
+import { DebugService } from './debug.service';
 import { RepositoryNodeService } from './repository-node.service';
-
-/**
- * Identity of the document the host has open, as announced by the OnlyOffice plugin. Present on
- * every inbound envelope (envelope level, `data` for DOCUMENT_INFO) and `null` when the editor
- * was opened with a stale plugin config — so always treat it as optional.
- *
- * Deliberately just the node id: everything else the app needs (title, permalink, write
- * permission) is loaded from the repository, see {@link OnlyOfficeDocumentService.documentNode}.
- * There is no separate `originalId` either — the connector resolves a collection reference to
- * its original before it ever reports one, so this id *is* the edited node.
- */
-export interface DocumentIdentity {
-  nodeId?: string;
-}
-
-/**
- * The `DOCUMENT_CONTENT` payload. Only the fields this app consumes are typed — `markdown` is
- * the one it feeds to the metadata agent; `html`, `documentJson`, `elements` etc. are carried
- * along untyped. Answers can also be one of the two error forms.
- */
-export interface DocumentContent {
-  trigger?: 'toolbar' | 'request';
-  requestId?: string;
-  editorType?: string;
-  title?: string;
-  text?: string;
-  markdown?: string;
-  document?: DocumentIdentity | null;
-  /** Set when the editor is not a text document (spreadsheet, presentation). */
-  unsupported?: boolean;
-  /** Set when the plugin failed to read the document. */
-  error?: string;
-  [field: string]: unknown;
-}
-
-/** An inbound envelope relayed by content/panel-host.js. */
-export interface PluginEnvelope {
-  event?: string;
-  data?: DocumentContent;
-  document?: DocumentIdentity | null;
-}
 
 /** How long we wait for an answer before giving up on a request. */
 const CONTENT_TIMEOUT_MS = 15000;
@@ -71,12 +37,16 @@ const READ_FAILED = 'Das Dokument konnte nicht ausgelesen werden.';
  *
  * The plugin only reports the node id, so this service also loads that node once and derives
  * title, permalink and write permission from it — see {@link documentNode}.
+ *
+ * In debug mode the requests never leave the sidebar: {@link DebugService} answers them with
+ * fixtures through the same inbound path — see {@link send}.
  */
 @Injectable({ providedIn: 'root' })
 export class OnlyOfficeDocumentService {
   private readonly browserExtension = inject(BrowserExtensionService);
   private readonly repositoryNodes = inject(RepositoryNodeService);
   private readonly auth = inject(AuthService);
+  private readonly debug = inject(DebugService);
 
   /**
    * Identity of the document currently open in the host, from the plugin's announce on startup
@@ -139,10 +109,7 @@ export class OnlyOfficeDocumentService {
    * reports an unsupported editor / a read failure.
    */
   requestContent(): Promise<DocumentContent> {
-    return this.request(
-      (requestId) => this.browserExtension.requestDocumentContent(requestId),
-      CONTENT_TIMEOUT_MS,
-    ).then((answer) => {
+    return this.request('content', CONTENT_TIMEOUT_MS).then((answer) => {
       if (answer.unsupported) throw new Error(UNSUPPORTED);
       if (answer.error) throw new Error(READ_FAILED);
       return answer;
@@ -151,10 +118,7 @@ export class OnlyOfficeDocumentService {
 
   /** Ask for the open document's identity only. Same failure modes as {@link requestContent}. */
   requestInfo(): Promise<DocumentIdentity | null> {
-    return this.request(
-      (requestId) => this.browserExtension.requestDocumentInfo(requestId),
-      INFO_TIMEOUT_MS,
-    ).then((answer) => answer.document ?? null);
+    return this.request('info', INFO_TIMEOUT_MS).then((answer) => answer.document ?? null);
   }
 
   /**
@@ -204,10 +168,7 @@ export class OnlyOfficeDocumentService {
   }
 
   /** Send a request under a fresh id and wait for its answer, bounded by `timeoutMs`. */
-  private request(
-    send: (requestId: string) => boolean,
-    timeoutMs: number,
-  ): Promise<DocumentContent> {
+  private request(kind: DocumentRequestKind, timeoutMs: number): Promise<DocumentContent> {
     const requestId = `es-${Date.now()}-${++this.requestCounter}`;
     return new Promise<DocumentContent>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -221,11 +182,24 @@ export class OnlyOfficeDocumentService {
         resolve(answer);
       });
 
-      if (!send(requestId)) {
+      if (!this.send(kind, requestId)) {
         clearTimeout(timer);
         this.pending.delete(requestId);
         reject(new Error(NO_HOST));
       }
     });
+  }
+
+  /**
+   * Ask for the document — from the host page, or from the simulator while debug mode is on. The
+   * simulated answer takes the same route back (a window message with the plugin's source
+   * marker), so only this one line differs between the two worlds. False means there is nobody
+   * to ask.
+   */
+  private send(kind: DocumentRequestKind, requestId: string): boolean {
+    if (this.debug.enabled()) return this.debug.answerDocumentRequest(kind, requestId);
+    return kind === 'info'
+      ? this.browserExtension.requestDocumentInfo(requestId)
+      : this.browserExtension.requestDocumentContent(requestId);
   }
 }

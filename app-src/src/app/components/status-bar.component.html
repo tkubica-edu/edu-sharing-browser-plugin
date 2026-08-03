@@ -16,8 +16,17 @@
     <span class="status-chip" title="Nicht angemeldet"><span class="d"></span>Abgemeldet</span>
   }
 
+  @if (debug.enabled()) {
+    <span class="status-chip is-debug" title="Debug-Modus: OnlyOffice-Events werden simuliert">
+      <span class="d"></span>Debug
+    </span>
+  }
+
   @if (conditions.onlyOfficePresent()) {
-    <span class="status-chip is-on" title="OnlyOffice erkannt"><span class="d"></span>OnlyOffice</span>
+    <span class="status-chip is-on"
+          [title]="debug.enabled() ? 'OnlyOffice simuliert (Debug-Modus)' : 'OnlyOffice erkannt'">
+      <span class="d"></span>OnlyOffice
+    </span>
   }
 
   @if (conditions.onEduSharing()) {
