@@ -15,12 +15,11 @@ const DIST = path.join(ROOT, 'dist');
 const VENDOR = path.join(ROOT, 'vendor');
 const APP_SRC = path.join(ROOT, 'app-src');
 const SIDEBAR = path.join(ROOT, 'sidebar');
-// Pre-built web-component bundles, each copied verbatim into the target under its own
-// folder name:
-//   scripts/edu → edu/  — edu-sharing bundle (edu-sharing-mds-editor, …), loaded by
-//                         EduBundleService.
-//   scripts/wlo → wlo/  — WLO bundle (metadata-agent-canvas, …), loaded by
-//                         ExtensionService when the extension point is enabled.
+// Pre-built web-component bundles, each copied verbatim into the target under the folder name the
+// app loads it by (see WebComponentBundleService):
+//   scripts/edu → edu/  — edu-sharing bundle (edu-sharing-mds-editor-wrapper, …)
+//   scripts/wlo → wlo/  — WLO bundle (metadata-agent-canvas, …), loaded only when the repository
+//                         config enables the additional web component
 const BUNDLE_DIRS = ['edu', 'wlo'];
 
 const TARGETS = ['chrome', 'firefox', 'safari'];

@@ -72,13 +72,13 @@ export class ContentSuggestionsService {
    * The filters handed to `<edu-sharing-search>` as its `initialValues`: the searched keywords as
    * values of the keyword widget, keyed by MDS widget id. Empty at the last step.
    *
-   * Deliberately not the element's `searchString`: that goes in as an extra `ngsearchword`
-   * criterion which is AND-ed with the filters, so it only narrows further — while as filter values
-   * the keywords are matched against the indexed keywords of the nodes, which is what they are for.
+   * Not the element's `searchString`: that goes in as an extra `ngsearchword` criterion AND-ed with
+   * the filters, so it only narrows further — as filter values the keywords are matched against the
+   * nodes' indexed keywords, which is what they are for.
    *
-   * A `computed`, so the object identity only changes when the keywords or the step do: the
-   * element's `initialValues` setter rebuilds its whole filter editor and re-runs the query on
-   * every set, so handing it a fresh object per change detection would search in a loop.
+   * A `computed`, so the object identity only changes with the keywords or the step: the element's
+   * `initialValues` setter rebuilds its whole filter editor and re-runs the query on every set, so
+   * a fresh object per change detection would search in a loop.
    */
   readonly filters = computed<Record<string, string[]>>(() => {
     const keywords = this.searchKeywords();

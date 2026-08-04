@@ -45,12 +45,10 @@
   }
 
   function closePanel() {
-    // FIRST, before anything else: drop every listener the open path attached. Our own resize
-    // listener re-applies the reserved width, so leaving it in place would make the restore below
-    // pointless — the dispatchResize() at the end would immediately reserve the space again.
-    // The teardown hangs off `window` because a toolbar toggle re-injects this file into a NEW
-    // closure: the instance that closes the panel is usually not the one that opened it and
-    // cannot see its local listeners.
+    // Drop the open path's listeners first: its resize listener re-applies the reserved width, so
+    // leaving it attached would make the restore below pointless. The teardown hangs off `window`
+    // because a toolbar toggle re-injects this file into a new closure — the instance that closes
+    // the panel is usually not the one that opened it.
     if (window.__eduSharingPanelTeardown) {
       try { window.__eduSharingPanelTeardown(); } catch (_) { /* tear down as far as possible */ }
       window.__eduSharingPanelTeardown = null;
@@ -147,12 +145,11 @@
     container.appendChild(handle);
     root.appendChild(container);
 
-    // Reserve space for the panel by CONSTRAINING THE ROOT WIDTH (not a margin): a
-    // margin-right leaves width:100%/100vw layouts (e.g. the OnlyOffice editor) at full
-    // width, so the panel would only overlay them. Setting `html { width: calc(100% - W) }`
-    // actually shrinks the content box, so a width:100% body/iframe follows. `overflow-x:
-    // hidden` clips any leftover 100vw children (no phantom scrollbar). `important` beats
-    // the site's own html styles. A synthetic resize nudges JS editors to re-layout.
+    // Reserve space by constraining the ROOT WIDTH, not with a margin: a margin-right leaves
+    // width:100%/100vw layouts (e.g. the OnlyOffice editor) at full width, so the panel would only
+    // overlay them, while `html { width: calc(100% - W) }` shrinks the content box so they follow.
+    // `overflow-x: hidden` clips leftover 100vw children (no phantom scrollbar), `important` beats
+    // the site's own html styles, and the synthetic resize nudges JS editors to re-layout.
     if (root.dataset.eduSharingPrevWidth === undefined) {
       root.dataset.eduSharingPrevWidth = root.style.width || '';
       root.dataset.eduSharingPrevOverflowX = root.style.overflowX || '';
@@ -195,10 +192,9 @@
       dragging = true;
       grip.style.background = 'rgba(0,59,124,0.8)';
       // During the drag: kill our iframe's pointer capture and text selection, and lay a
-      // transparent full-viewport shield over the page so pointermove keeps reaching the
-      // top document even when the pointer is over a host iframe (e.g. the OnlyOffice
-      // editor iframe, which would otherwise swallow the events). Below the panel's
-      // z-index so the panel stays on top.
+      // transparent full-viewport shield over the page so pointermove keeps reaching the top
+      // document even when the pointer is over a host iframe (which would otherwise swallow the
+      // events). Below the panel's z-index so the panel stays on top.
       iframe.style.pointerEvents = 'none';
       dragShield = document.createElement('div');
       Object.assign(dragShield.style, {
@@ -216,9 +212,9 @@
       e.preventDefault();
     });
 
-    // Keep the panel within bounds if the window is resized narrower. Named, so closePanel can
-    // remove it again — and guarded against a detached container, so a listener that somehow
-    // outlives its panel can never re-reserve the space.
+    // Keep the panel within bounds when the window gets narrower. Named so the teardown can remove
+    // it, and guarded on a connected container so a listener that outlives its panel can never
+    // re-reserve the page width.
     function onWindowResize() {
       if (!container.isConnected) return;
       applyWidth(panelWidth);
@@ -327,9 +323,8 @@
     };
     window.addEventListener('message', handler);
 
-    // Everything this instance attached to `window`, in one place for closePanel. Kept on
-    // `window` rather than in this closure: a toolbar toggle re-injects the file, and that fresh
-    // instance is the one that has to clean up after this one.
+    // Everything this instance attached to `window`, in one place for closePanel — on `window`
+    // rather than in this closure, since the instance that tears it down is a later injection.
     window.__eduSharingPanelTeardown = () => {
       window.removeEventListener('resize', onWindowResize);
       window.removeEventListener('message', handler);

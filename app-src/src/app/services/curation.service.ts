@@ -173,8 +173,7 @@ export class CurationService {
    */
   adoptOpenDocument(node: Node): void {
     if (this.activeNode() || this.hasUnsavedWork()) return;
-    // A name is set ONLY when really known — it is written back as `cm:name`, so the node id as a
-    // stand-in would rename the document to its uuid. See {@link ActiveNode}.
+    // Name only when really known, never the node id as a stand-in — see {@link ActiveNode}.
     this.applyLoadedNode(node.ref.id, node, node.name ?? null);
     // No agent result for a node we merely found open; its parsed view comes from the node's own
     // properties instead.
@@ -191,10 +190,8 @@ export class CurationService {
     this.saveError.set(null);
     try {
       const existing = this.activeNode();
-      // The current name is passed along so an update never renames the node: generated metadata
-      // carries no `cm:name`, and for a real document that name holds its file name + extension.
-      // `null` (name unknown) is passed on as such — update() then sends no `cm:name` at all
-      // rather than inventing one.
+      // Pass the current name so an update never renames the node (generated metadata carries no
+      // `cm:name`). An unknown name is passed on as such — update() then sends none at all.
       const saved = existing
         ? await this.repositoryNodes.update(existing.nodeId, values, existing.name ?? undefined)
         : await this.repositoryNodes.createInInbox(values);
@@ -247,29 +244,23 @@ export class CurationService {
   }
 
   /**
-   * Make the enriched document the active node, so {@link save} updates it in place. The reported
-   * id is already the edited node — the connector resolves a collection reference to its original
-   * before announcing it.
+   * Make the enriched document the active node, so {@link save} updates it in place.
    *
-   * `nodeMetadata` deliberately stays empty here: the editor must show the freshly generated
-   * metadata, not the node's stored properties (see {@link editorMetadata}). Without a node id
-   * (an editor opened with a stale plugin config) the flow falls back to creating a node on save,
-   * so the enrichment is never lost.
+   * `nodeMetadata` deliberately stays empty: the editor must show the freshly generated metadata,
+   * not the node's stored properties (see {@link editorMetadata}). Without a node id (a stale
+   * plugin config) the flow falls back to creating a node on save, so the enrichment is not lost.
    */
   private async adoptDocumentAsActiveNode(
     document: DocumentIdentity | null | undefined,
   ): Promise<void> {
     const nodeId = document?.nodeId;
     if (!nodeId) return;
-    // OnlyOfficeDocumentService already loaded this node when the plugin announced it, so reuse
-    // that instead of fetching it a second time; only fall back to a load of our own if its
-    // hydration did not run or failed.
+    // Reuse the node OnlyOfficeDocumentService already loaded for this id; only fetch it ourselves
+    // when that hydration did not run or failed.
     const hydrated = this.onlyOfficeDocument.documentNode();
     const node = hydrated?.ref.id === nodeId ? hydrated : await this.loadNode(nodeId);
     if (node) this.previewNode.set(node);
-    // A name is set ONLY when it is really known: it is written back as `cm:name`, so the node id
-    // as a stand-in would rename the document to its uuid and drop the file extension. The save
-    // target itself stands either way.
+    // Name only when really known (see {@link ActiveNode}); the save target stands either way.
     this.setActiveNode(nodeId, node?.name ?? null);
   }
 

@@ -16,7 +16,7 @@
   // Tinted hint-card background (used across intro/description cards)
   --es-hint-bg: #f0f4f9;
 
-  // Radius + spacing scale (mirrors the paddings the components used before the refactor)
+  // Radius + spacing scale — the paddings and corner radius shared across the components
   --es-radius: 8px;
   --es-space-1: 4px;
   --es-space-2: 8px;

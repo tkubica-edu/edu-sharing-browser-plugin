@@ -60,18 +60,14 @@ const SIMULATED_LATENCY_MS = 250;
 const LOG = '[edu-sharing][debug]';
 
 /**
- * Development mode that stands in for the host-side OnlyOffice plugin.
+ * Development mode that stands in for the host-side OnlyOffice plugin: every page counts as an
+ * insert host (see ConditionsService) and each `REQUEST_DOCUMENT_*` is answered right away with the
+ * fixtures above, instead of being broadcast to a host page that would never reply.
  *
- * With it enabled the extension behaves as if it ran on an OnlyOffice page with the plugin
- * active: every page counts as an insert host (see ConditionsService) and each
- * `REQUEST_DOCUMENT_*` is answered right away with the fixtures above, instead of being
- * broadcast to a host page that would never reply.
- *
- * The answers are **fed in through the real inbound path** — a window message carrying the
- * plugin's own {@link PLUGIN_SOURCE} marker, which `AppComponent` routes to
- * `OnlyOfficeDocumentService.accept()`. So the simulation exercises the `requestId`
- * correlation, the identity handling and the node hydration exactly as production does; nothing
- * downstream knows it is talking to a fixture.
+ * The answers are **fed in through the real inbound path** — a window message carrying the plugin's
+ * own {@link PLUGIN_SOURCE} marker, which `AppComponent` routes to
+ * `OnlyOfficeDocumentService.accept()`. So the `requestId` correlation, the identity handling and
+ * the node hydration run exactly as in production; nothing downstream knows it is a fixture.
  */
 @Injectable({ providedIn: 'root' })
 export class DebugService {

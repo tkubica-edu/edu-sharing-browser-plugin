@@ -42,22 +42,20 @@ export interface BundleStatus {
 const ELEMENT_TIMEOUT_MS = 15_000;
 
 /**
- * Loads the packaged web-component bundles into THIS document (the sidebar) — no iframe — so
- * their custom elements can be used as real tags. Each bundle is loaded at most once and the
- * load is memoised.
+ * Loads the packaged web-component bundles into THIS document (the sidebar) — no iframe — so their
+ * custom elements can be used as real tags. Each bundle is loaded at most once (memoised).
  *
- * Remote loading is deliberately unsupported: MV3 forbids remote code on extension pages and
- * the extension CSP is `script-src 'self'`, so every bundle ships as a
- * `web_accessible_resource` and is loaded from its own folder.
+ * Remote loading is unsupported by design: MV3 forbids remote code on extension pages and the
+ * extension CSP is `script-src 'self'`, so every bundle ships as a `web_accessible_resource`.
  *
  * Constraints that shaped this (see README "Direct web-component embedding"):
- * - `window.__env.EDU_SHARING_API_URL` must be set BEFORE the edu bundle boots; its
- *   HttpClient freezes the value at bootstrap.
- * - A bundle's `polyfills` script is its own zone.js. The sidebar app is zoneless, so the
- *   first bundle to load provides Zone — a second load would throw "Zone already loaded",
- *   hence the guard in {@link addScript}.
- * - `main` is loaded as an ES module so its relative dynamic chunk imports resolve against
- *   the bundle folder, not the sidebar document.
+ * - `window.__env.EDU_SHARING_API_URL` must be set BEFORE the edu bundle boots; its HttpClient
+ *   freezes the value at bootstrap.
+ * - A bundle's `polyfills` script is its own zone.js. The sidebar app is zoneless, so the first
+ *   bundle to load provides Zone — a second load throws "Zone already loaded", hence the guard in
+ *   {@link addScript}.
+ * - `main` is loaded as an ES module so its relative dynamic chunk imports resolve against the
+ *   bundle folder, not the sidebar document.
  * - The edu bundle's `scripts.js` (jQuery + globals) is a classic script and must run first.
  */
 @Injectable({ providedIn: 'root' })
@@ -142,12 +140,11 @@ export class WebComponentBundleService {
    * Publish the globals a bundle reads at bootstrap — both freeze their value there, so this has
    * to happen before the scripts run.
    *
-   * - `edu` reads `window.__env.EDU_SHARING_API_URL`, which MUST be absolute: the bundle passes
-   *   it through unchanged only when it starts with http(s):// (getAbsoluteEndpointUrl). A
-   *   relative value would resolve against THIS document's origin — the extension — so the
-   *   top-level connector navigation (…/eduservlet/connector) would become
-   *   chrome-extension://ID/… and never load. Refuse to boot with a clear error rather than
-   *   silently producing that broken URL.
+   * - `edu` reads `window.__env.EDU_SHARING_API_URL`, which MUST be absolute: the bundle passes it
+   *   through unchanged only when it starts with http(s):// (getAbsoluteEndpointUrl). A relative
+   *   value would resolve against this document's origin — the extension — so the top-level
+   *   connector navigation (…/eduservlet/connector) would become chrome-extension://ID/… and never
+   *   load. Better to refuse booting with a clear error than to produce that URL silently.
    * - `wlo` reads `window.__ENV.agentUrl` for the metadata-agent API, falling back to its own
    *   hardcoded default if unset — so this keeps it on the configured API.
    */

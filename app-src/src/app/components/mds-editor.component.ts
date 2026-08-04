@@ -22,11 +22,10 @@ interface MdsEditorElement extends HTMLElement {
 
 // Embeds <edu-sharing-mds-editor-wrapper> as a REAL custom element (no iframe).
 //
-// The wrapper REQUIRES `embedded = true` — it throws in ngOnInit otherwise ("Non-embedded use …
-// deprecated"). Angular Elements runs that ngOnInit on connect (appendChild), BEFORE an Angular
-// host's template property bindings are applied, so `[embedded]="true"` in a template would be
-// too late. The element is therefore created imperatively with every input set as a property
-// BEFORE it is appended.
+// The wrapper REQUIRES `embedded = true` — it throws in ngOnInit otherwise. Angular Elements runs
+// that ngOnInit on connect (appendChild), BEFORE a host template's property bindings are applied,
+// so `[embedded]="true"` in a template would be too late: the element is created imperatively with
+// every input set as a property BEFORE it is appended.
 //
 // In embedded mode the wrapper renders WITHOUT its own Save/Cancel: saving is driven by the
 // footer, which calls commit() on this component. Angular Elements proxy inputs/outputs but not
@@ -94,9 +93,9 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
    */
   commit(): void {
     const values: MdsValues = { ...this.latestValues };
-    // Workaround (only this case): the io form has no title/name widget, so a save can come
-    // back without a cm:name. When that happens and the metadata carried a cclom:title, add
-    // just that title back (the repository derives cm:name from it). No other fields merge.
+    // The io form has no title/name widget, so the emitted values can come back without a
+    // cm:name. In that case the seeded cclom:title is added back and the repository derives
+    // cm:name from it. This is the only field ever merged back in.
     const title = this.initialValues['cclom:title'];
     if (!values['cm:name']?.length && title?.length) values['cclom:title'] = title;
     this.save.emit(values);
@@ -113,8 +112,8 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
     element.groupId = this.groupId();
     element.setId = this.setId();
     element.repository = this.repository();
-    // Normalize the payload into MDS values (namespaced keys → string[]), exactly as the
-    // original edu-sharing-mds-editor web component did internally.
+    // Normalize the payload into MDS values (namespaced keys → string[]) — the shape the wrapper
+    // expects `currentValues` in.
     this.initialValues = toMdsEditorValues(this.metadata());
     // Seed latestValues so a save with no edits still sends everything.
     this.latestValues = this.initialValues;

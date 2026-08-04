@@ -3,11 +3,9 @@
 }
 
 <!--
-  The @if is REQUIRED, not cosmetic (see the component comment): inside a conditional block the
+  The @if is required, not cosmetic (see the component comment): inside a conditional block the
   element's DOM node is created detached, bound, and only then inserted — so `option` is already
-  set when connectedCallback upgrades the element. Placed directly in this template it would be
-  inserted during the creation pass, before any binding, and the bundle's own computed would
-  throw on `option().optionConfig`.
+  set when connectedCallback upgrades the element.
 -->
 @if (selectorOption(); as option) {
   <edu-sharing-nodes-selector

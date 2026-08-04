@@ -17,9 +17,9 @@ export const PLUGIN_SOURCE = 'edu-sharing-onlyoffice-plugin';
  * was opened with a stale plugin config — so always treat it as optional.
  *
  * Deliberately just the node id: everything else the app needs (title, permalink, write
- * permission) is loaded from the repository, see `OnlyOfficeDocumentService.documentNode`.
- * There is no separate `originalId` either — the connector resolves a collection reference to
- * its original before it ever reports one, so this id *is* the edited node.
+ * permission) is loaded from the repository, see `OnlyOfficeDocumentService.documentNode`. The id
+ * *is* the edited node: the connector resolves a collection reference to its original before
+ * reporting it, so there is nothing left to dereference here.
  */
 export interface DocumentIdentity {
   nodeId?: string;

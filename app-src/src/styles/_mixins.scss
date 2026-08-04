@@ -7,8 +7,8 @@
 //      the look lives here.
 //
 // Namespacing everything under `es-*` also sidesteps the edu-sharing web-component
-// bundle, which injects a GLOBAL `.card { background: …!important }` — our `.es-card`
-// never matches it, so no `!important` hack is needed anymore.
+// bundle, which injects a GLOBAL `.card { background: …!important }` — an `es-`-prefixed
+// class never collides with it, so no `!important` override is needed.
 
 // ---- Cards -----------------------------------------------------------------
 @mixin card {

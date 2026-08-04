@@ -49,21 +49,17 @@
     }
 
     <!--
-      Rendered once the keywords exist, so the element searches for them from the start (its own
-      first query runs as soon as the filter widgets initialize). Inside the @if the bindings are
-      applied before the element is inserted and upgraded — see NodesSelectorComponent.
+      Gated on the keywords, not on `filters`: `filters` is empty once the search runs unfiltered,
+      and the element must still be there to search. Inside the @if the bindings are applied before
+      the element is inserted and upgraded — see NodesSelectorComponent.
 
-      The keywords go in as `initialValues` (filter values of the keyword widget), not as
-      `searchString` — see ContentSuggestionsService.filters. Re-setting them, as "Neu aus Dokument"
-      and every widening step do, makes the element rebuild its filter editor and run the query
-      again. `filters` is only the first few keywords, and empty once the search runs unfiltered —
-      hence the gate on the keywords rather than on the filters.
+      Keywords go in as `initialValues` (filter values of the keyword widget), not as
+      `searchString` — see ContentSuggestionsService.filters. Every re-set makes the element rebuild
+      its filter editor and re-run the query. `totalResults` reports each query's count, which is
+      how an empty result widens the search (onTotalResults).
 
-      `totalResults` reports every query's result count, which is how an empty result widens the
-      search (onTotalResults) instead of leaving the user on an empty list.
-
-      Sorted by relevance (score, descending). The sort inputs are bound as strings because the
-      element parses them as comma-separated lists — a real `false` would break its setter.
+      The sort inputs are bound as strings: the element parses them as comma-separated lists, so a
+      real `false` would break its setter.
     -->
     @if (bundle.ready() && suggestions.keywords().length) {
       <edu-sharing-search

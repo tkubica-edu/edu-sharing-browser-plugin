@@ -27,19 +27,19 @@ const READ_FAILED = 'Das Dokument konnte nicht ausgelesen werden.';
 /**
  * Request/response bridge to the document the host page has open (the OnlyOffice plugin).
  *
- * Requests are sent through the panel host (`BrowserExtensionService`) and correlated by
- * `requestId`, because several may be in flight and the answer is a plain window message. The
- * plugin is an optional background plugin, so every request is bounded by a timeout — without
- * it a disabled plugin would leave the caller hanging forever.
+ * Requests go through the panel host (`BrowserExtensionService`) and are correlated by `requestId`,
+ * since several may be in flight and the answer is a plain window message. The plugin is an
+ * optional background plugin the user can switch off, so every request is bounded by a timeout —
+ * without one a disabled plugin leaves the caller hanging forever.
  *
- * Inbound envelopes are not read here: `AppComponent` owns the single `window:message` listener
- * and hands the DOCUMENT_* events to {@link accept}.
+ * Inbound envelopes are not read here: `AppComponent` owns the single `window:message` listener and
+ * hands the DOCUMENT_* events to {@link accept}.
  *
- * The plugin only reports the node id, so this service also loads that node once and derives
- * title, permalink and write permission from it — see {@link documentNode}.
+ * The plugin only reports the node id, so this service loads that node once and derives title,
+ * permalink and write permission from it — see {@link documentNode}.
  *
- * In debug mode the requests never leave the sidebar: {@link DebugService} answers them with
- * fixtures through the same inbound path — see {@link send}.
+ * In debug mode requests never leave the sidebar: {@link DebugService} answers them with fixtures
+ * through the same inbound path — see {@link send}.
  */
 @Injectable({ providedIn: 'root' })
 export class OnlyOfficeDocumentService {

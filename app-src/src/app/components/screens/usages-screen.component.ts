@@ -17,7 +17,6 @@ const USAGES_TAG = 'edu-sharing-usages';
   selector: 'es-usages-screen',
   templateUrl: './usages-screen.component.html',
   styleUrl: './usages-screen.component.scss',
-  // Allow the unknown <edu-sharing-usages> tag in this component's template.
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   changeDetection: ChangeDetectionStrategy.OnPush
 })

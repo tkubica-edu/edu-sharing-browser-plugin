@@ -6,10 +6,9 @@
   }
 
   <!--
-    <edu-sharing-mds-editor-wrapper> is created imperatively (see mount()) instead of used as a
-    template tag: as an @angular/elements custom element its ngOnInit runs on connect
-    (appendChild) and THROWS unless `embedded`/`currentValues` are already set. Template
-    property bindings are applied only AFTER connect, so they would be too late.
+    <edu-sharing-mds-editor-wrapper> is created imperatively into #host rather than used as a
+    template tag, because its inputs must be set as properties before it connects — see mount()
+    and the component comment.
   -->
   <div #host class="mds-host"></div>
 </div>

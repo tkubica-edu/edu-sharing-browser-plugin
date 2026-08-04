@@ -34,7 +34,7 @@ export class HistoryService {
       [],
     );
     const list = Array.isArray(stored) ? stored : [];
-    // Keep only entries that carry a node id (drops legacy pre-node entries).
+    // Keep only entries that carry a node id — without one an entry cannot be reopened.
     const valid = list.filter((entry) => !!entry?.nodeId);
     this.entries.set(valid);
     if (valid.length !== list.length) await this.persist();

@@ -1,14 +1,10 @@
 // "Passende Inhalte finden" — the derived keywords above the embedded search.
 //
-// The screen flows naturally so the panel's own scroll container (`.content` in AppComponent)
-// scrolls it, exactly like every other screen. It must NOT be a height:100% box: `<edu-sharing-search>`
-// scrolls its result list *internally* and only inside the height the embedder gives it (its demo
-// page sizes it with a plain `height`), so as a flex item filling the panel it swallowed the scroll —
-// its own list was clipped to the squeezed box while the panel had nothing left to scroll.
-//
-// So the element gets a definite height of its own (like the demo) and the keyword card above it
-// simply scrolls away with the page: the result list scrolls internally, and anything that does not
-// fit the panel is reachable through the panel's scroll.
+// Not a height:100% box: `<edu-sharing-search>` scrolls its result list internally, inside the
+// height the embedder gives it. Filling the panel as a flex item swallows the scroll — the list is
+// clipped to the squeezed box and the panel has nothing left to scroll. So the element gets a
+// definite height of its own and the keyword card above it scrolls away with the page (`.content`
+// in AppComponent), like on every other screen.
 :host {
   display: block;
 }

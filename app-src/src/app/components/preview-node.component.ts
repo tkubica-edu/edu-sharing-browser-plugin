@@ -15,7 +15,6 @@ const PREVIEW_TAG = 'edu-sharing-preview-sidebar';
   selector: 'es-preview-node',
   templateUrl: './preview-node.component.html',
   styleUrl: './preview-node.component.scss',
-  // Allow the unknown <edu-sharing-preview-sidebar> tag in this component's template.
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   changeDetection: ChangeDetectionStrategy.OnPush
 })

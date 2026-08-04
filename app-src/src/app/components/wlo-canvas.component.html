@@ -6,10 +6,9 @@
   }
 
   <!--
-    Rendered inside the @if so the element's inputs are applied before it is inserted and
-    upgraded (see NodesSelectorComponent for what happens otherwise). `metadataInput` seeds the
-    canvas; its own save/upload buttons stay off because the footer owns saving. Everything that
-    differs between editing and previewing comes from `config` (see CONFIGS).
+    Inside the @if so the element's inputs are applied before it is inserted and upgraded (see
+    NodesSelectorComponent). Its own save/upload buttons stay off because the footer owns saving;
+    everything that differs between editing and previewing comes from `config` (see CONFIGS).
   -->
   @if (bundle.ready()) {
     <metadata-agent-canvas

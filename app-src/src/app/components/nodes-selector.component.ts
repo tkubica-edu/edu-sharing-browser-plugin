@@ -30,12 +30,11 @@ export interface NodesSelectorOption {
 // screen that picks nodes (searching for content, choosing a collection); the caller supplies
 // the option config and the tabs to hide.
 //
-// The tag is NOT gated on the async bundle load — the element must be able to upgrade with its
-// inputs already in place, because a computed inside the bundle reads `option().optionConfig`
-// unguarded as it connects. It IS wrapped in an `@if` (see the template): a conditional block
-// creates the node detached, applies the bindings, and inserts it afterwards, so `option` is set
-// before connectedCallback runs. Rendering it at the template root instead inserts it during the
-// creation pass — before any binding — and that computed throws.
+// The tag is NOT gated on the async bundle load — the element must upgrade with its inputs already
+// in place, because a computed inside the bundle reads `option().optionConfig` unguarded as it
+// connects. It IS wrapped in an `@if` (see the template): a conditional block creates the node
+// detached, binds it, and inserts it afterwards. At the template root it would be inserted during
+// the creation pass, before any binding, and that computed throws.
 @Component({
   selector: 'es-nodes-selector',
   templateUrl: './nodes-selector.component.html',
