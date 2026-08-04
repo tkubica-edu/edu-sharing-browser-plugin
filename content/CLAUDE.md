@@ -127,12 +127,11 @@ applies if the raw `data.url` image is loaded manually, which the extension does
 
 ## Direction 3 — Request/response: the open document's content
 
-Powers **"Metadaten anreichern"**: on an OnlyOffice page the extension enriches the *edited
-document* instead of the page. It asks the host for the document's content and sends the
-`markdown` rendering to the metadata agent (`POST /generate`, text mode), then opens the result in
-the metadata editor. The `document` identity makes the edited document the **active node**, so
-saving writes the enriched metadata **onto that node** (`editNodeMetadata`) instead of creating a
-new one in the inbox.
+Powers **"Passende Inhalte"** (the Bearbeitungsmodus): on an OnlyOffice page the extension asks
+the host for the *edited document's* content and sends the `markdown` rendering to the metadata
+agent (`POST /generate`, text mode), then derives search keywords from the result and searches the
+repository for matching content. The `document` identity is what makes the edited document the
+**active node**, so every step of the flow works on it.
 
 Unlike the two directions above this is a **correlated pair**: every request carries a
 `requestId`, which the host mirrors into its answer, so parallel requests stay distinguishable.
@@ -157,8 +156,8 @@ Unlike the two directions above this is a **correlated pair**: every request car
 - **`document` rides on every outbound envelope** (envelope level, including `PREVIEW_NODE`) and
   additionally inside `DOCUMENT_INFO`'s `data`. It is **`null`** when the editor was opened with a
   stale, cached plugin config — always null-check. `OnlyOfficeDocumentService` then keeps the last
-  known identity instead of dropping it, and an enrichment without any node id falls back to
-  creating a node on save, so the result is never lost.
+  known identity instead of dropping it, and a flow without any node id falls back to creating a
+  node on save, so the result is never lost.
 - **`document` is the node id and nothing else.** It used to carry ten fields (title, permalink,
   mimetype, `editable`, `documentKey`, …) as base64url-JSON in the plugin's URL chain; that was
   dropped in favour of one plain `docNode` parameter — free-text fields forced the encoding and
@@ -168,8 +167,7 @@ Unlike the two directions above this is a **correlated pair**: every request car
   reference (`ccm:collection_io_reference` → `ccm:original`) to the original *before* reporting
   it, so the reported id already is the edited node — read it and save onto it directly.
 - **Write permission** comes from the loaded node's `access` (`documentWritable`), not from the
-  envelope. It is `null` while the node is unknown, and the enrich screen only warns on an
-  explicit `false`; the repository rejects the save either way.
+  envelope. It is `null` while the node is unknown; the repository rejects a save without it.
 - **Never rename the node:** generated metadata carries no `cm:name`, and the node's name holds the
   document's file name incl. extension — so `RepositoryNodeService.update` fills `cm:name` from the
   node's current name (the title fallback applies to *creating* a node only).
@@ -189,8 +187,8 @@ Unlike the two directions above this is a **correlated pair**: every request car
   (`app.component.ts`) — without that gate every page would trigger a broadcast into all frames and
   a 10 s timeout. Its answer makes the edited document the **active node** right away
   (`CurationService.adoptOpenDocument`, driven by an effect on `documentNode()` so a panel opened
-  logged out adopts it after login). The enrich screen still asks on open, guarded by
-  `!currentDocument()`, as a fallback for a page the URL check does not match.
+  logged out adopts it after login). A recognised node surfaces as the *Inhalt erkannt* entry of
+  the main menu — it never navigates for the user.
 - **Not buffered:** `panel-host.js` buffers/persists only `PREVIEW_NODE`. A `DOCUMENT_CONTENT`
   replay would be stale, and persisting its `html`/`documentJson` would blow the `storage.local`
   quota.
@@ -198,13 +196,81 @@ Unlike the two directions above this is a **correlated pair**: every request car
 ### Internal chain
 | # | From → To | Transport | Payload |
 |---|-----------|-----------|---------|
-| 1 | footer action → `CurationService.enrichOpenDocument()` → `MetadataAgentService.runForOpenDocument()` | — | — |
+| 1 | opening *Passende Inhalte* → `ContentSuggestionsService.deriveFromOpenDocument()` | — | — |
 | 2 | `OnlyOfficeDocumentService.requestContent()` → `BrowserExtensionService` → host top | `window.parent.postMessage` | `{type:'edusharing-request-document-content', requestId}` |
 | 3 | `panel-host.js` → all frames | `broadcastToFrames` (a single post to `window.top` would **not** reach the nested plugin frame) | `REQUEST_DOCUMENT_CONTENT` envelope |
 | 4 | plugin → host top → sidebar iframe | `postMessage`, relayed by `panel-host.js` | `DOCUMENT_CONTENT` envelope |
 | 5 | `app.component.ts` → `OnlyOfficeDocumentService.accept()` | filter `data.source`, match `requestId` | resolves the pending promise |
-| 6 | `markdown` → background `analyze.text` → `POST /generate` → metadata screen | `runtime.sendMessage` | agent payload |
-| 7 | `outcome.document` → `CurationService` active node (+ hydrated for the preview) → footer *Speichern* → `editNodeMetadata` | — | the document's own node |
+| 6 | `markdown` → background `analyze.text` → `POST /generate` → keywords | `runtime.sendMessage` | agent payload |
+| 7 | keywords → `<edu-sharing-search>` → double-click inserts the result into the document | `postMessage` | `edusharing-insert-node` |
+
+---
+
+## Direction 4 — Extension → Browser: staying open across page changes
+
+Not a host-integration direction at all: no page-side contract, only the extension's own parts.
+
+The panel is an iframe **inside the page**, so every navigation destroys it — a link the user clicks
+just as much as a page change the panel asks for itself. Being open is therefore a property of the
+**tab**, and the background worker (the only part that outlives a load) puts the panel back while
+that property holds.
+
+| # | From → To | Transport | Payload |
+|---|-----------|-----------|---------|
+| 1 | `panel-host.js` → background, on open and on close | `runtime.sendMessage` | `{action:'panel.state', open}` |
+| 2 | background: `setPanelOpen(sender.tab.id, open)` → `storage.session` | — | `eduSharingOpenPanels: number[]` |
+| 3 | background: `tabs.onUpdated` (status `complete`) → `restorePanel(tabId)` | `scripting.executeScript` | — |
+
+- **The tab comes from `sender`, never from the message** — which tab a content script speaks for is
+  not its own to claim.
+- **Closing is reported, navigating is not.** `closePanel()` runs only on a deliberate close (toolbar
+  toggle, the panel's ✕) and reports `open: false`; a page load never runs it, so the tab stays
+  marked open and the panel returns.
+- **`storage.session`, not a variable:** an MV3 worker is evicted between events. Falls back to
+  `storage.local` where session storage is missing. Cleared on `tabs.onRemoved` — tab ids get reused.
+- **`restorePanel` checks for an existing panel first** (a `func` injection reading
+  `#edusharing-panel-root`), because `panel-host.js` toggles: injecting onto a page that still has a
+  panel would close it, and `complete` is not guaranteed to arrive once per document.
+- A privileged page rejects injection; the tab stays marked open, so navigating back to a normal page
+  brings the panel back.
+
+### Carrying the panel's state across the change
+
+The panel coming back is not enough — it has to come back *where the user was*. `SessionResumeService`
+keeps that outside the app, since the app itself is destroyed by every load.
+
+| # | From → To | Transport | Payload |
+|---|-----------|-----------|---------|
+| 1 | `SessionResumeService` effect, on every change | `storage.local` | `eduSharingResumeState:<tabId>`: `{section, tab, nodeId, nodeSource, at}` |
+| 2 | sidebar boot → `restore()`, then `track()` | `storage.local` | the saved state |
+
+- **Written continuously, not on navigating.** A link the user clicks gives no warning, so there is no
+  moment at which the app could still save. The app's *own* navigations additionally call `save()` and
+  await it — the effect is scheduled, so it would not have run before the load.
+- **Keyed per tab** (`sender.tab.id`, via the `tabs.self` action — the sidebar cannot work that out
+  itself, and "the active tab" is not the same thing). Two tabs are two panels; one must never restore
+  into the other. The background drops the key on `tabs.onRemoved`.
+- **`restore()` before `track()`**, so the restored state is not immediately overwritten by the state
+  this boot started from.
+- **Expires after 60 s**, and a deliberate close (the panel's ✕) clears it: reopening the panel starts
+  at the main menu, which is the start view everywhere. A page load never clears it.
+- **`go()` refuses a section that does not apply here** — an OnlyOffice-only one, or one needing a node
+  that could not be loaded — and then `restore()` reports false and the app lands normally.
+- `resumeNode` tolerates a node this session may not read, falling back to its history entry (the
+  agent creates content with its own privileges, so a guest gets 403 for its own nodes).
+
+### Page changes the panel asks for itself
+
+*Inhalt bearbeiten* on a node that opens in a connector navigates the tab, since that editing happens
+on the node's own page (`…/components/render/<id>`, see `ContentFlowService`): `save()` →
+`{action:'tabs.navigate', url}` → `tabs.update`. The reopening and the restore above then apply.
+
+- **Skipped entirely** when the active tab's URL already contains the node id — the OnlyOffice editor
+  URL carries it (`docNode`), so navigating would throw away the editor the user is working in to
+  arrive where they already are.
+- A received `PREVIEW_NODE` for the node that is *already* the active one is ignored
+  (`app.component.ts`): the node's own page announces it, which would otherwise re-land the panel on
+  the main menu right after it was restored.
 
 ---
 
@@ -301,6 +367,6 @@ only string fields and the extension re-hydrates from `id`.
 | `app-src/src/app/services/onlyoffice-document.service.ts` | the request/response bridge: `requestContent`/`requestInfo` (`requestId` + timeout), `accept(envelope)`, `currentDocument` |
 | `app-src/src/app/services/debug.service.ts` | debug mode: answers the `REQUEST_DOCUMENT_*` events with hard-coded fixtures instead of asking the host page |
 | `app-src/src/app/services/metadata-agent.service.ts` | `runForOpenDocument()` — document content → `markdown` → agent |
-| `app-src/src/app/services/curation.service.ts` | `openNode(id)` (hydrate + open in the preview), `adoptOpenDocument(node)` (the open document as active node, no history entry), `enrichOpenDocument()` |
+| `app-src/src/app/services/curation.service.ts` | `openNode(id)` (hydrate the node into the flow), `adoptOpenDocument(node)` (the open document as active node, no history entry) |
 | `background/background.js` | `analyze.text` — `POST /generate` for text the sidebar supplies |
 | *(host-side, external)* | app that listens for `INSERT_NODE` / `REQUEST_DOCUMENT_*` and sends `PREVIEW_NODE` / `DOCUMENT_*` (e.g. OnlyOffice plugin) |

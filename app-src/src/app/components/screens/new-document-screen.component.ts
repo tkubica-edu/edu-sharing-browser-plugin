@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, inject, sig
 
 import { errorMessage } from '../../util/errors';
 import { AuthService } from '../../services/auth.service';
+import { ContentFlowService } from '../../services/content-flow.service';
 import { CurationService } from '../../services/curation.service';
 import { NavigationService } from '../../services/navigation.service';
 import { loadWebComponentBundle } from '../../services/web-component-bundle.service';
@@ -25,6 +26,7 @@ export class NewDocumentScreenComponent {
   protected readonly auth = inject(AuthService);
   private readonly curation = inject(CurationService);
   private readonly navigation = inject(NavigationService);
+  private readonly flow = inject(ContentFlowService);
 
   // The element is rendered only once its tag is defined — mounting it opens the dialog, so it
   // must not appear before the bundle can drive it.
@@ -37,16 +39,18 @@ export class NewDocumentScreenComponent {
     const detail = (event as CustomEvent).detail as { ref?: { id?: string }; id?: string } | null;
     const nodeId = detail?.ref?.id ?? detail?.id;
     if (!nodeId) return;
-    // Hydrate the new node into the flow (records it in the history) and land on the preview.
+    // Hydrate the new node into the flow (records it in the history), then enter the big step the
+    // node calls for: a document created through a connector is now open there, so this normally
+    // lands in the Bearbeitungsmodus.
     void this.curation
       .openNode(nodeId)
-      .then(() => this.navigation.land({ nodeJustLoaded: true }))
+      .then(() => this.flow.edit())
       .catch((cause: unknown) => this.error.set(errorMessage(cause)));
   }
 
   /** Fired when the dialog closes; a null detail means the user cancelled. */
   protected onDialogClosed(event: Event): void {
-    if ((event as CustomEvent).detail == null) this.navigation.openMenu();
+    if ((event as CustomEvent).detail == null) this.navigation.go('add-content');
   }
 
   protected onFailed(event: Event): void {

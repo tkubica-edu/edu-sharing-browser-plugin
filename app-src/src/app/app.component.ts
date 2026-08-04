@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, effect, inject, signal } from '@angular/core';
 
 import { APP_CONFIG } from './config';
+import { SectionId } from './model/navigation';
 import { PLUGIN_SOURCE, PluginEnvelope } from './model/onlyoffice-events';
 import { errorMessage } from './util/errors';
 import { AdditionalWebComponentService } from './services/additional-web-component.service';
@@ -13,6 +14,7 @@ import { HistoryEntry, HistoryService } from './services/history.service';
 import { NavigationService } from './services/navigation.service';
 import { OnlyOfficeDocumentService } from './services/onlyoffice-document.service';
 import { OptionIconService } from './services/option-icon.service';
+import { SessionResumeService } from './services/session-resume.service';
 
 import { ActionBarComponent } from './components/action-bar.component';
 import { HistoryComponent } from './components/history.component';
@@ -21,12 +23,15 @@ import { MenuComponent } from './components/menu.component';
 import { SearchComponent } from './components/search.component';
 import { SettingsComponent } from './components/settings.component';
 import { StatusBarComponent } from './components/status-bar.component';
-import { AnalyzeScreenComponent } from './components/screens/analyze-screen.component';
-import { EnrichScreenComponent } from './components/screens/enrich-screen.component';
+import { TabBarComponent } from './components/tab-bar.component';
+import { AddContentScreenComponent } from './components/screens/add-content-screen.component';
+import { ContentOptionsScreenComponent } from './components/screens/content-options-screen.component';
+import { CurationScreenComponent } from './components/screens/curation-screen.component';
 import { FindContentScreenComponent } from './components/screens/find-content-screen.component';
 import { CollectionsScreenComponent } from './components/screens/collections-screen.component';
 import { MetadataScreenComponent } from './components/screens/metadata-screen.component';
 import { NewDocumentScreenComponent } from './components/screens/new-document-screen.component';
+import { OwnContentScreenComponent } from './components/screens/own-content-screen.component';
 import { PreviewScreenComponent } from './components/screens/preview-screen.component';
 import { UsagesScreenComponent } from './components/screens/usages-screen.component';
 
@@ -39,10 +44,12 @@ const DISCARD_PROMPT =
 @Component({
   selector: 'es-root',
   imports: [
-    StatusBarComponent, ActionBarComponent, MenuComponent, LoginComponent, HistoryComponent,
-    SettingsComponent, SearchComponent, AnalyzeScreenComponent, EnrichScreenComponent, FindContentScreenComponent,
-    NewDocumentScreenComponent, MetadataScreenComponent, PreviewScreenComponent,
-    CollectionsScreenComponent, UsagesScreenComponent
+    StatusBarComponent, ActionBarComponent, TabBarComponent, MenuComponent, LoginComponent,
+    HistoryComponent, SettingsComponent, SearchComponent, AddContentScreenComponent,
+    ContentOptionsScreenComponent, CurationScreenComponent, FindContentScreenComponent,
+    NewDocumentScreenComponent, OwnContentScreenComponent,
+    MetadataScreenComponent, PreviewScreenComponent, CollectionsScreenComponent,
+    UsagesScreenComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
@@ -58,7 +65,7 @@ export class AppComponent implements OnInit {
   protected readonly auth = inject(AuthService);
   protected readonly navigation = inject(NavigationService);
   protected readonly conditions = inject(ConditionsService);
-  // Both for the topbar's utility icons (Verlauf's count, Einstellungen's pending-change dot).
+  // Loaded on boot; the Verlauf's entries feed its menu entry and its screen.
   protected readonly history = inject(HistoryService);
   protected readonly icons = inject(OptionIconService);
 
@@ -67,6 +74,7 @@ export class AppComponent implements OnInit {
   private readonly curation = inject(CurationService);
   private readonly onlyOfficeDocument = inject(OnlyOfficeDocumentService);
   private readonly debug = inject(DebugService);
+  private readonly sessionResume = inject(SessionResumeService);
 
   /** A node received while logged out — opened once the user logs in. */
   private readonly pendingNodeId = signal<string | null>(null);
@@ -83,7 +91,7 @@ export class AppComponent implements OnInit {
       const nodeId = this.pendingNodeId();
       if (nodeId && this.auth.authorized()) {
         this.pendingNodeId.set(null);
-        void this.openNode(() => this.curation.openNode(nodeId));
+        void this.openNode(() => this.curation.openNode(nodeId, 'detected'));
       }
     });
 
@@ -102,7 +110,7 @@ export class AppComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     // Only activates when the repository config enables `additionalWebComponent`.
     this.additionalWebComponent.initialize();
-    // First of all: the debug flag decides `onlyOfficePresent`, which every option's visibility
+    // First of all: the debug flag decides `onlyOfficePresent`, which the section visibilities
     // and the document request below are gated on.
     await this.debug.load();
     await this.auth.init();
@@ -110,9 +118,17 @@ export class AppComponent implements OnInit {
     const tab = await this.browserExtension.getActiveTab().catch(() => null);
     this.conditions.activeUrl.set(tab?.url ?? null);
 
-    // Land on the view that fits the current page: the options menu, or the login gate when
-    // logged out.
-    this.navigation.land();
+    // The panel is reopened after every page change (see background.js), so this boot may be the
+    // continuation of what the user was doing before the page changed. Pick that state back up
+    // instead of starting over; only then is landing skipped.
+    if (!(await this.sessionResume.restore())) {
+      // Land on the view that fits the current context: the main menu, or the login gate when
+      // logged out.
+      this.navigation.land();
+    }
+    // From here on the state is persisted as it changes — after the restore, so it is not overwritten
+    // by the state this boot started from.
+    this.sessionResume.track();
 
     // Tell the host page we're ready so it can replay a buffered PREVIEW_NODE, then consume any
     // node that was persisted while the sidebar was closed or booting.
@@ -138,13 +154,19 @@ export class AppComponent implements OnInit {
   }
 
   protected close(): void {
+    // Closing is deliberate, unlike a page change: the next opening starts at the main menu, so the
+    // carried-over state is dropped rather than restored into it.
+    void this.sessionResume.clear();
     this.browserExtension.closePanel();
   }
 
-  /** Open a saved node from the history (requested by the history screen). */
+  /**
+   * Open a saved node from the history (requested by the history screen). A picked node is handled
+   * exactly like a detected one: the *Inhaltsoptionen* screen offers the two ways on.
+   */
   protected async openFromHistory(entry: HistoryEntry): Promise<void> {
     if (!this.confirmDiscardUnsaved()) return;
-    await this.openNode(() => this.curation.openFromHistory(entry));
+    await this.openNode(() => this.curation.openFromHistory(entry), 'content-options');
   }
 
   protected hideBrokenLogo(event: Event): void {
@@ -165,9 +187,16 @@ export class AppComponent implements OnInit {
     await this.receiveNode(nodeId);
   }
 
-  /** Route a received node into the flow, deduping rapid duplicate deliveries. */
+  /**
+   * Route a received node into the flow, deduping rapid duplicate deliveries. It counts as
+   * *detected*, not picked: the host page pushed it, so it describes the open page and survives a
+   * return to the main menu (see CurationService.releaseChosenContent).
+   */
   private async receiveNode(nodeId: string | undefined): Promise<void> {
     if (!nodeId || this.isDuplicate(nodeId)) return;
+    // Already the app's content — reloading it would only throw away where the user is. Matters on
+    // the node's own page, which announces the node the panel arrived there to work on.
+    if (this.curation.activeNode()?.nodeId === nodeId) return;
     if (!this.confirmDiscardUnsaved()) return;
     if (!this.auth.authorized()) {
       // Not logged in yet → show the login gate; the effect opens the node after login.
@@ -175,17 +204,21 @@ export class AppComponent implements OnInit {
       this.navigation.land();
       return;
     }
-    await this.openNode(() => this.curation.openNode(nodeId));
+    await this.openNode(() => this.curation.openNode(nodeId, 'detected'));
   }
 
   /**
-   * Load a node into the flow and land on its preview; surface a failure to the user. Callers
-   * confirm discarding unsaved work first (see {@link confirmDiscardUnsaved}).
+   * Load a node into the flow; surface a failure to the user. Callers confirm discarding unsaved
+   * work first (see {@link confirmDiscardUnsaved}).
+   *
+   * Without a `target` the app re-lands on the main menu, where the loaded node shows up as the
+   * *Inhalt erkannt* menu entry — a node that merely arrived never navigates for the user.
    */
-  private async openNode(load: () => Promise<void>): Promise<void> {
+  private async openNode(load: () => Promise<void>, target?: SectionId): Promise<void> {
     try {
       await load();
-      this.navigation.land({ nodeJustLoaded: true });
+      if (target) this.navigation.go(target);
+      else this.navigation.land();
     } catch (cause: unknown) {
       alert('Der Node konnte nicht geladen werden: ' + errorMessage(cause));
     }

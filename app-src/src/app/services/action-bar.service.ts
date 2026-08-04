@@ -23,8 +23,9 @@ export interface FooterAction {
 }
 
 /**
- * Drives the footer action bar: turns the current view into its next steps, and bridges the
- * footer to a screen it does not own (the metadata editor's commit()) via a small handler slot.
+ * Drives the footer action bar: turns the open section (and, where it matters, its selected sub
+ * step) into its next steps, and bridges the footer to a screen it does not own (the metadata
+ * editor's commit()) via a small handler slot.
  */
 @Injectable({ providedIn: 'root' })
 export class ActionBarService {
@@ -44,58 +45,61 @@ export class ActionBarService {
   }
 
   readonly actions = computed<FooterAction[]>(() => {
-    switch (this.navigation.view()) {
-      case 'analyze':
-        return [
-          {
-            label: this.curation.running() ? 'Erschließe… (kann etwas dauern)' : 'Erschließung starten',
-            disabled: this.curation.running(),
-            run: async () => {
-              if (await this.curation.analyze()) this.navigation.go('metadata');
-            }
-          }
-        ];
-
-      case 'enrich':
+    switch (this.navigation.section()) {
+      // "Inhalt erschließen": run the metadata agent on the page and hand its result to the
+      // Qualitätssicherung.
+      case 'curation':
         return [
           {
             label: this.curation.running()
-              ? 'Lese Dokument & erschließe…'
-              : 'Metadaten anreichern',
+              ? 'Erschließe… (kann etwas dauern)'
+              : 'Erschließung starten',
             disabled: this.curation.running(),
             run: async () => {
-              if (await this.curation.enrichOpenDocument()) this.navigation.go('metadata');
+              if (await this.curation.analyze()) this.navigation.go('quality');
             }
           }
         ];
 
-      case 'metadata': {
+      // "Bearbeitungsmodus": the content is being edited in the connector; this hands over to the
+      // Qualitätssicherung when the user is done adjusting it.
+      case 'editing':
+        return [
+          {
+            label: 'Anpassungen speichern',
+            disabled: false,
+            run: () => this.navigation.go('quality')
+          }
+        ];
+
+      // "Qualitätssicherung": saving belongs to the metadata sub step (the editor owns the values);
+      // moving on to the last big step is offered from either sub step.
+      case 'quality': {
+        const onward: FooterAction = {
+          label: 'Zur Inhaltsübersicht',
+          disabled: !this.curation.activeNode(),
+          run: () => this.navigation.go('overview')
+        };
+        if (this.navigation.screen() !== 'metadata') return [onward];
         const handler = this.saveHandler();
         return [
           {
-            label: this.curation.saving() ? 'Speichern…' : 'Speichern',
-            disabled: !handler?.canSave() || this.curation.saving(),
+            // Stays in place once saved, saying what happened, rather than vanishing and shifting
+            // the footer under the user's cursor.
+            label: this.curation.saving()
+              ? 'Speichern…'
+              : this.curation.metadataFinal()
+                ? 'Gespeichert'
+                : 'Speichern',
+            disabled: !handler?.canSave() || this.curation.metadataLocked(),
             run: () => handler?.save()
-          }
+          },
+          onward
         ];
       }
 
-      case 'preview':
-        // With a node open, offer the logical next steps as a choice.
-        return [
-          {
-            label: 'Metadaten editieren',
-            disabled: false,
-            run: () => this.navigation.go('metadata')
-          },
-          {
-            label: 'Sammlung zuordnen',
-            disabled: false,
-            run: () => this.navigation.go('collections')
-          }
-        ];
-
-      // Every other view owns its own primary action (selector insert, login form, …).
+      // Every other section owns its own primary action (selector insert, login form, the
+      // "Inhaltsoptionen" choice, …).
       default:
         return [];
     }

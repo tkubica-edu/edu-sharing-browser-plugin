@@ -1,0 +1,53 @@
+:host { display: block; flex: 0 0 auto; }
+
+.tabs {
+  display: flex;
+  align-items: stretch;
+  background: var(--es-surface);
+  border-bottom: 1px solid var(--es-border);
+  // The labels can be long ("Metadaten bearbeiten"); scroll rather than squeeze them.
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar { display: none; }
+}
+
+// Icon over label, and each tab claims an equal share of the bar — with more tabs than fit, the
+// min-width keeps every label readable and the bar scrolls instead.
+.tab {
+  flex: 1 0 auto;
+  min-width: 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 10px 8px;
+  background: none;
+  border: none;
+  // Sits on the bar's own bottom border, so the active marker replaces it instead of stacking.
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--es-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+
+  &:hover:not(.is-active):not([disabled]) { color: var(--es-text); background: #f5f8fb; }
+
+  // A step that a later state unlocks: legible enough to read as the next thing, clearly not
+  // clickable yet.
+  &[disabled] { opacity: 0.45; cursor: not-allowed; }
+}
+
+.tab.is-active {
+  color: var(--es-blue);
+  border-bottom-color: var(--es-blue);
+}
+
+.t-icon {
+  display: block;
+  width: 18px; height: 18px;
+
+  ::ng-deep svg { width: 18px; height: 18px; display: block; }
+}

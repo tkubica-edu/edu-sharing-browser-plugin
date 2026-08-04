@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
+import { HistoryService } from '../services/history.service';
 import { NavigationService } from '../services/navigation.service';
 import { OptionIconService } from '../services/option-icon.service';
 
-// The "Aktionen & Optionen" list: the flow-agnostic options, filtered to those visible for the
-// current conditions. Selecting one navigates to its screen. The utility options (Verlauf,
-// Einstellungen) are not listed here — they live as icons in the topbar.
+// The main menu: the sections marked `menu`, filtered to those visible for the current conditions.
+// It is the start view everywhere — nothing opens itself, so what is on offer stays visible.
+// Selecting an entry navigates to its section.
 @Component({
   selector: 'es-menu',
   templateUrl: './menu.component.html',
@@ -15,4 +16,6 @@ import { OptionIconService } from '../services/option-icon.service';
 export class MenuComponent {
   protected readonly navigation = inject(NavigationService);
   protected readonly icons = inject(OptionIconService);
+  // For the Verlauf entry's count badge.
+  protected readonly history = inject(HistoryService);
 }

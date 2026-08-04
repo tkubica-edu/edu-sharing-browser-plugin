@@ -1,0 +1,26 @@
+@use 'mixins' as m;
+
+:host { display: block; }
+
+// The same clickable rows as the main menu — the add options are a menu one level down.
+.add-list { @include m.list-reset; }
+.add-list > li { @include m.list-item; }
+
+.add-item {
+  @include m.menu-item;
+  cursor: pointer;
+}
+
+.ai-icon {
+  flex: 0 0 auto;
+  width: 24px; height: 24px;
+  color: var(--es-text);
+
+  ::ng-deep svg { width: 24px; height: 24px; display: block; }
+}
+
+.ai-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.ai-title { font-weight: 600; font-size: 14px; }
+.ai-desc { font-size: 12px; color: var(--es-muted); line-height: 1.35; }
+
+.chevron { flex: 0 0 auto; width: 18px; height: 18px; color: var(--es-muted); }

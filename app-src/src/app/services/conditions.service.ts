@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 
-import { Conditions } from '../model/options';
+import { Conditions } from '../model/navigation';
 import { AuthService } from './auth.service';
 import { CurationService } from './curation.service';
 import { DebugService } from './debug.service';
@@ -29,7 +29,7 @@ function pathOf(url: string | null | undefined): string {
 }
 
 // Raw facts about the world, exposed as signals. Holds no navigation logic: it feeds both the
-// persistent status bar and every option's visibility predicate (via `snapshot`).
+// persistent status bar and every section's and tab's visibility predicate (via `snapshot`).
 @Injectable({ providedIn: 'root' })
 export class ConditionsService {
   private readonly auth = inject(AuthService);
@@ -66,6 +66,9 @@ export class ConditionsService {
   // content and for a node received from OnlyOffice / opened from the history.
   readonly hasActiveNode = computed(() => this.curation.activeNode() !== null);
 
+  // Narrower than the above: the node arrived on its own instead of being picked — see NodeSource.
+  readonly hasDetectedNode = this.curation.hasDetectedNode;
+
   // Editable metadata exists: an active node, or a fresh /generate result awaiting its first
   // save (the node is created on save, so the metadata option must open on a result too).
   readonly hasEditableMetadata = this.curation.hasEditableMetadata;
@@ -76,6 +79,7 @@ export class ConditionsService {
     onEduSharing: this.onEduSharing(),
     loggedIn: this.loggedIn(),
     hasActiveNode: this.hasActiveNode(),
+    hasDetectedNode: this.hasDetectedNode(),
     hasEditableMetadata: this.hasEditableMetadata(),
     editMode: this.editMode()
   }));

@@ -12,8 +12,8 @@ import { MdsEditorComponent } from '../mds-editor.component';
 import { MetadataEditor } from '../metadata-editor';
 import { WloCanvasComponent } from '../wlo-canvas.component';
 
-// "Metadaten editieren": embeds a metadata editor and hands its commit()/ready() to the footer
-// (ActionBarService), which owns the save button. On a successful save it advances to the preview.
+// "Metadaten bearbeiten", the first sub step of the Qualitätssicherung: embeds a metadata editor
+// and hands its commit()/ready() to the footer (ActionBarService), which owns the save button.
 //
 // Which editor is embedded depends on the repository config: the WLO canvas replaces the
 // edu-sharing MDS editor while the additional web component is enabled. Both implement
@@ -30,8 +30,8 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
   protected readonly curation = inject(CurationService);
   protected readonly additionalWebComponent = inject(AdditionalWebComponentService);
   private readonly actionBar = inject(ActionBarService);
-  private readonly navigation = inject(NavigationService);
   private readonly conditions = inject(ConditionsService);
+  private readonly navigation = inject(NavigationService);
 
   // Signal queries, so `canSave` tracks both which editor is rendered AND its ready() state.
   private readonly mdsEditor = viewChild(MdsEditorComponent);
@@ -57,7 +57,16 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
     this.actionBar.clearSaveHandler(this.saveHandler);
   }
 
+  /**
+   * Save, then move on to the sub step the save just unlocked ("Inhalte zuordnen", which needs the
+   * node this save created). Read *before* the save, so this only advances when saving is what
+   * unlocked it: re-saving an existing node, whose siblings were open all along, stays put.
+   *
+   * The section itself is never left — the footer's "Zur Inhaltsübersicht" is the way out.
+   */
   protected async save(values: MdsValues): Promise<void> {
-    if (await this.curation.save(values)) this.navigation.go('preview');
+    const nextWasLocked = this.navigation.nextTab()?.disabled ?? false;
+    if (!(await this.curation.save(values))) return;
+    if (nextWasLocked) this.navigation.goNextTab();
   }
 }

@@ -2,20 +2,56 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { CollectionServiceUnwrapped, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 import { firstValueFrom } from 'rxjs';
 
-import { DocumentIdentity } from '../model/onlyoffice-events';
 import { MdsValues } from '../util/mds-values';
 import { errorMessage } from '../util/errors';
 import { renderLink } from '../util/repository-links';
+import { AdditionalWebComponentService } from './additional-web-component.service';
 import { AuthService } from './auth.service';
+import { UploadedNode } from './browser-extension.service';
 import { HistoryEntry, HistoryService } from './history.service';
 import { MetadataAgentService } from './metadata-agent.service';
-import { OnlyOfficeDocumentService } from './onlyoffice-document.service';
+import { MetadataUploadService } from './metadata-upload.service';
 import { NodeSummary, RepositoryNodeService } from './repository-node.service';
 
 /** A collection the content was added to. */
 export interface Collection {
   id: string;
   name: string;
+}
+
+/**
+ * How the active node became the app's content.
+ *
+ * - `detected` — it arrived on its own: the host page announced the document it has open
+ *   (`DOCUMENT_INFO`) or asked for a node to be shown (`PREVIEW_NODE`). Nobody picked it, so it
+ *   describes the *page*, and it stays the app's content for as long as that page is open.
+ * - `chosen` — the user picked or created it (Verlauf, Eigene Inhalte, a new document). It belongs
+ *   to the flow the user started, so it is released again when that flow ends (see
+ *   {@link CurationService.releaseChosenContent}).
+ */
+export type NodeSource = 'detected' | 'chosen';
+
+/**
+ * Assemble a stand-in {@link Node} for a content the repository was never asked about — the one the
+ * metadata agent's `/upload` created and described itself (see
+ * {@link CurationService.applyUploadedNode}).
+ *
+ * A real `Node` has ~30 fields; the elements fed from it read a handful (`ref.id`, `name`, `title`,
+ * `mediatype`, `properties`), so only those are filled and the cast declares the rest absent. It is
+ * a *repository content* (`ccm:io`) whose file is the linked web page — which is what `mediatype`
+ * and `type` say, so the usages element and the preview treat it like any other such node.
+ */
+function toPartialNode(nodeId: string, uploaded: UploadedNode, values: MdsValues): Node {
+  return {
+    ref: { id: nodeId, repo: HOME_REPOSITORY },
+    name: uploaded.title ?? nodeId,
+    title: uploaded.title ?? undefined,
+    description: uploaded.description ?? undefined,
+    type: 'ccm:io',
+    mediatype: 'link',
+    properties: values,
+    access: []
+  } as unknown as Node;
 }
 
 /**
@@ -32,21 +68,33 @@ export interface ActiveNode {
   link: string;
 }
 
-// Node state and actions for the content options (analyze / metadata / preview / collections).
-// Navigation between options lives in NavigationService and ActionBarService — this service
-// only owns the node and its side-effecting operations.
+// The node the app works on, plus the actions the flow's steps run on it (curating, saving,
+// assigning). Navigation lives in NavigationService and ActionBarService — this service only owns
+// the node and its side-effecting operations.
 @Injectable({ providedIn: 'root' })
 export class CurationService {
   private readonly auth = inject(AuthService);
   private readonly metadataAgent = inject(MetadataAgentService);
+  private readonly metadataUpload = inject(MetadataUploadService);
+  private readonly additionalWebComponent = inject(AdditionalWebComponentService);
   private readonly repositoryNodes = inject(RepositoryNodeService);
-  private readonly onlyOfficeDocument = inject(OnlyOfficeDocumentService);
   private readonly history = inject(HistoryService);
   // The generated CollectionV1Service (exported as CollectionServiceUnwrapped) — the read-only
   // CollectionService wrapper does not cover adding a node.
   private readonly collections = inject(CollectionServiceUnwrapped);
 
   readonly activeNode = signal<ActiveNode | null>(null);
+
+  /** How the active node arrived; `null` while there is none. */
+  private readonly nodeSource = signal<NodeSource | null>(null);
+
+  /** An active node that arrived on its own — see {@link NodeSource}. */
+  readonly hasDetectedNode = computed(
+    () => this.activeNode() !== null && this.nodeSource() === 'detected',
+  );
+
+  /** How the active node arrived, for carrying it across a page change (SessionResumeService). */
+  readonly nodeSourceOf = this.nodeSource.asReadonly();
   /** The active node's stored properties, fed to the metadata editor. */
   readonly nodeMetadata = signal<MdsValues | null>(null);
   /** The full hydrated node, fed to the preview element. */
@@ -64,6 +112,24 @@ export class CurationService {
   /** Set while a generated result still waits to be saved; see {@link hasUnsavedWork}. */
   private readonly resultPending = signal(false);
 
+  /** Set once the content was written through the metadata agent's upload; see {@link metadataLocked}. */
+  private readonly uploaded = signal(false);
+
+  /**
+   * The metadata is final: the content went through the agent's upload, which *creates* it (with a
+   * duplicate check and an editorial workflow) and therefore happens exactly once — there is nothing
+   * a further edit could be saved to. The editor is replaced by a read-only view of what was
+   * written, rather than left standing with its fields switched off.
+   */
+  readonly metadataFinal = this.uploaded.asReadonly();
+
+  /**
+   * No editing right now: either the metadata is {@link metadataFinal}, or a save is in flight — the
+   * values have been read and are being written, so changing them would silently diverge from what
+   * lands in the repository.
+   */
+  readonly metadataLocked = computed(() => this.saving() || this.metadataFinal());
+
   /** A metadata-agent result or an active node exists. */
   readonly hasEditableMetadata = computed(
     () => this.metadataAgent.lastRun()?.ok === true || this.activeNode() !== null,
@@ -72,8 +138,8 @@ export class CurationService {
   /**
    * A generated result that has not been written to a node yet — loading another entry would
    * discard it, so the caller confirms first. Tracked explicitly rather than derived from "no
-   * active node", because an enrichment of the open OnlyOffice document already *has* its target
-   * node while still being unsaved.
+   * active node": a result can already have its target node (a document found open) and still be
+   * unsaved.
    */
   readonly hasUnsavedWork = this.resultPending.asReadonly();
 
@@ -94,8 +160,20 @@ export class CurationService {
   }
 
   /**
+   * Release a content the user picked, now that the flow for it has ended (returning to the main
+   * menu — see {@link NavigationService.openMenu}). A `detected` node is kept: it describes the page
+   * that is still open, not a flow the user walked out of.
+   *
+   * Only an actual node is released. A curated result that has no node yet survives, since nothing
+   * else holds it and the user has not saved it anywhere.
+   */
+  releaseChosenContent(): void {
+    if (this.activeNode() && this.nodeSource() !== 'detected') this.startNew();
+  }
+
+  /**
    * Run the metadata agent for the active tab, dropping any previous node. Returns true on
-   * success so the footer can advance to the metadata screen. Nothing is written to the
+   * success so the footer can advance to the Qualitätssicherung. Nothing is written to the
    * history here — an entry is recorded only once a node is actually saved (see {@link save}).
    */
   async analyze(): Promise<boolean> {
@@ -108,29 +186,18 @@ export class CurationService {
   }
 
   /**
-   * Like {@link analyze}, but the content comes from the document the host page has open (the
-   * OnlyOffice editor) instead of the page — and that document *is* a repository node, so it
-   * becomes the active node: saving writes the enriched metadata onto it instead of creating a
-   * new node in the inbox.
-   */
-  async enrichOpenDocument(): Promise<boolean> {
-    if (!this.auth.authorized()) return false;
-    this.resetNodeState();
-    const outcome = await this.metadataAgent.runForOpenDocument();
-    if (!outcome.ok || !outcome.parsed) return false;
-    this.resultPending.set(true);
-    await this.adoptDocumentAsActiveNode(outcome.document);
-    return true;
-  }
-
-  /**
    * Open a saved node from the history: load the live node and seed the active-node state
    * (preview + editable metadata). Navigation is driven by the caller. Throws if the node
    * cannot be fetched, leaving the state untouched.
    */
   async openFromHistory(entry: HistoryEntry): Promise<void> {
-    const node = await this.repositoryNodes.get(entry.nodeId);
-    this.applyLoadedNode(entry.nodeId, node, node.name ?? entry.title);
+    // The live node is a bonus, not a requirement. An entry can point at a node THIS session may not
+    // read: the metadata agent creates the content with its own privileges, so a guest ends up with
+    // history entries the repository answers 403 for. The entry itself holds the metadata that was
+    // saved, so it stands in for the node (see {@link applyStoredEntry}).
+    const node = await this.loadNode(entry.nodeId);
+    if (!node) this.applyStoredEntry(entry);
+    else this.applyLoadedNode(entry.nodeId, node, node.name ?? entry.title, 'chosen');
     // Keep the stored parsed result so the raw/field views and the source line show.
     this.metadataAgent.restore({
       ok: true,
@@ -144,10 +211,10 @@ export class CurationService {
    * node (an OnlyOffice preview or a freshly created document) where no agent result exists.
    * The node is recorded in the history so it can be reopened later.
    */
-  async openNode(nodeId: string): Promise<void> {
+  async openNode(nodeId: string, source: NodeSource = 'chosen'): Promise<void> {
     const node = await this.repositoryNodes.get(nodeId);
     const name = node.name ?? nodeId;
-    this.applyLoadedNode(nodeId, node, name);
+    this.applyLoadedNode(nodeId, node, name, source);
     // No agent result for an externally received node; the raw/field views hide. Its parsed
     // view is derived from the node's own properties instead.
     this.metadataAgent.reset();
@@ -163,9 +230,35 @@ export class CurationService {
   }
 
   /**
+   * Take a node back up that the panel was working on before the page changed
+   * (see SessionResumeService). Nothing is written to the history — the node is already in it, and
+   * this is the same content continuing, not a new one being opened.
+   *
+   * Tolerates a node this session may not read, exactly like {@link openFromHistory}: the stored
+   * entry stands in for it.
+   */
+  async resumeNode(nodeId: string, source: NodeSource): Promise<void> {
+    const node = await this.loadNode(nodeId);
+    if (node) {
+      this.applyLoadedNode(nodeId, node, node.name ?? nodeId, source);
+      this.metadataAgent.reset();
+      return;
+    }
+    const entry = this.history.entries().find((candidate) => candidate.nodeId === nodeId);
+    if (!entry) return;
+    this.applyStoredEntry(entry);
+    this.nodeSource.set(source);
+    this.metadataAgent.restore({
+      ok: true,
+      parsed: entry.parsed,
+      source: { url: entry.url, title: entry.title, favIconUrl: entry.favIconUrl }
+    });
+  }
+
+  /**
    * Adopt the document the host page has open as the active node, so the app works on it from the
    * start (preview, metadata, collections all target the edited document). Takes the node the
-   * {@link OnlyOfficeDocumentService} already loaded, so it costs no second fetch.
+   * OnlyOffice document service already loaded, so it costs no second fetch.
    *
    * Unlike {@link openNode} nothing is written to the history — the user did not pick this node,
    * it is simply what happens to be open. Ignored once anything else is loaded or unsaved, so a
@@ -174,7 +267,7 @@ export class CurationService {
   adoptOpenDocument(node: Node): void {
     if (this.activeNode() || this.hasUnsavedWork()) return;
     // Name only when really known, never the node id as a stand-in — see {@link ActiveNode}.
-    this.applyLoadedNode(node.ref.id, node, node.name ?? null);
+    this.applyLoadedNode(node.ref.id, node, node.name ?? null, 'detected');
     // No agent result for a node we merely found open; its parsed view comes from the node's own
     // properties instead.
     this.metadataAgent.reset();
@@ -182,10 +275,16 @@ export class CurationService {
 
   /**
    * Save the metadata: create the node the first time, otherwise update it in place. Returns
-   * true on success so the metadata screen can advance to the preview.
+   * true on success so the caller can offer the next step.
+   *
+   * A freshly curated content takes a different route while the additional web component is
+   * enabled — see {@link saveThroughAgent}.
    */
   async save(values: MdsValues): Promise<boolean> {
     if (!this.auth.authorized()) return false;
+    if (this.additionalWebComponent.enabled() && !this.activeNode()) {
+      return this.saveThroughAgent(values);
+    }
     this.saving.set(true);
     this.saveError.set(null);
     try {
@@ -216,6 +315,94 @@ export class CurationService {
     }
   }
 
+  /**
+   * Save a freshly curated content through the metadata agent's own upload instead of creating the
+   * node ourselves. That is the save belonging to the WLO canvas, which is the editor while the
+   * additional web component is enabled: the agent creates the node, checks for duplicates and
+   * starts the editorial workflow — a plain node create does none of that.
+   *
+   * Only for a content that has no node yet. An existing node (a document found open, one picked
+   * from the Verlauf or den eigenen Inhalten) is updated in place by {@link save}, since uploading
+   * it again would create a second copy.
+   */
+  private async saveThroughAgent(values: MdsValues): Promise<boolean> {
+    this.saving.set(true);
+    this.saveError.set(null);
+    try {
+      const lastRun = this.metadataAgent.lastRun();
+      const outcome = await this.metadataUpload.upload(
+        values,
+        lastRun?.parsed?.raw ?? null,
+        lastRun?.source?.url,
+      );
+      if (!outcome.ok) {
+        this.saveError.set(outcome.error ?? 'Upload fehlgeschlagen.');
+        return false;
+      }
+      this.resultPending.set(false);
+      this.uploaded.set(true);
+      if (outcome.node?.nodeId) await this.applyUploadedNode(outcome.node, values);
+      return true;
+    } catch (cause: unknown) {
+      this.saveError.set(errorMessage(cause));
+      return false;
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  /**
+   * Take the uploaded content over into the flow **from the endpoint's own answer**, without
+   * loading the node.
+   *
+   * The node is deliberately not fetched back: the agent creates it with its own privileges, so the
+   * session the panel runs under (a guest — which is the normal case with the additional web
+   * component) is not allowed to read it. `/upload` already reports everything the following steps
+   * need, so its `node` is treated as the node: its id identifies it, its `repositoryUrl` is the
+   * link out, and the values just committed *are* its metadata — they are what was written.
+   */
+  private async applyUploadedNode(uploaded: UploadedNode, values: MdsValues): Promise<void> {
+    const nodeId = uploaded.nodeId!;
+    this.activeNode.set({
+      nodeId,
+      // The agent's title, never the id — see {@link ActiveNode}.
+      name: uploaded.title ?? null,
+      link: uploaded.repositoryUrl ?? renderLink(this.auth.repositoryUrl(), nodeId)
+    });
+    // The committed values, since there are no stored properties to read: the editor keeps showing
+    // exactly what was saved, and the preview and the usages element get a node to work on.
+    this.nodeMetadata.set(values);
+    this.previewNode.set(toPartialNode(nodeId, uploaded, values));
+    // The user curated and saved this one, so it belongs to the flow they started.
+    this.nodeSource.set('chosen');
+    await this.recordSaved({ nodeId, name: uploaded.title ?? nodeId });
+  }
+
+  /**
+   * Seed the flow from a stored history entry alone, for a node the repository will not hand back
+   * (see {@link openFromHistory}). The entry's parsed metadata is what was saved to that node, so it
+   * serves as its properties — the same substitution {@link applyUploadedNode} makes.
+   */
+  private applyStoredEntry(entry: HistoryEntry): void {
+    const values = (entry.parsed?.raw ?? {}) as MdsValues;
+    this.resetNodeState();
+    this.setActiveNode(entry.nodeId, entry.title || null);
+    this.nodeSource.set('chosen');
+    this.nodeMetadata.set(values);
+    this.previewNode.set(
+      toPartialNode(entry.nodeId, { nodeId: entry.nodeId, title: entry.title }, values),
+    );
+  }
+
+  /** Load a node for display purposes; `null` when the repository will not hand it back. */
+  private async loadNode(nodeId: string): Promise<Node | null> {
+    try {
+      return await this.repositoryNodes.get(nodeId);
+    } catch {
+      return null;
+    }
+  }
+
   /** Add the active node to the given collection(s). */
   async assignToCollections(collections: readonly Collection[]): Promise<void> {
     const node = this.activeNode();
@@ -243,36 +430,6 @@ export class CurationService {
     }
   }
 
-  /**
-   * Make the enriched document the active node, so {@link save} updates it in place.
-   *
-   * `nodeMetadata` deliberately stays empty: the editor must show the freshly generated metadata,
-   * not the node's stored properties (see {@link editorMetadata}). Without a node id (a stale
-   * plugin config) the flow falls back to creating a node on save, so the enrichment is not lost.
-   */
-  private async adoptDocumentAsActiveNode(
-    document: DocumentIdentity | null | undefined,
-  ): Promise<void> {
-    const nodeId = document?.nodeId;
-    if (!nodeId) return;
-    // Reuse the node OnlyOfficeDocumentService already loaded for this id; only fetch it ourselves
-    // when that hydration did not run or failed.
-    const hydrated = this.onlyOfficeDocument.documentNode();
-    const node = hydrated?.ref.id === nodeId ? hydrated : await this.loadNode(nodeId);
-    if (node) this.previewNode.set(node);
-    // Name only when really known (see {@link ActiveNode}); the save target stands either way.
-    this.setActiveNode(nodeId, node?.name ?? null);
-  }
-
-  /** Load a node for display purposes; `null` when it cannot be fetched. */
-  private async loadNode(nodeId: string): Promise<Node | null> {
-    try {
-      return await this.repositoryNodes.get(nodeId);
-    } catch {
-      return null;
-    }
-  }
-
   /** Record a saved node in the history (only saved nodes are kept there). */
   private async recordSaved(saved: NodeSummary): Promise<void> {
     const lastRun = this.metadataAgent.lastRun();
@@ -290,9 +447,15 @@ export class CurationService {
   }
 
   /** Reset the state and seed node, preview and editor metadata from a hydrated node. */
-  private applyLoadedNode(nodeId: string, node: Node, name: string | null): void {
+  private applyLoadedNode(
+    nodeId: string,
+    node: Node,
+    name: string | null,
+    source: NodeSource,
+  ): void {
     this.resetNodeState();
     this.setActiveNode(nodeId, name);
+    this.nodeSource.set(source);
     this.previewNode.set(node);
     this.nodeMetadata.set(node.properties as MdsValues);
   }
@@ -303,7 +466,9 @@ export class CurationService {
 
   private resetNodeState(): void {
     this.resultPending.set(false);
+    this.uploaded.set(false);
     this.activeNode.set(null);
+    this.nodeSource.set(null);
     this.nodeMetadata.set(null);
     this.previewNode.set(null);
     this.saveError.set(null);

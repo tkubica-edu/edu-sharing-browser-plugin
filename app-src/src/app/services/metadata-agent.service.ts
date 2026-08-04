@@ -1,8 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 
-import { DocumentIdentity } from '../model/onlyoffice-events';
 import { BrowserExtensionService, PageSource } from './browser-extension.service';
-import { OnlyOfficeDocumentService } from './onlyoffice-document.service';
 import { errorMessage } from '../util/errors';
 
 /** Reserved (non-metadata) top-level keys in the metadata-agent response. */
@@ -17,8 +15,8 @@ const LANGUAGE = 'de';
 /** Below this the agent has nothing to work with (matches the background worker's own guard). */
 const MIN_DOCUMENT_LENGTH = 50;
 
-const DOCUMENT_EMPTY =
-  'Das OnlyOffice-Dokument enthält zu wenig Text für eine Erschließung. Bitte erst Inhalte schreiben.';
+const TEXT_EMPTY =
+  'Der Text enthält zu wenig Inhalt für eine Erschließung.';
 
 export interface MetadataField {
   key: string;
@@ -38,23 +36,15 @@ export interface AnalyzeOutcome {
   source?: PageSource;
   parsed?: ParsedMetadata;
   error?: string;
-  /**
-   * Identity of the enriched document — set only by {@link MetadataAgentService.runForOpenDocument}.
-   * It is the repository node the metadata belongs to, so the flow saves onto it instead of
-   * creating a new one.
-   */
-  document?: DocumentIdentity | null;
 }
 
 /**
- * Runs the metadata agent against the active tab or against the document the host page has open
- * (through the background worker, see BrowserExtensionService) and parses its response for
- * display.
+ * Runs the metadata agent (through the background worker, see BrowserExtensionService) and parses
+ * its response for display.
  */
 @Injectable({ providedIn: 'root' })
 export class MetadataAgentService {
   private readonly browserExtension = inject(BrowserExtensionService);
-  private readonly onlyOfficeDocument = inject(OnlyOfficeDocumentService);
 
   private readonly lastRunState = signal<AnalyzeOutcome | null>(null);
 
@@ -79,41 +69,13 @@ export class MetadataAgentService {
   }
 
   /**
-   * Same as {@link run}, but the content comes from the document the host page has open (the
-   * OnlyOffice editor) instead of the page: ask the plugin for the document content and send its
-   * **markdown** rendering to the agent. The title/permalink of the document's repository node
-   * become the source line, so the metadata screen shows what was enriched, and its identity is
-   * returned in the outcome — the metadata belongs to that node, so the caller saves onto it.
-   */
-  async runForOpenDocument(): Promise<AnalyzeOutcome> {
-    this.running.set(true);
-    try {
-      const content = await this.onlyOfficeDocument.requestContent();
-      const outcome = await this.analyzeText(content.markdown ?? '');
-      if (!outcome.ok) return this.remember(outcome);
-      return this.remember({
-        ...outcome,
-        source: {
-          url: this.onlyOfficeDocument.documentPermaLink() ?? '',
-          title: content.title || this.onlyOfficeDocument.documentTitle() || 'OnlyOffice-Dokument'
-        },
-        document: content.document
-      });
-    } catch (cause: unknown) {
-      return this.remember({ ok: false, error: errorMessage(cause) });
-    } finally {
-      this.running.set(false);
-    }
-  }
-
-  /**
    * Run the agent on text the caller already holds and return the outcome **without** storing it
    * as {@link lastRun} — for flows that only consume the agent's output (deriving search keywords,
    * see ContentSuggestionsService) instead of opening it for editing.
    */
   async analyzeText(text: string): Promise<AnalyzeOutcome> {
     const trimmed = text.trim();
-    if (trimmed.length < MIN_DOCUMENT_LENGTH) return { ok: false, error: DOCUMENT_EMPTY };
+    if (trimmed.length < MIN_DOCUMENT_LENGTH) return { ok: false, error: TEXT_EMPTY };
     const response = await this.browserExtension.analyzeText(trimmed, LANGUAGE);
     return response.success
       ? { ok: true, parsed: this.parse(response.result) }

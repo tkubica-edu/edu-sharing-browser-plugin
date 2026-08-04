@@ -1,6 +1,6 @@
 // Background worker: toggles the injected sidebar panel, extracts the active tab's
-// content, and proxies POST /generate (from the worker to stay CORS-portable).
-// Auth is handled in the sidebar app, not here.
+// content, and proxies the metadata agent's POST /generate and POST /upload (from the
+// worker to stay CORS-portable). Auth is handled in the sidebar app, not here.
 
 /* global EDU_SHARING_CONFIG */
 
@@ -45,6 +45,78 @@ async function togglePanel(tab) {
 }
 
 browser.action.onClicked.addListener((tab) => { togglePanel(tab); });
+
+// PANEL SURVIVAL ACROSS A PAGE CHANGE
+//
+// The panel is an iframe injected INTO the page, so EVERY navigation destroys it — a link the user
+// clicks just as much as a page change the panel asked for itself. Being open is therefore treated
+// as a property of the TAB, not of the document: while it holds, this worker puts the panel back
+// after every load. Only the worker outlives a load, so this is its job.
+//
+// panel-host.js reports the state it puts the page into ('panel.state'), so opening and closing stay
+// in one place — the content script decides, this only remembers. The state lives in storage, not in
+// a variable: an MV3 worker is evicted between events.
+
+const OPEN_PANELS_KEY = 'eduSharingOpenPanels';
+
+/** Session storage where available — being open belongs to this browser run, not to the profile. */
+function panelStateArea() {
+  return browser.storage.session ?? browser.storage.local;
+}
+
+async function readOpenPanels() {
+  try {
+    const items = await panelStateArea().get({ [OPEN_PANELS_KEY]: [] });
+    return Array.isArray(items?.[OPEN_PANELS_KEY]) ? items[OPEN_PANELS_KEY] : [];
+  } catch (error) {
+    console.warn('⚠️ Reading the open-panel state failed:', error?.message || error);
+    return [];
+  }
+}
+
+async function setPanelOpen(tabId, open) {
+  if (typeof tabId !== 'number') return;
+  const tabs = await readOpenPanels();
+  if (open === tabs.includes(tabId)) return;
+  const next = open ? [...tabs, tabId] : tabs.filter((id) => id !== tabId);
+  try {
+    await panelStateArea().set({ [OPEN_PANELS_KEY]: next });
+  } catch (error) {
+    console.warn('⚠️ Storing the open-panel state failed:', error?.message || error);
+  }
+}
+
+/** Put the panel back on a tab whose panel is meant to be open. */
+async function restorePanel(tabId) {
+  if (!(await readOpenPanels()).includes(tabId)) return;
+  try {
+    // panel-host.js TOGGLES, so injecting it onto a page that still has a panel would close it.
+    // `complete` is not guaranteed to arrive once per document, hence the check rather than trust.
+    const [present] = await browser.scripting.executeScript({
+      target: { tabId },
+      func: () => !!document.getElementById('edusharing-panel-root')
+    });
+    if (present?.result) return;
+    await browser.scripting.executeScript({ target: { tabId }, files: ['content/panel-host.js'] });
+  } catch (error) {
+    // A privileged page rejects injection — no panel can live there. The tab stays marked open, so
+    // navigating back to a normal page brings it back.
+    console.warn('⚠️ Panel restore failed:', error?.message || error);
+  }
+}
+
+browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  // Wait for the new document: injecting into a still-loading page would be torn down by it.
+  if (changeInfo.status === 'complete') void restorePanel(tabId);
+});
+
+// A closed tab's id tells us nothing anymore, and ids get reused — drop everything keyed by it.
+browser.tabs.onRemoved.addListener((tabId) => {
+  void setPanelOpen(tabId, false);
+  // Same key the sidebar app builds (see SessionResumeService); without this, its per-tab entries
+  // would pile up in storage for the rest of the browser run.
+  browser.storage.local.remove(`eduSharingResumeState:${tabId}`).catch(() => {});
+});
 
 // ACTIVE TAB + ON-DEMAND CONTENT EXTRACTION
 
@@ -132,25 +204,79 @@ async function callGenerate(body) {
   return result;
 }
 
+// /upload PROXY
+
+// POST an assembled upload body to the metadata agent, which writes the content into the
+// repository itself (duplicate check + workflow). Proxied through the worker for the same reason
+// as /generate: the endpoint is cross-origin for the sidebar document.
+async function callUpload(body) {
+  const response = await fetchWithTimeout(
+    `${API_URL}/upload`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(body)
+    },
+    GENERATE_TIMEOUT_MS
+  );
+  // A rejected upload answers with a JSON body too (`success: false`), so the payload is read
+  // either way and only a bodyless failure becomes an error.
+  const result = await safeJson(response);
+  if (!result || typeof result !== 'object') {
+    throw new Error(`upload failed: ${response.status}`);
+  }
+  return result;
+}
+
 // MESSAGE ROUTER (from the Angular sidebar app)
 
 const ALLOWED_ACTIONS = new Set([
+  'panel.state',
+  'tabs.self',
   'tabs.getActive',
   'tabs.extractPageData',
+  'tabs.navigate',
   'analyze.run',
-  'analyze.text'
+  'analyze.text',
+  'metadata.upload'
 ]);
 
-browser.runtime.onMessage.addListener((message) => {
+browser.runtime.onMessage.addListener((message, sender) => {
   if (!message || !ALLOWED_ACTIONS.has(message.action)) return; // not ours
 
   // Return a promise so the polyfill replies asynchronously.
   return (async () => {
     try {
       switch (message.action) {
+        // panel-host.js reporting what it just did. The tab comes from the SENDER, never from the
+        // message: which tab a content script speaks for is not its own to claim.
+        case 'panel.state': {
+          await setPanelOpen(sender?.tab?.id, message.open === true);
+          return { success: true };
+        }
+
+        // Which tab the CALLER sits in. The sidebar needs it to keep its state per tab; it cannot
+        // work that out itself, and "the active tab" is not the same thing — a panel restored on a
+        // background tab would read the wrong one.
+        case 'tabs.self': {
+          return { success: true, tabId: typeof sender?.tab?.id === 'number' ? sender.tab.id : null };
+        }
+
         case 'tabs.getActive': {
           const tab = await getActiveNormalTab();
           return { success: true, tab: { id: tab.id, url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl } };
+        }
+
+        // Take the active tab to another URL and bring the panel back on the new page. Queued
+        // BEFORE the navigation: the load starts immediately and takes the caller down with it.
+        case 'tabs.navigate': {
+          const url = typeof message.url === 'string' ? message.url : '';
+          if (!/^https?:\/\//i.test(url)) return { success: false, error: 'INVALID_URL' };
+          const tab = await getActiveNormalTab();
+          // The panel is what asked, so it is open — recorded explicitly in case that state was lost.
+          await setPanelOpen(tab.id, true);
+          await browser.tabs.update(tab.id, { url });
+          return { success: true };
         }
 
         case 'tabs.extractPageData': {
@@ -175,12 +301,20 @@ browser.runtime.onMessage.addListener((message) => {
           };
         }
 
-        // POST text supplied by the sidebar to /generate (no tab involved) — used by the
-        // OnlyOffice enrichment, where the content comes from the editor, not from the page.
+        // POST text supplied by the sidebar to /generate (no tab involved) — used where the
+        // content comes from the open OnlyOffice document rather than from the page (deriving
+        // search keywords for "Passende Inhalte").
         case 'analyze.text': {
           const text = typeof message.text === 'string' ? message.text : '';
           if (text.trim().length < 50) return { success: false, error: 'EMPTY_EXTRACTION' };
           const result = await callGenerate(buildTextGenerateBody(text, message.language));
+          return { success: true, result };
+        }
+
+        // POST an upload body assembled by the sidebar to /upload — the metadata agent's own way
+        // of writing the curated content into the repository.
+        case 'metadata.upload': {
+          const result = await callUpload(message.body ?? {});
           return { success: true, result };
         }
 

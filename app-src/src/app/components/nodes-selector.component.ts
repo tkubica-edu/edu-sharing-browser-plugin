@@ -16,7 +16,14 @@ export interface NodesSelectorOption {
   option?: string;
   trap?: boolean;
   optionConfig: {
-    state: 'search' | 'collections';
+    /**
+     * The tab the selector opens on. It MUST be one the selector actually offers — the tab is
+     * looked up in its own supported list, so a value that is blacklisted here (or unsupported in
+     * the current selection mode) selects nothing and the element renders empty. `'workspace'` is
+     * accepted by the element but has not proven usable as an opening tab (see
+     * OwnContentScreenComponent).
+     */
+    state: 'search' | 'collections' | 'workspace';
     applyLabel?: string;
     autoClose?: boolean;
     /** Let collection nodes be selected, not just opened. Set from the component input. */

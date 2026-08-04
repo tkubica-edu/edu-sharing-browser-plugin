@@ -108,7 +108,7 @@
 @mixin hint { color: var(--es-danger); font-size: 12px; margin: 2px 0 0; }
 
 // ---- Screen layout ---------------------------------------------------------
-// Scroll-container padding shared by every option screen (see components/screens/).
+// Scroll-container padding shared by every screen (see components/screens/).
 @mixin screen-body { padding: var(--es-space-4); }
 
 // Row of chips under a hint card ("x / y Felder", "Node: …", assigned collections).
@@ -145,7 +145,7 @@
 }
 
 // A full-width clickable menu row: leading icon, title + description block, trailing
-// chevron. Basis for the "Aktionen & Optionen" list.
+// chevron. Basis for the main menu and the add-content list.
 @mixin menu-item {
   width: 100%;
   display: flex;

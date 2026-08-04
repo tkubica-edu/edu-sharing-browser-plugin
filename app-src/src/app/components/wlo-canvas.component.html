@@ -1,4 +1,6 @@
-<div class="canvas-wrap">
+<!-- `inert` locks the keyboard too (the class below only stops the pointer), so a locked canvas
+     cannot be edited by tabbing into it either. -->
+<div class="canvas-wrap" [class.is-locked]="locked()" [attr.inert]="locked() ? '' : null">
   @if (bundle.error()) {
     <p class="es-error">WLO-Editor konnte nicht geladen werden: {{ bundle.error() }}</p>
   } @else if (!bundle.ready()) {
@@ -9,21 +11,25 @@
     Inside the @if so the element's inputs are applied before it is inserted and upgraded (see
     NodesSelectorComponent). Its own save/upload buttons stay off because the footer owns saving;
     everything that differs between editing and previewing comes from `config` (see CONFIGS).
+
+    Locking takes the editing affordances with it: read-only fields, but also no per-field actions
+    and no reset button, since both would offer changes that can no longer be saved.
   -->
   @if (bundle.ready()) {
     <metadata-agent-canvas
-      [metadataInput]="metadata()"
+      [metadataInput]="seed()"
+      [previewImage]="previewImage()"
       [layout]="config().layout"
       [columns]="config().columns"
-      [readonly]="config().readonly"
       [borderless]="config().borderless"
       [showInputArea]="config().showInputArea"
       [showFooter]="config().showFooter"
-      [showFieldActions]="config().showFieldActions"
       [showFloatingControls]="config().showFloatingControls"
       [showContentType]="config().showContentType"
       [showContentTypeOnly]="config().showContentTypeOnly"
-      [showResetButton]="config().showResetButton"
+      [readonly]="config().readonly || locked()"
+      [showFieldActions]="config().showFieldActions && !locked()"
+      [showResetButton]="config().showResetButton && !locked()"
       [language]="'de'"
       [highlightAi]="false"
       [showStatusBar]="false"

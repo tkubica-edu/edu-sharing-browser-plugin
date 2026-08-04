@@ -12,6 +12,24 @@
   cursor: pointer;
 }
 
+// The prominent entry (Inhalt erkannt): a tinted card with a blue accent edge, so the entry the
+// current page makes obvious reads as the offered next step rather than as one row among many.
+.menu-list > li.is-prominent {
+  border-color: #b9d2f0;
+  box-shadow: 0 1px 6px rgba(0, 59, 124, 0.12);
+
+  .menu-item {
+    background: #eef4fc;
+    border-left: 4px solid var(--es-blue);
+    padding-left: 10px;
+
+    &:hover:not([disabled]) { background: #e3edfa; }
+  }
+  .mi-icon { color: var(--es-blue); }
+  .mi-title { color: var(--es-blue); }
+  .chevron { color: var(--es-blue); }
+}
+
 .mi-icon {
   flex: 0 0 auto;
   width: 26px;
@@ -22,7 +40,18 @@
 }
 
 .mi-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-.mi-title { font-weight: 600; font-size: 15px; }
+.mi-title { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+
+// The Verlauf entry's entry count, which used to sit on its topbar icon.
+.mi-count {
+  background: #e6edf6;
+  color: var(--es-blue);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+}
 .mi-desc { font-size: 12px; color: var(--es-muted); line-height: 1.35; }
 
 .chevron { flex: 0 0 auto; width: 20px; height: 20px; color: var(--es-muted); }

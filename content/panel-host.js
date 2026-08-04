@@ -38,6 +38,19 @@
     } catch (_) { /* ignore persistence failures */ }
   }
 
+  // Tell the worker whether this tab has a panel. It keeps that as a property of the TAB and puts
+  // the panel back after every navigation while it holds — the panel is an iframe in the page, so
+  // any page change destroys it, and the user expects it to stay open regardless.
+  //
+  // Reported from here because this is where opening and closing are decided; the worker only
+  // remembers. Best effort: without it the panel merely does not come back.
+  function reportPanelState(open) {
+    try {
+      const reply = api.runtime.sendMessage({ action: 'panel.state', open: open });
+      if (reply && typeof reply.catch === 'function') reply.catch(() => {});
+    } catch (_) { /* no worker to tell — nothing to keep in sync */ }
+  }
+
   // Nudge JS-driven, resize-listening layouts (e.g. the OnlyOffice editor) to re-measure
   // against the changed root width.
   function dispatchResize() {
@@ -65,6 +78,9 @@
     delete root.dataset.eduSharingPrevOverflowX;
     // Let the page expand back to full width.
     dispatchResize();
+    // Closed deliberately (toolbar toggle or the panel's ✕) — so it must NOT come back on the next
+    // page. A navigation, by contrast, never runs this: nothing is reported and the panel returns.
+    reportPanelState(false);
   }
 
   // Toggle: already open → close and stop.
@@ -157,6 +173,7 @@
     root.style.setProperty('width', 'calc(100% - ' + panelWidth + 'px)', 'important');
     root.style.setProperty('overflow-x', 'hidden', 'important');
     dispatchResize();
+    reportPanelState(true);
 
     function applyWidth(w) {
       panelWidth = clampWidth(w);

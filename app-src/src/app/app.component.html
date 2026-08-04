@@ -2,17 +2,14 @@
   <img class="logo" src="../icons/32.png" alt="" (error)="hideBrokenLogo($event)" />
   <span class="title">Edu-Sharing</span>
 
-  <!-- The utility options (Verlauf, Einstellungen): always reachable, so they sit here as icons
-       next to the close button instead of in the options menu. -->
-  @for (option of navigation.topbarOptions(); track option.id) {
-    <button class="topbar-btn" [class.is-active]="navigation.view() === option.id"
-            [title]="option.label" [attr.aria-label]="option.label"
-            (click)="navigation.go(option.id)">
-      <span class="tb-icon" [innerHTML]="icons.icon(option.id)"></span>
-      @if (option.id === 'history' && history.entries().length) {
-        <span class="count">{{ history.entries().length }}</span>
-      }
-      @if (option.id === 'settings' && auth.needsReload()) {
+  <!-- The utility sections (Einstellungen): always reachable, so they sit here as icons next to
+       the close button instead of in the main menu. -->
+  @for (section of navigation.topbarSections(); track section.id) {
+    <button class="topbar-btn" [class.is-active]="navigation.section() === section.id"
+            [title]="section.label" [attr.aria-label]="section.label"
+            (click)="navigation.go(section.id)">
+      <span class="tb-icon" [innerHTML]="icons.icon(section.id)"></span>
+      @if (section.id === 'settings' && auth.needsReload()) {
         <span class="dot" title="Änderung übernehmen"></span>
       }
     </button>
@@ -23,12 +20,12 @@
 
 <es-status-bar></es-status-bar>
 
-<!-- Always shows the current view's title; the back-to-menu button appears on every view
+<!-- Always shows the open section's title; the back-to-menu button appears on every section
      except the menu itself. -->
 <div class="step-header">
   @if (navigation.showBack()) {
     <button class="back-btn" (click)="navigation.openMenu()"
-            title="Zurück zu Aktionen & Optionen" aria-label="Zurück zu Aktionen & Optionen">
+            title="Zurück zum Hauptmenü" aria-label="Zurück zum Hauptmenü">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
     </button>
@@ -36,21 +33,31 @@
   <h2 class="step-title">{{ navigation.title() }}</h2>
 </div>
 
+<!-- The open section's sub steps, for the sections that have more than one. -->
+@if (navigation.showTabs()) {
+  <es-tab-bar></es-tab-bar>
+}
+
 <main class="content">
-  @switch (navigation.view()) {
-    @case ('menu') { <es-menu></es-menu> }
-    @case ('login') { <es-login></es-login> }
-    @case ('analyze') { <es-analyze-screen></es-analyze-screen> }
-    @case ('enrich') { <es-enrich-screen></es-enrich-screen> }
-    @case ('new-document') { <es-new-document-screen></es-new-document-screen> }
-    @case ('metadata') { <es-metadata-screen></es-metadata-screen> }
-    @case ('preview') { <es-preview-screen></es-preview-screen> }
-    @case ('usages') { <es-usages-screen></es-usages-screen> }
-    @case ('collections') { <es-collections-screen></es-collections-screen> }
-    @case ('search') { <es-search></es-search> }
-    @case ('find-content') { <es-find-content-screen></es-find-content-screen> }
-    @case ('history') { <es-history (open)="openFromHistory($event)"></es-history> }
-    @case ('settings') { <es-settings></es-settings> }
+  @if (navigation.section() === 'menu') {
+    <es-menu></es-menu>
+  } @else {
+    @switch (navigation.screen()) {
+      @case ('login') { <es-login></es-login> }
+      @case ('add-content') { <es-add-content-screen></es-add-content-screen> }
+      @case ('new-document') { <es-new-document-screen></es-new-document-screen> }
+      @case ('search') { <es-search></es-search> }
+      @case ('curation') { <es-curation-screen></es-curation-screen> }
+      @case ('own-content') { <es-own-content-screen></es-own-content-screen> }
+      @case ('history') { <es-history (open)="openFromHistory($event)"></es-history> }
+      @case ('content-options') { <es-content-options-screen></es-content-options-screen> }
+      @case ('find-content') { <es-find-content-screen></es-find-content-screen> }
+      @case ('metadata') { <es-metadata-screen></es-metadata-screen> }
+      @case ('collections') { <es-collections-screen></es-collections-screen> }
+      @case ('preview') { <es-preview-screen></es-preview-screen> }
+      @case ('usages') { <es-usages-screen></es-usages-screen> }
+      @case ('settings') { <es-settings></es-settings> }
+    }
   }
 </main>
 

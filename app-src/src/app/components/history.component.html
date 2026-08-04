@@ -27,7 +27,7 @@
         <div class="item-body">
           <div class="body-head">
             <span class="meta-line">{{ entry.timestamp | date: 'dd.MM.yyyy HH:mm' }}</span>
-            <button class="btn-load" (click)="open.emit(entry)">In Vorschau öffnen</button>
+            <button class="btn-load" (click)="open.emit(entry)">Inhalt öffnen</button>
           </div>
           <dl class="fields">
             @for (field of entry.parsed.fields; track field.key) {

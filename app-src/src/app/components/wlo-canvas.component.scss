@@ -2,6 +2,14 @@
 
 .canvas-wrap { display: flex; flex-direction: column; }
 
+// Locked: block the interaction here rather than relying on the element honouring `readonly` on an
+// already-mounted canvas. `inert` covers the keyboard as well, which pointer-events alone does not.
+.canvas-wrap.is-locked {
+  opacity: 0.65;
+  pointer-events: none;
+  user-select: none;
+}
+
 metadata-agent-canvas {
   display: block;
   width: 100%;

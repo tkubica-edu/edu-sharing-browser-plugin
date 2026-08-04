@@ -1,0 +1,13 @@
+<nav class="tabs" role="tablist">
+  @for (tab of navigation.tabs(); track tab.id) {
+    <!-- A locked sub step stays in the bar: it says what is still missing (its hint) instead of
+         appearing out of nowhere once the step becomes reachable. -->
+    <button class="tab" role="tab" [class.is-active]="navigation.screen() === tab.id"
+            [attr.aria-selected]="navigation.screen() === tab.id"
+            [disabled]="tab.disabled" [title]="tab.disabled ? tab.disabledHint ?? '' : tab.label"
+            (click)="navigation.goTab(tab.id)">
+      <span class="t-icon" [innerHTML]="icons.icon(tab.id)"></span>
+      <span class="t-label">{{ tab.label }}</span>
+    </button>
+  }
+</nav>

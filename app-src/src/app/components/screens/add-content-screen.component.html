@@ -1,0 +1,24 @@
+<div class="es-screen-body">
+  <section class="es-hint-card">
+    <p class="es-muted">
+      Wähle, wie der Inhalt hinzugefügt werden soll. Ein neu erstellter Inhalt wird direkt im
+      Connector geöffnet und kann dort bearbeitet werden.
+    </p>
+  </section>
+
+  <ul class="add-list">
+    @for (option of options(); track option.section) {
+      <li>
+        <button class="add-item" (click)="navigation.go(option.section)">
+          <span class="ai-icon" [innerHTML]="icons.icon(option.section)"></span>
+          <span class="ai-main">
+            <span class="ai-title">{{ option.label }}</span>
+            <span class="ai-desc">{{ option.description }}</span>
+          </span>
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+        </button>
+      </li>
+    }
+  </ul>
+</div>

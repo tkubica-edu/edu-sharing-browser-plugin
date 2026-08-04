@@ -16,6 +16,36 @@ export interface AnalyzeResponse {
   error?: string;
 }
 
+/**
+ * Reply of the background worker's `metadata.upload` message. `success` is the *transport*: the
+ * endpoint's own verdict is in `result`, which is what a caller has to check (a rejected upload —
+ * e.g. a detected duplicate — is a successful request).
+ */
+export interface UploadResponse {
+  success: boolean;
+  result?: {
+    success?: boolean;
+    error?: string | null;
+    duplicate?: boolean | null;
+    node?: UploadedNode;
+  };
+  error?: string;
+}
+
+/**
+ * The node the metadata agent created, as `/upload` reports it. Deliberately the whole thing: it is
+ * everything the app knows about the new node — a guest may not read it back from the repository —
+ * so the flow is seeded from this instead of from a node load (see CurationService).
+ */
+export interface UploadedNode {
+  nodeId?: string;
+  title?: string | null;
+  description?: string | null;
+  wwwurl?: string | null;
+  /** Link into the repository UI (`…/components/render/<id>`). */
+  repositoryUrl?: string | null;
+}
+
 // Wrapper over the WebExtension APIs this app needs: background messaging, local storage and
 // postMessage to the host page. Privileged work (reading the tab, calling the metadata agent)
 // is delegated to the background worker to stay CORS-portable across browsers.
@@ -41,6 +71,33 @@ export class BrowserExtensionService {
       language,
     })) as AnalyzeResponse | null;
     return response ?? { success: false, error: 'NO_RESPONSE' };
+  }
+
+  /**
+   * Ask the background worker to POST an upload body to the metadata agent's `/upload`, which
+   * writes the curated content into the repository itself. The reply carries the endpoint's own
+   * answer verbatim (see {@link UploadResponse}).
+   */
+  async uploadMetadata(body: Record<string, unknown>): Promise<UploadResponse> {
+    const response = (await browser.runtime.sendMessage({
+      action: 'metadata.upload',
+      body,
+    })) as UploadResponse | null;
+    return response ?? { success: false, error: 'NO_RESPONSE' };
+  }
+
+  /**
+   * The id of the tab this panel sits in, as the background worker sees it (`sender.tab`). Null
+   * outside an extension context.
+   *
+   * Not the same as {@link getActiveTab}: a panel restored on a background tab would read the wrong
+   * one there. Needed to keep per-tab state apart — see SessionResumeService.
+   */
+  async getOwnTabId(): Promise<number | null> {
+    const response = (await browser.runtime
+      .sendMessage({ action: 'tabs.self' })
+      .catch(() => null)) as { tabId?: number | null } | null;
+    return typeof response?.tabId === 'number' ? response.tabId : null;
   }
 
   async getActiveTab(): Promise<PageSource | null> {
@@ -79,6 +136,18 @@ export class BrowserExtensionService {
   /** Same, for the document's identity only (`DOCUMENT_INFO`, no content payload). */
   requestDocumentInfo(requestId: string): boolean {
     return this.postToHost({ type: 'edusharing-request-document-info', requestId });
+  }
+
+  /**
+   * Take the active tab to `url`, and have the panel reopened on the new page.
+   *
+   * Driven by the background worker, not by the host page: the panel is an iframe in the page being
+   * navigated, so it is destroyed by the load — the worker is the only party that outlives it and can
+   * inject the panel again. What the panel was *doing* is restored separately, from storage
+   * (SessionResumeService), so it comes back in the same state.
+   */
+  async navigateTab(url: string): Promise<void> {
+    await browser.runtime.sendMessage({ action: 'tabs.navigate', url });
   }
 
   /** Tell the host page the sidebar has booted, so it can replay a buffered inbound event. */

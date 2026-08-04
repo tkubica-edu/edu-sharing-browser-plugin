@@ -5,8 +5,9 @@ import { ConditionsService } from '../services/conditions.service';
 import { CurationService } from '../services/curation.service';
 import { DebugService } from '../services/debug.service';
 
-// The persistent condition bar. Always visible, independent of the options — it shows the states
-// the options' visibility is derived from (login, insert host, Edu-Sharing page, active node,
+// The persistent condition bar. Always visible, independent of the navigation — it shows the
+// states the sections' visibility is derived from (login, insert host, Edu-Sharing page, active
+// node,
 // edit mode) so the user can always see why options appear or disappear.
 @Component({
   selector: 'es-status-bar',

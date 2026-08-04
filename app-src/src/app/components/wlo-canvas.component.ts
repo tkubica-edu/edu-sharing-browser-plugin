@@ -1,4 +1,7 @@
-import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, computed, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, computed, input, linkedSignal,
+  output, signal
+} from '@angular/core';
 
 import { MdsValues, toMdsEditorValues } from '../util/mds-values';
 import { loadWebComponentBundle } from '../services/web-component-bundle.service';
@@ -94,8 +97,36 @@ export class WloCanvasComponent implements MetadataEditor {
   /** Editing (default) or a read-only view of the properties. */
   readonly mode = input<WloCanvasMode>('edit');
 
+  /**
+   * Locks the form in 'edit' mode: the fields stay visible but can no longer be changed. For the
+   * point at which the values have left the editor — a save is in flight, or the one-shot upload
+   * they belong to already happened (see CurationService.metadataLocked).
+   */
+  readonly locked = input(false);
+
+  /**
+   * The content's preview image. The canvas keeps it in its own state rather than reading it off
+   * the payload, so it has to be passed separately; empty means "none".
+   */
+  readonly previewImage = input('');
+
   /** Emits the current values when the footer triggers a save (mode 'edit'). */
   readonly save = output<MdsValues>();
+
+  /**
+   * What the element is actually seeded with: the FIRST payload the input carried, held for as long
+   * as this component is mounted.
+   *
+   * The canvas reloads its whole state whenever `metadataInput` changes, which would discard the
+   * user's edits and re-render the editor. Saving does change the source of that payload — the node's
+   * stored properties replace the agent result — so without this freeze the editor would visibly
+   * reload right after "Speichern". Like MdsEditorComponent, it is seeded once and owns its state
+   * from then on; a different content arrives through a new instance of this component.
+   */
+  protected readonly seed = linkedSignal<MetadataSeed, MetadataSeed>({
+    source: this.metadata,
+    computation: (metadata, previous) => previous?.value ?? metadata
+  });
 
   protected readonly config = computed(() => CONFIGS[this.mode()]);
 
@@ -108,7 +139,7 @@ export class WloCanvasComponent implements MetadataEditor {
   private readonly latest = signal<CanvasMetadata | null>(null);
 
   commit(): void {
-    const current = this.latest() ?? (this.metadata() as CanvasMetadata);
+    const current = this.latest() ?? (this.seed() as CanvasMetadata);
     // Keep only the namespaced field values — the envelope (contextName, schemaVersion,
     // metadataset_uri, _source_text, …) is not node metadata.
     this.save.emit(toMdsEditorValues(current.metadata ?? current));

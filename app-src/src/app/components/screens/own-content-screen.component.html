@@ -1,0 +1,19 @@
+<!-- Login required to browse the repository — reuse the shared gate. -->
+@if (auth.authorized()) {
+  <div class="nodes-wrap">
+    @if (error()) {
+      <p class="es-error select-msg">{{ error() }}</p>
+    } @else if (loading()) {
+      <p class="es-muted select-msg">Inhalt wird geladen …</p>
+    }
+
+    <es-nodes-selector
+      [option]="option"
+      [tabBlacklist]="hiddenTabs"
+      [primaryMode]="'activity'"
+      errorLabel="Eigene Inhalte konnten nicht geladen werden"
+    ></es-nodes-selector>
+  </div>
+} @else {
+  <div class="login-gate"><es-login></es-login></div>
+}

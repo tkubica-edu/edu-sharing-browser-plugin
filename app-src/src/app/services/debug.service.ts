@@ -12,8 +12,8 @@ import { BrowserExtensionService } from './browser-extension.service';
 /**
  * Node id the simulated document reports as the edited one. A deliberately fake default: the
  * repository load then fails silently and the app falls back to the bare id. Put a real node id
- * of the configured repository in the settings to let the whole flow run through, including
- * saving the enriched metadata onto that node.
+ * of the configured repository in the settings to let the whole flow run through, including saving
+ * metadata onto that node.
  */
 const DEFAULT_DOCUMENT_NODE_ID = 'debug-document-node';
 

@@ -1,12 +1,17 @@
 <div class="menu">
   <ul class="menu-list">
-    @for (option of navigation.visibleOptions(); track option.id) {
-      <li>
-        <button class="menu-item" (click)="navigation.go(option.id)">
-          <span class="mi-icon" [innerHTML]="icons.icon(option.id)"></span>
+    @for (section of navigation.menuSections(); track section.id) {
+      <li [class.is-prominent]="section.prominent">
+        <button class="menu-item" (click)="navigation.go(section.id)">
+          <span class="mi-icon" [innerHTML]="icons.icon(section.id)"></span>
           <span class="mi-main">
-            <span class="mi-title">{{ option.label }}</span>
-            <span class="mi-desc">{{ option.description }}</span>
+            <span class="mi-title">
+              {{ section.label }}
+              @if (section.id === 'history' && history.entries().length) {
+                <span class="mi-count">{{ history.entries().length }}</span>
+              }
+            </span>
+            <span class="mi-desc">{{ section.description }}</span>
           </span>
           <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>

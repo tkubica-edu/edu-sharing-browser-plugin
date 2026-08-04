@@ -1,7 +1,11 @@
 <div class="es-screen-body">
   <section class="es-hint-card">
     <p class="es-muted">
-      Prüfe und ergänze die Metadaten und speichere sie anschließend über „Speichern".
+      @if (curation.metadataFinal()) {
+        Die Metadaten sind gespeichert und können hier nicht mehr geändert werden.
+      } @else {
+        Prüfe und ergänze die Metadaten und speichere sie anschließend über „Speichern".
+      }
     </p>
 
     @if (metadataAgent.lastRun()?.source; as source) {
@@ -23,7 +27,15 @@
       <!-- The WLO canvas replaces the edu-sharing MDS editor while the repository config
            enables it; both implement the same MetadataEditor contract. -->
       @if (additionalWebComponent.enabled()) {
-        <es-wlo-canvas [metadata]="metadata" (save)="save($event)"></es-wlo-canvas>
+        <!-- Once the metadata is final it is *shown*, not edited-with-everything-disabled: a
+             separate branch, so the canvas is created read-only from the start (its 'detail' preset)
+             instead of being switched over after mounting. -->
+        @if (curation.metadataFinal()) {
+          <es-wlo-canvas mode="detail" [metadata]="metadata"></es-wlo-canvas>
+        } @else {
+          <es-wlo-canvas [metadata]="metadata" [locked]="curation.metadataLocked()"
+                         (save)="save($event)"></es-wlo-canvas>
+        }
       } @else {
         <es-mds-editor [metadata]="metadata" (save)="save($event)"></es-mds-editor>
       }

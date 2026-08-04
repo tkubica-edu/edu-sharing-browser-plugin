@@ -1,0 +1,33 @@
+<div class="es-screen-body">
+  <section class="es-hint-card">
+    <p class="es-muted">Für diesen Inhalt liegen Metadaten im Repository.</p>
+
+    @if (curation.activeNode(); as node) {
+      <p class="node-title">{{ node.name || node.nodeId }}</p>
+      <div class="es-result-sub">
+        <a class="es-chip" [href]="node.link" target="_blank" rel="noopener">Im Repository öffnen</a>
+      </div>
+    }
+  </section>
+
+  <!-- The same rows as the main menu: these two are a choice of next step, not form buttons. -->
+  <ul class="option-list">
+    @for (option of options; track option.label) {
+      <li>
+        <button class="menu-item" [disabled]="flow.deciding()" (click)="option.run()">
+          <span class="mi-icon" [innerHTML]="icons.icon(option.icon)"></span>
+          <span class="mi-main">
+            <span class="mi-title">{{ option.label }}</span>
+            <span class="mi-desc">{{ option.description }}</span>
+          </span>
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+        </button>
+      </li>
+    }
+  </ul>
+
+  @if (flow.deciding()) {
+    <p class="es-muted">Der Inhalt wird geprüft …</p>
+  }
+</div>
