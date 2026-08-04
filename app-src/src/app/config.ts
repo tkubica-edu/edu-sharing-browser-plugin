@@ -1,6 +1,9 @@
 // Sidebar defaults. API base is fixed; the repository URL is a user-editable default.
 export const APP_CONFIG = {
   apiUrl: 'https://metadata-agent-api.vercel.app',
+  // Same agent behind the repository's proxy — off because it needs a repository session
+  // (403/401 without one); see the note in the root config.js.
+  // apiUrl: 'https://repository.staging.openeduhub.net/edu-sharing/rest/bapi/api/v1/proxy/metadata-agent-canvas',
   defaultRepositoryUrl: 'https://repository.staging.openeduhub.net/edu-sharing',
  //defaultRepositoryUrl: 'http://repository.127.0.0.1.nip.io:8100/edu-sharing',
   storageKeys: {

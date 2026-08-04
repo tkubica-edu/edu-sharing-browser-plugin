@@ -5,7 +5,11 @@ const EDU_SHARING_CONFIG = {
     // Metadata-Agent API (no auth); called only from the background worker.
     api: {
         url: 'https://metadata-agent-api.vercel.app',
-        localUrl: 'http://localhost:8000'
+        localUrl: 'http://localhost:8000',
+        // Same agent behind the repository's proxy. Kept off: the endpoint authorizes by
+        // repository session (403/401 without it) and the background worker has none — enabling
+        // it means moving the /generate call into the sidebar, which carries the session cookie.
+        // url: 'https://repository.staging.openeduhub.net/edu-sharing/rest/bapi/api/v1/proxy/metadata-agent-canvas',
     },
 
     // Default repository base (user-editable; /rest is appended by the auth layer).
