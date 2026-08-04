@@ -25,6 +25,7 @@ import { SettingsComponent } from './components/settings.component';
 import { StatusBarComponent } from './components/status-bar.component';
 import { TabBarComponent } from './components/tab-bar.component';
 import { AddContentScreenComponent } from './components/screens/add-content-screen.component';
+import { AddMaterialScreenComponent } from './components/screens/add-material-screen.component';
 import { ContentOptionsScreenComponent } from './components/screens/content-options-screen.component';
 import { CurationScreenComponent } from './components/screens/curation-screen.component';
 import { FindContentScreenComponent } from './components/screens/find-content-screen.component';
@@ -48,7 +49,7 @@ const DISCARD_PROMPT =
     StatusBarComponent, ActionBarComponent, TabBarComponent, MenuComponent, LoginComponent,
     HistoryComponent, SettingsComponent, SearchComponent, AddContentScreenComponent,
     ContentOptionsScreenComponent, CurationScreenComponent, FindContentScreenComponent,
-    NewDocumentScreenComponent, OwnContentScreenComponent,
+    NewDocumentScreenComponent, AddMaterialScreenComponent, OwnContentScreenComponent,
     MetadataScreenComponent, PreviewScreenComponent, CollectionsScreenComponent,
     UsagesScreenComponent, ShareScreenComponent
   ],

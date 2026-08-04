@@ -31,6 +31,7 @@
              leaving and re-entering it (a sibling sub step, e.g. "Sammlungen hinzufügen") must not
              turn it into a read-only view. A save is only locked out while it is in flight. -->
         <es-wlo-canvas [metadata]="metadata" [locked]="curation.metadataLocked()"
+                       [sourceUrl]="sourceUrl"
                        (save)="save($event)"></es-wlo-canvas>
       } @else {
         <es-mds-editor [metadata]="metadata" (save)="save($event)"></es-mds-editor>

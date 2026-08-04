@@ -13,6 +13,7 @@ export type ScreenId =
   | 'settings'
   | 'add-content'
   | 'new-document'
+  | 'add-material'
   | 'search'
   | 'curation'
   | 'own-content'
@@ -32,6 +33,7 @@ export type SectionId =
   | 'settings'
   | 'add-content'
   | 'new-document'
+  | 'add-material'
   | 'search'
   | 'curation'
   | 'own-content'
@@ -182,6 +184,13 @@ export const SECTIONS: readonly AppSection[] = [
     description: 'Ein neues OnlyOffice-Dokument im Repository anlegen',
     visible: requiresLogin(),
     tabs: [{ id: 'new-document', label: 'Erstellen' }]
+  },
+  {
+    id: 'add-material',
+    label: 'Datei oder Link',
+    description: 'Eine Datei hochladen oder einen Link als Inhalt speichern',
+    visible: requiresLogin(),
+    tabs: [{ id: 'add-material', label: 'Hinzufügen' }]
   },
   {
     id: 'search',

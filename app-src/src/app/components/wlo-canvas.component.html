@@ -14,11 +14,17 @@
 
     Locking takes the editing affordances with it: read-only fields, but also no per-field actions
     and no reset button, since both would offer changes that can no longer be saved.
+
+    With a `sourceUrl` the canvas erschließt that page itself on mount ('url' mode + autoExtract —
+    what its own URL input would trigger); without one both stay off and nothing is extracted.
   -->
   @if (bundle.ready()) {
     <metadata-agent-canvas
       [metadataInput]="seed()"
       [previewImage]="previewImage()"
+      [inputMode]="sourceUrl() ? 'url' : 'text'"
+      [url]="sourceUrl()"
+      [autoExtract]="!!sourceUrl()"
       [layout]="config().layout"
       [columns]="config().columns"
       [borderless]="config().borderless"

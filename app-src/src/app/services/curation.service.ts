@@ -97,6 +97,31 @@ export class CurationService {
   readonly nodeSourceOf = this.nodeSource.asReadonly();
   /** The active node's stored properties, fed to the metadata editor. */
   readonly nodeMetadata = signal<MdsValues | null>(null);
+
+  /**
+   * A page the metadata editor should erschließen itself, for a content whose source is known but
+   * whose metadata is not — a link that was just added to the repository (see
+   * AddMaterialScreenComponent). The WLO canvas runs the agent on it as it mounts; `null` means
+   * there is nothing to extract.
+   */
+  readonly extractionUrl = signal<string | null>(null);
+
+  /**
+   * Take the pending source page over, clearing it: the extraction belongs to the editor that is
+   * opening now, and re-entering the sub step later must not run the agent over the page again.
+   */
+  takeExtractionUrl(): string {
+    const url = this.extractionUrl();
+    if (url) this.extractionUrl.set(null);
+    return url ?? '';
+  }
+
+  /**
+   * Bumped whenever {@link nodeMetadata} carries values that REPLACE what is in the editor (the
+   * result of {@link rerunForActiveNode}), so the editor reseeds instead of keeping its own state
+   * — see WloCanvasComponent.seedVersion.
+   */
+  readonly editorSeedVersion = signal(0);
   /** The full hydrated node, fed to the preview element. */
   readonly previewNode = signal<Node | null>(null);
 
@@ -473,5 +498,6 @@ export class CurationService {
     this.saveError.set(null);
     this.assignError.set(null);
     this.assignedCollections.set([]);
+    this.extractionUrl.set(null);
   }
 }

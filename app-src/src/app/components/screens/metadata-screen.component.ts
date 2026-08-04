@@ -41,6 +41,13 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
     () => this.wloCanvas() ?? this.mdsEditor(),
   );
 
+  /**
+   * A page this editor should erschließen as it opens (an added link, see
+   * AddMaterialScreenComponent). Taken over ONCE, at construction: the screen is rebuilt whenever
+   * the sub step is re-entered, and re-extracting the page then would discard the user's edits.
+   */
+  protected readonly sourceUrl = this.curation.takeExtractionUrl();
+
   /** Stable object, so register/clear pair up by identity. */
   private readonly saveHandler: SaveHandler = {
     save: () => this.editor()?.commit(),
@@ -58,15 +65,16 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Save, then move on to the sub step the save just unlocked ("Inhalte zuordnen", which needs the
-   * node this save created). Read *before* the save, so this only advances when saving is what
-   * unlocked it: re-saving an existing node, whose siblings were open all along, stays put.
+   * Save, then move on to the next sub step ("Inhalte zuordnen"): saving the metadata is what
+   * finishes this step, so the Qualitätssicherung continues where it leads — also for a node that
+   * existed beforehand (an added material, a document found open), where the next step was open
+   * all along and staying put would leave the save looking like it did nothing.
    *
-   * The section itself is never left — the footer's "Zur Inhaltsübersicht" is the way out.
+   * The section itself is never left — the footer's "Zur Inhaltsübersicht" is the way out, and the
+   * editor stays editable via the tab bar.
    */
   protected async save(values: MdsValues): Promise<void> {
-    const nextWasLocked = this.navigation.nextTab()?.disabled ?? false;
     if (!(await this.curation.save(values))) return;
-    if (nextWasLocked) this.navigation.goNextTab();
+    this.navigation.goNextTab();
   }
 }

@@ -99,8 +99,8 @@ export class WloCanvasComponent implements MetadataEditor {
 
   /**
    * Locks the form in 'edit' mode: the fields stay visible but can no longer be changed. For the
-   * point at which the values have left the editor — a save is in flight, or the one-shot upload
-   * they belong to already happened (see CurationService.metadataLocked).
+   * window in which the values have left the editor and are being written — a save in flight (see
+   * CurationService.metadataLocked).
    */
   readonly locked = input(false);
 
@@ -109,6 +109,16 @@ export class WloCanvasComponent implements MetadataEditor {
    * the payload, so it has to be passed separately; empty means "none".
    */
   readonly previewImage = input('');
+
+  /**
+   * A page the canvas should erschließen *itself* on mount: it is handed over as the element's
+   * `url` + `inputMode="url"` with `autoExtract`, so the agent reads that page and fills the form.
+   * Empty means "nothing to extract" — the form then only shows what it was seeded with.
+   *
+   * Used for a content whose source is known but whose metadata is not: a link that was just added
+   * to the repository (see AddMaterialScreenComponent).
+   */
+  readonly sourceUrl = input('');
 
   /** Emits the current values when the footer triggers a save (mode 'edit'). */
   readonly save = output<MdsValues>();

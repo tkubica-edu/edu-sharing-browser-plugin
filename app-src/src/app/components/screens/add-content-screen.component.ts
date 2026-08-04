@@ -34,6 +34,11 @@ export class AddContentScreenComponent {
       description: 'Ein neues Dokument anlegen und im Connector bearbeiten'
     },
     {
+      section: 'add-material',
+      label: 'Datei oder Link',
+      description: 'Eine Datei hochladen oder einen Link als neuen Inhalt speichern'
+    },
+    {
       section: 'search',
       label: 'Suchen & einfügen',
       description: 'Einen vorhandenen Inhalt suchen und in das geöffnete Dokument einfügen'

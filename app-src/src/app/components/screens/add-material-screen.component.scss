@@ -1,0 +1,18 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+/* The hint carries the top padding for the screen; what follows it only pads the rest. */
+.material-hint { margin: 14px 14px 0; }
+
+.login-gate { padding: 0 14px 14px; }
+
+.material-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0 14px 14px;
+}
+
+.material-host { display: block; width: 100%; }
