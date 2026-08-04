@@ -60,7 +60,8 @@ export class ContentFlowService {
 
   /**
    * Take the current tab to the node's page in the repository (`…/components/render/<id>`), where the
-   * connector opens the content for editing.
+   * connector opens the content for editing — *unless the editing is already on screen*, see
+   * {@link alreadyOpen}.
    *
    * The panel cannot survive that load — it is an iframe in the page — so it is *restored* instead:
    * the state is written to storage first, the background worker reopens the panel on the new page,
@@ -69,13 +70,24 @@ export class ContentFlowService {
    */
   private async openNodePage(): Promise<void> {
     const node = this.curation.activeNode();
-    if (!node) return;
-    // Already on a page about this node — the OnlyOffice editor it is open in carries its id, as
-    // does the node's own page. Navigating would throw away the editor the user is working in (and
-    // the panel with it) to arrive where they already are.
-    if ((this.conditions.activeUrl() ?? '').includes(node.nodeId)) return;
+    if (!node || this.alreadyOpen(node.nodeId)) return;
     // Save BEFORE navigating: the load tears this app down without further notice.
     await this.sessionResume.save();
     await this.browserExtension.navigateTab(node.link);
+  }
+
+  /**
+   * Whether the content is already open for editing on the current page — then the panel only has to
+   * switch into the Bearbeitungsmodus, and replacing the page would throw away the editor the user is
+   * working in (and the panel with it) to arrive where they already are.
+   *
+   * Two ways to tell, because a connector page does not have to name the node in its URL:
+   * - the connector is on screen at all (the OnlyOffice check, which is what opening a content for
+   *   editing produces);
+   * - or the URL references this node — the node's own page, and the editor where it does carry it.
+   */
+  private alreadyOpen(nodeId: string): boolean {
+    if (this.conditions.onlyOfficePresent()) return true;
+    return (this.conditions.activeUrl() ?? '').includes(nodeId);
   }
 }

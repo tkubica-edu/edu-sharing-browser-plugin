@@ -265,9 +265,11 @@ keeps that outside the app, since the app itself is destroyed by every load.
 on the node's own page (`…/components/render/<id>`, see `ContentFlowService`): `save()` →
 `{action:'tabs.navigate', url}` → `tabs.update`. The reopening and the restore above then apply.
 
-- **Skipped entirely** when the active tab's URL already contains the node id — the OnlyOffice editor
-  URL carries it (`docNode`), so navigating would throw away the editor the user is working in to
-  arrive where they already are.
+- **Skipped entirely when the editing is already on screen** (`ContentFlowService.alreadyOpen`): the
+  connector is present (the OnlyOffice check), or the tab's URL references the node. Then only the
+  panel switches into the Bearbeitungsmodus — replacing the page would throw away the editor the user
+  is working in, and the panel with it. Two checks because a connector page does not have to name the
+  node in its URL.
 - A received `PREVIEW_NODE` for the node that is *already* the active one is ignored
   (`app.component.ts`): the node's own page announces it, which would otherwise re-land the panel on
   the main menu right after it was restored.
