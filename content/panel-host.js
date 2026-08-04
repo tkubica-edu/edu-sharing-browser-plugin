@@ -45,6 +45,16 @@
   }
 
   function closePanel() {
+    // FIRST, before anything else: drop every listener the open path attached. Our own resize
+    // listener re-applies the reserved width, so leaving it in place would make the restore below
+    // pointless — the dispatchResize() at the end would immediately reserve the space again.
+    // The teardown hangs off `window` because a toolbar toggle re-injects this file into a NEW
+    // closure: the instance that closes the panel is usually not the one that opened it and
+    // cannot see its local listeners.
+    if (window.__eduSharingPanelTeardown) {
+      try { window.__eduSharingPanelTeardown(); } catch (_) { /* tear down as far as possible */ }
+      window.__eduSharingPanelTeardown = null;
+    }
     const el = document.getElementById(PANEL_ID);
     if (el) el.remove();
     // Restore the page exactly as before: drop our reserved width + overflow clip, then
@@ -57,10 +67,6 @@
     delete root.dataset.eduSharingPrevOverflowX;
     // Let the page expand back to full width.
     dispatchResize();
-    if (window.__eduSharingPanelMsgHandler) {
-      window.removeEventListener('message', window.__eduSharingPanelMsgHandler);
-      window.__eduSharingPanelMsgHandler = null;
-    }
   }
 
   // Toggle: already open → close and stop.
@@ -210,8 +216,14 @@
       e.preventDefault();
     });
 
-    // Keep the panel within bounds if the window is resized narrower.
-    window.addEventListener('resize', () => applyWidth(panelWidth));
+    // Keep the panel within bounds if the window is resized narrower. Named, so closePanel can
+    // remove it again — and guarded against a detached container, so a listener that somehow
+    // outlives its panel can never re-reserve the space.
+    function onWindowResize() {
+      if (!container.isConnected) return;
+      applyWidth(panelWidth);
+    }
+    window.addEventListener('resize', onWindowResize);
 
     // Envelope contract shared with the OnlyOffice page-side plugin. It listens on both
     // window.postMessage and a CustomEvent named EDU_PLUGIN_CHANNEL, and only accepts
@@ -313,7 +325,17 @@
           ' frame(s), requestId:', data && data.requestId);
       }
     };
-    window.__eduSharingPanelMsgHandler = handler;
     window.addEventListener('message', handler);
+
+    // Everything this instance attached to `window`, in one place for closePanel. Kept on
+    // `window` rather than in this closure: a toolbar toggle re-injects the file, and that fresh
+    // instance is the one that has to clean up after this one.
+    window.__eduSharingPanelTeardown = () => {
+      window.removeEventListener('resize', onWindowResize);
+      window.removeEventListener('message', handler);
+      // Closed mid-drag: onPointerUp owns the drag cleanup (shield, text selection, its own
+      // capture-phase listeners), so reuse it instead of repeating it here.
+      onPointerUp();
+    };
   });
 })();

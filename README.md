@@ -278,9 +278,11 @@ resets per session.
 
 ### Manual test checklist
 1. Toolbar click → the sidebar docks on the right; drag its left edge to resize; the ✕ button
-   closes it. The start view is the menu, which lists the options visible for the current page
-   (on an OnlyOffice page *Inhalt suchen* first, and nothing opens on its own), the status bar
-   shows the matching chips, and the topbar carries the *Verlauf* / *Einstellungen* icons.
+   closes it — and the page must take the freed width back immediately (no empty strip), also
+   after a later window resize and after closing straight out of a drag. The start view is the
+   menu, which lists the options visible for the current page (on an OnlyOffice page *Inhalt
+   suchen* first, and nothing opens on its own), the status bar shows the matching chips, and the
+   topbar carries the *Verlauf* / *Einstellungen* icons.
 2. **Einstellungen** (topbar icon, reachable while logged out): the Repository-URL defaults to
    `https://repository.staging.openeduhub.net/edu-sharing` and is required. Changing it shows an
    *Übernehmen* button that reloads the sidebar so the library re-initializes against the new
