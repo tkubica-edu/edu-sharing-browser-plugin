@@ -22,7 +22,8 @@ export type ScreenId =
   | 'metadata'
   | 'collections'
   | 'preview'
-  | 'usages';
+  | 'usages'
+  | 'share';
 
 /** A navigable section: the main menu itself, a menu entry, or a step of the content flow. */
 export type SectionId =
@@ -224,7 +225,8 @@ export const SECTIONS: readonly AppSection[] = [
     visible: requiresLogin((c) => c.hasActiveNode),
     tabs: [
       { id: 'preview', label: 'Vorschau' },
-      { id: 'usages', label: 'Nutzung' }
+      { id: 'usages', label: 'Nutzung' },
+      { id: 'share', label: 'Inhalt teilen' }
     ]
   },
 

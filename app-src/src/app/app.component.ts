@@ -33,6 +33,7 @@ import { MetadataScreenComponent } from './components/screens/metadata-screen.co
 import { NewDocumentScreenComponent } from './components/screens/new-document-screen.component';
 import { OwnContentScreenComponent } from './components/screens/own-content-screen.component';
 import { PreviewScreenComponent } from './components/screens/preview-screen.component';
+import { ShareScreenComponent } from './components/screens/share-screen.component';
 import { UsagesScreenComponent } from './components/screens/usages-screen.component';
 
 /** Window in which the same node delivery is treated as a duplicate. */
@@ -49,7 +50,7 @@ const DISCARD_PROMPT =
     ContentOptionsScreenComponent, CurationScreenComponent, FindContentScreenComponent,
     NewDocumentScreenComponent, OwnContentScreenComponent,
     MetadataScreenComponent, PreviewScreenComponent, CollectionsScreenComponent,
-    UsagesScreenComponent
+    UsagesScreenComponent, ShareScreenComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',

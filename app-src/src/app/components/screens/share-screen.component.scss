@@ -1,0 +1,14 @@
+// "Inhalt teilen" — the element brings the QR code and the copyable link; only the surrounding card
+// layout is ours.
+:host { display: block; }
+
+.share {
+  display: flex;
+  justify-content: center;
+}
+
+// The card is always in the template (it is the mount point), so it must not show as an empty box
+// before the element is in it.
+.share:empty {
+  display: none;
+}

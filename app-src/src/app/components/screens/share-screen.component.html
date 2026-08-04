@@ -1,0 +1,24 @@
+<div class="es-screen-body">
+  <section class="es-hint-card">
+    <p class="es-muted">
+      Teile den Inhalt über den Link oder den QR-Code — beide führen auf die Seite des Inhalts im
+      Repository.
+    </p>
+  </section>
+
+  @if (bundle.error()) {
+    <section class="es-card">
+      <p class="es-error">Teilen konnte nicht geladen werden: {{ bundle.error() }}</p>
+    </section>
+  } @else if (error(); as message) {
+    <section class="es-card"><p class="es-error">{{ message }}</p></section>
+  } @else if (!curation.activeNode()) {
+    <p class="es-muted">Noch kein Inhalt vorhanden.</p>
+  } @else if (!bundle.ready()) {
+    <p class="es-muted">Teilen wird geladen …</p>
+  }
+
+  <!-- The element is created and filled in here rather than by a binding — it reads its node id on
+       init, before template bindings would have run (see the component comment). -->
+  <section class="es-card share" #host></section>
+</div>
