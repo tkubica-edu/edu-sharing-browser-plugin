@@ -5,8 +5,12 @@ import { BrowserExtensionService } from '../services/browser-extension.service';
 import { LoginComponent } from './login.component';
 import { NodesSelectorComponent, NodesSelectorOption } from './nodes-selector.component';
 
-// "Inhalt suchen": the shared nodes selector in search mode. The chosen nodes are posted to the
-// host page (OnlyOffice), which inserts them.
+// The shared nodes selector in search mode (Suche, Sammlungen, Workspace). The chosen nodes are
+// posted to the host page (OnlyOffice), which inserts them.
+//
+// Used from two places, since picking content to insert is the same job in both: "Inhalt hinzufügen →
+// Suchen & einfügen", and the Bearbeitungsmodus, where it sits next to the keyword-driven extended
+// search (FindContentScreenComponent) as the way to go looking for something yourself.
 @Component({
   selector: 'es-search',
   imports: [LoginComponent, NodesSelectorComponent],
