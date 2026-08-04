@@ -1,8 +1,8 @@
 <div class="es-screen-body">
   <section class="es-hint-card">
     <p class="es-muted">
-      @if (curation.metadataFinal()) {
-        Die Metadaten sind gespeichert und können hier nicht mehr geändert werden.
+      @if (curation.metadataSaved()) {
+        Die Metadaten sind gespeichert. Du kannst sie weiter bearbeiten und erneut speichern.
       } @else {
         Prüfe und ergänze die Metadaten und speichere sie anschließend über „Speichern".
       }
@@ -27,15 +27,11 @@
       <!-- The WLO canvas replaces the edu-sharing MDS editor while the repository config
            enables it; both implement the same MetadataEditor contract. -->
       @if (additionalWebComponent.enabled()) {
-        <!-- Once the metadata is final it is *shown*, not edited-with-everything-disabled: a
-             separate branch, so the canvas is created read-only from the start (its 'detail' preset)
-             instead of being switched over after mounting. -->
-        @if (curation.metadataFinal()) {
-          <es-wlo-canvas mode="detail" [metadata]="metadata"></es-wlo-canvas>
-        } @else {
-          <es-wlo-canvas [metadata]="metadata" [locked]="curation.metadataLocked()"
-                         (save)="save($event)"></es-wlo-canvas>
-        }
+        <!-- Always the editing preset, also after a save: this screen is "Metadaten bearbeiten", and
+             leaving and re-entering it (a sibling sub step, e.g. "Sammlungen hinzufügen") must not
+             turn it into a read-only view. A save is only locked out while it is in flight. -->
+        <es-wlo-canvas [metadata]="metadata" [locked]="curation.metadataLocked()"
+                       (save)="save($event)"></es-wlo-canvas>
       } @else {
         <es-mds-editor [metadata]="metadata" (save)="save($event)"></es-mds-editor>
       }

@@ -112,23 +112,21 @@ export class CurationService {
   /** Set while a generated result still waits to be saved; see {@link hasUnsavedWork}. */
   private readonly resultPending = signal(false);
 
-  /** Set once the content was written through the metadata agent's upload; see {@link metadataLocked}. */
-  private readonly uploaded = signal(false);
+  /** Set once the metadata was written at least once; see {@link metadataSaved}. */
+  private readonly saved = signal(false);
 
   /**
-   * The metadata is final: the content went through the agent's upload, which *creates* it (with a
-   * duplicate check and an editorial workflow) and therefore happens exactly once — there is nothing
-   * a further edit could be saved to. The editor is replaced by a read-only view of what was
-   * written, rather than left standing with its fields switched off.
+   * The metadata has been written at least once. Only the *wording* of the save step depends on it
+   * ("erneut speichern") — editing stays open: the save created (or found) the active node, so every
+   * further save updates that node in place (see {@link save}).
    */
-  readonly metadataFinal = this.uploaded.asReadonly();
+  readonly metadataSaved = this.saved.asReadonly();
 
   /**
-   * No editing right now: either the metadata is {@link metadataFinal}, or a save is in flight — the
-   * values have been read and are being written, so changing them would silently diverge from what
-   * lands in the repository.
+   * No editing right now, because a save is in flight: the values have been read and are being
+   * written, so changing them would silently diverge from what lands in the repository.
    */
-  readonly metadataLocked = computed(() => this.saving() || this.metadataFinal());
+  readonly metadataLocked = computed(() => this.saving());
 
   /** A metadata-agent result or an active node exists. */
   readonly hasEditableMetadata = computed(
@@ -296,6 +294,7 @@ export class CurationService {
         : await this.repositoryNodes.createInInbox(values);
       this.setActiveNode(saved.nodeId, saved.name);
       this.resultPending.set(false);
+      this.saved.set(true);
       // Load the full hydrated node once: its properties re-seed the editor (so re-editing
       // uses the stored values) and the node itself feeds the preview.
       try {
@@ -340,7 +339,7 @@ export class CurationService {
         return false;
       }
       this.resultPending.set(false);
-      this.uploaded.set(true);
+      this.saved.set(true);
       if (outcome.node?.nodeId) await this.applyUploadedNode(outcome.node, values);
       return true;
     } catch (cause: unknown) {
@@ -466,7 +465,7 @@ export class CurationService {
 
   private resetNodeState(): void {
     this.resultPending.set(false);
-    this.uploaded.set(false);
+    this.saved.set(false);
     this.activeNode.set(null);
     this.nodeSource.set(null);
     this.nodeMetadata.set(null);

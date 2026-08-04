@@ -84,12 +84,15 @@ export class ActionBarService {
         const handler = this.saveHandler();
         return [
           {
-            // Stays in place once saved, saying what happened, rather than vanishing and shifting
-            // the footer under the user's cursor.
+            // The re-save is marked TODO on the button itself: the editor stays editable after a
+            // save, but a second save takes the in-place update route (see CurationService.save),
+            // which for an agent-uploaded node is not settled yet — the agent creates it with its
+            // own privileges and offers no endpoint that writes back to it (see WIDGET-REFERENZ.md,
+            // "Bestandsinhalte via Node-ID").
             label: this.curation.saving()
               ? 'Speichern…'
-              : this.curation.metadataFinal()
-                ? 'Gespeichert'
+              : this.curation.metadataSaved()
+                ? 'Erneut speichern (TODO)'
                 : 'Speichern',
             disabled: !handler?.canSave() || this.curation.metadataLocked(),
             run: () => handler?.save()
