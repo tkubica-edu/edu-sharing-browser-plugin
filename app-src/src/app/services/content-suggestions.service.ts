@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 
 import { errorMessage } from '../util/errors';
+import { KeywordRankingService, RankedKeyword } from './keyword-ranking.service';
 import { MetadataAgentService } from './metadata-agent.service';
 import { OnlyOfficeDocumentService } from './onlyoffice-document.service';
 
@@ -15,19 +16,26 @@ import { OnlyOfficeDocumentService } from './onlyoffice-document.service';
  */
 const KEYWORD_WIDGET = 'cclom:general_keyword';
 
-/** How many of the agent's keywords are kept at all — the list the screen shows. */
+/**
+ * How many of the agent's keywords are kept at all — the list the screen shows. The cut is made
+ * *after* ranking, so it keeps the best ones rather than the first ones the agent named.
+ */
 const MAX_KEYWORDS = 8;
 
 /**
  * How many keywords the search *starts* with. All values of one widget go into a single search
  * criterion, and the repository's `ngsearch` query template joins them in a way that narrows the
- * result set — so a long list of agent-invented keywords matches nothing at all, while the first
- * (most relevant) two still find promising content. See {@link step} for the relaxation from here.
+ * result set — so a long list of agent-invented keywords matches nothing at all, while the two
+ * best-supported ones still find promising content. Which two those are is decided by
+ * {@link KeywordRankingService}, not by the agent's order. See {@link step} for the relaxation.
  */
 const SEARCH_KEYWORDS = 2;
 
 const NO_KEYWORDS =
   'Für das Dokument konnten keine Schlagworte erzeugt werden. Bitte erst mehr Inhalte schreiben.';
+
+/** Log prefix, as everywhere else in the extension (`[edu-sharing][<station>]`). */
+const LOG = '[edu-sharing][keywords]';
 
 /**
  * Derives search words from the document the host page has open, for "Passende Inhalte finden":
@@ -48,12 +56,26 @@ const NO_KEYWORDS =
 export class ContentSuggestionsService {
   private readonly onlyOfficeDocument = inject(OnlyOfficeDocumentService);
   private readonly metadataAgent = inject(MetadataAgentService);
+  private readonly ranking = inject(KeywordRankingService);
 
   readonly running = signal(false);
   readonly error = signal<string | null>(null);
 
-  /** The keywords the agent generated for the open document. */
+  /** The keywords the agent generated for the open document, best-supported first. */
   readonly keywords = signal<readonly string[]>([]);
+
+  /**
+   * The ranking behind {@link keywords} — the evidence per keyword, for anything that wants to show
+   * *why* a keyword is searched or not.
+   */
+  readonly ranked = signal<readonly RankedKeyword[]>([]);
+
+  /**
+   * The document text the current keywords were generated from. Kept because the ranking needs it
+   * *after* the agent answered, and because re-reading the document would mean another round trip
+   * to the plugin for text we already had in hand.
+   */
+  readonly documentText = signal('');
 
   /**
    * How far the search has been relaxed, because keywords the agent invented are often carried by
@@ -100,18 +122,30 @@ export class ContentSuggestionsService {
     this.error.set(null);
     try {
       const content = await this.onlyOfficeDocument.requestContent();
-      const outcome = await this.metadataAgent.extractField(content.markdown ?? '', KEYWORD_WIDGET);
+      const text = content.markdown ?? '';
+      const outcome = await this.metadataAgent.extractField(text, KEYWORD_WIDGET);
       if (!outcome.ok) {
         this.error.set(outcome.error ?? NO_KEYWORDS);
         return false;
       }
-      const keywords = this.pickKeywords(outcome.values ?? []);
-      if (!keywords.length) {
+      const fromAgent = this.pickKeywords(outcome.values ?? []);
+      console.log(
+        `${LOG} ⬅ ${fromAgent.length} from the agent, its own order (${text.length} chars of text):`,
+        [...fromAgent],
+      );
+
+      // Rank against the very text the keywords were generated from, then cut — so the ones that
+      // survive and lead are the ones the document supports, not the ones the agent named first.
+      const ranked = this.ranking.rank(fromAgent, text).slice(0, MAX_KEYWORDS);
+      if (!ranked.length) {
         this.error.set(NO_KEYWORDS);
         return false;
       }
-      this.keywords.set(keywords);
+      this.documentText.set(text);
+      this.ranked.set(ranked);
+      this.keywords.set(ranked.map((entry) => entry.keyword));
       this.step.set(0);
+      this.logRanking(ranked);
       return true;
     } catch (cause: unknown) {
       this.error.set(errorMessage(cause));
@@ -140,11 +174,42 @@ export class ContentSuggestionsService {
   /** Forget the derived keywords, so the next visit reads the document again. */
   reset(): void {
     this.keywords.set([]);
+    this.ranked.set([]);
+    this.documentText.set('');
     this.error.set(null);
     this.step.set(0);
   }
 
-  /** The generated keywords, de-duplicated (first spelling wins) and capped. */
+  /**
+   * Report the ranking: the order that came out, and which of it the query uses. The evidence goes
+   * out as a table, because that is the form the weights are judged from — why a keyword sits where
+   * it does is only visible next to its neighbours' numbers.
+   */
+  private logRanking(ranked: readonly RankedKeyword[]): void {
+    console.log(
+      `${LOG} ➡ after ranking, searched:`,
+      [...this.searchKeywords()],
+      '| rest only shown:',
+      ranked.slice(this.searchKeywords().length).map((entry) => entry.keyword),
+    );
+    console.table(
+      ranked.map((entry) => ({
+        keyword: entry.keyword,
+        score: Number(entry.score.toFixed(3)),
+        text: entry.textScore,
+        occurrences: entry.occurrences,
+        title: entry.inTitle,
+        heading: entry.inHeading,
+        allTerms: entry.allTermsPresent,
+        agentRank: entry.agentRank,
+      })),
+    );
+  }
+
+  /**
+   * The generated keywords, de-duplicated (first spelling wins). Not capped here — the cap belongs
+   * after the ranking, or it would throw away keywords before anything looked at them.
+   */
   private pickKeywords(values: readonly string[]): string[] {
     const unique = new Map(
       values
@@ -152,6 +217,6 @@ export class ContentSuggestionsService {
         .filter(Boolean)
         .map((word) => [word.toLowerCase(), word]),
     );
-    return [...unique.values()].slice(0, MAX_KEYWORDS);
+    return [...unique.values()];
   }
 }
