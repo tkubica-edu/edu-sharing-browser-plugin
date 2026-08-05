@@ -207,12 +207,14 @@ export const SECTIONS: readonly AppSection[] = [
     description: 'Der Inhalt ist im Connector geöffnet und wird dort bearbeitet',
     visible: requiresLogin((c) => c.hasActiveNode),
     // Two ways to reach content for the document being edited, because they answer different
-    // questions: the extended search *suggests* what fits it (keywords derived from its text), the
-    // nodes selector lets the user go and find something themselves (Suche, Sammlungen, Workspace).
-    // Both hand the chosen node to the host page, so either can be used at any point.
+    // questions: the nodes selector lets the user go and find something themselves (Suche,
+    // Sammlungen, Workspace), the extended search *suggests* what fits the document (keywords
+    // derived from its text). Both hand the chosen node to the host page, so either can be used at
+    // any point. Searching comes first — it is the one that works without reading the document,
+    // and it is what the user is here for; the suggestions are the offer on top.
     tabs: [
-      { id: 'find-content', label: 'Passende Inhalte' },
-      { id: 'search', label: 'Inhalt auswählen' }
+      { id: 'search', label: 'Inhalt auswählen' },
+      { id: 'find-content', label: 'Passende Inhalte' }
     ]
   },
   {
