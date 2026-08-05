@@ -21,7 +21,7 @@ interface ContentOption {
 // from the Verlauf, or picked from den eigenen Inhalten. It offers the ways on as main-menu-style
 // rows.
 //
-// "Inhalt bearbeiten" is the one that depends on the content rather than on the panel's state: it
+// "Bearbeitungsmodus" is the one that depends on the content rather than on the panel's state: it
 // applies to a content that opens in a connector, which the repository's connector list decides
 // (see NodeConnectorService) — so the row appears once that answer is in.
 @Component({
@@ -64,10 +64,10 @@ export class ContentOptionsScreenComponent {
   /**
    * The ways on that apply right now, in the order they are offered.
    *
-   * Editing is offered for a content that opens in a connector, and on the insert host itself —
-   * there the editor is on screen, which is that same statement made by the page. What the row then
-   * does is not decided here: {@link ContentFlowService.edit} opens the connector, or goes straight
-   * to the Bearbeitungsmodus when the content is already open in it.
+   * The Bearbeitungsmodus is offered for a content that opens in a connector, and on the insert host
+   * itself — there the editor is on screen, which is that same statement made by the page. Either way
+   * the editor is already open by the time this screen is reached, so the row only enters the panel
+   * step (see {@link ContentFlowService.enterEditing}).
    *
    * Each option is checked against its target section as well, so none of them offers a step that
    * {@link NavigationService.go} would refuse.
@@ -78,11 +78,9 @@ export class ContentOptionsScreenComponent {
     if (this.opensInConnector() || conditions.onlyOfficePresent) {
       options.push({
         section: 'editing',
-        label: 'Inhalt bearbeiten',
-        description: conditions.onlyOfficePresent
-          ? 'Inhalte in OnlyOffice einfügen'
-          : 'Im Connector öffnen und Inhalte einfügen',
-        run: () => this.flow.edit()
+        label: 'Bearbeitungsmodus',
+        description: 'Inhalte suchen und in das Dokument einfügen',
+        run: () => this.flow.enterEditing()
       });
     }
     options.push(

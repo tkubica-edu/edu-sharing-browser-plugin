@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 
 import { errorMessage } from '../../util/errors';
 import { AuthService } from '../../services/auth.service';
+import { ContentFlowService } from '../../services/content-flow.service';
 import { CurationService } from '../../services/curation.service';
 import { NavigationService } from '../../services/navigation.service';
 import { LoginComponent } from '../login.component';
@@ -9,7 +10,8 @@ import { NodesSelectorComponent, NodesSelectorOption } from '../nodes-selector.c
 
 // "Eigene Inhalte": the shared nodes selector, restricted to the user's own workspace. The picked
 // node becomes the app's active content — from there the flow is the same as for a detected or a
-// history node, so the *Inhaltsoptionen* screen offers the two ways on (edit / overview).
+// history node, so the *Inhaltsoptionen* screen offers the ways on. Except where the content itself
+// says where it opens: one that has a connector goes straight into it (see open()).
 //
 // A collection can be picked as well as a file (`allowCollectionSelection`, see the template): both
 // are content of the user's own, and which of the two it is only shows up further along the flow.
@@ -24,6 +26,7 @@ export class OwnContentScreenComponent {
   protected readonly auth = inject(AuthService);
   private readonly curation = inject(CurationService);
   private readonly navigation = inject(NavigationService);
+  private readonly flow = inject(ContentFlowService);
 
   protected readonly error = signal<string | null>(null);
   protected readonly loading = signal(false);
@@ -50,7 +53,7 @@ export class OwnContentScreenComponent {
     trap: false,
     optionConfig: {
       state: 'search',
-      applyLabel: 'Inhalt öffnen',
+      applyLabel: 'Inhaltsoptionen öffnen',
       autoClose: false,
       // Exactly one: this screen opens *the* content the user picked, so a second one has nowhere
       // to go. The selector has no single-selection mode (its element takes no such input and its
@@ -63,14 +66,21 @@ export class OwnContentScreenComponent {
     }
   };
 
-  /** Load the picked node into the flow and hand over to the *Inhaltsoptionen* screen. */
+  /**
+   * Load the picked node into the flow and open it.
+   *
+   * A content that opens in a connector is taken straight there: picking such a content *is* opening
+   * it, so waiting for a second click would only ask the user to confirm what they just asked for.
+   * Everything else has nothing to open outside the panel and lands on the *Inhaltsoptionen* screen,
+   * which is also where the connector content comes back to once it has been edited.
+   */
   private async open(nodeId: string | undefined): Promise<void> {
     if (!nodeId) return;
     this.error.set(null);
     this.loading.set(true);
     try {
       await this.curation.openNode(nodeId);
-      this.navigation.go('content-options');
+      if (!(await this.flow.openInConnector())) this.navigation.go('content-options');
     } catch (cause: unknown) {
       this.error.set('Der Inhalt konnte nicht geladen werden: ' + errorMessage(cause));
     } finally {
