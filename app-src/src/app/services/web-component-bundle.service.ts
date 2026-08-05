@@ -1,9 +1,9 @@
 import { Injectable, Signal, inject, signal } from '@angular/core';
 import browser from 'webextension-polyfill';
 
-import { APP_CONFIG } from '../config';
 import { errorMessage } from '../util/errors';
 import { AuthService } from './auth.service';
+import { MetadataAgentApiService } from './metadata-agent-api.service';
 
 /**
  * The pre-built web-component bundles packaged with the extension. Each name is both the
@@ -61,6 +61,7 @@ const ELEMENT_TIMEOUT_MS = 15_000;
 @Injectable({ providedIn: 'root' })
 export class WebComponentBundleService {
   private readonly auth = inject(AuthService);
+  private readonly agentApi = inject(MetadataAgentApiService);
 
   private readonly loads = new Map<WebComponentBundle, Promise<void>>();
 
@@ -154,7 +155,7 @@ export class WebComponentBundleService {
       __ENV?: Record<string, string>;
     };
     if (bundle === 'wlo') {
-      globals.__ENV = { ...(globals.__ENV ?? {}), agentUrl: APP_CONFIG.apiUrl };
+      globals.__ENV = { ...(globals.__ENV ?? {}), agentUrl: this.agentApi.baseUrl() };
       return;
     }
     const apiRootUrl = this.auth.apiRootUrl();

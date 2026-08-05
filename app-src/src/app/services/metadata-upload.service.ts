@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { APP_CONFIG } from '../config';
 import { MdsValues } from '../util/mds-values';
 import { BrowserExtensionService, UploadedNode } from './browser-extension.service';
+import { MetadataAgentApiService } from './metadata-agent-api.service';
 import { errorMessage } from './../util/errors';
 
 /** The envelope keys the agent's payload carries alongside the field values. */
@@ -45,6 +46,7 @@ export interface UploadOutcome {
 @Injectable({ providedIn: 'root' })
 export class MetadataUploadService {
   private readonly browserExtension = inject(BrowserExtensionService);
+  private readonly agentApi = inject(MetadataAgentApiService);
 
   /**
    * Upload the edited values as a new content.
@@ -77,7 +79,7 @@ export class MetadataUploadService {
       screenshot_method: SCREENSHOT_METHOD
     };
     try {
-      const response = await this.browserExtension.uploadMetadata(body);
+      const response = await this.browserExtension.uploadMetadata(body, this.agentApi.baseUrl());
       if (!response.success) return { ok: false, error: response.error ?? 'Upload fehlgeschlagen.' };
       const result = response.result ?? {};
       return {

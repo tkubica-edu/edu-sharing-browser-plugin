@@ -81,11 +81,18 @@ export class BrowserExtensionService {
     });
   }
 
-  /** Ask the background worker to analyze the active tab. */
-  async analyzeActiveTab(language: string): Promise<AnalyzeResponse> {
+  /**
+   * Ask the background worker to analyze the active tab.
+   *
+   * `apiUrl` is which metadata agent to call: it follows from the configured repository, which only
+   * the panel knows (see MetadataAgentApiService) — the worker has no repository of its own and
+   * falls back to the agent's public deployment when told nothing.
+   */
+  async analyzeActiveTab(language: string, apiUrl?: string): Promise<AnalyzeResponse> {
     const response = (await browser.runtime.sendMessage({
       action: 'analyze.run',
       language,
+      apiUrl,
     })) as AnalyzeResponse | null;
     return response ?? { success: false, error: 'NO_RESPONSE' };
   }
@@ -93,12 +100,13 @@ export class BrowserExtensionService {
   /**
    * Ask the background worker to POST an upload body to the metadata agent's `/upload`, which
    * writes the curated content into the repository itself. The reply carries the endpoint's own
-   * answer verbatim (see {@link UploadResponse}).
+   * answer verbatim (see {@link UploadResponse}). `apiUrl` as in {@link analyzeActiveTab}.
    */
-  async uploadMetadata(body: Record<string, unknown>): Promise<UploadResponse> {
+  async uploadMetadata(body: Record<string, unknown>, apiUrl?: string): Promise<UploadResponse> {
     const response = (await browser.runtime.sendMessage({
       action: 'metadata.upload',
       body,
+      apiUrl,
     })) as UploadResponse | null;
     return response ?? { success: false, error: 'NO_RESPONSE' };
   }

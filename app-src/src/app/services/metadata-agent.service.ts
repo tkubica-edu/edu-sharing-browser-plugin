@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 
-import { APP_CONFIG } from '../config';
 import { BrowserExtensionService, PageSource } from './browser-extension.service';
+import { MetadataAgentApiService } from './metadata-agent-api.service';
 import { errorMessage } from '../util/errors';
 
 /** Reserved (non-metadata) top-level keys in the metadata-agent response. */
@@ -73,6 +73,7 @@ interface ExtractFieldAnswer {
 @Injectable({ providedIn: 'root' })
 export class MetadataAgentService {
   private readonly browserExtension = inject(BrowserExtensionService);
+  private readonly agentApi = inject(MetadataAgentApiService);
 
   private readonly lastRunState = signal<AnalyzeOutcome | null>(null);
 
@@ -83,7 +84,12 @@ export class MetadataAgentService {
   async run(): Promise<AnalyzeOutcome> {
     this.running.set(true);
     try {
-      const response = await this.browserExtension.analyzeActiveTab(LANGUAGE);
+      // The worker has no repository of its own to derive the agent from, so it is told which one
+      // to call (see MetadataAgentApiService).
+      const response = await this.browserExtension.analyzeActiveTab(
+        LANGUAGE,
+        this.agentApi.baseUrl(),
+      );
       return this.remember(
         response.success
           ? { ok: true, source: response.source, parsed: this.parse(response.result) }
@@ -155,8 +161,8 @@ export class MetadataAgentService {
 
   /**
    * POST the text to the agent's `/extract-field`, straight from the sidebar document — the same
-   * way the WLO canvas calls `/generate` (`window.__ENV.agentUrl`, also {@link APP_CONFIG.apiUrl}),
-   * and unlike {@link run}, which goes through the background worker.
+   * way the WLO canvas calls `/generate` (`window.__ENV.agentUrl`, the same base — see
+   * MetadataAgentApiService), and unlike {@link run}, which goes through the background worker.
    *
    * Deliberately so: the call shows up in the panel's own DevTools like every other request the
    * sidebar makes, and there is no second build artifact that can fall out of sync — a worker still
@@ -170,7 +176,7 @@ export class MetadataAgentService {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), EXTRACT_TIMEOUT_MS);
     try {
-      const response = await fetch(`${APP_CONFIG.apiUrl}/extract-field`, {
+      const response = await fetch(`${this.agentApi.baseUrl()}/extract-field`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({

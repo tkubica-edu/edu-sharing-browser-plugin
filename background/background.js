@@ -5,6 +5,11 @@
 
 /* global EDU_SHARING_CONFIG */
 
+/**
+ * Fallback metadata agent, for a call that arrives without one. Which agent applies follows from
+ * the configured repository, and only the sidebar knows that (see MetadataAgentApiService), so it
+ * names the base in every message — this is what is used when it does not.
+ */
 const API_URL = (typeof EDU_SHARING_CONFIG !== 'undefined' && EDU_SHARING_CONFIG.getApiUrl())
   || 'https://metadata-agent-api.vercel.app';
 const DEFAULT_TIMEOUT_MS = (typeof EDU_SHARING_CONFIG !== 'undefined' && EDU_SHARING_CONFIG.network?.defaultTimeoutMs) || 20000;
@@ -25,6 +30,16 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_M
 async function safeJson(response) {
   try { return await response.json(); }
   catch { return null; }
+}
+
+/**
+ * The metadata agent a message asks for, or {@link API_URL} when it names none. Only an absolute
+ * http(s) base is accepted: the sender is trusted, but a malformed value would otherwise turn into
+ * a request against this worker's own origin, which no agent answers.
+ */
+function agentBaseOf(message) {
+  const url = typeof message?.apiUrl === 'string' ? message.apiUrl.trim() : '';
+  return /^https?:\/\//i.test(url) ? url.replace(/\/+$/, '') : API_URL;
 }
 
 // PANEL TOGGLE (toolbar button)
@@ -197,8 +212,8 @@ function buildGenerateBody(pageData, language) {
  * /generate — after the full generate timeout, and reported as if the extraction had failed. The
  * health call turns that into an immediate, unambiguous answer.
  */
-async function callHealth() {
-  const url = `${API_URL}/health`;
+async function callHealth(apiUrl) {
+  const url = `${apiUrl}/health`;
   let response;
   try {
     response = await fetchWithTimeout(url, { headers: { 'Accept': 'application/json' } });
@@ -214,11 +229,11 @@ async function callHealth() {
   return result;
 }
 
-async function callGenerate(body) {
+async function callGenerate(body, apiUrl) {
   // First health, then generate: no point sending an extraction to a base that is not answering.
-  await callHealth();
+  await callHealth(apiUrl);
   const response = await fetchWithTimeout(
-    `${API_URL}/generate`,
+    `${apiUrl}/generate`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -240,9 +255,9 @@ async function callGenerate(body) {
 // POST an assembled upload body to the metadata agent, which writes the content into the
 // repository itself (duplicate check + workflow). Proxied through the worker for the same reason
 // as /generate: the endpoint is cross-origin for the sidebar document.
-async function callUpload(body) {
+async function callUpload(body, apiUrl) {
   const response = await fetchWithTimeout(
-    `${API_URL}/upload`,
+    `${apiUrl}/upload`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -323,7 +338,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
           }
           const pageData = await extractPageDataFromTab(tab.id);
           const body = buildGenerateBody(pageData, message.language);
-          const result = await callGenerate(body);
+          const result = await callGenerate(body, agentBaseOf(message));
           return {
             success: true,
             result,
@@ -334,7 +349,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
         // POST an upload body assembled by the sidebar to /upload — the metadata agent's own way
         // of writing the curated content into the repository.
         case 'metadata.upload': {
-          const result = await callUpload(message.body ?? {});
+          const result = await callUpload(message.body ?? {}, agentBaseOf(message));
           return { success: true, result };
         }
 
@@ -348,4 +363,4 @@ browser.runtime.onMessage.addListener((message, sender) => {
   })();
 });
 
-console.log('✅ edu-sharing background ready. API:', API_URL);
+console.log('✅ edu-sharing background ready. API fallback:', API_URL);
