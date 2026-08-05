@@ -364,10 +364,8 @@ export class CurationService {
    *
    * `/upload` only ever CREATES: it takes no node id, and the nodes it writes are the agent's, not
    * the panel session's. So a second save cannot update what the first one wrote — it uploads
-   * again and produces a NEW node, which then becomes the content the flow works on. The duplicate
-   * check is therefore turned off from the second save on, since the node the first one created
-   * would be found as the duplicate of exactly this content. The footer says so ("Erneut
-   * speichern", see ActionBarService).
+   * again and produces a NEW node, which then becomes the content the flow works on. The footer
+   * says so ("Erneut speichern", see ActionBarService).
    */
   private async saveThroughAgent(values: MdsValues): Promise<boolean> {
     this.saving.set(true);
@@ -378,7 +376,6 @@ export class CurationService {
         values,
         lastRun?.parsed?.raw ?? null,
         lastRun?.source?.url,
-        !this.saved(),
       );
       if (!outcome.ok) {
         this.saveError.set(outcome.error ?? 'Upload fehlgeschlagen.');
