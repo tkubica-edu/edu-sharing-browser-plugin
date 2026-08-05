@@ -1,5 +1,6 @@
 import { Injectable, Signal, computed, inject, signal } from '@angular/core';
 
+import { AdditionalWebComponentService } from './additional-web-component.service';
 import { CurationService } from './curation.service';
 import { NavigationService } from './navigation.service';
 
@@ -31,6 +32,7 @@ export interface FooterAction {
 export class ActionBarService {
   private readonly curation = inject(CurationService);
   private readonly navigation = inject(NavigationService);
+  private readonly additionalWebComponent = inject(AdditionalWebComponentService);
 
   // The metadata screen registers its save handler (→ mdsEditor.commit()) while mounted, so the
   // footer can drive a save without referencing the editor.
@@ -84,15 +86,18 @@ export class ActionBarService {
         const handler = this.saveHandler();
         return [
           {
-            // The re-save is marked TODO on the button itself: the editor stays editable after a
-            // save, but a second save takes the in-place update route (see CurationService.save),
-            // which for an agent-uploaded node is not settled yet — the agent creates it with its
-            // own privileges and offers no endpoint that writes back to it (see WIDGET-REFERENZ.md,
-            // "Bestandsinhalte via Node-ID").
+            // Normally one label throughout: every save writes the same node, so a second wording
+            // would announce a difference there is none.
+            //
+            // With the additional web component there IS one. Saving goes through the agent's
+            // `/upload`, which only ever CREATES — there is no endpoint that writes back to a node
+            // it made, and the panel session (a guest) may not edit it either (see
+            // WIDGET-REFERENZ.md, "Bestandsinhalte via Node-ID"). So saving again produces ANOTHER
+            // node and continues with it; "Erneut speichern" says that before it happens.
             label: this.curation.saving()
               ? 'Speichern…'
-              : this.curation.metadataSaved()
-                ? 'Erneut speichern (TODO)'
+              : this.additionalWebComponent.enabled() && this.curation.metadataSaved()
+                ? 'Erneut speichern'
                 : 'Speichern',
             disabled: !handler?.canSave() || this.curation.metadataLocked(),
             run: () => handler?.save()

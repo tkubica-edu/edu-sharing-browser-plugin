@@ -320,9 +320,11 @@ export class CurationService {
    */
   async save(values: MdsValues): Promise<boolean> {
     if (!this.auth.authorized()) return false;
-    if (this.additionalWebComponent.enabled() && !this.activeNode()) {
-      return this.saveThroughAgent(values);
-    }
+    // With the additional web component every save goes through the agent's upload — not just the
+    // first one. The nodes it writes belong to the agent's own privileges, so the session the panel
+    // runs under (a guest) may neither read nor edit them: an update in place is not available for
+    // them, and a second save can only be another upload. See {@link saveThroughAgent}.
+    if (this.additionalWebComponent.enabled()) return this.saveThroughAgent(values);
     this.saving.set(true);
     this.saveError.set(null);
     try {
@@ -355,14 +357,17 @@ export class CurationService {
   }
 
   /**
-   * Save a freshly curated content through the metadata agent's own upload instead of creating the
-   * node ourselves. That is the save belonging to the WLO canvas, which is the editor while the
-   * additional web component is enabled: the agent creates the node, checks for duplicates and
-   * starts the editorial workflow — a plain node create does none of that.
+   * Save through the metadata agent's own upload instead of writing the node ourselves. That is the
+   * save belonging to the WLO canvas, which is the editor while the additional web component is
+   * enabled: the agent creates the node, checks for duplicates and starts the editorial workflow —
+   * a plain node create does none of that.
    *
-   * Only for a content that has no node yet. An existing node (a document found open, one picked
-   * from the Verlauf or den eigenen Inhalten) is updated in place by {@link save}, since uploading
-   * it again would create a second copy.
+   * `/upload` only ever CREATES: it takes no node id, and the nodes it writes are the agent's, not
+   * the panel session's. So a second save cannot update what the first one wrote — it uploads
+   * again and produces a NEW node, which then becomes the content the flow works on. The duplicate
+   * check is therefore turned off from the second save on, since the node the first one created
+   * would be found as the duplicate of exactly this content. The footer says so ("Erneut
+   * speichern", see ActionBarService).
    */
   private async saveThroughAgent(values: MdsValues): Promise<boolean> {
     this.saving.set(true);
@@ -373,6 +378,7 @@ export class CurationService {
         values,
         lastRun?.parsed?.raw ?? null,
         lastRun?.source?.url,
+        !this.saved(),
       );
       if (!outcome.ok) {
         this.saveError.set(outcome.error ?? 'Upload fehlgeschlagen.');
@@ -402,6 +408,12 @@ export class CurationService {
    */
   private async applyUploadedNode(uploaded: UploadedNode, values: MdsValues): Promise<void> {
     const nodeId = uploaded.nodeId!;
+    // A re-upload produces a DIFFERENT node (see saveThroughAgent), and what the previous one was
+    // assigned to says nothing about this one — so the assignments start over with it.
+    if (this.activeNode() && this.activeNode()!.nodeId !== nodeId) {
+      this.assignedCollections.set([]);
+      this.assignError.set(null);
+    }
     this.activeNode.set({
       nodeId,
       // The agent's title, never the id — see {@link ActiveNode}.

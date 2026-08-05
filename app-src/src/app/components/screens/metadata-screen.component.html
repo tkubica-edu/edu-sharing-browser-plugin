@@ -3,6 +3,10 @@
     <p class="es-muted">
       @if (curation.metadataSaved()) {
         Die Metadaten sind gespeichert. Du kannst sie weiter bearbeiten und erneut speichern.
+        @if (additionalWebComponent.enabled()) {
+          „Erneut speichern" legt dabei einen <strong>neuen Inhalt</strong> an, der dann hier
+          weitergeführt wird — der bereits gespeicherte bleibt unverändert bestehen.
+        }
       } @else {
         Prüfe und ergänze die Metadaten und speichere sie anschließend über „Speichern".
       }

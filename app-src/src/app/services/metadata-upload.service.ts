@@ -54,17 +54,22 @@ export class MetadataUploadService {
    *   type, `_origins`, `_source_text`) that the endpoint expects alongside the values, and which
    *   an editor's committed values alone do not contain.
    * @param sourceUrl the page the content was curated from, used for the preview screenshot.
+   * @param checkDuplicates whether the endpoint should refuse content it already knows. On for the
+   *   first upload of a content; OFF for a deliberate re-upload — the node the previous save
+   *   created would otherwise be found as its duplicate, and the endpoint has no way of updating
+   *   that node (see CurationService.saveThroughAgent).
    */
   async upload(
     values: MdsValues,
     payload: Record<string, unknown> | null,
     sourceUrl?: string,
+    checkDuplicates = true,
   ): Promise<UploadOutcome> {
     const envelope = this.envelopeOf(payload);
     const body: Record<string, unknown> = {
       metadata: { ...values, ...envelope },
       repository: APP_CONFIG.uploadRepository,
-      check_duplicates: true,
+      check_duplicates: checkDuplicates,
       start_workflow: true,
       write_extended_data: true,
       extended_text: envelope['_source_text'],
