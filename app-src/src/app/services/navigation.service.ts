@@ -172,7 +172,8 @@ export class NavigationService {
    * the main menu once the trail is used up.
    *
    * A step that no longer applies is skipped rather than opened (its content is gone, the page
-   * changed) — the trail is where the user *was*, and only what still holds can be returned to.
+   * changed) — the trail is where the user *was*, and only what still holds can be returned to. So
+   * is a step that must not be re-entered at all (see AppSection.oneWay).
    */
   back(): void {
     let trail = this.trail();
@@ -181,8 +182,7 @@ export class NavigationService {
       trail = trail.slice(0, -1);
       if (target.section === 'menu') break;
       const section = this.sectionOf(target.section);
-      const conditions = this.conditions.snapshot();
-      if (!section?.visible(conditions) || !this.isEnabled(section, conditions)) continue;
+      if (!section || !this.canReturnTo(section)) continue;
       this.trail.set(trail);
       this.open(target.section, target.tab);
       this.releaseContentUnneededBy(section);
@@ -244,8 +244,7 @@ export class NavigationService {
       // The menu is the root: reaching it means nothing above it survived, which is a landing.
       if (candidate.section === 'menu') break;
       const section = this.sectionOf(candidate.section);
-      const conditions = this.conditions.snapshot();
-      if (!section?.visible(conditions) || !this.isEnabled(section, conditions)) continue;
+      if (!section || !this.canReturnTo(section)) continue;
       this.trail.set(steps.slice(0, index));
       this.open(candidate.section, candidate.tab);
       return true;
@@ -253,10 +252,28 @@ export class NavigationService {
     return false;
   }
 
-  /** The step back returns to; undefined once the trail is used up (then it is the main menu). */
+  /**
+   * The step back returns to; undefined once the trail is used up (then it is the main menu). The
+   * same skipping as {@link back}, so the button's label names where it actually goes.
+   */
   private previousStep(): NavStep | undefined {
     const trail = this.trail();
-    return trail[trail.length - 1];
+    for (let index = trail.length - 1; index >= 0; index--) {
+      const step = trail[index];
+      if (step.section === 'menu') return step;
+      const section = this.sectionOf(step.section);
+      if (section && this.canReturnTo(section)) return step;
+    }
+    return undefined;
+  }
+
+  /**
+   * Whether a visited section can be re-opened: it still applies, and re-entering it is a return
+   * rather than a restart (see AppSection.oneWay).
+   */
+  private canReturnTo(section: AppSection): boolean {
+    const conditions = this.conditions.snapshot();
+    return !section.oneWay && section.visible(conditions) && this.isEnabled(section, conditions);
   }
 
   /** Open a section without touching the trail — the one place section/tab are actually set. */

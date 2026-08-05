@@ -113,6 +113,14 @@ export interface AppSection {
    * guards and the section title work exactly like for a menu entry.
    */
   topbar?: boolean;
+  /**
+   * A section that must never be *returned* to: entering it starts something rather than showing
+   * something, so re-entering it would start that again — for "Inhalt erstellen", whose screen opens
+   * the OnlyOffice create-dialog the moment it mounts. Back (and a resume after a page change) walks
+   * past such a step to the one behind it, so the user cannot be caught in the dialog they just left.
+   * It is still entered normally; only the way back skips it.
+   */
+  oneWay?: boolean;
 }
 
 /** Everything except login and settings requires a valid login. */
@@ -199,6 +207,9 @@ export const SECTIONS: readonly AppSection[] = [
     label: 'Inhalt erstellen',
     description: 'Ein neues OnlyOffice-Dokument im Repository anlegen',
     visible: requiresLogin(),
+    // Mounting the screen opens the create-dialog, so coming back here would ask the user to create
+    // yet another document instead of letting them out — see AppSection.oneWay.
+    oneWay: true,
     tabs: [{ id: 'new-document', label: 'Erstellen' }]
   },
   {
