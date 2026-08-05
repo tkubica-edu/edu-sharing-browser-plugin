@@ -93,8 +93,11 @@ export interface AppSection {
    * that vanishes takes its explanation with it.
    */
   enabled?: (conditions: Conditions) => boolean;
-  /** Why the section cannot be entered, shown as its tooltip. */
-  disabledHint?: string;
+  /**
+   * Why the section cannot be entered, shown as its tooltip. A function when it is disabled for more
+   * than one reason and the user is owed the one that applies.
+   */
+  disabledHint?: string | ((conditions: Conditions) => string);
   /** The section's sub steps, in tab order. Never empty. */
   tabs: readonly SectionTab[];
   /** Listed as an entry of the main menu. Without it the section is only reachable from the flow. */
@@ -174,13 +177,19 @@ export const SECTIONS: readonly AppSection[] = [
     label: 'Inhalt erschließen',
     description: 'Aus der aktuellen Webseite Metadaten erzeugen',
     visible: requiresLogin(),
-    // Nothing left to erschließen once a content was detected for this page: the repository already
-    // holds it (PageRecognitionService found it by URL) or the host has it open — and *that* content
-    // is what the panel offers to work on, under "Inhalt erkannt". Curating again would produce a
-    // second node for the same page.
-    enabled: (c) => !c.hasDetectedNode,
-    disabledHint:
-      'Dieser Inhalt ist bereits erschlossen — er wird unter „Inhalt erkannt" angeboten.',
+    // Two kinds of page have nothing to erschließen, and the entry stays listed on both to say which:
+    //
+    // - Edu-Sharing itself: its pages are the repository showing what it already holds, never a
+    //   source to read metadata off. That holds for the whole of it, so the option is off there for
+    //   good — not just where a node was recognised.
+    // - any page whose content was already detected: the repository holds it (PageRecognitionService
+    //   found it by URL) or the host has it open, and *that* content is what the panel offers to work
+    //   on under "Inhalt erkannt". Curating again would produce a second node for the same page.
+    enabled: (c) => !c.onEduSharing && !c.hasDetectedNode,
+    disabledHint: (c) =>
+      c.onEduSharing
+        ? 'Edu-Sharing-Seiten werden nicht erschlossen — sie zeigen, was das Repository schon hat.'
+        : 'Dieser Inhalt ist bereits erschlossen — er wird unter „Inhalt erkannt“ angeboten.',
     menu: true,
     tabs: [{ id: 'curation', label: 'Erschließen' }]
   },

@@ -43,10 +43,11 @@ The options:
 - **Login** — the shared `es-login` gate; shown while logged out and reused inline by the
   screens that need a session.
 - **Inhalt erschließen** — reads the active tab, calls `POST {apiUrl}/generate` through the
-  background worker and advances to the metadata screen. Hidden on Edu-Sharing itself and on
-  an insert host, where the intent is searching instead. **Disabled while a content was detected
-  for the page** (see *Inhalt erkannt*): curating it again would produce a second node for the
-  same page.
+  background worker and advances to the metadata screen. It stays listed but is **disabled** on two
+  kinds of page, saying which in its tooltip: **on Edu-Sharing itself**, whose pages show what the
+  repository already holds and are never a source to read metadata off — so there for good, not only
+  where a node was recognised; and **while a content was detected for the page** (see *Inhalt
+  erkannt*), since curating it again would produce a second node for the same page.
 - **Inhalt erkannt** — a node that turned up on its own, offered as the prominent menu entry.
   Two ways it does: the OnlyOffice plugin announcing the document it has open (`DOCUMENT_INFO`),
   and — on every other page — `getWebsiteInformation` (`ClientutilsV1Service`, the lookup the

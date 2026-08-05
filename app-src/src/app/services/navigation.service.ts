@@ -11,9 +11,13 @@ export interface TabView extends SectionTab {
   disabled: boolean;
 }
 
-/** A section as the main menu renders it: its definition plus whether it can be entered. */
-export interface SectionView extends AppSection {
+/**
+ * A section as the main menu renders it: its definition plus whether it can be entered, with the
+ * reason already resolved to the one that applies right now (see AppSection.disabledHint).
+ */
+export interface SectionView extends Omit<AppSection, 'disabledHint'> {
   disabled: boolean;
+  disabledHint?: string;
 }
 
 /** A visited step: a section plus the sub step that was open in it. */
@@ -71,7 +75,14 @@ export class NavigationService {
     return SECTIONS.filter(
       (section) =>
         section.menu && section.visible(conditions) && (section.listed?.(conditions) ?? true),
-    ).map((section) => ({ ...section, disabled: !this.isEnabled(section, conditions) }));
+    ).map((section) => ({
+      ...section,
+      disabled: !this.isEnabled(section, conditions),
+      disabledHint:
+        typeof section.disabledHint === 'function'
+          ? section.disabledHint(conditions)
+          : section.disabledHint
+    }));
   });
 
   /** The utility sections, shown as topbar icons rather than as menu entries. */
