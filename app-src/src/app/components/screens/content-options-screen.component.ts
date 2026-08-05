@@ -52,9 +52,11 @@ export class ContentOptionsScreenComponent {
       const node = this.curation.previewNode();
       this.opensInConnector.set(false);
       if (!node) return;
-      void this.nodeConnector.opensInConnector(node).then((opens) => {
+      // Only *whether* there is one matters here; which one it is decides where editing navigates
+      // to, and that is ContentFlowService's business.
+      void this.nodeConnector.connectorFor(node).then((connector) => {
         // Only if it is still the same content — the answer may outlive it.
-        if (this.curation.previewNode() === node) this.opensInConnector.set(opens);
+        if (this.curation.previewNode() === node) this.opensInConnector.set(connector !== null);
       });
     });
   }
