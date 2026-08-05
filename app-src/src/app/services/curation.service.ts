@@ -286,7 +286,8 @@ export class CurationService {
    * page that is open rather than about a choice the user made:
    *
    * - the document the host page has open (OnlyOfficeDocumentService, which already loaded it);
-   * - the content the repository already holds for this page's URL (PageRecognitionService).
+   * - the content the repository already holds for this page's URL, or the one a repository page
+   *   shows (PageRecognitionService — see also {@link adoptDetectedNodeId}).
    *
    * Unlike {@link openNode} nothing is written to the history — the user did not pick this node,
    * it is simply what happens to be open. Ignored once anything else is loaded or unsaved, so a
@@ -303,6 +304,22 @@ export class CurationService {
     // duplicate list of getWebsiteInformation). Then it is loaded once, so the metadata editor
     // opens on the stored values instead of on nothing.
     if (!node.properties) void this.hydrateActiveNode(node.ref.id);
+  }
+
+  /**
+   * Adopt a node an open page identifies by **id** — what a repository page does, naming the content
+   * it shows in its own URL (see PageRecognitionService). Answers whether it became the content.
+   *
+   * The node is loaded first: an id alone is not a content, and the guard is checked before that too,
+   * so a page the panel has already moved on from costs no request. A node the session may not read
+   * is simply not adopted — the page says what it shows, not what this session is allowed to see.
+   */
+  async adoptDetectedNodeId(nodeId: string): Promise<boolean> {
+    if (this.activeNode() || this.hasUnsavedWork()) return false;
+    const node = await this.loadNode(nodeId);
+    if (!node) return false;
+    this.adoptDetectedNode(node);
+    return this.activeNode()?.nodeId === nodeId;
   }
 
   /** Re-seed preview and editor from the fully loaded node; a no-op if the flow moved on since. */
