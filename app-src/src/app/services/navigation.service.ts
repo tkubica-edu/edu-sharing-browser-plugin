@@ -228,9 +228,29 @@ export class NavigationService {
     this.openMenu();
   }
 
-  /** Take a trail over from a restored state, so back still walks it (SessionResumeService). */
-  restoreTrail(steps: readonly NavStep[]): void {
-    this.trail.set(steps.slice(-TRAIL_LIMIT));
+  /**
+   * Reopen a stored state (SessionResumeService): the step the user was on, with the steps behind it
+   * as the trail. Answers whether anything was opened — nothing is, when none of it applies here.
+   *
+   * The stored step often cannot be re-entered on the new page: it needed a content that described
+   * the page just left. Then the *deepest step behind it that still applies* is opened instead, so
+   * the panel comes back as close to where the user was as this page allows — rather than dropping
+   * them at the main menu with the way back thrown away.
+   */
+  resume(step: NavStep, trail: readonly NavStep[]): boolean {
+    const steps = [...trail.slice(-TRAIL_LIMIT), step];
+    for (let index = steps.length - 1; index >= 0; index--) {
+      const candidate = steps[index];
+      // The menu is the root: reaching it means nothing above it survived, which is a landing.
+      if (candidate.section === 'menu') break;
+      const section = this.sectionOf(candidate.section);
+      const conditions = this.conditions.snapshot();
+      if (!section?.visible(conditions) || !this.isEnabled(section, conditions)) continue;
+      this.trail.set(steps.slice(0, index));
+      this.open(candidate.section, candidate.tab);
+      return true;
+    }
+    return false;
   }
 
   /** The step back returns to; undefined once the trail is used up (then it is the main menu). */

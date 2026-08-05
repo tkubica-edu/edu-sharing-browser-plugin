@@ -78,8 +78,14 @@ export class SessionResumeService {
    * `targetUrl` is the page the app is about to open. It is stored as the state's own page, so the
    * node survives that navigation — see {@link restore}, which otherwise drops a node that only
    * described the page being left.
+   *
+   * This is the app's LAST write: tracking is switched off first, because the navigation that
+   * brought us here was itself a state change, so the effect above is already scheduled and would
+   * otherwise land *after* this one — with the page being left as the state's page, which is exactly
+   * what this call is correcting. Whoever cancels the navigation calls {@link track} again.
    */
   async save(targetUrl?: string): Promise<void> {
+    this.tracking.set(false);
     await this.write({ ...this.snapshot(), url: targetUrl ?? this.conditions.activeUrl() });
   }
 
@@ -111,15 +117,14 @@ export class SessionResumeService {
     if (state.nodeId && this.nodeStillApplies(state)) {
       await this.curation.resumeNode(state.nodeId, state.nodeSource ?? 'detected');
     }
-    this.navigation.go(state.section, { tab: state.tab ?? undefined });
-    // `go` refuses a section that does not apply on this page (an OnlyOffice-only one, or one that
-    // needs a node that could not be loaded) — then nothing was restored and the caller should land.
-    if (this.navigation.section() !== state.section) return false;
-    // After `go`, which pushed the step it was called from: the trail is the stored one, so back
-    // continues where the user was rather than jumping to the menu (a state from before this was
-    // stored has none — then back does what it used to).
-    this.navigation.restoreTrail(state.trail ?? []);
-    return true;
+    // The whole way the user came, not just where they stood: a step that does not apply on this
+    // page (an OnlyOffice-only one, or one that needs a node that could not be loaded) hands over to
+    // the one behind it, and only a state of which nothing applies is no restore at all — then the
+    // caller lands. A state from before the trail was stored has none, and restores as it used to.
+    return this.navigation.resume(
+      { section: state.section, tab: state.tab ?? null },
+      state.trail ?? [],
+    );
   }
 
   /**

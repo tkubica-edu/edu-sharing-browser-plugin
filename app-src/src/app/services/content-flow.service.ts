@@ -76,7 +76,14 @@ export class ContentFlowService {
     // navigation is the flow continuing, not the page changing under it (see
     // SessionResumeService.nodeStillApplies).
     await this.sessionResume.save(node.link);
-    await this.browserExtension.navigateTab(node.link);
+    try {
+      await this.browserExtension.navigateTab(node.link);
+    } catch (cause: unknown) {
+      // The page stays, so this app lives on: take the state tracking back up, which `save` switched
+      // off for what it assumed was the last write of this panel.
+      this.sessionResume.track();
+      throw cause;
+    }
   }
 
   /**
