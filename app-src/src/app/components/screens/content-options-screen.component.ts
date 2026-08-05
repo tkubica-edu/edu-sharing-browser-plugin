@@ -64,10 +64,10 @@ export class ContentOptionsScreenComponent {
   /**
    * The ways on that apply right now, in the order they are offered.
    *
-   * The Bearbeitungsmodus is offered for a content that opens in a connector, and on the insert host
-   * itself — there the editor is on screen, which is that same statement made by the page. Either way
-   * the editor is already open by the time this screen is reached, so the row only enters the panel
-   * step (see {@link ContentFlowService.enterEditing}).
+   * Editing is offered for a content that opens in a connector, and on the insert host itself —
+   * there the editor is on screen, which is that same statement made by the page. What the row then
+   * does is not decided here: {@link ContentFlowService.edit} opens the connector, or goes straight
+   * to the Bearbeitungsmodus when the content is already open in it.
    *
    * Each option is checked against its target section as well, so none of them offers a step that
    * {@link NavigationService.go} would refuse.
@@ -79,8 +79,10 @@ export class ContentOptionsScreenComponent {
       options.push({
         section: 'editing',
         label: 'Bearbeitungsmodus',
-        description: 'Inhalte suchen und in das Dokument einfügen',
-        run: () => this.flow.enterEditing()
+        description: conditions.onlyOfficePresent
+          ? 'Inhalte in OnlyOffice einfügen'
+          : 'Im Connector öffnen und Inhalte einfügen',
+        run: () => this.flow.edit()
       });
     }
     options.push(

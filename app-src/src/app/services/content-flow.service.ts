@@ -30,56 +30,37 @@ export class ContentFlowService {
   readonly deciding = signal(false);
 
   /**
-   * Open the active content in its connector and accompany it in the Bearbeitungsmodus. Answers
-   * whether it has one — a content that opens in no connector is left where it is.
+   * "Bearbeitungsmodus": that step when the node opens in a connector, else Qualitätssicherung.
    *
-   * This is what *picking* a content does, for every way in: a freshly created document, a file from
-   * *Eigene Inhalte*. Opening such a content means opening its editor, so it happens right then
-   * rather than one screen later — by the time the Inhaltsoptionen are on screen, the content the
-   * connector holds is already open in it.
-   *
-   * The connector is asked for twice over: whether there is one at all decides this, and the one
-   * there is provides the URL that opens the content in it. Editing means being in the editor, so
-   * that is where the tab goes; the node's own page is only the fallback for a connector that
-   * reports no URL.
+   * The connector is asked for twice over: whether there is one at all decides the branch, and the
+   * one there is provides the URL that *opens* the content in it — the same for every way in (a
+   * freshly created document, a file from *Eigene Inhalte*, a Verlauf entry). Editing means being in
+   * the editor, so that is where the tab goes; the node's own page is only the fallback for a
+   * connector that reports no URL.
    */
-  async openInConnector(): Promise<boolean> {
+  async edit(): Promise<void> {
     // The hydrated node, not just the active-node summary: the filetype matching reads its
-    // mimetype, properties and access. A generated result that has no node yet has no connector
-    // either — nothing can be open in one.
+    // mimetype, properties and access.
     const node = this.curation.previewNode();
-    if (!node) return false;
+    if (!node) {
+      // A generated result that has no node yet — nothing can be open in a connector.
+      this.navigation.go('quality');
+      return;
+    }
     this.deciding.set(true);
     try {
       const connector = await this.nodeConnector.connectorFor(node);
-      if (!connector) return false;
+      if (!connector) {
+        this.navigation.go('quality');
+        return;
+      }
       // The section is set first so it is part of the state that is saved and restored: the panel
       // reopens on the new page in the Bearbeitungsmodus.
       this.navigation.go('editing');
       await this.openNodePage(this.nodeConnector.getConnectorUrl(node, connector));
-      return true;
     } finally {
       this.deciding.set(false);
     }
-  }
-
-  /**
-   * Take the content to the step it calls for: the connector's Bearbeitungsmodus when it has one,
-   * else the Qualitätssicherung. For where a content *arrives* and the next step is not the user's
-   * choice but the content's — a document just created through a connector is open in it.
-   */
-  async edit(): Promise<void> {
-    if (!(await this.openInConnector())) this.navigation.go('quality');
-  }
-
-  /**
-   * "Bearbeitungsmodus": accompany the editor the content is already open in — the panel step alone,
-   * with no navigation of the tab. Nothing to open here: on the insert host the editor *is* the page,
-   * and a content picked elsewhere was opened in its connector when it was picked (see
-   * {@link openInConnector}).
-   */
-  enterEditing(): void {
-    this.navigation.go('editing');
   }
 
   /** "Qualitätssicherung": the metadata step, straight from a node — nothing to decide here. */
