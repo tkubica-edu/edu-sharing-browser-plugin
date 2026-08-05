@@ -1,0 +1,30 @@
+// Angular Material tokens for the embedded web components.
+//
+// Both packaged bundles are loaded into THIS document (no iframe, see
+// WebComponentBundleService), and each ships a full Angular Material theme that declares its
+// tokens on `html`:
+//
+//   scripts/edu/styles.css      html { --mat-table-background-color: white;   … }  (454 tokens)
+//   scripts/wlo/styles.…css     html { --mat-table-background-color: #fcf8fd; … }  (721 tokens)
+//
+// 95 of those tokens collide with different values, and since both sheets use the same selector,
+// the winner is whichever `<link>` was appended last — i.e. which bundle happened to load first,
+// which depends on where the user navigated. That is why the tables and trees of the edu elements
+// ("Eigene Inhalte", the nodes selector) turn up in the pale violet of the WLO bundle's Material 3
+// palette (#fcf8fd is its `surface`) instead of white.
+//
+// The three tokens below are the ones that *paint surfaces*, so they are the visible part of that
+// collision. They are re-declared here on `:root`, whose specificity (0,1,0) beats both bundles'
+// `html` (0,0,1) — so the panel's own surface colours win no matter what order the bundles load
+// in. This also applies inside the WLO canvas, which is intended: one panel, one surface colour.
+//
+// The dark theme is untouched: the edu bundle declares it under `.isDarkTheme` / `body.isDarkTheme`,
+// which still outranks (or, at equal specificity, follows) this block.
+//
+// The remaining collisions are shades of text, borders and elevations that are not noticeable in
+// what we embed. If one of them does show up, this is the place for it.
+:root {
+  --mat-table-background-color: var(--es-surface);
+  --mat-tree-container-background-color: var(--es-surface);
+  --mat-app-background-color: var(--es-bg);
+}

@@ -1,4 +1,7 @@
 @use 'tokens';
+// Must come after 'tokens': it maps the panel's surface colours onto the Material tokens the
+// embedded bundles paint with.
+@use 'embedded-material';
 @use 'mixins' as m;
 
 * { box-sizing: border-box; }
