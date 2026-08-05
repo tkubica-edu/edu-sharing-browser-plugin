@@ -190,6 +190,9 @@ export const SECTIONS: readonly AppSection[] = [
       c.onEduSharing
         ? 'Edu-Sharing-Seiten werden nicht erschlossen — sie zeigen, was das Repository schon hat.'
         : 'Dieser Inhalt ist bereits erschlossen — er wird unter „Inhalt erkannt“ angeboten.',
+    // Opening the screen starts the Erschließung (see CurationScreenComponent), so stepping back
+    // into it would run it again and carry the user straight forward — see AppSection.oneWay.
+    oneWay: true,
     menu: true,
     tabs: [{ id: 'curation', label: 'Erschließen' }]
   },

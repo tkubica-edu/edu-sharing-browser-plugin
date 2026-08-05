@@ -49,13 +49,14 @@ export class ActionBarService {
   readonly actions = computed<FooterAction[]>(() => {
     switch (this.navigation.section()) {
       // "Inhalt erschließen": run the metadata agent on the page and hand its result to the
-      // Qualitätssicherung.
+      // Qualitätssicherung. The screen starts that itself on entry, so what is left for the footer
+      // is the repeat — after a failure, or for a page that has changed since.
       case 'curation':
         return [
           {
             label: this.curation.running()
               ? 'Erschließe… (kann etwas dauern)'
-              : 'Erschließung starten',
+              : 'Erschließung wiederholen',
             disabled: this.curation.running(),
             run: async () => {
               if (await this.curation.analyze()) this.navigation.go('quality');

@@ -1,0 +1,325 @@
+// One cycle drives everything here, so every animation below is `var(--cp-cycle)` long and says
+// WHEN it does its thing in percentages of that cycle. Keeping a single duration is what holds the
+// scene and its caption together: an item lands while "gesammelt" is on screen, the cart is scanned
+// while "bewertet" is, and the whole thing repeats seamlessly for as long as the agent runs.
+//
+// The phases, as percentages of the cycle:
+//   0–22 %  the page is read (the sweep goes over it)
+//   6–58 %  its images and texts fly into the cart, one after the other
+//  58–96 %  the AI goes over what was collected
+:host {
+  --cp-cycle: 4.8s;
+  // How far an item travels: from just inside the page's right edge into the cart's basket. The
+  // scene is centred, so both ends are known — see .cp-flight for where the travel starts.
+  --cp-distance: 57px;
+
+  display: block;
+  width: 100%;
+}
+
+.cp-scene {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  padding: var(--es-space-4) 0;
+  color: var(--es-blue);
+  // The scene's geometry is pinned to the pixel (the flight distances are measured against it), so
+  // it is scaled as a whole rather than resized: it is centred in a screen-filling card and would
+  // otherwise read as a small detail floating in it.
+  transform: scale(1.3);
+}
+
+// ---- The page being read -------------------------------------------------
+
+.cp-page {
+  position: relative;
+  overflow: hidden;
+  flex: 0 0 auto;
+  width: 92px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border: 1px solid var(--es-border);
+  border-radius: 6px;
+  background: var(--es-surface);
+}
+
+.cp-page-shot {
+  height: 24px;
+  border-radius: 3px;
+  background: linear-gradient(120deg, var(--es-blue-600) 0%, #7fb0e6 100%);
+  opacity: 0.85;
+}
+
+.cp-page-line {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--es-border);
+
+  &--short {
+    width: 60%;
+  }
+}
+
+// The reading sweep: a soft band travelling down the page, once per cycle at the very start.
+.cp-sweep {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 22px;
+  background: linear-gradient(180deg, rgb(10 79 158 / 0%), rgb(10 79 158 / 18%), rgb(10 79 158 / 0%));
+  animation: cp-sweep var(--cp-cycle) linear infinite;
+}
+
+@keyframes cp-sweep {
+  0% { transform: translateY(-22px); opacity: 0; }
+  4% { opacity: 1; }
+  20% { transform: translateY(66px); opacity: 1; }
+  24%, 100% { transform: translateY(66px); opacity: 0; }
+}
+
+// ---- What is picked off it ----------------------------------------------
+
+// Where the flights start, so all four travel the same way: a zero-sized lane just inside the
+// page's right edge. The scene's content is 162px wide (92 page + 26 gap + 44 cart) and centred, so
+// that edge sits 11px right of the centre and the cart's basket 57px further along.
+.cp-flight {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  margin-left: -5px;
+}
+
+.cp-item {
+  position: absolute;
+  left: 0;
+  top: -7px;
+  width: 16px;
+  height: 13px;
+  border-radius: 3px;
+  opacity: 0;
+  animation: cp-fly-high var(--cp-cycle) cubic-bezier(0.35, 0, 0.5, 1) infinite;
+
+  // A screenshot tile and a text snippet, told apart at a glance: the tile is the page's own
+  // gradient, the snippet is two lines of "text".
+  &--shot {
+    background: linear-gradient(120deg, var(--es-blue-600) 0%, #7fb0e6 100%);
+  }
+
+  &--text {
+    background: var(--es-surface);
+    border: 1px solid var(--es-border);
+    background-image: linear-gradient(var(--es-muted) 0 0), linear-gradient(var(--es-muted) 0 0);
+    background-size: 9px 1.5px, 6px 1.5px;
+    background-position: 3px 4px, 3px 7.5px;
+    background-repeat: no-repeat;
+  }
+
+  // Alternating arcs, so the four do not read as one sliding block.
+  &--2,
+  &--4 {
+    animation-name: cp-fly-low;
+  }
+
+  // The stagger: one item leaves roughly every 0.3 s, in the order they were picked.
+  &--2 { animation-delay: 0.3s; }
+  &--3 { animation-delay: 0.6s; }
+  &--4 { animation-delay: 0.9s; }
+}
+
+@keyframes cp-fly-high {
+  0%, 6% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+  12% { opacity: 1; transform: translate(8px, -10px) scale(1); }
+  30% { opacity: 1; transform: translate(calc(var(--cp-distance) * 0.5), -20px) scale(1); }
+  42% { opacity: 1; transform: translate(var(--cp-distance), 0) scale(0.65); }
+  46%, 100% { opacity: 0; transform: translate(var(--cp-distance), 6px) scale(0.4); }
+}
+
+@keyframes cp-fly-low {
+  0%, 6% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+  12% { opacity: 1; transform: translate(8px, 6px) scale(1); }
+  30% { opacity: 1; transform: translate(calc(var(--cp-distance) * 0.5), 12px) scale(1); }
+  42% { opacity: 1; transform: translate(var(--cp-distance), 2px) scale(0.65); }
+  46%, 100% { opacity: 0; transform: translate(var(--cp-distance), 6px) scale(0.4); }
+}
+
+// ---- The cart, and the AI going over it ---------------------------------
+
+.cp-cart {
+  position: relative;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  animation: cp-cart var(--cp-cycle) ease-in-out infinite;
+
+  svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+// A nudge as each item lands, then the lift while the AI works.
+@keyframes cp-cart {
+  0%, 10% { transform: translateY(0) scale(1); }
+  14% { transform: translateY(1.5px) scale(0.98); }
+  20%, 26% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(1.5px) scale(0.98); }
+  36%, 56% { transform: translateY(0) scale(1); }
+  58%, 92% { transform: translateY(-2px) scale(1.06); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+// What has been collected, stacking up inside the basket as the items arrive. Placed against the
+// basket the SVG draws: its interior is x 15–33 / y 9–20 once the 32×30 viewBox is scaled to 44×44,
+// so the stack grows upwards from that floor.
+.cp-load {
+  position: absolute;
+  left: 15px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 1.5px;
+  width: 15px;
+}
+
+.cp-load-bar {
+  height: 3px;
+  border-radius: 1px;
+  background: var(--es-blue-600);
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: var(--cp-cycle) steps(1, end) infinite;
+
+  // Each bar appears with the item it stands for. A window of its own rather than a delay on one
+  // shared animation: a delay shifts the whole timeline, so the bars would still be standing while
+  // the next cycle's items are already flying — they have to clear together, when the cart empties.
+  &--1 { animation-name: cp-load-1; }
+  &--2 { animation-name: cp-load-2; }
+  &--3 { animation-name: cp-load-3; }
+}
+
+@keyframes cp-load-1 {
+  0%, 15% { transform: scaleX(0); }
+  16%, 94% { transform: scaleX(1); }
+  95%, 100% { transform: scaleX(0); }
+}
+
+@keyframes cp-load-2 {
+  0%, 27% { transform: scaleX(0); }
+  28%, 94% { transform: scaleX(1); }
+  95%, 100% { transform: scaleX(0); }
+}
+
+@keyframes cp-load-3 {
+  0%, 39% { transform: scaleX(0); }
+  40%, 94% { transform: scaleX(1); }
+  95%, 100% { transform: scaleX(0); }
+}
+
+// The verdict phase: the badge comes up over the full cart and pulses while it evaluates.
+.cp-ai {
+  position: absolute;
+  right: -8px;
+  top: -6px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--es-blue);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  line-height: 14px;
+  opacity: 0;
+  transform: scale(0.4);
+  animation: cp-ai var(--cp-cycle) ease-out infinite;
+}
+
+@keyframes cp-ai {
+  0%, 56% { opacity: 0; transform: scale(0.4); }
+  62% { opacity: 1; transform: scale(1.15); }
+  68% { opacity: 1; transform: scale(1); }
+  76% { opacity: 1; transform: scale(1.12); }
+  84%, 92% { opacity: 1; transform: scale(1); }
+  96%, 100% { opacity: 0; transform: scale(0.9); }
+}
+
+// ---- The caption -------------------------------------------------------
+
+// All three phases live in the same grid cell, so the line neither grows nor shifts what is below it
+// as they cross-fade.
+// The scale on the scene leaves its layout box at the unscaled size, so the caption keeps its own
+// distance from what it describes.
+.cp-caption {
+  display: grid;
+  margin: var(--es-space-4) 0 0;
+  min-height: 1.3em;
+  text-align: center;
+  color: var(--es-text);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.cp-phase {
+  grid-area: 1 / 1;
+  opacity: 0;
+  animation: var(--cp-cycle) ease-in-out infinite;
+
+  &--1 { animation-name: cp-phase-1; }
+  &--2 { animation-name: cp-phase-2; }
+  &--3 { animation-name: cp-phase-3; }
+}
+
+@keyframes cp-phase-1 {
+  0%, 20% { opacity: 1; }
+  25%, 95% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes cp-phase-2 {
+  0%, 20% { opacity: 0; }
+  26%, 52% { opacity: 1; }
+  58%, 100% { opacity: 0; }
+}
+
+@keyframes cp-phase-3 {
+  0%, 54% { opacity: 0; }
+  60%, 92% { opacity: 1; }
+  98%, 100% { opacity: 0; }
+}
+
+// Movement is the decoration, not the message: without it the scene stands as a still picture of a
+// filled cart being evaluated, and the caption still says what is happening.
+@media (prefers-reduced-motion: reduce) {
+  .cp-sweep,
+  .cp-item {
+    display: none;
+  }
+
+  .cp-cart,
+  .cp-load-bar,
+  .cp-ai,
+  .cp-phase {
+    animation: none;
+  }
+
+  .cp-load-bar {
+    transform: scaleX(1);
+  }
+
+  .cp-ai {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .cp-phase--3 {
+    opacity: 1;
+  }
+}

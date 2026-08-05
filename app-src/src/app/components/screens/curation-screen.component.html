@@ -1,14 +1,22 @@
-<div class="es-screen-body">
-  <section class="es-hint-card">
-    <p class="es-muted">
-      Analysiert die aktuelle Webseite und erzeugt daraus Metadaten. Anschließend kannst du
-      sie prüfen, speichern und einer Sammlung zuordnen.
-    </p>
-  </section>
+<div class="es-screen-body" [class.is-running]="curation.running()">
+  @if (curation.running()) {
+    <!-- The run is the whole screen while it lasts: the intro describes a step that is already
+         under way, and the previous run's error is about to be replaced. -->
+    <section class="es-card run-card">
+      <es-curation-progress></es-curation-progress>
+    </section>
+  } @else {
+    <section class="es-hint-card">
+      <p class="es-muted">
+        Analysiert die aktuelle Webseite und erzeugt daraus Metadaten. Anschließend kannst du
+        sie prüfen, speichern und einer Sammlung zuordnen.
+      </p>
+    </section>
 
-  @if (metadataAgent.lastRun(); as run) {
-    @if (!run.ok) {
-      <section class="es-card"><p class="es-error">{{ run.error }}</p></section>
+    @if (metadataAgent.lastRun(); as run) {
+      @if (!run.ok) {
+        <section class="es-card"><p class="es-error">{{ run.error }}</p></section>
+      }
     }
   }
 </div>

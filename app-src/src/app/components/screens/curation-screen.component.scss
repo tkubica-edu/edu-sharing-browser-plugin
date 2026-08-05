@@ -1,2 +1,27 @@
-// "Inhalt erschließen" — intro only; all visuals come from the global `es-*` primitives.
-:host { display: block; }
+// "Inhalt erschließen" — the intro state is all global `es-*` primitives. The running state is the
+// exception: the animation is the only thing on screen while it lasts, so it takes the panel's whole
+// height and sits in the middle of it, rather than as a card at the top under empty space.
+//
+// The chain that carries the height down from the panel: the shell's `.content` is a flex item of a
+// 100vh column, so `100%` here is a real height to fill.
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.es-screen-body.is-running {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.run-card {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  // The card is the only thing in the body while running, so the primitive's bottom margin would
+  // only push it off-centre.
+  margin-bottom: 0;
+}
