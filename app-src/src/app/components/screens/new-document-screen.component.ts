@@ -1,5 +1,8 @@
-import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, OnDestroy, inject, signal
+} from '@angular/core';
 
+import { redirectBundleWindows } from '../../util/bundle-windows';
 import { errorMessage } from '../../util/errors';
 import { AuthService } from '../../services/auth.service';
 import { ContentFlowService } from '../../services/content-flow.service';
@@ -22,7 +25,7 @@ const CONNECTOR_TAG = 'edu-sharing-add-with-connector';
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class NewDocumentScreenComponent {
+export class NewDocumentScreenComponent implements OnDestroy {
   protected readonly auth = inject(AuthService);
   private readonly curation = inject(CurationService);
   private readonly navigation = inject(NavigationService);
@@ -33,6 +36,17 @@ export class NewDocumentScreenComponent {
   protected readonly bundle = loadWebComponentBundle('edu', CONNECTOR_TAG);
 
   protected readonly error = signal<string | null>(null);
+
+  /**
+   * Undo for the `window.open` redirect. The dialog pre-opens the tab it later navigates to the
+   * editor, and builds that first URL from *our* base href — see {@link redirectBundleWindows}.
+   * Installed for this screen only, since patching `window` is global.
+   */
+  private readonly restoreWindows = redirectBundleWindows(() => this.auth.repositoryUrl());
+
+  ngOnDestroy(): void {
+    this.restoreWindows();
+  }
 
   /** Fired once the node exists and the OnlyOffice editor window has been opened. */
   protected onNodeCreated(event: Event): void {
