@@ -71,8 +71,11 @@ export class ContentFlowService {
   private async openNodePage(): Promise<void> {
     const node = this.curation.activeNode();
     if (!node || this.alreadyOpen(node.nodeId)) return;
-    // Save BEFORE navigating: the load tears this app down without further notice.
-    await this.sessionResume.save();
+    // Save BEFORE navigating: the load tears this app down without further notice. The node's page
+    // goes into the state as the page it belongs to, so the panel comes back working on it — this
+    // navigation is the flow continuing, not the page changing under it (see
+    // SessionResumeService.nodeStillApplies).
+    await this.sessionResume.save(node.link);
     await this.browserExtension.navigateTab(node.link);
   }
 

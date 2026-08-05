@@ -3,6 +3,7 @@ import { Injectable, effect, inject, signal } from '@angular/core';
 import { APP_CONFIG } from '../config';
 import { ScreenId, SectionId } from '../model/navigation';
 import { BrowserExtensionService } from './browser-extension.service';
+import { ConditionsService } from './conditions.service';
 import { CurationService, NodeSource } from './curation.service';
 import { NavigationService } from './navigation.service';
 
@@ -12,6 +13,8 @@ interface ResumeState {
   tab: ScreenId | null;
   nodeId: string | null;
   nodeSource: NodeSource | null;
+  /** The page the state belongs to — the current one, or the one it is being carried to. */
+  url: string | null;
   at: number;
 }
 
@@ -41,6 +44,7 @@ export class SessionResumeService {
   private readonly browserExtension = inject(BrowserExtensionService);
   private readonly navigation = inject(NavigationService);
   private readonly curation = inject(CurationService);
+  private readonly conditions = inject(ConditionsService);
 
   /** Off until {@link track} is called, so nothing is written before the restore has run. */
   private readonly tracking = signal(false);
@@ -68,9 +72,13 @@ export class SessionResumeService {
    *
    * For the app's own navigations (see ContentFlowService): the effect above is *scheduled*, so it
    * would not have run before the page load tears this app down. Everything else is covered by it.
+   *
+   * `targetUrl` is the page the app is about to open. It is stored as the state's own page, so the
+   * node survives that navigation — see {@link restore}, which otherwise drops a node that only
+   * described the page being left.
    */
-  async save(): Promise<void> {
-    await this.write(this.snapshot());
+  async save(targetUrl?: string): Promise<void> {
+    await this.write({ ...this.snapshot(), url: targetUrl ?? this.conditions.activeUrl() });
   }
 
   /** Where the user is. Reads every signal the state is made of, so the effect tracks them all. */
@@ -80,6 +88,7 @@ export class SessionResumeService {
       tab: this.navigation.screen(),
       nodeId: this.curation.activeNode()?.nodeId ?? null,
       nodeSource: this.curation.nodeSourceOf() ?? null,
+      url: this.conditions.activeUrl(),
       at: Date.now()
     };
   }
@@ -96,13 +105,34 @@ export class SessionResumeService {
     if (!state?.section || Date.now() - (state.at ?? 0) > RESUME_WINDOW_MS) return false;
 
     // The node first: the section the user was in is often only reachable *because* of it.
-    if (state.nodeId) {
+    if (state.nodeId && this.nodeStillApplies(state)) {
       await this.curation.resumeNode(state.nodeId, state.nodeSource ?? 'detected');
     }
     this.navigation.go(state.section, { tab: state.tab ?? undefined });
     // `go` refuses a section that does not apply on this page (an OnlyOffice-only one, or one that
     // needs a node that could not be loaded) — then nothing was restored and the caller should land.
     return this.navigation.section() === state.section;
+  }
+
+  /**
+   * Whether the stored node is still the panel's content on THIS page.
+   *
+   * A `detected` node is a statement about the page it was found on (the document the host has
+   * open, the content the repository holds for that URL) — so it does not survive a page change:
+   * clicking a link on the page means the panel starts over there, and the new page is looked at
+   * on its own. What the app navigates to itself is not a change in that sense — it carries the
+   * page it is heading for into the state (see {@link save}), so the node stays.
+   *
+   * A `chosen` node is the user's own pick, which belongs to the flow they started rather than to
+   * the page, and is released only when that flow ends (CurationService.releaseChosenContent).
+   *
+   * A state without a page (written by an earlier version), or a page that cannot be read on this
+   * boot, is taken at face value: not knowing where we are is no reason to throw the node away.
+   */
+  private nodeStillApplies(state: ResumeState): boolean {
+    const current = this.conditions.activeUrl();
+    if (state.nodeSource !== 'detected' || !state.url || !current) return true;
+    return state.url === current;
   }
 
   /** Forget the state, so the next opening of the panel starts at the main menu. */

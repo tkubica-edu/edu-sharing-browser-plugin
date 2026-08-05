@@ -16,8 +16,15 @@ import { CurationService } from './curation.service';
  * has been erschlossen before, so there is nothing to curate — the existing content is what the
  * panel should work on, and it surfaces as the *Inhalt erkannt* menu entry.
  *
- * Only on a page that is not an insert host: there the OnlyOffice plugin announces the document it
- * has open, which is a statement about the *editor*, not about the page's URL.
+ * Only where nothing else already speaks for the page, and it ranks LAST behind those:
+ *
+ * - an insert host (the OnlyOffice editor, `…/eduservlet/connector`): the plugin announces the
+ *   document it has open, a statement about the *editor* rather than about the page's URL, and it
+ *   is the accurate one — the editor's own URL says nothing about the content being edited;
+ * - a repository page: it announces its node itself (`PREVIEW_NODE`).
+ *
+ * On both, asking `getWebsiteInformation` about the URL would at best repeat that answer and at
+ * worst contradict it, so it is not asked at all.
  */
 @Injectable({ providedIn: 'root' })
 export class PageRecognitionService {
@@ -39,12 +46,13 @@ export class PageRecognitionService {
    */
   async recognize(): Promise<boolean> {
     const url = httpUrl(this.conditions.activeUrl());
-    // No lookup on an insert host (the plugin speaks for that page), without a session to run it
-    // under, or when the panel already works on something — adopting would refuse anyway, and the
-    // answer would be thrown away.
+    // No lookup where something else speaks for the page (see the class comment), without a
+    // session to run it under, or when the panel already works on something — adopting would
+    // refuse anyway, and the answer would be thrown away.
     if (
       !url ||
       this.conditions.onlyOfficePresent() ||
+      this.conditions.onEduSharing() ||
       !this.auth.authorized() ||
       this.curation.activeNode() ||
       this.curation.hasUnsavedWork()

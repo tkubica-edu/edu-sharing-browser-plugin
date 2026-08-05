@@ -5,8 +5,15 @@ import { AuthService } from './auth.service';
 import { CurationService } from './curation.service';
 import { DebugService } from './debug.service';
 
-/** URL pattern that marks an insert host (the OnlyOffice editor) where searching applies. */
-const INSERT_HOST_PATTERN = /\/src\/tools\/onlyoffice/;
+/**
+ * URL patterns that mark an insert host — the OnlyOffice editor, where searching applies and where
+ * the plugin speaks for the open document. Two of them: the editor as the repository opens it
+ * (`…/eduservlet/connector`), and the standalone integration the examples use.
+ *
+ * Matched on the path, never on the whole URL: a page merely *about* OnlyOffice
+ * (de.wikipedia.org/wiki/OnlyOffice) is a page like any other.
+ */
+const INSERT_HOST_PATTERNS = [/\/src\/tools\/onlyoffice/, /\/eduservlet\/connector/];
 
 /** Host of a URL, lower-cased; '' when it cannot be parsed. */
 function hostOf(url: string | null | undefined): string {
@@ -44,9 +51,11 @@ export class ConditionsService {
 
   // Debug mode counts as an insert host on any page: it simulates the plugin's answers, so the
   // OnlyOffice-only options must be reachable without an editor.
-  readonly onlyOfficePresent = computed(
-    () => this.debug.enabled() || INSERT_HOST_PATTERN.test(this.activeUrl() ?? ''),
-  );
+  readonly onlyOfficePresent = computed(() => {
+    if (this.debug.enabled()) return true;
+    const path = pathOf(this.activeUrl());
+    return !!path && INSERT_HOST_PATTERNS.some((pattern) => pattern.test(path));
+  });
 
   // Edu-Sharing page: the active host matches the configured repository host, OR the path
   // contains `/edu-sharing`.
