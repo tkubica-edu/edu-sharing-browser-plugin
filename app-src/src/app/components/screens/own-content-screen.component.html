@@ -7,10 +7,13 @@
       <p class="es-muted select-msg">Inhalt wird geladen …</p>
     }
 
+    <!-- Collections count as content here: they are the user's own just as much as a file is, so
+         clicking one selects it instead of only opening it (see the Sammlungen tab). -->
     <es-nodes-selector
       [option]="option"
       [tabBlacklist]="hiddenTabs"
       [primaryMode]="'activity'"
+      [allowCollectionSelection]="true"
       errorLabel="Eigene Inhalte konnten nicht geladen werden"
     ></es-nodes-selector>
   </div>
