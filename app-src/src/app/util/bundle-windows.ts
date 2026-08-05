@@ -48,18 +48,72 @@ export function repositoryWindowUrl(rawUrl: string, repositoryUrl: string): stri
 }
 
 /**
- * Make the bundle's `window.open` calls land on the repository instead of on a non-existent
- * extension URL, for as long as a screen that embeds such an element is mounted. Returns the
- * undo — patching `window` is global, so it must not outlive that screen.
+ * Take over the window the bundle opens for the editor, for as long as a screen embedding such an
+ * element is mounted. Returns the undo — patching `window` is global, so it must not outlive that
+ * screen.
+ *
+ * A tab we cannot reach is worse than no tab: the panel lives in *this* tab and cannot be injected
+ * into a new one, so the editor opening there means the user ends up in front of the document
+ * without the panel that sent them. So the pre-opened window is not opened at all — it is a stub,
+ * and the URL the bundle assigns to it goes to `onEditorUrl` instead. The caller then takes its own
+ * tab there, where the panel comes back with the page (see ContentFlowService.openNodePage).
+ *
+ * Only the bundle's *own* (extension-origin) URLs are taken over — those are the ones it builds
+ * from our base href and that lead nowhere. A window it opens on a real web URL is passed straight
+ * through, so nothing else the bundle might do is affected.
  */
-export function redirectBundleWindows(repositoryUrl: () => string): () => void {
-  const original = window.open.bind(window);
+export function captureBundleEditorWindow(
+  repositoryUrl: () => string,
+  onEditorUrl: (url: string) => void,
+): () => void {
+  // The reference itself, not a bound copy: the undo has to put back exactly what was there, or
+  // repeated mount/unmount cycles would leave a stack of wrappers behind.
+  const original = window.open;
   window.open = (url?: string | URL, target?: string, features?: string): Window | null => {
     const raw = url instanceof URL ? url.href : url ?? '';
-    const redirected = repositoryWindowUrl(raw, repositoryUrl());
-    return original(redirected ?? url, target, features);
+    if (repositoryWindowUrl(raw, repositoryUrl()) === null) {
+      // A real web URL — not ours to interfere with.
+      return original.call(window, url, target, features);
+    }
+    return stubWindow(repositoryUrl, onEditorUrl);
   };
   return () => {
     window.open = original;
   };
+}
+
+/**
+ * Stands in for the window the bundle believes it opened. It only has to carry what the bundle does
+ * with the handle: assign `location.href` once the node exists, and `close()` it when creating
+ * failed.
+ */
+function stubWindow(repositoryUrl: () => string, onEditorUrl: (url: string) => void): Window {
+  const location = {
+    set href(value: string) {
+      onEditorUrl(editorUrl(value, repositoryUrl()));
+    },
+    get href(): string {
+      return '';
+    },
+  };
+  return { location, close: () => {}, closed: false, focus: () => {} } as unknown as Window;
+}
+
+/**
+ * The URL to actually navigate to, from what the bundle assigned.
+ *
+ * Normalized, because the bundle composes it by string (`…/rest/` + `../eduservlet/connector?…`):
+ * a browser collapses that on navigation, but we hand the URL on to `tabs.update` and store it as
+ * the resumed page, and there it should be the address the page will really have. An
+ * extension-origin value — only possible with a missing `__env` — is carried over to the repository
+ * rather than navigated to, as everywhere else here.
+ */
+function editorUrl(raw: string, repositoryUrl: string): string {
+  const rewritten = repositoryWindowUrl(raw, repositoryUrl);
+  if (rewritten) return rewritten;
+  try {
+    return new URL(raw, document.baseURI).href;
+  } catch {
+    return raw;
+  }
 }

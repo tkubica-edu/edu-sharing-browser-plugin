@@ -45,19 +45,20 @@ export class NodeConnectorService {
   }
 
   /**
-   * Whether the node opens in *any* connector — the branch point of the content flow. Resolves
-   * false when the connector list cannot be read: without that knowledge the flow must not claim
-   * the node is being edited elsewhere.
+   * The connector this node opens in, or null — the branch point of the content flow, and the
+   * source of the URL that editing navigates to ({@link getConnectorUrl}). Resolves null when the
+   * connector list cannot be read: without that knowledge the flow must not claim the node is being
+   * edited elsewhere.
    */
-  async opensInConnector(node: Node): Promise<boolean> {
+  async connectorFor(node: Node): Promise<Connector | null> {
     try {
-      return (await firstValueFrom(this.observeConnectorForNode(node))) !== null;
+      return await firstValueFrom(this.observeConnectorForNode(node));
     } catch {
-      return false;
+      return null;
     }
   }
 
-  /** URL that opens the node in its connector — put it in `window.open()` from a click handler. */
+  /** URL that opens the node in its connector — the page the Bearbeitungsmodus takes the tab to. */
   getConnectorUrl(node: Node, connector: Connector): string {
     const base = this.apiConfig.rootUrl.replace(/\/rest\/?$/, '');
     const params = new URLSearchParams({ connectorId: connector.id ?? '', nodeId: node.ref.id });

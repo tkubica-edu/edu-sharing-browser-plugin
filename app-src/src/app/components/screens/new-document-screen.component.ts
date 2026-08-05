@@ -2,7 +2,7 @@ import {
   ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, OnDestroy, inject, signal
 } from '@angular/core';
 
-import { redirectBundleWindows } from '../../util/bundle-windows';
+import { captureBundleEditorWindow } from '../../util/bundle-windows';
 import { errorMessage } from '../../util/errors';
 import { AuthService } from '../../services/auth.service';
 import { ContentFlowService } from '../../services/content-flow.service';
@@ -12,6 +12,9 @@ import { loadWebComponentBundle } from '../../services/web-component-bundle.serv
 import { LoginComponent } from '../login.component';
 
 const CONNECTOR_TAG = 'edu-sharing-add-with-connector';
+
+/** Log prefix, as everywhere else in the extension (`[edu-sharing][<station>]`). */
+const LOG = '[edu-sharing][connector]';
 
 // "Neues OnlyOffice-Dokument": embeds <edu-sharing-add-with-connector> as a REAL custom element
 // (no iframe). Mounting the element opens the OnlyOffice create-dialog immediately and, on
@@ -38,24 +41,33 @@ export class NewDocumentScreenComponent implements OnDestroy {
   protected readonly error = signal<string | null>(null);
 
   /**
-   * Undo for the `window.open` redirect. The dialog pre-opens the tab it later navigates to the
-   * editor, and builds that first URL from *our* base href — see {@link redirectBundleWindows}.
-   * Installed for this screen only, since patching `window` is global.
+   * Undo for the `window.open` takeover: the dialog's own editor tab is suppressed, because the
+   * panel cannot follow into it — the flow takes *this* tab to the editor instead
+   * ({@link ContentFlowService.edit}). This screen only, since patching `window` is global.
+   *
+   * The URL the dialog wanted is only logged. It is not used to navigate: it arrives whenever the
+   * dialog gets round to it, while the flow needs the target at a defined moment — and the flow
+   * derives the same URL from the node's connector anyway, for every way into the editor rather
+   * than just this one.
    */
-  private readonly restoreWindows = redirectBundleWindows(() => this.auth.repositoryUrl());
+  private readonly restoreWindows = captureBundleEditorWindow(
+    () => this.auth.repositoryUrl(),
+    (url) => console.log(`${LOG} the connector dialog would have opened its own tab on:`, url),
+  );
 
   ngOnDestroy(): void {
     this.restoreWindows();
   }
 
-  /** Fired once the node exists and the OnlyOffice editor window has been opened. */
+  /** Fired once the node exists and the dialog has handed over the editor URL. */
   protected onNodeCreated(event: Event): void {
     const detail = (event as CustomEvent).detail as { ref?: { id?: string }; id?: string } | null;
     const nodeId = detail?.ref?.id ?? detail?.id;
     if (!nodeId) return;
     // Hydrate the new node into the flow (records it in the history), then enter the big step the
-    // node calls for: a document created through a connector is now open there, so this normally
-    // lands in the Bearbeitungsmodus.
+    // node calls for: a document created through a connector is edited there, so this lands in the
+    // Bearbeitungsmodus and takes the tab into the editor — the page the user asked for by creating
+    // the document.
     void this.curation
       .openNode(nodeId)
       .then(() => this.flow.edit())
