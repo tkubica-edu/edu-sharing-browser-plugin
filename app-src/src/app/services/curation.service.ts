@@ -183,9 +183,11 @@ export class CurationService {
   }
 
   /**
-   * Release a content the user picked, now that the flow for it has ended (returning to the main
-   * menu — see {@link NavigationService.openMenu}). A `detected` node is kept: it describes the page
-   * that is still open, not a flow the user walked out of.
+   * Release a content the user picked, now that the steps it was picked for have been left: the main
+   * menu was reached (NavigationService.openMenu), or the back button stepped back to a view that
+   * does not need a content — the picker it was picked in, for instance (NavigationService.back).
+   * A `detected` node is kept: it describes the page that is still open, not a flow the user walked
+   * out of.
    *
    * Only an actual node is released. A curated result that has no node yet survives, since nothing
    * else holds it and the user has not saved it anywhere.

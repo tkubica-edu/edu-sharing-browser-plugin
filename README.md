@@ -16,11 +16,17 @@ always-available utilities — *Verlauf* and *Einstellungen* — are marked `top
 as **icons in the topbar** next to the close button (`NavigationService.topbarOptions`); they are
 otherwise ordinary options, so visibility, guards and the view title work the same. The **status
 bar** shows the same facts as chips, so it is always visible why an option appears or disappears —
-and it can drop the active content again. The **back button** always returns to the menu.
+and it can drop the active content again. The **back button** walks back through the steps the user
+came through (`NavigationService.back`) and reaches the menu at the end of the trail; switching sub
+steps within a section is not a step of its own. Stepping back to a view that does not need a
+content **releases a content the user picked** — going back into *Eigene Inhalte* from
+*Inhaltsoptionen* means picking again — while a *detected* one is kept, since it describes the open
+page (`CurationService.releaseChosenContent`). The trail is carried across a page change with the
+rest of the session state (`SessionResumeService`).
 
 On an **OnlyOffice page the edited document is the active node from the start**: the sidebar asks
 the page-side plugin once on boot for its identity (`REQUEST_DOCUMENT_INFO` → `DOCUMENT_INFO`, see
-`content/CLAUDE.md`), loads that node and adopts it (`CurationService.adoptOpenDocument`). So
+`content/CLAUDE.md`), loads that node and adopts it (`CurationService.adoptDetectedNode`). So
 *Vorschau*, *Metadaten editieren* and *Einsortieren in Sammlungen* are available immediately,
 without an erschließen run. It is best effort and silent: the plugin is optional and may never
 answer, and when the panel was opened logged out the node is adopted once the user logs in. No

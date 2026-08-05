@@ -20,12 +20,12 @@
 
 <es-status-bar></es-status-bar>
 
-<!-- Always shows the open section's title; the back-to-menu button appears on every section
-     except the menu itself. -->
+<!-- Always shows the open section's title; the back button appears on every section except the menu
+     itself and walks back through the steps the user came through (see NavigationService.back). -->
 <div class="step-header">
   @if (navigation.showBack()) {
-    <button class="back-btn" (click)="navigation.openMenu()"
-            title="Zurück zum Hauptmenü" aria-label="Zurück zum Hauptmenü">
+    <button class="back-btn" (click)="navigation.back()"
+            [title]="navigation.backLabel()" [attr.aria-label]="navigation.backLabel()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
     </button>

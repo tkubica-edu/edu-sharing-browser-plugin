@@ -5,12 +5,14 @@ import { ScreenId, SectionId } from '../model/navigation';
 import { BrowserExtensionService } from './browser-extension.service';
 import { ConditionsService } from './conditions.service';
 import { CurationService, NodeSource } from './curation.service';
-import { NavigationService } from './navigation.service';
+import { NavStep, NavigationService } from './navigation.service';
 
 /** What is carried across a page change. Ids only — everything else is re-derived on the new page. */
 interface ResumeState {
   section: SectionId;
   tab: ScreenId | null;
+  /** The steps behind the open one, so the back button still walks them on the new page. */
+  trail: NavStep[];
   nodeId: string | null;
   nodeSource: NodeSource | null;
   /** The page the state belongs to — the current one, or the one it is being carried to. */
@@ -86,6 +88,7 @@ export class SessionResumeService {
     return {
       section: this.navigation.section(),
       tab: this.navigation.screen(),
+      trail: [...this.navigation.trailOf()],
       nodeId: this.curation.activeNode()?.nodeId ?? null,
       nodeSource: this.curation.nodeSourceOf() ?? null,
       url: this.conditions.activeUrl(),
@@ -111,7 +114,12 @@ export class SessionResumeService {
     this.navigation.go(state.section, { tab: state.tab ?? undefined });
     // `go` refuses a section that does not apply on this page (an OnlyOffice-only one, or one that
     // needs a node that could not be loaded) — then nothing was restored and the caller should land.
-    return this.navigation.section() === state.section;
+    if (this.navigation.section() !== state.section) return false;
+    // After `go`, which pushed the step it was called from: the trail is the stored one, so back
+    // continues where the user was rather than jumping to the menu (a state from before this was
+    // stored has none — then back does what it used to).
+    this.navigation.restoreTrail(state.trail ?? []);
+    return true;
   }
 
   /**

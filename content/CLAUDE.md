@@ -190,7 +190,7 @@ Unlike the two directions above this is a **correlated pair**: every request car
 - **`REQUEST_DOCUMENT_INFO` is sent once on sidebar boot**, gated on `conditions.onlyOfficePresent()`
   (`app.component.ts`) — without that gate every page would trigger a broadcast into all frames and
   a 10 s timeout. Its answer makes the edited document the **active node** right away
-  (`CurationService.adoptOpenDocument`, driven by an effect on `documentNode()` so a panel opened
+  (`CurationService.adoptDetectedNode`, driven by an effect on `documentNode()` so a panel opened
   logged out adopts it after login). A recognised node surfaces as the *Inhalt erkannt* entry of
   the main menu — it never navigates for the user.
 - **Not buffered:** `panel-host.js` buffers/persists only `PREVIEW_NODE`. A `DOCUMENT_CONTENT`
@@ -373,6 +373,6 @@ only string fields and the extension re-hydrates from `id`.
 | `app-src/src/app/services/onlyoffice-document.service.ts` | the request/response bridge: `requestContent`/`requestInfo` (`requestId` + timeout), `accept(envelope)`, `currentDocument` |
 | `app-src/src/app/services/debug.service.ts` | debug mode: answers the `REQUEST_DOCUMENT_*` events with hard-coded fixtures instead of asking the host page |
 | `app-src/src/app/services/metadata-agent.service.ts` | `extractField(text, fieldId)` — document `markdown` → `POST /extract-field` (own `fetch`, like the WLO canvas' `/generate`) → the one field's values |
-| `app-src/src/app/services/curation.service.ts` | `openNode(id)` (hydrate the node into the flow), `adoptOpenDocument(node)` (the open document as active node, no history entry) |
+| `app-src/src/app/services/curation.service.ts` | `openNode(id)` (hydrate the node into the flow), `adoptDetectedNode(node)` (the open document as active node, no history entry) |
 | `background/background.js` | `analyze.run` — `POST /generate` for the extracted tab (the erschließen path; the keyword call does not go through here) |
 | *(host-side, external)* | app that listens for `INSERT_NODE` / `REQUEST_DOCUMENT_*` and sends `PREVIEW_NODE` / `DOCUMENT_*` (e.g. OnlyOffice plugin) |
