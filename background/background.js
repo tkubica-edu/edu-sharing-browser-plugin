@@ -1,6 +1,7 @@
 // Background worker: toggles the injected sidebar panel, extracts the active tab's
-// content, and proxies the metadata agent's POST /generate and POST /upload (from the
-// worker to stay CORS-portable). Auth is handled in the sidebar app, not here.
+// content, and proxies the metadata agent's POST /generate (preceded by GET /health) and
+// POST /upload (from the worker to stay CORS-portable). Auth is handled in the sidebar app,
+// not here.
 
 /* global EDU_SHARING_CONFIG */
 
@@ -172,7 +173,35 @@ function buildGenerateBody(pageData, language) {
   };
 }
 
+/**
+ * `GET /health` — asked BEFORE every /generate.
+ *
+ * The agent is reachable under two very different bases (see config.js): its own deployment, or the
+ * repository's `…/bapi/api/v1/proxy/metadata-agent-canvas`, where the endpoint authorizes by
+ * repository session. A misconfigured or unauthorized base then only shows up as a failing
+ * /generate — after the full generate timeout, and reported as if the extraction had failed. The
+ * health call turns that into an immediate, unambiguous answer.
+ */
+async function callHealth() {
+  const url = `${API_URL}/health`;
+  let response;
+  try {
+    response = await fetchWithTimeout(url, { headers: { 'Accept': 'application/json' } });
+  } catch (error) {
+    throw new Error(`Metadata-Agent nicht erreichbar (${url}): ${error?.message || error}`);
+  }
+  if (!response.ok) {
+    const errorText = (await response.text().catch(() => '')).substring(0, 300);
+    throw new Error(`Metadata-Agent nicht bereit: ${response.status} - ${errorText}`);
+  }
+  const result = await safeJson(response);
+  console.log('✅ metadata-agent health:', result?.version || result?.status || 'ok');
+  return result;
+}
+
 async function callGenerate(body) {
+  // First health, then generate: no point sending an extraction to a base that is not answering.
+  await callHealth();
   const response = await fetchWithTimeout(
     `${API_URL}/generate`,
     {
