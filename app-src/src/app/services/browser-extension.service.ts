@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 import browser from 'webextension-polyfill';
 
 /** The page an analysis was run against. */
@@ -53,6 +53,33 @@ export interface UploadedNode {
 export class BrowserExtensionService {
   /** Whether we appear to be inside the extension (vs. a plain dev server). */
   readonly available = typeof browser !== 'undefined' && !!browser.runtime?.id;
+
+  /**
+   * The URL the background worker last announced for THIS tab; null until one arrives.
+   *
+   * It announces every URL change of the tab, **including the ones a page makes in place**: an
+   * edu-sharing page routes with the History API, so its URL becomes another page's without a load —
+   * this panel is never torn down and would otherwise keep working on the URL it booted with. Only
+   * the worker sees that happen (see background.js, `tab.url`).
+   */
+  readonly announcedUrl = signal<string | null>(null);
+
+  /** This panel's tab, for telling its own announcements from another tab's; null while unknown. */
+  private ownTabId: number | null = null;
+
+  constructor() {
+    if (!this.available) return;
+    // Resolved once, up front: the announcement is a broadcast to every panel, so it has to be
+    // matched against this one's tab. While the id is unknown — a panel opened as its own tab, a
+    // plain dev server — there is only one panel anyway, so every announcement is its own.
+    void this.getOwnTabId().then((tabId) => (this.ownTabId = tabId));
+    browser.runtime.onMessage.addListener((message: unknown) => {
+      const announcement = message as { action?: string; tabId?: number; url?: string } | null;
+      if (announcement?.action !== 'tab.url' || !announcement.url) return;
+      if (this.ownTabId !== null && announcement.tabId !== this.ownTabId) return;
+      this.announcedUrl.set(announcement.url);
+    });
+  }
 
   /** Ask the background worker to analyze the active tab. */
   async analyzeActiveTab(language: string): Promise<AnalyzeResponse> {

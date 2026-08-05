@@ -115,6 +115,14 @@ export class AppComponent implements OnInit {
       }
     });
 
+    // The tab's URL can change without this app being torn down: an edu-sharing page routes in place
+    // (History API), so the panel keeps running while the page becomes another one. Take that page
+    // over — the background worker is what notices it (see BrowserExtensionService.announcedUrl).
+    effect(() => {
+      const url = this.browserExtension.announcedUrl();
+      if (url && this.booted()) untracked(() => this.pageChanged(url));
+    });
+
     // Make the document the host has open the active node, as soon as its node is loaded. An
     // effect rather than a `then()` on the request below, because the panel is usually opened
     // logged out: the id arrives immediately, the node only once a session exists (the service
@@ -196,6 +204,24 @@ export class AppComponent implements OnInit {
 
   protected hideBrokenLogo(event: Event): void {
     (event.target as HTMLImageElement).style.visibility = 'hidden';
+  }
+
+  /**
+   * Adopt a page this app was not rebooted for.
+   *
+   * Everything derived from the URL has to follow it: the conditions (which page this is, whether it
+   * is an insert host or the repository), the content that described the *previous* page — a detected
+   * one, see CurationService.releaseDetectedContent — and then the new page is recognised like any
+   * other, so its own node surfaces as *Inhalt erkannt*.
+   *
+   * Order matters: the conditions first, because the recognition reads them; the release before it,
+   * because it refuses to adopt while a content is still held.
+   */
+  private pageChanged(url: string): void {
+    if (url === this.conditions.activeUrl()) return;
+    this.conditions.activeUrl.set(url);
+    this.curation.releaseDetectedContent();
+    void this.pageRecognition.recognize();
   }
 
   /** Read and clear the node persisted by panel-host while the sidebar was closed or booting. */

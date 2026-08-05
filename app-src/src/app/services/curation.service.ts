@@ -197,6 +197,24 @@ export class CurationService {
   }
 
   /**
+   * The mirror image: release a content that described the page just left — a `detected` one, whose
+   * whole statement was about that page. A picked content stays; it belongs to the flow the user
+   * started, not to the page they happened to be on.
+   *
+   * For a page that changes *under the panel* without reloading it (an edu-sharing page routing in
+   * place, see AppComponent). A reboot needs none of this — it starts with no content at all, and
+   * SessionResumeService decides there whether a stored one still applies.
+   *
+   * Unsaved work outranks the page change and is never thrown away: a generated result the user has
+   * not saved is theirs, not the page's — the recognition of the new page stands down for it too
+   * (PageRecognitionService).
+   */
+  releaseDetectedContent(): void {
+    if (this.hasUnsavedWork()) return;
+    if (this.activeNode() && this.nodeSource() === 'detected') this.startNew();
+  }
+
+  /**
    * Run the metadata agent for the active tab, dropping any previous node. Returns true on
    * success so the footer can advance to the Qualitätssicherung. Nothing is written to the
    * history here — an entry is recorded only once a node is actually saved (see {@link save}).
