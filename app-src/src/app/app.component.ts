@@ -152,7 +152,9 @@ export class AppComponent implements OnInit {
     // request that is waiting for them.
     if (this.onlyOfficeDocument.accept(message)) return;
     if (message.event !== 'PREVIEW_NODE') return;
-    void this.receiveNode((message.data as { id?: string } | undefined)?.id);
+    // SUSPENDED: a double-click on an object in the editor fires this, and loading its node as the
+    // active node throws the user out of whatever they were doing. Uncomment to restore it.
+    // void this.receiveNode((message.data as { id?: string } | undefined)?.id);
   }
 
   protected close(): void {
@@ -186,7 +188,11 @@ export class AppComponent implements OnInit {
     const nodeId = pending?.data?.data?.id;
     if (!nodeId) return;
     await this.browserExtension.storageSet(APP_CONFIG.storageKeys.pendingPreview, null);
-    await this.receiveNode(nodeId);
+    // SUSPENDED together with the live PREVIEW_NODE relay in `onWindowMessage` — this is the same
+    // event, only buffered while the sidebar was closed or booting. The entry is still read and
+    // cleared above, so a stale one cannot surface later. Uncomment to restore it.
+    void nodeId;
+    // await this.receiveNode(nodeId);
   }
 
   /**

@@ -175,7 +175,10 @@ Unlike the two directions above this is a **correlated pair**: every request car
   bulk (megabytes with data-URI images); they are relayed but never read here.
 - **`trigger`**: `"request"` for an answer to one of our requests, `"toolbar"` for the plugin's own
   toolbar button, `"announce"` for the one `DOCUMENT_INFO` on plugin startup. Unsolicited answers
-  carry no `requestId` — the extension takes only the identity from them.
+  carry no `requestId`. From an unsolicited `DOCUMENT_INFO` the extension takes the identity; an
+  unsolicited `DOCUMENT_CONTENT` is **ignored completely** (`OnlyOfficeDocumentService.accept`) —
+  a double-click in the editor fires one, and adopting its document as the active node would throw
+  the user out of whatever they were doing.
 - **Error forms** (always with `trigger`/`requestId`/`document`): `{unsupported:true, editorType}`
   for a non-text editor (spreadsheet, presentation — `DOCUMENT_INFO` works in all types) and
   `{error:"read-failed"}`.

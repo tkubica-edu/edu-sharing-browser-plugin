@@ -133,14 +133,22 @@ export class OnlyOfficeDocumentService {
     // DOCUMENT_INFO. A stale plugin config sends null — then the last known identity is kept,
     // since a null tells us nothing new.
     const document = envelope.document ?? answer.document ?? null;
+
+    // An unsolicited answer (the plugin's toolbar button, a double-click in the editor, or its
+    // startup announce) has no waiting caller.
+    const resolve = answer.requestId ? this.pending.get(answer.requestId) : undefined;
+
+    // An unsolicited DOCUMENT_CONTENT is dropped entirely: nobody asked for it, and taking its
+    // identity would make that document the active node — throwing the user out of whatever they
+    // were doing (a double-click in the editor fires one). Only DOCUMENT_INFO still announces the
+    // open document. Remove this guard to get the old behaviour back.
+    if (envelope.event === 'DOCUMENT_CONTENT' && !resolve) return true;
+
     if (document) {
       this.currentDocument.set(document);
       this.hydrate();
     }
 
-    // An unsolicited answer (the plugin's toolbar button, or its startup announce) has no
-    // waiting caller — the identity above is all we take from it.
-    const resolve = answer.requestId ? this.pending.get(answer.requestId) : undefined;
     if (resolve) resolve({ ...answer, document });
     return true;
   }
