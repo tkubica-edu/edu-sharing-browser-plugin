@@ -1,10 +1,14 @@
 :host {
   display: block;
+  box-sizing: border-box;
   height: 100%;
+  /* Here, not on the children: the hint above them is conditional, and the screen's top spacing
+     must not come and go with it. */
+  padding-top: 14px;
 }
 
-/* The hint carries the top padding for the screen; what follows it only pads the rest. */
-.material-hint { margin: 14px 14px 0; }
+/* Keeps the card's own bottom gap (the shorthand would drop it) — the dialog starts right below. */
+.material-hint { margin: 0 14px 12px; }
 
 .login-gate { padding: 0 14px 14px; }
 

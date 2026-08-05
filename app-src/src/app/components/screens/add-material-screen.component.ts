@@ -59,6 +59,8 @@ export class AddMaterialScreenComponent implements OnDestroy {
   protected readonly saving = signal(false);
 
   private element: AddMaterialElement | null = null;
+  /** `chooseParent` the mounted element was created with; see {@link mount}. */
+  private mountedWithPicker: boolean | null = null;
 
   private readonly onResult = (event: Event): void => {
     const result = (event as CustomEvent).detail as AddMaterialResult | null;
@@ -68,28 +70,42 @@ export class AddMaterialScreenComponent implements OnDestroy {
   constructor() {
     afterRenderEffect({
       write: () => {
+        // Reads loggedIn() as well, so a login that arrives later re-creates the element with the
+        // location picker (the dialog reads dialogData once, at its own ngOnInit).
+        this.auth.loggedIn();
         if (this.bundle.ready()) this.mount();
       }
     });
   }
 
   ngOnDestroy(): void {
-    this.element?.removeEventListener('dialogResult', this.onResult);
-    this.element?.remove();
-    this.element = null;
+    this.detach();
   }
 
-  /** Create the element, set its input as a property, THEN append (see the class comment). */
+  /**
+   * Create the element, set its input as a property, THEN append (see the class comment).
+   *
+   * Re-created rather than updated when the login changes, or when the previous element left the
+   * DOM with its host (the login gate replaces it): the dialog reads `dialogData` in its own
+   * ngOnInit, so a later change would not reach it.
+   */
   private mount(): void {
-    if (this.element) return;
     const host = this.host()?.nativeElement;
     if (!host) return;
+    // The location picker, exactly as the repository shows it (create-menu / nodes-selector: no
+    // parent given ⇒ let the user choose one). It needs a session to browse and to write outside
+    // the inbox, so without a login it stays off and the node goes to the inbox — which is also
+    // the only thing that works where the panel runs without one.
+    const withPicker = this.auth.loggedIn();
+    if (this.element?.isConnected && this.mountedWithPicker === withPicker) return;
+    this.detach();
     const element = document.createElement(MATERIAL_TAG) as AddMaterialElement;
     element.dialogData = {
-      // No parent picker: the panel has no room for the repository's file-chooser dialog, and the
-      // node goes where a curated content goes (the inbox, see MaterialUploadService).
+      // No parent: with the picker on, that is what makes the dialog ask for one (and it insists —
+      // its save stays disabled until a folder is picked); with it off, MaterialUploadService falls
+      // back to the inbox, where a curated content lands too.
       parent: null,
-      chooseParent: false,
+      chooseParent: withPicker,
       childobject: false,
       // One material at a time — the flow it hands over to carries exactly one node.
       multiple: false,
@@ -101,6 +117,14 @@ export class AddMaterialScreenComponent implements OnDestroy {
     element.addEventListener('dialogResult', this.onResult);
     host.appendChild(element);
     this.element = element;
+    this.mountedWithPicker = withPicker;
+  }
+
+  private detach(): void {
+    this.element?.removeEventListener('dialogResult', this.onResult);
+    this.element?.remove();
+    this.element = null;
+    this.mountedWithPicker = null;
   }
 
   /** Write the picked file / entered link into the repository and continue with the new node. */

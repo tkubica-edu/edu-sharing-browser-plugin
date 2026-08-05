@@ -1,15 +1,17 @@
 <!--
-  Shown unconditionally, NOT only on the login gate: `authorized()` is also true where the panel
-  skips the login (no login required), and the dialog still writes into the repository under a
-  repository session. Without one the upload fails inside the element, so the requirement has to be
-  stated where it applies — before anything is picked.
+  The requirement, stated wherever it is not already met — which is NOT the same as the login gate
+  below: `authorized()` is also true where the panel skips the login, and the dialog still needs a
+  repository session to write. So it hangs on the session itself: with one ("Angemeldet: …" in the
+  status bar) there is nothing to say.
 -->
-<section class="es-hint-card material-hint">
-  <p class="es-muted">
-    Zum Hochladen einer Datei oder zum Speichern eines Links ist eine Anmeldung am Repository
-    erforderlich — der Inhalt wird unter deinem Konto angelegt.
-  </p>
-</section>
+@if (!auth.loggedIn()) {
+  <section class="es-hint-card material-hint">
+    <p class="es-muted">
+      Zum Hochladen einer Datei oder zum Speichern eines Links ist eine Anmeldung am Repository
+      erforderlich — der Inhalt wird unter deinem Konto angelegt.
+    </p>
+  </section>
+}
 
 <!-- Login required to write into the repository — reuse the shared gate. -->
 @if (auth.authorized()) {
