@@ -38,7 +38,16 @@ The options:
   screens that need a session.
 - **Inhalt erschließen** — reads the active tab, calls `POST {apiUrl}/generate` through the
   background worker and advances to the metadata screen. Hidden on Edu-Sharing itself and on
-  an insert host, where the intent is searching instead.
+  an insert host, where the intent is searching instead. **Disabled while a content was detected
+  for the page** (see *Inhalt erkannt*): curating it again would produce a second node for the
+  same page.
+- **Inhalt erkannt** — a node that turned up on its own, offered as the prominent menu entry.
+  Two ways it does: the OnlyOffice plugin announcing the document it has open (`DOCUMENT_INFO`),
+  and — on every other page — `getWebsiteInformation` (`ClientutilsV1Service`, the lookup the
+  repository's own *Datei oder Link* dialog uses), whose `duplicateNodes` say the URL is already
+  in the repository. The first of them becomes the active node (`PageRecognitionService` →
+  `CurationService.adoptDetectedNode`). Nothing navigates for the user — the finding surfaces as
+  a menu entry, never as a jump.
 - **Metadaten anreichern** — only on an OnlyOffice page: the same erschließen flow, but the
   content comes from the **edited document** instead of the page. The sidebar asks the page-side
   plugin for the document content (`REQUEST_DOCUMENT_CONTENT` → `DOCUMENT_CONTENT`, correlated by

@@ -2,7 +2,12 @@
   <ul class="menu-list">
     @for (section of navigation.menuSections(); track section.id) {
       <li [class.is-prominent]="section.prominent">
-        <button class="menu-item" (click)="navigation.go(section.id)">
+        <!-- A section that does not apply right now stays listed and disabled, saying why in its
+             tooltip (e.g. "Inhalt erschließen" for a page whose content is already in the
+             repository) — see AppSection.enabled. -->
+        <button class="menu-item" (click)="navigation.go(section.id)"
+                [disabled]="section.disabled"
+                [attr.title]="section.disabled ? section.disabledHint : null">
           <span class="mi-icon" [innerHTML]="icons.icon(section.id)"></span>
           <span class="mi-main">
             <span class="mi-title">

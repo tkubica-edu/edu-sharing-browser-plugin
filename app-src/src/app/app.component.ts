@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component, OnInit, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy, Component, OnInit, effect, inject, signal, untracked
+} from '@angular/core';
 
 import { APP_CONFIG } from './config';
 import { SectionId } from './model/navigation';
@@ -14,6 +16,7 @@ import { HistoryEntry, HistoryService } from './services/history.service';
 import { NavigationService } from './services/navigation.service';
 import { OnlyOfficeDocumentService } from './services/onlyoffice-document.service';
 import { OptionIconService } from './services/option-icon.service';
+import { PageRecognitionService } from './services/page-recognition.service';
 import { SessionResumeService } from './services/session-resume.service';
 
 import { ActionBarComponent } from './components/action-bar.component';
@@ -75,6 +78,7 @@ export class AppComponent implements OnInit {
   private readonly additionalWebComponent = inject(AdditionalWebComponentService);
   private readonly curation = inject(CurationService);
   private readonly onlyOfficeDocument = inject(OnlyOfficeDocumentService);
+  private readonly pageRecognition = inject(PageRecognitionService);
   private readonly debug = inject(DebugService);
   private readonly sessionResume = inject(SessionResumeService);
 
@@ -88,12 +92,26 @@ export class AppComponent implements OnInit {
   /** Guard: the host's open document is adopted as the active node at most once. */
   private documentAdopted = false;
 
+  /** Set once the boot finished, so the page recognition cannot outrun the session restore. */
+  private readonly booted = signal(false);
+
   constructor() {
     effect(() => {
       const nodeId = this.pendingNodeId();
       if (nodeId && this.auth.authorized()) {
         this.pendingNodeId.set(null);
         void this.openNode(() => this.curation.openNode(nodeId, 'detected'));
+      }
+    });
+
+    // Ask the repository whether it already holds the open page as a content, so a find surfaces as
+    // the *Inhalt erkannt* menu entry (see PageRecognitionService, which decides for itself when
+    // there is nothing to ask). An effect rather than a step of the boot, because the lookup needs a
+    // session: on a page opened logged out it runs again once the login exists. `untracked`, so it
+    // is the login that re-triggers it and not every signal the lookup happens to read.
+    effect(() => {
+      if (this.booted() && this.auth.authorized()) {
+        untracked(() => void this.pageRecognition.recognize());
       }
     });
 
@@ -105,7 +123,7 @@ export class AppComponent implements OnInit {
       const node = this.onlyOfficeDocument.documentNode();
       if (!node || this.documentAdopted) return;
       this.documentAdopted = true;
-      this.curation.adoptOpenDocument(node);
+      this.curation.adoptDetectedNode(node);
     });
   }
 
@@ -143,6 +161,9 @@ export class AppComponent implements OnInit {
     if (this.conditions.onlyOfficePresent() && !this.onlyOfficeDocument.currentDocument()) {
       void this.onlyOfficeDocument.requestInfo().catch(() => null);
     }
+
+    // Last: the boot is done, which releases the page recognition (see the effect above).
+    this.booted.set(true);
   }
 
   protected onWindowMessage(event: MessageEvent): void {

@@ -1,11 +1,18 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 
-import { AppSection, SECTIONS, ScreenId, SectionId, SectionTab } from '../model/navigation';
+import {
+  AppSection, Conditions, SECTIONS, ScreenId, SectionId, SectionTab
+} from '../model/navigation';
 import { ConditionsService } from './conditions.service';
 import { CurationService } from './curation.service';
 
 /** A section's sub step as the tab bar renders it: its definition plus whether it can be opened. */
 export interface TabView extends SectionTab {
+  disabled: boolean;
+}
+
+/** A section as the main menu renders it: its definition plus whether it can be entered. */
+export interface SectionView extends AppSection {
   disabled: boolean;
 }
 
@@ -30,15 +37,16 @@ export class NavigationService {
   readonly showBack = computed(() => this.section() !== 'menu');
 
   /**
-   * The sections listed in the main menu, in registry order, filtered by the conditions. A section
-   * may be reachable without being offered here — see AppSection.listed.
+   * The sections listed in the main menu, in registry order, filtered by the conditions, each with
+   * whether it can be entered right now. A section may be reachable without being offered here —
+   * see AppSection.listed.
    */
-  readonly menuSections = computed(() => {
+  readonly menuSections = computed<readonly SectionView[]>(() => {
     const conditions = this.conditions.snapshot();
     return SECTIONS.filter(
       (section) =>
         section.menu && section.visible(conditions) && (section.listed?.(conditions) ?? true),
-    );
+    ).map((section) => ({ ...section, disabled: !this.isEnabled(section, conditions) }));
   });
 
   /** The utility sections, shown as topbar icons rather than as menu entries. */
@@ -93,12 +101,15 @@ export class NavigationService {
   });
 
   constructor() {
-    // Guard: if the open section becomes invisible (logout, node cleared, page change), don't
-    // strand the user on a dead screen — re-land on a valid view.
+    // Guard: if the open section becomes invisible (logout, node cleared, page change) or disabled
+    // (a content was detected for this page while "Inhalt erschließen" was open), don't strand the
+    // user on a dead screen — re-land on a valid view.
     effect(() => {
       const id = this.section();
       if (id === 'menu') return;
-      if (!this.isVisible(id)) this.land();
+      const conditions = this.conditions.snapshot();
+      const section = this.sectionOf(id);
+      if (!section?.visible(conditions) || !this.isEnabled(section, conditions)) this.land();
     });
   }
 
@@ -110,9 +121,17 @@ export class NavigationService {
     return this.sectionOf(id)?.visible(conditions) ?? false;
   }
 
-  /** Navigate to a section, if currently visible; optionally straight to one of its tabs. */
+  /**
+   * Navigate to a section, if it can be entered right now; optionally straight to one of its tabs.
+   *
+   * A *disabled* section is refused as firmly as an invisible one — the menu renders it as a
+   * disabled row, and every other caller (a footer action, a screen offering a choice of sections)
+   * must not be able to route around that.
+   */
   go(id: SectionId, options?: { tab?: ScreenId }): void {
-    if (!this.isVisible(id)) return;
+    const conditions = this.conditions.snapshot();
+    const section = this.sectionOf(id);
+    if (!section?.visible(conditions) || !this.isEnabled(section, conditions)) return;
     this.section.set(id);
     this.requestedTab.set(options?.tab ?? null);
   }
@@ -148,6 +167,10 @@ export class NavigationService {
   land(): void {
     if (!this.conditions.snapshot().loggedIn) return this.go('login');
     this.openMenu();
+  }
+
+  private isEnabled(section: AppSection, conditions: Conditions): boolean {
+    return section.enabled?.(conditions) ?? true;
   }
 
   private sectionOf(id: SectionId): AppSection | undefined {

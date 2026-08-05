@@ -86,6 +86,15 @@ export interface AppSection {
   title?: string;
   description: string;
   visible: (conditions: Conditions) => boolean;
+  /**
+   * Whether the section can be entered right now; defaults to always. Like a tab's
+   * {@link SectionTab.enabled}, a section that does not apply *at the moment* stays **visible and
+   * disabled** rather than disappearing: the menu is the list of what the panel can do, and a row
+   * that vanishes takes its explanation with it.
+   */
+  enabled?: (conditions: Conditions) => boolean;
+  /** Why the section cannot be entered, shown as its tooltip. */
+  disabledHint?: string;
   /** The section's sub steps, in tab order. Never empty. */
   tabs: readonly SectionTab[];
   /** Listed as an entry of the main menu. Without it the section is only reachable from the flow. */
@@ -157,6 +166,13 @@ export const SECTIONS: readonly AppSection[] = [
     label: 'Inhalt erschließen',
     description: 'Aus der aktuellen Webseite Metadaten erzeugen',
     visible: requiresLogin(),
+    // Nothing left to erschließen once a content was detected for this page: the repository already
+    // holds it (PageRecognitionService found it by URL) or the host has it open — and *that* content
+    // is what the panel offers to work on, under "Inhalt erkannt". Curating again would produce a
+    // second node for the same page.
+    enabled: (c) => !c.hasDetectedNode,
+    disabledHint:
+      'Dieser Inhalt ist bereits erschlossen — er wird unter „Inhalt erkannt" angeboten.',
     menu: true,
     tabs: [{ id: 'curation', label: 'Erschließen' }]
   },

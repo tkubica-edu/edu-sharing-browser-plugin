@@ -4,6 +4,7 @@ import { AuthService } from '../services/auth.service';
 import { ConditionsService } from '../services/conditions.service';
 import { CurationService } from '../services/curation.service';
 import { DebugService } from '../services/debug.service';
+import { PageRecognitionService } from '../services/page-recognition.service';
 
 // The persistent condition bar. Always visible, independent of the navigation — it shows the
 // states the sections' visibility is derived from (login, insert host, Edu-Sharing page, active
@@ -20,6 +21,7 @@ export class StatusBarComponent {
   protected readonly auth = inject(AuthService);
   protected readonly curation = inject(CurationService);
   protected readonly debug = inject(DebugService);
+  protected readonly pageRecognition = inject(PageRecognitionService);
 
   protected logout(): void {
     void this.auth.logout();

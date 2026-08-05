@@ -39,6 +39,14 @@
     </span>
   }
 
+  <!-- The URL lookup that recognises the open page as an existing content. Reported while it runs,
+       so the "Inhalt erschließen" entry going disabled a moment later has a visible reason. -->
+  @if (pageRecognition.checking()) {
+    <span class="status-chip" title="Es wird geprüft, ob diese Seite bereits erschlossen ist">
+      <span class="d"></span>Seite wird geprüft…
+    </span>
+  }
+
   @if (curation.activeNode(); as node) {
     <span class="status-chip is-on" [title]="'Aktiver Inhalt: ' + (node.name ?? node.nodeId)">
       <span class="d"></span><span class="chip-label">Aktiver Inhalt: {{ node.name ?? node.nodeId }}</span>

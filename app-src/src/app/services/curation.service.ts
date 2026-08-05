@@ -279,21 +279,36 @@ export class CurationService {
   }
 
   /**
-   * Adopt the document the host page has open as the active node, so the app works on it from the
-   * start (preview, metadata, collections all target the edited document). Takes the node the
-   * OnlyOffice document service already loaded, so it costs no second fetch.
+   * Adopt a node that turned up on its own as the active node, so the app works on it from the
+   * start (preview, metadata, collections all target it). Two callers hand one over, both about the
+   * page that is open rather than about a choice the user made:
+   *
+   * - the document the host page has open (OnlyOfficeDocumentService, which already loaded it);
+   * - the content the repository already holds for this page's URL (PageRecognitionService).
    *
    * Unlike {@link openNode} nothing is written to the history — the user did not pick this node,
    * it is simply what happens to be open. Ignored once anything else is loaded or unsaved, so a
    * late arrival (the identity is often known only after login) never clobbers the user's work.
    */
-  adoptOpenDocument(node: Node): void {
+  adoptDetectedNode(node: Node): void {
     if (this.activeNode() || this.hasUnsavedWork()) return;
     // Name only when really known, never the node id as a stand-in — see {@link ActiveNode}.
     this.applyLoadedNode(node.ref.id, node, node.name ?? null, 'detected');
     // No agent result for a node we merely found open; its parsed view comes from the node's own
     // properties instead.
     this.metadataAgent.reset();
+    // A node that arrives as part of *another* answer can come without its properties (the
+    // duplicate list of getWebsiteInformation). Then it is loaded once, so the metadata editor
+    // opens on the stored values instead of on nothing.
+    if (!node.properties) void this.hydrateActiveNode(node.ref.id);
+  }
+
+  /** Re-seed preview and editor from the fully loaded node; a no-op if the flow moved on since. */
+  private async hydrateActiveNode(nodeId: string): Promise<void> {
+    const node = await this.loadNode(nodeId);
+    if (!node || this.activeNode()?.nodeId !== nodeId) return;
+    this.previewNode.set(node);
+    this.nodeMetadata.set(node.properties as MdsValues);
   }
 
   /**
