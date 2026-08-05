@@ -59,8 +59,10 @@ The options:
 - **Passende Inhalte finden** — only on an OnlyOffice page: searches the repository for content
   matching the **edited document**. The query is not typed but derived — the same
   `REQUEST_DOCUMENT_CONTENT` → `DOCUMENT_CONTENT` round trip as *Metadaten anreichern*, then
-  `POST {apiUrl}/generate` on the answer's `markdown`, and the generated
-  `cclom:general_keyword` values (title as fallback, deduplicated, capped) become the
+  `POST {apiUrl}/extract-field` on the answer's `markdown` — the single-field endpoint, asked for
+  `field_id: cclom:general_keyword` out of the agent's `core.json`, because a full `/generate` would
+  extract a whole metadata set of which only the keywords are used here. The generated
+  `cclom:general_keyword` values (deduplicated, capped) become the
   `initial-values` of **`edu-sharing-search`** — the embedded search that adds the metadata filters
   of the search page to a node list. `initial-values` is a map of MDS widget id → values (here
   `{"cclom:general_keyword": [...]}`), i.e. the keywords are used as a **filter**, not as the
@@ -225,7 +227,8 @@ before the scripts run — mirroring `window.__env.EDU_SHARING_API_URL` for the 
 ### Network legs & CORS
 | Leg | Where it runs | Why |
 |-----|---------------|-----|
-| `POST /generate` (Metadata-Agent API) | background service worker | background fetch is gated by `host_permissions`, not CORS/page-CSP — portable everywhere (`analyze.run` for a tab, `analyze.text` for the OnlyOffice document's markdown) |
+| `POST /generate` (Metadata-Agent API) | background service worker | background fetch is gated by `host_permissions`, not CORS/page-CSP — portable everywhere (`analyze.run`: extract the tab, generate everything) |
+| `POST /extract-field` (Metadata-Agent API) | sidebar document (`MetadataAgentService`) | same context the WLO canvas calls `/generate` from, so the request is visible in the panel's own DevTools and there is no worker build that can fall out of sync with the app. Relies on `host_permissions` for the cross-origin call, like the repository login |
 | Page content extraction | `scripting.executeScript` (background) | no cross-origin fetch |
 | Repository login | Angular `HttpClient` (library) | the library owns the call; relies on `host_permissions` bypassing CORS on Chrome/Edge/Firefox |
 

@@ -1,21 +1,19 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 
 import { errorMessage } from '../util/errors';
-import { MetadataAgentService, ParsedMetadata } from './metadata-agent.service';
+import { MetadataAgentService } from './metadata-agent.service';
 import { OnlyOfficeDocumentService } from './onlyoffice-document.service';
 
-/** Agent fields the search words are taken from, in order of preference. */
-const KEYWORD_FIELDS = ['cclom:general_keyword', 'cclom:classification_keyword'];
-
 /**
- * The MDS widget the keywords are filtered on. `cclom:general_keyword` is a free-text keyword in
- * the search index, so the agent's values go in verbatim — unlike vocabulary widgets (e.g.
- * `ccm:educationalcontext`), which would need valuespace keys instead of labels.
+ * The keywords, in both roles: the agent field that is generated (`field_id` of
+ * `/extract-field`, defined in the agent's `core.json`) and the MDS widget the search filters on.
+ * The same id on purpose — the agent's values are meant to land in that filter unchanged.
+ *
+ * `cclom:general_keyword` is a free-text keyword in the search index, so they go in verbatim —
+ * unlike vocabulary widgets (e.g. `ccm:educationalcontext`), which would need valuespace keys
+ * instead of labels.
  */
 const KEYWORD_WIDGET = 'cclom:general_keyword';
-
-/** Fallback when the agent found no keywords — a title still searches for something sensible. */
-const TITLE_FIELD = 'cclom:title';
 
 /** How many of the agent's keywords are kept at all — the list the screen shows. */
 const MAX_KEYWORDS = 8;
@@ -33,8 +31,14 @@ const NO_KEYWORDS =
 
 /**
  * Derives search words from the document the host page has open, for "Passende Inhalte finden":
- * ask the OnlyOffice plugin for the document content, run the metadata agent on its markdown and
- * keep the keywords it generated. Those become the keyword filter of `<edu-sharing-search>`.
+ * ask the OnlyOffice plugin for the document content, have the metadata agent generate the keyword
+ * field from its markdown and keep what it answered. Those become the keyword filter of
+ * `<edu-sharing-search>`.
+ *
+ * Only that one field is requested ({@link MetadataAgentService.extractField}), not a whole
+ * metadata set: everything else the agent could extract would be thrown away here, and a full run
+ * takes considerably longer — which the user waits through, since the derivation starts when the
+ * screen opens.
  *
  * The run deliberately does **not** become the app's {@link MetadataAgentService.lastRun}: this is
  * a search aid, not an erschließen result, so it must not turn up in the metadata editor nor count
@@ -96,12 +100,12 @@ export class ContentSuggestionsService {
     this.error.set(null);
     try {
       const content = await this.onlyOfficeDocument.requestContent();
-      const outcome = await this.metadataAgent.analyzeText(content.markdown ?? '');
-      if (!outcome.ok || !outcome.parsed) {
+      const outcome = await this.metadataAgent.extractField(content.markdown ?? '', KEYWORD_WIDGET);
+      if (!outcome.ok) {
         this.error.set(outcome.error ?? NO_KEYWORDS);
         return false;
       }
-      const keywords = this.pickKeywords(outcome.parsed);
+      const keywords = this.pickKeywords(outcome.values ?? []);
       if (!keywords.length) {
         this.error.set(NO_KEYWORDS);
         return false;
@@ -140,14 +144,10 @@ export class ContentSuggestionsService {
     this.step.set(0);
   }
 
-  /** The keyword fields' values, de-duplicated and capped; the title if there are none. */
-  private pickKeywords(parsed: ParsedMetadata): string[] {
-    const valuesOf = (keys: string[]) =>
-      parsed.fields.filter((field) => keys.includes(field.key)).flatMap((field) => field.values);
-    const candidates = valuesOf(KEYWORD_FIELDS);
-    const words = candidates.length ? candidates : valuesOf([TITLE_FIELD]);
+  /** The generated keywords, de-duplicated (first spelling wins) and capped. */
+  private pickKeywords(values: readonly string[]): string[] {
     const unique = new Map(
-      words
+      values
         .map((word) => word.trim())
         .filter(Boolean)
         .map((word) => [word.toLowerCase(), word]),

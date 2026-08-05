@@ -233,6 +233,8 @@ Gleiche `instance-id` → geteilter State. Events feuern nur von der **ersten re
 Antwort: `field_id`, `field_label`, `value`, `raw_value` (vor Normalisierung), `previous_value`, `changed`, `normalized`, `context`, `version`, `schema_file`, `processing`.
 
 > ⚠️ Die Widget-`ApiService` hat `extractField()` implementiert, aber **kein UI-Element ruft sie auf**. Einzelfeld-Regeneration ist aktuell nur per API nutzbar — z. B. aus der Host-Anwendung heraus, das Ergebnis dann per `el.metadataInput = {...}` zurückspielen.
+>
+> Diese Extension nutzt den Endpunkt direkt (ohne Widget) für *Passende Inhalte*: `field_id: "cclom:general_keyword"` mit `schema_file: "core.json"` auf das Markdown des offenen Dokuments, siehe `background/background.js` (`analyze.field`). Pflicht sind nur `schema_file` und `field_id`; `input_source` (`"text"`), `language` (`"de"`), `normalize` (`true`), `context`/`version` haben Defaults. Der Wert kommt bei mehrwertigen Feldern als JSON-Array zurück, laut Schema-`examples` ist aber auch ein kommagetrennter String erlaubt — beides abfangen.
 
 ### b) `POST /generate` mit `regenerate_fields` — Teilmenge
 

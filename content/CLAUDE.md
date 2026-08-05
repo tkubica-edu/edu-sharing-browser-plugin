@@ -129,8 +129,9 @@ applies if the raw `data.url` image is loaded manually, which the extension does
 
 Powers **"Passende Inhalte"** (the Bearbeitungsmodus): on an OnlyOffice page the extension asks
 the host for the *edited document's* content and sends the `markdown` rendering to the metadata
-agent (`POST /generate`, text mode), then derives search keywords from the result and searches the
-repository for matching content. The `document` identity is what makes the edited document the
+agent (`POST /extract-field`, text mode, `field_id: cclom:general_keyword`), then searches the
+repository for content matching the keywords it answered. Only that one field is generated — a full
+`/generate` would extract a whole metadata set of which everything but the keywords is discarded. The `document` identity is what makes the edited document the
 **active node**, so every step of the flow works on it.
 
 Unlike the two directions above this is a **correlated pair**: every request carries a
@@ -204,7 +205,7 @@ Unlike the two directions above this is a **correlated pair**: every request car
 | 3 | `panel-host.js` → all frames | `broadcastToFrames` (a single post to `window.top` would **not** reach the nested plugin frame) | `REQUEST_DOCUMENT_CONTENT` envelope |
 | 4 | plugin → host top → sidebar iframe | `postMessage`, relayed by `panel-host.js` | `DOCUMENT_CONTENT` envelope |
 | 5 | `app.component.ts` → `OnlyOfficeDocumentService.accept()` | filter `data.source`, match `requestId` | resolves the pending promise |
-| 6 | `markdown` → background `analyze.text` → `POST /generate` → keywords | `runtime.sendMessage` | agent payload |
+| 6 | `markdown` → `POST {apiUrl}/extract-field` → keywords | `fetch` from the sidebar document (no worker) | agent payload |
 | 7 | keywords → `<edu-sharing-search>` → double-click inserts the result into the document | `postMessage` | `edusharing-insert-node` |
 
 ---
@@ -365,13 +366,13 @@ only string fields and the extension re-hydrates from `id`.
 | File | Role |
 |---|---|
 | `app-src/src/app/components/search.component.ts` | selector's `onNodesChoosen` → `insertNodes` (outbound) |
-| `app-src/src/app/services/browser-extension.service.ts` | `insertNodes`, `requestDocumentContent`, `requestDocumentInfo` (outbound), `signalReady` (ready handshake), `analyzeText` (→ background `/generate`) |
+| `app-src/src/app/services/browser-extension.service.ts` | `insertNodes`, `requestDocumentContent`, `requestDocumentInfo` (outbound), `signalReady` (ready handshake) |
 | `content/panel-host.js` | relay hub: broadcasts `INSERT_NODE` / `REQUEST_DOCUMENT_*`; relays inbound envelopes, buffers only `PREVIEW_NODE` |
 | `app-src/src/app/app.component.ts` | single `window:message` listener: `DOCUMENT_*` → the document bridge, `PREVIEW_NODE` → the flow |
 | `app-src/src/app/model/onlyoffice-events.ts` | the inbound contract: `PLUGIN_SOURCE` marker + `PluginEnvelope` / `DocumentContent` / `DocumentIdentity` payloads |
 | `app-src/src/app/services/onlyoffice-document.service.ts` | the request/response bridge: `requestContent`/`requestInfo` (`requestId` + timeout), `accept(envelope)`, `currentDocument` |
 | `app-src/src/app/services/debug.service.ts` | debug mode: answers the `REQUEST_DOCUMENT_*` events with hard-coded fixtures instead of asking the host page |
-| `app-src/src/app/services/metadata-agent.service.ts` | `runForOpenDocument()` — document content → `markdown` → agent |
+| `app-src/src/app/services/metadata-agent.service.ts` | `extractField(text, fieldId)` — document `markdown` → `POST /extract-field` (own `fetch`, like the WLO canvas' `/generate`) → the one field's values |
 | `app-src/src/app/services/curation.service.ts` | `openNode(id)` (hydrate the node into the flow), `adoptOpenDocument(node)` (the open document as active node, no history entry) |
-| `background/background.js` | `analyze.text` — `POST /generate` for text the sidebar supplies |
+| `background/background.js` | `analyze.run` — `POST /generate` for the extracted tab (the erschließen path; the keyword call does not go through here) |
 | *(host-side, external)* | app that listens for `INSERT_NODE` / `REQUEST_DOCUMENT_*` and sends `PREVIEW_NODE` / `DOCUMENT_*` (e.g. OnlyOffice plugin) |

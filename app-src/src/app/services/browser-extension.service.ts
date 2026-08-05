@@ -63,16 +63,6 @@ export class BrowserExtensionService {
     return response ?? { success: false, error: 'NO_RESPONSE' };
   }
 
-  /** Ask the background worker to run the metadata agent on text the sidebar already holds. */
-  async analyzeText(text: string, language: string): Promise<AnalyzeResponse> {
-    const response = (await browser.runtime.sendMessage({
-      action: 'analyze.text',
-      text,
-      language,
-    })) as AnalyzeResponse | null;
-    return response ?? { success: false, error: 'NO_RESPONSE' };
-  }
-
   /**
    * Ask the background worker to POST an upload body to the metadata agent's `/upload`, which
    * writes the curated content into the repository itself. The reply carries the endpoint's own

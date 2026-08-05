@@ -172,19 +172,6 @@ function buildGenerateBody(pageData, language) {
   };
 }
 
-// Build the /generate request body for text the sidebar already holds (e.g. the markdown of an
-// open OnlyOffice document). Text mode only — there is no URL to fall back to.
-function buildTextGenerateBody(text, language) {
-  return {
-    text,
-    context: 'default',
-    version: 'latest',
-    language: language || 'de',
-    include_core: true,
-    enable_geocoding: true
-  };
-}
-
 async function callGenerate(body) {
   const response = await fetchWithTimeout(
     `${API_URL}/generate`,
@@ -237,7 +224,6 @@ const ALLOWED_ACTIONS = new Set([
   'tabs.extractPageData',
   'tabs.navigate',
   'analyze.run',
-  'analyze.text',
   'metadata.upload'
 ]);
 
@@ -299,16 +285,6 @@ browser.runtime.onMessage.addListener((message, sender) => {
             result,
             source: { url: pageData?.url || tab.url, title: pageData?.title || tab.title, favIconUrl: tab.favIconUrl }
           };
-        }
-
-        // POST text supplied by the sidebar to /generate (no tab involved) — used where the
-        // content comes from the open OnlyOffice document rather than from the page (deriving
-        // search keywords for "Passende Inhalte").
-        case 'analyze.text': {
-          const text = typeof message.text === 'string' ? message.text : '';
-          if (text.trim().length < 50) return { success: false, error: 'EMPTY_EXTRACTION' };
-          const result = await callGenerate(buildTextGenerateBody(text, message.language));
-          return { success: true, result };
         }
 
         // POST an upload body assembled by the sidebar to /upload — the metadata agent's own way
