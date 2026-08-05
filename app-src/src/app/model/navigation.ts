@@ -255,7 +255,7 @@ export const SECTIONS: readonly AppSection[] = [
   {
     id: 'overview',
     label: 'Inhaltsübersicht',
-    description: 'Vorschau, Aufrufe und Nutzung des Inhalts',
+    description: 'Vorschau, Nutzung und Teilen des Inhalts',
     visible: requiresLogin((c) => c.hasActiveNode),
     tabs: [
       { id: 'preview', label: 'Vorschau' },

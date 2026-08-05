@@ -53,7 +53,12 @@ export class ContentFlowService {
     }
   }
 
-  /** "Inhaltsübersicht anzeigen": the last big step, straight from a node. */
+  /** "Qualitätssicherung": the metadata step, straight from a node — nothing to decide here. */
+  showQuality(): void {
+    this.navigation.go('quality');
+  }
+
+  /** "Inhaltsübersicht": the last big step, straight from a node. */
   showOverview(): void {
     this.navigation.go('overview');
   }

@@ -10,12 +10,12 @@
     }
   </section>
 
-  <!-- The same rows as the main menu: these two are a choice of next step, not form buttons. -->
+  <!-- The same rows as the main menu: these are a choice of next step, not form buttons. -->
   <ul class="option-list">
-    @for (option of options; track option.label) {
+    @for (option of options(); track option.label) {
       <li>
         <button class="menu-item" [disabled]="flow.deciding()" (click)="option.run()">
-          <span class="mi-icon" [innerHTML]="icons.icon(option.icon)"></span>
+          <span class="mi-icon" [innerHTML]="icons.icon(option.section)"></span>
           <span class="mi-main">
             <span class="mi-title">{{ option.label }}</span>
             <span class="mi-desc">{{ option.description }}</span>
