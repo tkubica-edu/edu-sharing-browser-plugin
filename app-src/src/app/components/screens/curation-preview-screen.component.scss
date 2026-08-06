@@ -1,0 +1,5 @@
+// "Vorschau und Titel" — everything on screen belongs to the embedded view group, so this only gives
+// it its card.
+:host { display: block; }
+
+.preview-card { padding: 12px 14px; }

@@ -16,6 +16,7 @@ export type ScreenId =
   | 'add-material'
   | 'search'
   | 'curation'
+  | 'curation-preview'
   | 'own-content'
   | 'history'
   | 'content-options'
@@ -36,6 +37,7 @@ export type SectionId =
   | 'add-material'
   | 'search'
   | 'curation'
+  | 'curation-preview'
   | 'own-content'
   | 'history'
   | 'content-options'
@@ -60,6 +62,9 @@ export interface Conditions {
   /** Editable metadata exists: an active node OR a fresh /generate result not yet saved.
    *  (The node is created on the first save, so the metadata tab opens on a result too.) */
   hasEditableMetadata: boolean;
+  /** A fresh /generate result that has not been written to a node yet — a content still being
+   *  curated. Narrower than {@link hasEditableMetadata}, which a saved node satisfies too. */
+  hasCuratedDraft: boolean;
   /** The metadata editor is currently open. */
   editMode: boolean;
   /** The recognition has not answered yet what this page's content is (PageRecognitionService).
@@ -255,6 +260,17 @@ export const SECTIONS: readonly AppSection[] = [
   },
 
   // ---- Reached from a menu section ---------------------------------------
+  {
+    id: 'curation-preview',
+    label: 'Vorschau und Titel',
+    description: 'Vorschaubild und Titel des erschlossenen Inhalts prüfen',
+    // The second step of "Inhalt erschließen", reached the moment its run succeeded: a curated
+    // result that has no node yet is exactly the state this step is about (see
+    // CurationPreviewScreenComponent). Once the content is saved it falls away — the picture and the
+    // title are then the node's own, and the Qualitätssicherung is where they are edited.
+    visible: requiresLogin((c) => c.hasCuratedDraft),
+    tabs: [{ id: 'curation-preview', label: 'Vorschau' }]
+  },
   {
     id: 'new-document',
     label: 'Inhalt erstellen',

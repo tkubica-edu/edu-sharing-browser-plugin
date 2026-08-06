@@ -1,0 +1,21 @@
+<div class="es-screen-body">
+  <section class="es-hint-card">
+    <p class="es-muted">
+      Vorschaubild und Titel des erschlossenen Inhalts prüfen und anpassen. Gespeichert wird der
+      Inhalt erst in der Qualitätssicherung.
+    </p>
+  </section>
+
+  <!-- The view group renders both the picture and the title; `nodes` mode, because the draft has no
+       node behind it that a widget could write to on its own (see MdsPreviewWidgetComponent). -->
+  @if (draftNode; as node) {
+    <section class="es-card preview-card">
+      <es-mds-preview-widget [node]="node" editorMode="nodes"
+                             (valuesChange)="onValuesChange($event)"></es-mds-preview-widget>
+    </section>
+  } @else {
+    <section class="es-card">
+      <p class="es-muted">Es liegt kein erschlossener Inhalt vor.</p>
+    </section>
+  }
+</div>

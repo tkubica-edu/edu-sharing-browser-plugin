@@ -18,6 +18,9 @@ const ICONS: Record<IconId, string> = {
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h5"/><path d="M13.5 3L19 8.5V13"/><path d="M13.5 3v5.5H19"/><path d="M8 10h3.5"/><path d="M8 13.5h5"/><circle cx="17" cy="17.5" r="4"/><path d="M17 15.6v3.8"/><path d="M15.1 17.5h3.8"/></svg>',
   curation:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h4"/><path d="M13.5 3L19 8.5V11"/><path d="M13.5 3v5.5H19"/><path d="M8 10h3.5"/><path d="M8 13.5h4"/><circle cx="16.2" cy="16.2" r="3.3"/><path d="M18.7 18.7L21.3 21.3"/></svg>',
+  // The curated content's picture, before anything is written: a framed image.
+  'curation-preview':
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="M3 16.5l4.5-3.5L12 17"/><path d="M13 17l3-3 5 4"/></svg>',
   'own-content':
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2l2 2.5H19.5A1.5 1.5 0 0 1 21 10v7.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
   history:

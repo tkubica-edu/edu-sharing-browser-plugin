@@ -1,8 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { CollectionServiceUnwrapped, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
+import { CollectionServiceUnwrapped, DEFAULT, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 import { firstValueFrom } from 'rxjs';
 
-import { MdsValues, firstString } from '../util/mds-values';
+import { MdsValues, firstString, toMdsEditorValues } from '../util/mds-values';
 import { errorMessage } from '../util/errors';
 import { renderLink } from '../util/repository-links';
 import { AdditionalWebComponentService } from './additional-web-component.service';
@@ -65,6 +65,63 @@ function toPartialNode(nodeId: string, uploaded: UploadedNode, values: MdsValues
     mediatype: 'link',
     properties: values,
     access: []
+  } as unknown as Node;
+}
+
+/**
+ * Stands where a node id belongs on the draft node below. It identifies nothing in the repository —
+ * the content does not exist there yet — so no request must ever be built from it; it is only there
+ * because the MDS machinery reads `ref.id` while rendering.
+ */
+const DRAFT_NODE_ID = '-draft-';
+
+/** Name of a draft whose metadata carries no title yet. Never written anywhere. */
+const DRAFT_NAME = 'Neuer Inhalt';
+
+/**
+ * The access rights the draft node reports. The MDS editor asks the *node* whether it may be edited
+ * (`hasAccessPermission(node, 'Write')`) before it offers a widget for editing, and a stand-in with
+ * no rights would render as read-only. It stands for a content the user is about to create, so it
+ * states the rights they will have on it.
+ */
+const DRAFT_ACCESS = ['Read', 'Write', 'Change', 'Delete'];
+
+/**
+ * A preview URL in the shape the native MDS preview widget can build its image source from: it
+ * appends its own parameters (`&crop=true&width=…`), which for a URL that carries no query at all
+ * would land in the path and fetch nothing. A trailing `?` gives that `&` something to attach to;
+ * the empty first parameter is ignored by image hosts.
+ */
+function previewSource(url: string): string {
+  return url.includes('?') ? url : `${url}?`;
+}
+
+/**
+ * Assemble the stand-in {@link Node} for a content that has just been curated and has no node in the
+ * repository yet — the one the preview step hands to the MDS editor, so the view group's `<preview>`
+ * and title widgets have a node to work on (see {@link CurationService.draftNode}).
+ *
+ * Beyond {@link toPartialNode} two fields matter, both because the editor reads them off the *node*
+ * rather than off its own inputs: `metadataset` (the editor's `setId` input only applies to a
+ * node-less editor, so a draft without it would resolve no metadata set) and `access`
+ * (see {@link DRAFT_ACCESS}).
+ */
+function toDraftNode(values: MdsValues, title: string | null, previewUrl: string | null): Node {
+  return {
+    ref: { id: DRAFT_NODE_ID, repo: HOME_REPOSITORY },
+    name: title ?? DRAFT_NAME,
+    title: title ?? undefined,
+    type: 'ccm:io',
+    mediatype: 'link',
+    metadataset: DEFAULT,
+    aspects: [],
+    access: DRAFT_ACCESS,
+    properties: values,
+    // `isIcon: false` — the widget shows the picture itself only for a real preview; for an icon it
+    // renders the repository's icon element instead, which needs a node the repository knows.
+    preview: previewUrl
+      ? { url: previewSource(previewUrl), isIcon: false, width: 0, height: 0 }
+      : undefined
   } as unknown as Node;
 }
 
@@ -151,6 +208,9 @@ export class CurationService {
   /** Set while a generated result still waits to be saved; see {@link hasUnsavedWork}. */
   private readonly resultPending = signal(false);
 
+  /** What the preview step's editor last reported; see {@link reportDraftValues}. */
+  private readonly draftValues = signal<MdsValues | null>(null);
+
   /** Set once the metadata was written at least once; see {@link metadataSaved}. */
   private readonly saved = signal(false);
 
@@ -222,6 +282,53 @@ export class CurationService {
     return preview?.url ? { url: preview.url, isIcon: true } : null;
   });
 
+  /**
+   * The stand-in node for the content that has just been curated — what the preview step edits, since
+   * that content has no node in the repository yet (see {@link toDraftNode}). `null` when there is no
+   * curated result to build one from.
+   *
+   * Deliberately a method rather than a computed signal: the MDS editor re-initialises whenever its
+   * `nodes` property changes, and the values this node is built from are the ones that editor reports
+   * back — as a signal it would rebuild the form under the user's hands. The caller reads it once, as
+   * the step opens.
+   */
+  draftNode(): Node | null {
+    if (this.metadataAgent.lastRun()?.ok !== true) return null;
+    const preview = this.contentPreview();
+    return toDraftNode(
+      toMdsEditorValues(this.editorMetadata()),
+      this.contentTitle(),
+      preview && !preview.isIcon ? preview.url : null,
+    );
+  }
+
+  /**
+   * Take over the values the preview step's editor reports — its title widget, and whatever else the
+   * view group carries. Only remembered here: feeding them back into the metadata while the step is
+   * open would re-seed the very editor that reported them (see {@link draftNode}), so they are
+   * applied when the step is left — see {@link applyDraftValues}.
+   */
+  reportDraftValues(values: MdsValues): void {
+    this.draftValues.set(values);
+  }
+
+  /**
+   * Write the preview step's edits into the curated result, so every step after it works on them: the
+   * metadata editor opens on the adjusted title and the save writes it.
+   *
+   * It is the agent's payload that is rewritten, because that payload *is* the flow's metadata as long
+   * as there is no node (see {@link editorMetadata}). The display fields are re-derived from the
+   * merged values rather than patched, so the field views stay consistent with them.
+   */
+  applyDraftValues(): void {
+    const values = this.draftValues();
+    const run = this.metadataAgent.lastRun();
+    if (!values || !run?.parsed) return;
+    this.draftValues.set(null);
+    const raw = { ...run.parsed.raw, ...values };
+    this.metadataAgent.restore({ ...run, parsed: this.metadataAgent.parse(raw) });
+  }
+
   /** Clear the whole flow for a fresh analysis. */
   startNew(): void {
     this.metadataAgent.reset();
@@ -262,7 +369,7 @@ export class CurationService {
 
   /**
    * Run the metadata agent for the active tab, dropping any previous node. Returns true on
-   * success so the footer can advance to the Qualitätssicherung. Nothing is written to the
+   * success so the caller can advance to the preview step. Nothing is written to the
    * history here — an entry is recorded only once a node is actually saved (see {@link save}).
    */
   async analyze(): Promise<boolean> {
@@ -597,6 +704,7 @@ export class CurationService {
 
   private resetNodeState(): void {
     this.resultPending.set(false);
+    this.draftValues.set(null);
     this.saved.set(false);
     this.activeNode.set(null);
     this.nodeSource.set(null);

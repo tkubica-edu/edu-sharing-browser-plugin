@@ -1,13 +1,25 @@
 import {
   afterRenderEffect, ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, ElementRef,
-  OnDestroy, effect, input, signal, viewChild
+  OnDestroy, effect, input, output, signal, viewChild
 } from '@angular/core';
 import { DEFAULT, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 
-import { toMdsEditorValues } from '../util/mds-values';
+import { MdsValues, toMdsEditorValues } from '../util/mds-values';
 import { loadWebComponentBundle } from '../services/web-component-bundle.service';
 
 const EDITOR_TAG = 'edu-sharing-mds-editor-wrapper';
+
+/**
+ * How the wrapper renders the view group's widgets.
+ *
+ * - `inline` — each widget as its display value, editable by clicking it; the preview widget brings
+ *   its own save for the picture, which writes straight to the node. For a node the repository
+ *   holds.
+ * - `nodes` — the widgets as a form, edited like any other. Nothing writes by itself; the values are
+ *   reported via {@link MdsPreviewWidgetComponent.valuesChange} and committed by the caller. This is
+ *   the mode for a node the repository does not have (yet).
+ */
+export type PreviewEditorMode = 'inline' | 'nodes';
 
 /**
  * MDS view group whose form contains the native `<preview>` widget.
@@ -47,13 +59,18 @@ interface MdsEditorElement extends HTMLElement {
 }
 
 /**
- * The repository's own preview of a node, rendered by the native MDS preview widget rather than by an
- * `<img>`. Since that widget has no element, this mounts a second `<edu-sharing-mds-editor-wrapper>`
- * read-only for the node and the stylesheet hides everything of the form but the picture.
+ * A node's preview as the repository itself renders it — by the native MDS preview widget rather than
+ * by an `<img>`. Since that widget has no element of its own, this mounts an
+ * `<edu-sharing-mds-editor-wrapper>` for the node and lets {@link PREVIEW_GROUP} decide what is on
+ * screen besides the picture (its title, typically).
  *
- * Two limits: it needs a node (a content not yet saved has none — that is what
- * `CurationService.contentPreview` covers), and it stays read-only, because the widget's upload and
- * delete write through the wrapper's own save, which embedded mode hides.
+ * It needs a node: a content the repository does not hold has none, and the caller either falls back
+ * to the plain image (`CurationService.contentPreview`) or hands over a stand-in
+ * (`CurationService.draftNode`).
+ *
+ * What the user changes here is *not* saved by this component. In `inline` mode the preview widget
+ * writes the picture to the node itself; everything else is reported through {@link valuesChange} and
+ * is the caller's to commit — embedded mode hides the wrapper's own save.
  */
 @Component({
   selector: 'es-mds-preview-widget',
@@ -69,8 +86,20 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
   /** The view group to render — see {@link PREVIEW_GROUP} for what it has to contain. */
   readonly groupId = input(PREVIEW_GROUP);
 
-  /** MDS set id; `-default-` resolves to the repository's default set. */
+  /**
+   * MDS set id; `-default-` resolves to the repository's default set. Applies to a node-less editor
+   * only — with a node the wrapper takes the set from the node's own `metadataset`.
+   */
   readonly setId = input(DEFAULT);
+
+  /** How the group's widgets are rendered — see {@link PreviewEditorMode}. */
+  readonly editorMode = input<PreviewEditorMode>('inline');
+
+  /**
+   * The current values of the group's widgets, on every change. A SUBSET of the node's properties:
+   * only what this group renders.
+   */
+  readonly valuesChange = output<MdsValues>();
 
   private readonly host = viewChild.required<ElementRef<HTMLElement>>('host');
 
@@ -80,6 +109,10 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
   readonly ready = signal(false);
 
   private element: MdsEditorElement | null = null;
+
+  private readonly onValuesChange = (event: Event): void => {
+    this.valuesChange.emit((event as CustomEvent).detail as MdsValues);
+  };
 
   constructor() {
     // Same as MdsEditorComponent: every input is set as a property BEFORE the element is appended
@@ -102,6 +135,7 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.element?.removeEventListener('currentValuesChange', this.onValuesChange);
     this.element?.remove();
     this.element = null;
   }
@@ -110,15 +144,16 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
     if (this.element) return;
     const element = document.createElement(EDITOR_TAG) as MdsEditorElement;
     element.embedded = true;
-    // 'viewer': the form renders what the node has and no widget offers an edit (see the class doc).
-    element.editorMode = 'inline';
+    element.editorMode = this.editorMode();
     element.groupId = this.groupId();
     element.setId = this.setId();
     element.repository = HOME_REPOSITORY;
-    // The node is already hydrated, so the wrapper must not fetch it again.
+    // The node is already hydrated, so the wrapper must not fetch it again — and a stand-in node is
+    // one the repository could not hand back at all.
     element.nodes = [forMdsEditor(this.node())];
     element.nodeRefetch = false;
     element.style.cssText = 'display:block;width:100%';
+    element.addEventListener('currentValuesChange', this.onValuesChange);
     this.host().nativeElement.appendChild(element);
     this.element = element;
     this.ready.set(true);

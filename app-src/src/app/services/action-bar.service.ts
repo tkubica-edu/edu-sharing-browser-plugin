@@ -21,6 +21,12 @@ export interface FooterAction {
   label: string;
   disabled: boolean;
   run: () => void | Promise<void>;
+  /**
+   * How the button carries. Defaults to `primary` — the offered next step, which is what a footer
+   * action normally is. `secondary` is for the way *out* of a step (abandoning it), so it does not
+   * compete with going on.
+   */
+  kind?: 'primary' | 'secondary';
 }
 
 /**
@@ -48,9 +54,9 @@ export class ActionBarService {
 
   readonly actions = computed<FooterAction[]>(() => {
     switch (this.navigation.section()) {
-      // "Inhalt erschließen": run the metadata agent on the page and hand its result to the
-      // Qualitätssicherung. The screen starts that itself on entry, so what is left for the footer
-      // is the repeat — after a failure, or for a page that has changed since.
+      // "Inhalt erschließen": run the metadata agent on the page and hand its result to the preview
+      // step. The screen starts that itself on entry, so what is left for the footer is the repeat —
+      // after a failure, or for a page that has changed since.
       case 'curation':
         return [
           {
@@ -59,7 +65,31 @@ export class ActionBarService {
               : 'Erschließung wiederholen',
             disabled: this.curation.running(),
             run: async () => {
-              if (await this.curation.analyze()) this.navigation.go('quality');
+              if (await this.curation.analyze()) this.navigation.go('curation-preview');
+            }
+          }
+        ];
+
+      // The preview step of the Erschließung: nothing is written here, so what it offers is the two
+      // ways on — dropping the run altogether, or taking it into the Qualitätssicherung, which is
+      // where the save lives. The adjusted picture and title travel with it (applyDraftValues).
+      case 'curation-preview':
+        return [
+          {
+            label: 'Abbrechen',
+            kind: 'secondary',
+            disabled: false,
+            run: () => {
+              this.curation.startNew();
+              this.navigation.openMenu();
+            }
+          },
+          {
+            label: 'Zur Qualitätssicherung',
+            disabled: false,
+            run: () => {
+              this.curation.applyDraftValues();
+              this.navigation.go('quality');
             }
           }
         ];

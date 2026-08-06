@@ -252,3 +252,12 @@
   border-color: var(--es-blue);
   &:hover:not([disabled]) { background: var(--es-blue-600); border-color: var(--es-blue-600); }
 }
+
+// The way out of a step (Abbrechen), beside the way on: an outline, so it reads as the lesser of the
+// two without being hidden.
+@mixin fbtn-secondary {
+  background: var(--es-surface);
+  color: var(--es-text);
+  border-color: var(--es-border);
+  &:hover:not([disabled]) { background: var(--es-hint-bg); }
+}

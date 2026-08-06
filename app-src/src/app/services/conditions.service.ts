@@ -94,6 +94,10 @@ export class ConditionsService {
   // save (the node is created on save, so the metadata option must open on a result too).
   readonly hasEditableMetadata = this.curation.hasEditableMetadata;
 
+  // A curation that has not been saved yet — the state the preview step of "Inhalt erschließen"
+  // belongs to. Narrower than the above: a saved node has editable metadata but nothing pending.
+  readonly hasCuratedDraft = this.curation.hasUnsavedWork;
+
   /** The snapshot handed to every option's visible() predicate. */
   readonly snapshot = computed<Conditions>(() => ({
     onlyOfficePresent: this.onlyOfficePresent(),
@@ -103,6 +107,7 @@ export class ConditionsService {
     hasActiveNode: this.hasActiveNode(),
     hasDetectedNode: this.hasDetectedNode(),
     hasEditableMetadata: this.hasEditableMetadata(),
+    hasCuratedDraft: this.hasCuratedDraft(),
     editMode: this.editMode(),
     recognizingContent: this.recognizingContent()
   }));
