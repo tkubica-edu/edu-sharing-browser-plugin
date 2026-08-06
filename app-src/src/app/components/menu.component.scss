@@ -30,6 +30,54 @@
   .chevron { color: var(--es-blue); }
 }
 
+// The focal entry (Inhalt erkannt): the panel is *about* the content of the open page — the entries
+// below it are what else can be done. So it is not one of the list's rows: it is bigger, and a gap
+// twice the list's own sets it off from them.
+//
+// Sized this way in every state it can be in (a content, still checking, none), unlike the
+// highlighting above — the menu must not resize under the user when the answer arrives. See
+// AppSection.focal.
+.menu-list > li.is-focal {
+  margin-bottom: 12px;
+
+  .menu-item { padding: 20px 16px; gap: 16px; }
+  .mi-main { gap: 4px; }
+  .mi-title { font-size: 18px; }
+  .mi-desc { font-size: 13px; }
+  .mi-spinner { width: 18px; height: 18px; }
+  .chevron { width: 24px; height: 24px; }
+
+  .mi-icon {
+    width: 34px;
+    height: 34px;
+
+    ::ng-deep svg { width: 34px; height: 34px; }
+  }
+
+  .mi-preview {
+    width: 58px;
+    height: 38px;
+
+    &.is-icon { width: 34px; height: 34px; }
+  }
+}
+
+// Both at once: the accent edge eats 4px, so the text keeps the same distance from the card as in the
+// row's other states.
+.menu-list > li.is-focal.is-prominent .menu-item { padding-left: 12px; }
+
+// The separator below the focal entry. A list item, so it sits in the flow of the list, but none of
+// the card styling of a real entry — hence the reset of the shared `list-item` mixin.
+.menu-list > li.menu-split {
+  height: 1px;
+  margin: 0 2px 14px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: var(--es-border);
+  overflow: visible;
+}
+
 .mi-icon {
   flex: 0 0 auto;
   width: 26px;

@@ -27,6 +27,7 @@ import { SearchComponent } from './components/search.component';
 import { SettingsComponent } from './components/settings.component';
 import { StatusBarComponent } from './components/status-bar.component';
 import { TabBarComponent } from './components/tab-bar.component';
+import { UserBarComponent } from './components/user-bar.component';
 import { AddContentScreenComponent } from './components/screens/add-content-screen.component';
 import { AddMaterialScreenComponent } from './components/screens/add-material-screen.component';
 import { ContentOptionsScreenComponent } from './components/screens/content-options-screen.component';
@@ -49,8 +50,8 @@ const DISCARD_PROMPT =
 @Component({
   selector: 'es-root',
   imports: [
-    StatusBarComponent, ActionBarComponent, TabBarComponent, MenuComponent, LoginComponent,
-    HistoryComponent, SettingsComponent, SearchComponent, AddContentScreenComponent,
+    StatusBarComponent, ActionBarComponent, TabBarComponent, UserBarComponent, MenuComponent,
+    LoginComponent, HistoryComponent, SettingsComponent, SearchComponent, AddContentScreenComponent,
     ContentOptionsScreenComponent, CurationScreenComponent, FindContentScreenComponent,
     NewDocumentScreenComponent, AddMaterialScreenComponent, OwnContentScreenComponent,
     MetadataScreenComponent, PreviewScreenComponent, CollectionsScreenComponent,

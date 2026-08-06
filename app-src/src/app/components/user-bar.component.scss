@@ -1,0 +1,87 @@
+@use 'mixins' as m;
+
+:host { display: block; flex: 0 0 auto; }
+
+// The same chrome as the action bar — both are the panel's bottom edge, so they read as one kind of
+// thing rather than as two different footers. Only the padding differs: this bar's own row brings it.
+.user-bar {
+  @include m.action-bar;
+
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+}
+
+.ub-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover { background: var(--es-hint-bg); }
+}
+
+.ub-avatar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--es-hint-bg);
+  color: var(--es-blue);
+
+  svg { width: 20px; height: 20px; display: block; }
+}
+
+.ub-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+
+.ub-title { font-size: 13px; font-weight: 700; color: var(--es-blue); }
+
+// The name can be anything the repository calls the account, so it is cut off rather than allowed to
+// push the chevron out of the bar.
+.ub-name {
+  font-size: 13px;
+  color: var(--es-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ub-chevron {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  color: var(--es-blue);
+  transition: transform 0.15s ease;
+
+  &.is-open { transform: rotate(180deg); }
+}
+
+// What the chevron opens. Above the row in the source order it is below it on screen, so it grows
+// upwards from the bar's edge — nothing under the pointer moves when it opens.
+.ub-panel {
+  display: flex;
+  padding: 0 14px 10px;
+}
+
+.ub-action {
+  @include m.fbtn;
+
+  background: var(--es-surface);
+  border-color: var(--es-border);
+  color: var(--es-text);
+  cursor: pointer;
+
+  &:hover { background: var(--es-hint-bg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ub-chevron { transition: none; }
+}

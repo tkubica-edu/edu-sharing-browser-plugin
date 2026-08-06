@@ -81,6 +81,10 @@ export class ConditionsService {
   // is required, so every option stays reachable and the login gate never appears.
   readonly loggedIn = this.auth.authorized;
 
+  // The raw session flag, for the one question `authorized` cannot answer: whether there is a login
+  // to *make* — see Conditions.hasSession and the login section.
+  readonly hasSession = this.auth.loggedIn;
+
   // An active node exists when a node has been created or loaded — true both for curated
   // content and for a node received from OnlyOffice / opened from the history.
   readonly hasActiveNode = computed(() => this.curation.activeNode() !== null);
@@ -97,6 +101,7 @@ export class ConditionsService {
     onlyOfficePresent: this.onlyOfficePresent(),
     onEduSharing: this.onEduSharing(),
     loggedIn: this.loggedIn(),
+    hasSession: this.hasSession(),
     hasActiveNode: this.hasActiveNode(),
     hasDetectedNode: this.hasDetectedNode(),
     hasEditableMetadata: this.hasEditableMetadata(),

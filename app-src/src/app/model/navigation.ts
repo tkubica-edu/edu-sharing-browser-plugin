@@ -51,6 +51,12 @@ export interface Conditions {
   onEduSharing: boolean;
   /** A valid, non-guest repository login exists — or none is required (see AuthService.authorized). */
   loggedIn: boolean;
+  /**
+   * A repository session of the user's own exists. Narrower than {@link loggedIn}, which is also true
+   * where no login is *required* — so this is the one to ask when the question is about signing in
+   * rather than about being allowed to work: a guest may log in, and only they can.
+   */
+  hasSession: boolean;
   /** An active node exists — a curated content OR a node received from OnlyOffice. */
   hasActiveNode: boolean;
   /** The active node arrived on its own (a DOCUMENT_INFO / PREVIEW_NODE), rather than being picked. */
@@ -124,6 +130,15 @@ export interface AppSection {
    */
   prominent?: boolean | ((conditions: Conditions) => boolean);
   /**
+   * The menu's centre: rendered larger than the other entries and set off from them, because the
+   * panel is *about* this one and the rest are what else can be done.
+   *
+   * Unlike {@link prominent} it does not depend on the conditions: it is the entry's role, not a
+   * verdict about the open page. So the row keeps its size through all of its states — the menu does
+   * not resize under the user when the answer it is waiting for arrives.
+   */
+  focal?: boolean;
+  /**
    * The section is waiting on something and the answer is what the entry reports (see the *Inhalt
    * erkannt* entry while the recognition runs). Rendered as a spinner on the menu row, which stays
    * disabled meanwhile — the row is already the place the answer will appear, so it says "still
@@ -158,7 +173,11 @@ export const SECTIONS: readonly AppSection[] = [
     id: 'login',
     label: 'Login',
     description: 'Bei der Edu-Sharing-Instanz anmelden',
-    visible: (c) => !c.loggedIn,
+    // Judged on the *session*, not on `loggedIn`: where no login is required the panel already works,
+    // and the screen would be unreachable — but signing in is still the user's to choose (it is what
+    // turns a guest into themselves, with their own contents and permissions). Reached from the user
+    // bar, not from the menu; the landing logic still uses `loggedIn`, so a guest is never sent here.
+    visible: (c) => !c.hasSession,
     tabs: [{ id: 'login', label: 'Anmelden' }]
   },
 
@@ -195,8 +214,10 @@ export const SECTIONS: readonly AppSection[] = [
         ? 'Es wird noch geprüft, ob diese Seite bereits ein Inhalt im Repository ist.'
         : 'Zu dieser Seite wurde kein Inhalt erkannt — sie kann über „Inhalt erschließen“ erschlossen werden.',
     loading: (c) => !c.hasActiveNode && c.recognizingContent,
-    // It leads the menu and is highlighted while there *is* a content: a recognised content is what
-    // the user came for. With nothing found the row is a report, not an offer.
+    // It leads the menu and is its centre — the panel exists for the content of the open page, and
+    // everything below this row is what else can be done. It is *highlighted* only while there
+    // actually is a content: with nothing found the row is a report, not an offer.
+    focal: true,
     prominent: (c) => c.hasActiveNode,
     tabs: [{ id: 'content-options', label: 'Inhaltsoptionen' }]
   },

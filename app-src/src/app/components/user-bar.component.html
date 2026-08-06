@@ -1,0 +1,33 @@
+@if (visible()) {
+  <footer class="user-bar">
+    <!-- The whole row is the control, not just the chevron: it is one target, and at the panel's
+         width a 20px hit area at the far edge is the hardest thing on screen to hit. -->
+    <button class="ub-row" (click)="toggle()" [attr.aria-expanded]="expanded()" [title]="hint()">
+      <span class="ub-avatar" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="8.5" r="3.5" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
+        </svg>
+      </span>
+      <span class="ub-main">
+        <span class="ub-title">{{ title() }}</span>
+        <span class="ub-name">{{ subtitle() }}</span>
+      </span>
+      <svg class="ub-chevron" [class.is-open]="expanded()" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+           aria-hidden="true"><path d="M5 9l7 7 7-7" /></svg>
+    </button>
+
+    <!-- What the row folds out is the one thing that can be done about the session it names: end it,
+         or — as a guest working without a login — sign in as oneself after all. -->
+    @if (expanded()) {
+      <div class="ub-panel">
+        @if (guest()) {
+          <button class="ub-action" (click)="login()">Anmelden</button>
+        } @else {
+          <button class="ub-action" (click)="logout()">Abmelden</button>
+        }
+      </div>
+    }
+  </footer>
+}

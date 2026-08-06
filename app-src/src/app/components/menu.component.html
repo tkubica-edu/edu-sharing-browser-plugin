@@ -1,7 +1,7 @@
 <div class="menu">
   <ul class="menu-list">
     @for (section of navigation.menuSections(); track section.id) {
-      <li [class.is-prominent]="section.prominent">
+      <li [class.is-prominent]="section.prominent" [class.is-focal]="section.focal">
         <!-- A section that does not apply right now stays listed and disabled, saying why in its
              tooltip (e.g. "Inhalt erschließen" for a page whose content is already in the
              repository) — see AppSection.enabled. -->
@@ -42,6 +42,13 @@
           }
         </button>
       </li>
+
+      <!-- The line between the panel's centre and everything else it can do. Presentational: the
+           separation is what the eye needs, not something a screen reader should announce — the
+           entries themselves say what they are. -->
+      @if (section.focal) {
+        <li class="menu-split" role="presentation"></li>
+      }
     }
   </ul>
 </div>

@@ -25,7 +25,15 @@
       <button class="es-btn es-btn--primary" [disabled]="!canSubmit()" (click)="login()">
         {{ loggingIn() ? 'Anmelden…' : 'Anmelden' }}
       </button>
-      <span class="es-muted">Anmeldung ist erforderlich.</span>
+      <!-- Not always required: where the repository lets the panel work without a login, the user
+           came here from the user bar to work as themselves rather than as a guest. -->
+      <span class="es-muted">
+        @if (auth.loginRequired()) {
+          Anmeldung ist erforderlich.
+        } @else {
+          Ohne Anmeldung sind nur öffentliche Inhalte verfügbar.
+        }
+      </span>
     </div>
 
     @if (auth.needsReload()) {
