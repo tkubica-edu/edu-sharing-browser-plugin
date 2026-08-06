@@ -1,7 +1,7 @@
 @if (visible()) {
   <footer class="user-bar">
-    <!-- The whole row is the control, not just the chevron: it is one target, and at the panel's
-         width a 20px hit area at the far edge is the hardest thing on screen to hit. -->
+    <!-- The whole row is the control, not just the chevron: one target, and a 20px hit area at the
+         panel's far edge is the hardest thing on screen to hit. -->
     <button class="ub-row" (click)="toggle()" [attr.aria-expanded]="expanded()" [title]="hint()">
       <span class="ub-avatar" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -18,8 +18,7 @@
            aria-hidden="true"><path d="M5 9l7 7 7-7" /></svg>
     </button>
 
-    <!-- What the row folds out is the one thing that can be done about the session it names: end it,
-         or — as a guest working without a login — sign in as oneself after all. -->
+    <!-- What the row folds out is what can be done about the session it names: end it, or sign in. -->
     @if (expanded()) {
       <div class="ub-panel">
         @if (guest()) {

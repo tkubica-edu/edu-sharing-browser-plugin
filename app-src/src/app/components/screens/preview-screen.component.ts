@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 
-import { firstString } from '../../util/mds-values';
 import { AdditionalWebComponentService } from '../../services/additional-web-component.service';
 import { CurationService } from '../../services/curation.service';
 import { PreviewNodeComponent } from '../preview-node.component';
@@ -24,18 +23,8 @@ export class PreviewScreenComponent {
   protected readonly curation = inject(CurationService);
   protected readonly additionalWebComponent = inject(AdditionalWebComponentService);
 
-  /**
-   * The content's title: its `cclom:title` if the metadata carries one, else the node's own title,
-   * else its name (the file name). Never the node id — an id is not a title.
-   */
-  protected readonly title = computed(() => {
-    const metadata = this.curation.editorMetadata();
-    return (
-      firstString(metadata?.['cclom:title']) ??
-      firstString(this.curation.previewNode()?.title) ??
-      firstString(this.curation.activeNode()?.name)
-    );
-  });
+  /** The content's title — see CurationService.contentTitle, which the menu reads too. */
+  protected readonly title = this.curation.contentTitle;
 
   /**
    * The content's picture (see CurationService.contentPreview); `''` when there is none — that is

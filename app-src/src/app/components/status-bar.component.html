@@ -39,8 +39,7 @@
     </span>
   }
 
-  <!-- The recognition of the open page as an existing content. Reported while it is under way, so
-       the "Inhalt erschließen" entry going disabled a moment later has a visible reason. -->
+  <!-- Reported while the recognition runs, so "Inhalt erschließen" going disabled has a reason. -->
   @if (conditions.recognizingContent()) {
     <span class="status-chip" title="Es wird geprüft, ob diese Seite bereits erschlossen ist">
       <span class="d"></span>Seite wird geprüft…

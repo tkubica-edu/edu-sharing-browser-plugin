@@ -9,26 +9,8 @@
   word-break: break-word;
 }
 
-// Deliberately the main menu's own row look (same mixin, same class names as menu.component), so
-// the two ways on read as menu options rather than as a form.
-.option-list { @include m.list-reset; }
-.option-list > li { @include m.list-item; }
-
-.menu-item {
-  @include m.menu-item;
-  cursor: pointer;
+// The main menu's row look: these ways on are menu options one level down, not form buttons.
+.option-list {
+  @include m.menu-rows;
+  @include m.menu-rows-full-width;
 }
-
-.mi-icon {
-  flex: 0 0 auto;
-  width: 26px; height: 26px;
-  color: var(--es-text);
-
-  ::ng-deep svg { width: 26px; height: 26px; display: block; }
-}
-
-.mi-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-.mi-title { font-weight: 600; font-size: 15px; }
-.mi-desc { font-size: 12px; color: var(--es-muted); line-height: 1.35; }
-
-.chevron { flex: 0 0 auto; width: 20px; height: 20px; color: var(--es-muted); }

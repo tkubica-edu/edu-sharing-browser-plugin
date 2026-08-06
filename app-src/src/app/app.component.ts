@@ -226,11 +226,9 @@ export class AppComponent implements OnInit {
    * On an OnlyOffice page, ask once for the open document's identity so it becomes the node the app
    * works on (the effect in the constructor adopts it).
    *
-   * This is the recognition for such a page — the plugin states the document instead of the URL
-   * being looked up (see PageRecognitionService) — so it also settles `recognizingContent`: the
-   * *Inhalt erkannt* entry keeps saying "wird geprüft" until the plugin answers, and reports "kein
-   * Inhalt erkannt" once it did not (the plugin is optional and may be switched off, in which case
-   * the request runs into its timeout).
+   * This is the recognition for such a page — the plugin states the document instead of the URL being
+   * looked up (see PageRecognitionService) — so it settles `recognizingContent` as well, including
+   * when the plugin is switched off and the request runs into its timeout.
    */
   private async askHostForItsDocument(): Promise<void> {
     try {

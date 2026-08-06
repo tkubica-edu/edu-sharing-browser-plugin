@@ -12,10 +12,8 @@
       }
     </p>
 
-    <!-- What is being described, next to the numbers describing it: the content's picture — the
-         node's preview, or the image the agent found on the page (see
-         CurationService.contentPreview). The MDS editor below takes no image of its own, so this is
-         the only place in this step where the content shows itself. -->
+    <!-- The content's picture next to what is said about it (CurationService.contentPreview). The
+         editors below take no image of their own. -->
     <div class="source-row">
       @if (curation.contentPreview(); as preview) {
         <img class="source-preview" [class.is-icon]="preview.isIcon" [src]="preview.url" alt=""
@@ -38,10 +36,8 @@
     </div>
   </section>
 
-  <!-- EXPERIMENT: the repository's own preview widget (the native MDS `<preview>`), next to the
-       editor rather than inside it — see MdsPreviewWidgetComponent. It renders a *node's* picture, so
-       it only appears for a node that has one: before the first save there is no node at all, and a
-       node without a preview would leave an empty card. -->
+  <!-- The repository's own preview widget beside the editor (MdsPreviewWidgetComponent). It renders a
+       node's picture, so it only appears for a node that has one. -->
   @if (nodeWithPreview(); as node) {
     <section class="es-card preview-widget-card">
       <p class="es-muted card-label">Vorschau des Nodes (MDS-Widget)</p>

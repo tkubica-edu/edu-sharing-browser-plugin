@@ -6,16 +6,17 @@
     </p>
   </section>
 
+  <!-- The main menu's rows, one level down — same class names as the `menu-rows` mixin expects. -->
   <ul class="add-list">
     @for (option of options(); track option.section) {
       <li>
-        <button class="add-item" (click)="navigation.go(option.section)">
-          <span class="ai-icon" [innerHTML]="icons.icon(option.section)"></span>
-          <span class="ai-main">
-            <span class="ai-title">{{ option.label }}</span>
-            <span class="ai-desc">{{ option.description }}</span>
+        <button class="menu-item" (click)="navigation.go(option.section)">
+          <span class="mi-icon" [innerHTML]="icons.icon(option.section)"></span>
+          <span class="mi-main">
+            <span class="mi-title">{{ option.label }}</span>
+            <span class="mi-desc">{{ option.description }}</span>
           </span>
-          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
         </button>
       </li>

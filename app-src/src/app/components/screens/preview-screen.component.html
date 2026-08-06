@@ -28,9 +28,8 @@
     }
   } @else if (curation.previewNode(); as node) {
     <section class="es-card">
-      <!-- Also here, not only in the WLO branch: the preview element renders whatever the node
-           carries, and a freshly curated node has no thumbnail of its own yet — the image the agent
-           found on the source page is then the only picture of the content there is. -->
+      <!-- The preview element renders whatever the node carries; a freshly curated node has no
+           thumbnail yet, and then the agent's image is the only picture there is. -->
       @if (previewImage()) {
         <img class="preview-image" [src]="previewImage()" alt="" (error)="hideBrokenImage($event)" />
       }

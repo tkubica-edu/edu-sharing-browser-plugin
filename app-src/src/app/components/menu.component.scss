@@ -1,122 +1,117 @@
 @use 'mixins' as m;
 
-:host { display: block; }
-
-.menu { padding: var(--es-space-4); }
-
-.menu-list { @include m.list-reset; }
-.menu-list > li { @include m.list-item; }
-
-.menu-item {
-  @include m.menu-item;
-  cursor: pointer;
+// The surface reaches the bottom of the scroll area instead of ending under the last row.
+:host {
+  display: block;
+  min-height: 100%;
+  background: var(--es-surface);
 }
 
-// The prominent entry (Inhalt erkannt): a tinted card with a blue accent edge, so the entry the
-// current page makes obvious reads as the offered next step rather than as one row among many.
-.menu-list > li.is-prominent {
-  border-color: #b9d2f0;
-  box-shadow: 0 1px 6px rgba(0, 59, 124, 0.12);
+// One surface with hairlines between the entries, not a stack of cards.
+.menu { background: var(--es-surface); }
 
-  .menu-item {
-    background: #eef4fc;
-    border-left: 4px solid var(--es-blue);
-    padding-left: 10px;
+// ---- The centre: the content of the open page ----------------------------
 
-    &:hover:not([disabled]) { background: #e3edfa; }
-  }
-  .mi-icon { color: var(--es-blue); }
-  .mi-title { color: var(--es-blue); }
-  .chevron { color: var(--es-blue); }
+.focus {
+  padding: 14px 16px 16px;
+  border-bottom: 1px solid var(--es-border);
 }
 
-// The focal entry (Inhalt erkannt): the panel is *about* the content of the open page — the entries
-// below it are what else can be done. So it is not one of the list's rows: it is bigger, and a gap
-// twice the list's own sets it off from them.
-//
-// Sized this way in every state it can be in (a content, still checking, none), unlike the
-// highlighting above — the menu must not resize under the user when the answer arrives. See
-// AppSection.focal.
-.menu-list > li.is-focal {
-  margin-bottom: 12px;
-
-  .menu-item { padding: 20px 16px; gap: 16px; }
-  .mi-main { gap: 4px; }
-  .mi-title { font-size: 18px; }
-  .mi-desc { font-size: 13px; }
-  .mi-spinner { width: 18px; height: 18px; }
-  .chevron { width: 24px; height: 24px; }
-
-  .mi-icon {
-    width: 34px;
-    height: 34px;
-
-    ::ng-deep svg { width: 34px; height: 34px; }
-  }
-
-  .mi-preview {
-    width: 58px;
-    height: 38px;
-
-    &.is-icon { width: 34px; height: 34px; }
-  }
-}
-
-// Both at once: the accent edge eats 4px, so the text keeps the same distance from the card as in the
-// row's other states.
-.menu-list > li.is-focal.is-prominent .menu-item { padding-left: 12px; }
-
-// The separator below the focal entry. A list item, so it sits in the flow of the list, but none of
-// the card styling of a real entry — hence the reset of the shared `list-item` mixin.
-.menu-list > li.menu-split {
-  height: 1px;
-  margin: 0 2px 14px;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: var(--es-border);
-  overflow: visible;
-}
-
-.mi-icon {
-  flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
+.focus-label {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--es-text);
-
-  ::ng-deep svg { width: 26px; height: 26px; display: block; }
 }
 
-// The recognised content's own preview, in the icon's place. Wider than the icon (previews are
-// landscape) but no taller, so a row does not change height when a preview arrives or fails; the
-// image is cropped rather than fitted, since a letterboxed thumbnail this small reads as an empty
-// box.
-.mi-preview {
-  flex: 0 0 auto;
-  width: 40px;
-  height: 26px;
-  border-radius: 3px;
+// A card, because it shows a *thing* (a content) rather than a way on — hence also no chevron.
+.focus-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px;
+  background: var(--es-surface);
   border: 1px solid var(--es-border);
-  background: #fff;
-  object-fit: cover;
+  border-radius: var(--es-radius);
+  text-align: left;
+  color: var(--es-text);
+  cursor: pointer;
 
-  // The repository's type icon rather than a rendered thumbnail (preview.isIcon): a transparent
-  // glyph standing for the kind of material, so it is shown at the icon's size and whole — a frame
-  // around it would claim it is a picture of the content.
-  &.is-icon {
-    width: 26px;
-    height: 26px;
-    border: none;
-    border-radius: 0;
-    background: none;
-    object-fit: contain;
+  &:hover:not([disabled]) { background: var(--es-hint-bg); }
+
+  // Nothing recognised, or still checking: the card stays and carries the report, only greyed out.
+  &[disabled] {
+    cursor: not-allowed;
+
+    .fc-title, .fc-tile { color: var(--es-muted); }
   }
 }
 
-.mi-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-.mi-title { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+// The picture's place, kept whether or not there is one: a preview, else the section's icon.
+.fc-tile {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--es-radius);
+  background: var(--es-hint-bg);
+  color: var(--es-blue);
+}
 
-// The Verlauf entry's entry count, which used to sit on its topbar icon.
+.fc-icon {
+  display: block;
+  width: 30px;
+  height: 30px;
+
+  ::ng-deep svg { width: 30px; height: 30px; display: block; }
+}
+
+// Fitted, not cropped: a preview is landscape and the tile is square, so filling it would leave a
+// slice of the picture. Letterboxed against the tile's tint it stays recognisable.
+.fc-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+
+  // The repository's bare type icon rather than a picture — shown at icon size (contentPreview).
+  &.is-icon {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+.fc-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+
+.fc-title {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.fc-desc { font-size: 12px; color: var(--es-muted); line-height: 1.35; }
+
+// The card has no chevron, so the spinner sits at the trailing edge on its own.
+.fc-spinner {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #b6c6d8;
+  border-top-color: var(--es-blue);
+  border-radius: 50%;
+  animation: mi-spin 0.9s linear infinite;
+}
+
+// ---- The other options ---------------------------------------------------
+
+// The rows come from the shared mixin, so the panel's menus stay one look.
+.menu-list { @include m.menu-rows; }
+
+// The Verlauf entry's count badge.
 .mi-count {
   background: #e6edf6;
   color: var(--es-blue);
@@ -126,30 +121,12 @@
   padding: 3px 6px;
   border-radius: 999px;
 }
-.mi-desc { font-size: 12px; color: var(--es-muted); line-height: 1.35; }
-
-.chevron { flex: 0 0 auto; width: 20px; height: 20px; color: var(--es-muted); }
-
-// Stands in for the chevron while the entry waits on its answer (see AppSection.loading), so it
-// takes the chevron's size and the row's layout does not shift when the answer arrives.
-.mi-spinner {
-  flex: 0 0 auto;
-  width: 14px;
-  height: 14px;
-  margin: 3px;
-  // Deliberately darker than a border would be: the row it sits on is disabled while it spins, and
-  // the dimming applies to it too.
-  border: 2px solid #b6c6d8;
-  border-top-color: var(--es-blue);
-  border-radius: 50%;
-  animation: mi-spin 0.9s linear infinite;
-}
 
 @keyframes mi-spin {
   to { transform: rotate(360deg); }
 }
 
-// The rotation only says "still working"; the row's own text says it too, so it can stand still.
+// The card's own text says "still working" too, so the rotation can stand still.
 @media (prefers-reduced-motion: reduce) {
-  .mi-spinner { animation: none; }
+  .fc-spinner { animation: none; }
 }

@@ -43,24 +43,21 @@ export class PageRecognitionService {
   /**
    * Recognise the open page's content and adopt it. Answers whether one was found.
    *
-   * Reports being under way through `ConditionsService.recognizingContent`, and clears it on every
-   * way out — the *Inhalt erkannt* entry says "wird geprüft" until then and "kein Inhalt erkannt"
-   * afterwards, so leaving it set would leave the panel checking forever.
+   * Reports being under way through `ConditionsService.recognizingContent` and clears it on every way
+   * out — a flag left set would leave the panel checking forever.
    *
    * Silent on every failure: this is a bonus (a guest session may not be allowed to read the node or
    * to run the lookup, and an unreachable page is not an error either) — without it the user simply
    * gets the *Inhalt erschließen* offer they would have got anyway.
    */
   async recognize(): Promise<boolean> {
-    // Without a session there is nothing to ask under — and the login runs this again (see
-    // AppComponent), so the question stays open rather than being answered with "no content".
+    // Nothing to ask under, and the login runs this again (AppComponent) — so the question stays open
+    // rather than being answered with "no content".
     if (!this.auth.authorized()) return false;
-    // On an insert host the plugin speaks for the page (see the class comment): its answer is what
-    // settles the recognition there, so this one leaves the state alone — see
-    // AppComponent.askHostForItsDocument.
+    // On an insert host the plugin speaks for the page (see the class comment) and its answer settles
+    // the recognition — see AppComponent.askHostForItsDocument.
     if (this.conditions.onlyOfficePresent()) return false;
-    // Nothing to recognise either when the panel already works on something — adopting would refuse
-    // anyway, and the answer would be thrown away.
+    // Nothing to recognise while the panel already works on something: adopting would refuse anyway.
     if (this.curation.activeNode() || this.curation.hasUnsavedWork()) {
       this.conditions.recognizingContent.set(false);
       return false;

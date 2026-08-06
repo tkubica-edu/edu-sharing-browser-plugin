@@ -12,17 +12,15 @@ export interface TabView extends SectionTab {
 }
 
 /**
- * A section as the main menu renders it: its definition with everything that depends on the current
- * conditions already resolved — its texts, whether it can be entered, and the reason that applies
- * right now (see AppSection.label and AppSection.disabledHint).
+ * A section as the menu renders it: its definition with everything that depends on the conditions
+ * already resolved — its texts, whether it can be entered, and the reason that applies.
  */
 export interface SectionView
-  extends Omit<AppSection, 'label' | 'description' | 'disabledHint' | 'prominent' | 'loading'> {
+  extends Omit<AppSection, 'label' | 'description' | 'disabledHint' | 'loading'> {
   label: string;
   description: string;
   disabled: boolean;
   disabledHint?: string;
-  prominent: boolean;
   loading: boolean;
 }
 
@@ -71,10 +69,7 @@ export class NavigationService {
       : 'Zurück zum Hauptmenü';
   });
 
-  /**
-   * The sections listed in the main menu, in registry order, filtered by the conditions, each
-   * resolved for the state that holds right now — its texts and whether it can be entered.
-   */
+  /** The sections listed in the main menu, in registry order, resolved for the current conditions. */
   readonly menuSections = computed<readonly SectionView[]>(() => {
     const conditions = this.conditions.snapshot();
     return SECTIONS.filter((section) => section.menu && section.visible(conditions)).map((section) =>
@@ -316,7 +311,7 @@ export class NavigationService {
     }
   }
 
-  /** A section resolved for one set of conditions — everything the templates render directly. */
+  /** A section resolved for one set of conditions — what the templates render directly. */
   private viewOf(section: AppSection, conditions: Conditions): SectionView {
     return {
       ...section,
@@ -327,10 +322,6 @@ export class NavigationService {
         typeof section.disabledHint === 'function'
           ? section.disabledHint(conditions)
           : section.disabledHint,
-      prominent:
-        typeof section.prominent === 'function'
-          ? section.prominent(conditions)
-          : section.prominent ?? false,
       loading: section.loading?.(conditions) ?? false
     };
   }

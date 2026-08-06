@@ -50,12 +50,11 @@ export class ConditionsService {
   readonly editMode = signal(false);
 
   /**
-   * Whether it is still open what the active page's content is — set by PageRecognitionService (and,
-   * on an insert host, by the panel's request for the host's document; see AppComponent).
+   * Whether it is still open what the active page's content is. Set by PageRecognitionService and, on
+   * an insert host, by the request for the host's document (see AppComponent).
    *
-   * True to begin with: on boot nothing has answered yet, and reporting "kein Inhalt" before anyone
-   * looked would be a finding the panel has not made. Only once this is false does the absence of a
-   * content mean there is none — see the *Inhalt erkannt* section, which says both.
+   * True to begin with: on boot nothing has answered yet, and only once this is false does the absence
+   * of a content mean there is none.
    */
   readonly recognizingContent = signal(true);
 
@@ -81,8 +80,7 @@ export class ConditionsService {
   // is required, so every option stays reachable and the login gate never appears.
   readonly loggedIn = this.auth.authorized;
 
-  // The raw session flag, for the one question `authorized` cannot answer: whether there is a login
-  // to *make* — see Conditions.hasSession and the login section.
+  // The raw session flag, for the question `authorized` cannot answer: is there a login to *make*?
   readonly hasSession = this.auth.loggedIn;
 
   // An active node exists when a node has been created or loaded — true both for curated

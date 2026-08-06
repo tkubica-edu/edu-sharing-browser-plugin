@@ -2,10 +2,8 @@
 
 .pw-wrap { display: block; }
 
-// `position` + `overflow`, because the widget's own picture is built from absolutely positioned
-// layers (a blurred backdrop at `top: -30px; left: -30px` behind the image). Without a positioned,
-// clipping box around it, those layers resolve against something further up and spill over whatever
-// sits above the widget — the card's own label, for instance.
+// The widget's picture is built from absolutely positioned layers (a blurred backdrop behind the
+// image), which need a positioned, clipping box or they spill over whatever sits above the widget.
 .pw-host {
   position: relative;
   overflow: hidden;
@@ -13,17 +11,12 @@
   width: 100%;
 }
 
-// The wrapper renders the group's whole form — one view with the `<preview>` widget first and the
-// rest of the node's fields after it. Only the picture is wanted here, so everything around it is
-// hidden rather than "not rendered": which widgets a view has is the repository's MDS to decide, not
-// ours, and the widget cannot be addressed on its own (see the component comment).
+// The wrapper renders the group's whole form; only the picture is wanted, so everything around it is
+// hidden — which widgets a view has is the repository's MDS to decide, not ours.
 //
-// `::ng-deep`, because the element is created imperatively and therefore carries no view-encapsulation
-// attribute of this component (same reason MdsEditorComponent sizes its element inline). The rules
-// are anchored on `.pw-host`, so they cannot leak into the editor rendered elsewhere on the screen.
-//
-// Selected by *containment* (`:has`) rather than by position: the view's widget order is the MDS's
-// business and may differ per repository.
+// `::ng-deep` because the element is created imperatively and carries no encapsulation attribute of
+// this component; the rules are anchored on `.pw-host` so they cannot leak into the editor elsewhere.
+// Selected by containment (`:has`), since the widget order differs per repository.
 .pw-host ::ng-deep {
   // The form's own chrome around the views — the "show extended fields" switch.
   es-mds-editor-core > *:not(.mds-views) { display: none; }

@@ -20,8 +20,8 @@ export interface Collection {
 }
 
 /**
- * The content's picture: an image URL plus whether it is only the repository's *type* icon rather
- * than a rendered preview of the material — see {@link CurationService.contentPreview}.
+ * The content's picture: an image URL plus whether it is only the repository's *type* icon rather than
+ * a rendered preview — see {@link CurationService.contentPreview}.
  */
 export interface ContentPreview {
   url: string;
@@ -40,10 +40,7 @@ export interface ContentPreview {
  */
 export type NodeSource = 'detected' | 'chosen';
 
-/**
- * The preview image a metadata payload names, if any: the metadata agent's `preview_image_url`, or a
- * stored `preview:url` on a node's properties. Null when it names none.
- */
+/** The preview image a metadata payload names: `preview_image_url` (agent) or `preview:url` (node). */
 function previewImageOf(payload: Record<string, unknown> | null | undefined): string | null {
   return firstString(payload?.['preview_image_url']) ?? firstString(payload?.['preview:url']);
 }
@@ -194,23 +191,26 @@ export class CurationService {
   });
 
   /**
-   * The picture of the content the app works on, for wherever it is shown as itself — the *Inhalt
-   * erkannt* entry, the metadata step, the preview.
+   * What to call the content: the title its metadata carries, else the node's own title, else its
+   * name (the file name). Never the node id — an id is not a title; `null` means no name is known.
+   */
+  readonly contentTitle = computed<string | null>(
+    () =>
+      firstString(this.editorMetadata()?.['cclom:title']) ??
+      firstString(this.previewNode()?.title) ??
+      firstString(this.activeNode()?.name),
+  );
+
+  /**
+   * The content's picture, for wherever it is shown as itself. Three sources, ranked by how much each
+   * says about *this* content; null when none of them has one.
    *
-   * Three sources, ranked by how much each says about *this* content:
-   *
-   * 1. **The node's rendered preview** — the repository's own picture of a content it holds. Nothing
-   *    beats it.
-   * 2. **The image the metadata agent found** (`preview_image_url` — the page's `og:image` and
-   *    friends, see the content script). What a curated content has instead of 1: before the save
-   *    its node does not exist, and after it the repository has not rendered anything yet. Read from
-   *    the editor's metadata *and* from the agent's own result, because {@link editorMetadata} swaps
-   *    the payload for the node's stored properties on the first save — and those do not carry it.
-   * 3. **The node's type icon** (`preview.isIcon`: the repository answered with a 302 to
-   *    `…/mime-types/previews/<type>.svg`). It says "a link", "a PDF" — true, but nothing about this
-   *    content, so a real image from 2 comes first.
-   *
-   * Null when none of them has one — then the caller shows whatever it shows without a picture.
+   * 1. The node's rendered preview — the repository's own picture of a content it holds.
+   * 2. The image the metadata agent found (`preview_image_url`, the page's `og:image`), which is what
+   *    a curated content has instead. Read from the editor's metadata *and* from the agent's result,
+   *    since {@link editorMetadata} swaps in the node's stored properties on the first save.
+   * 3. The node's type icon (`preview.isIcon`) — true of the kind of material, but not of this one,
+   *    so a real image comes first.
    */
   readonly contentPreview = computed<ContentPreview | null>(() => {
     const preview = this.previewNode()?.preview;

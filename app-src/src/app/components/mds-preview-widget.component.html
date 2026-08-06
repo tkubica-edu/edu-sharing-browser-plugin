@@ -5,9 +5,6 @@
     <p class="es-muted">Vorschau wird geladen…</p>
   }
 
-  <!--
-    The wrapper is created imperatively into #host, not written as a tag: its `embedded` input must
-    be a property before it connects — see mount() and the component comment.
-  -->
+  <!-- Created imperatively into #host: `embedded` must be a property before the element connects. -->
   <div #host class="pw-host"></div>
 </div>

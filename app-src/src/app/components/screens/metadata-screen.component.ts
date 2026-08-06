@@ -42,10 +42,7 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
     () => this.wloCanvas() ?? this.mdsEditor(),
   );
 
-  /**
-   * The node whose own preview the native MDS widget can show; null when there is none to show —
-   * see MdsPreviewWidgetComponent.
-   */
+  /** The node whose own preview the native MDS widget can show; null when there is none. */
   protected readonly nodeWithPreview = computed(() => {
     const node = this.curation.previewNode();
     return node?.preview?.url ? node : null;
@@ -88,11 +85,7 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
     this.navigation.goNextTab();
   }
 
-  /**
-   * Drop the content's picture when it cannot be loaded — it is a foreign URL (the page's
-   * `og:image`) or a repository URL this session may not read. Nothing takes its place here: the
-   * step is about the metadata, and the picture is the extra.
-   */
+  /** Drop the content's picture when it cannot be loaded; nothing takes its place here. */
   protected hideBrokenImage(event: Event): void {
     (event.target as HTMLImageElement).style.display = 'none';
   }

@@ -3,12 +3,12 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { AuthService } from '../services/auth.service';
 import { NavigationService } from '../services/navigation.service';
 
-// The bottom bar naming who the panel is acting as. That is the one fact about the *session* rather
-// than about the open page, which is why it sits at the bottom edge and not in the status bar's row
-// of page conditions. It is also where that session is changed: signing in, signing out.
+// The bottom bar naming who the panel is acting as, and where that session is changed: signing in,
+// signing out. It is about the session rather than about the open page, hence the bottom edge instead
+// of the status bar's row of page conditions.
 //
-// It decides for itself whether it is on screen (see {@link visible}), like ActionBarComponent does:
-// the shell renders it unconditionally and the conditions live in one place.
+// Like ActionBarComponent it decides for itself whether it is on screen (see {@link visible}), so the
+// shell renders it unconditionally.
 @Component({
   selector: 'es-user-bar',
   templateUrl: './user-bar.component.html',
@@ -20,17 +20,14 @@ export class UserBarComponent {
   private readonly navigation = inject(NavigationService);
 
   /**
-   * When the bar is shown. Two conditions:
+   * When the bar is shown:
    *
-   * - **The panel may work with the repository at all** — `authorized`, so it also covers the case
-   *   where no login is required (the additional web component); then there is no user, but the
-   *   answer "as a guest" is just as much part of the picture as a name would be.
-   * - **A screen that is a plain list** — see AppSection.plain. On a form, an editor or an embedded
-   *   selector the bottom edge belongs to the screen (and in three sections to the action bar, which
-   *   would otherwise sit under a second footer).
+   * - `authorized`, so the case without a required login counts too — "as a guest" is an answer as
+   *   much as a name is.
+   * - a screen that is a plain list (AppSection.plain); elsewhere the bottom edge belongs to the
+   *   screen, or to the action bar.
    *
-   * The main menu is named separately because it is the root view and has no entry in `SECTIONS`,
-   * so there is nothing there to carry the flag.
+   * The main menu is named separately: it is the root view and has no entry in `SECTIONS`.
    */
   protected readonly visible = computed(
     () =>
@@ -39,9 +36,8 @@ export class UserBarComponent {
   );
 
   /**
-   * No session of the user's own: the repository lets the panel work without a login (see
-   * AuthService.authorized), so there is a guest where the name would be — and signing in is still
-   * on offer, which is what {@link login} is for.
+   * No session of the user's own: the repository lets the panel work without a login, so there is a
+   * guest where the name would be — and {@link login} is still on offer.
    */
   protected readonly guest = computed(() => !this.auth.loggedIn());
 
@@ -67,10 +63,8 @@ export class UserBarComponent {
   }
 
   /**
-   * Sign in although nothing demands it: a guest works with the repository's public view, and the
-   * user's own contents and permissions only come with their own session. Opens the login screen,
-   * which stays reachable for exactly this case (see the `login` section's visibility) — and once the
-   * session exists it falls away again, so the navigation guard returns the user to the menu.
+   * Sign in although nothing demands it — a guest only sees the repository's public view. Opens the
+   * login screen, which falls away once the session exists, so the guard returns to the menu.
    */
   protected login(): void {
     this.expanded.set(false);

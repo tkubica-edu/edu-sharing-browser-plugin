@@ -51,11 +51,7 @@ export interface Conditions {
   onEduSharing: boolean;
   /** A valid, non-guest repository login exists — or none is required (see AuthService.authorized). */
   loggedIn: boolean;
-  /**
-   * A repository session of the user's own exists. Narrower than {@link loggedIn}, which is also true
-   * where no login is *required* — so this is the one to ask when the question is about signing in
-   * rather than about being allowed to work: a guest may log in, and only they can.
-   */
+  /** A session of the user's own. Narrower than {@link loggedIn}: ask this about *signing in*. */
   hasSession: boolean;
   /** An active node exists — a curated content OR a node received from OnlyOffice. */
   hasActiveNode: boolean;
@@ -66,16 +62,12 @@ export interface Conditions {
   hasEditableMetadata: boolean;
   /** The metadata editor is currently open. */
   editMode: boolean;
-  /** Nothing has answered yet what this page's content is — the recognition is still running.
-   *  Only once this is false does "no content" mean there is none (see PageRecognitionService). */
+  /** The recognition has not answered yet what this page's content is (PageRecognitionService).
+   *  Only once this is false does "no content" mean there is none. */
   recognizingContent: boolean;
 }
 
-/**
- * A text that may depend on the conditions — for an entry that *names its own state* instead of
- * only being disabled by it: "Inhalt erkannt" also has to say "Kein Inhalt erkannt" and "Inhalt
- * wird geprüft", because the row is the one place the finding is reported.
- */
+/** A text that may depend on the conditions — for an entry that names its own state. */
 export type SectionText = string | ((conditions: Conditions) => string);
 
 /** Resolve a {@link SectionText} against the conditions that hold right now. */
@@ -124,34 +116,18 @@ export interface AppSection {
   /** Listed as an entry of the main menu. Without it the section is only reachable from the flow. */
   menu?: boolean;
   /**
-   * The section's screen is a plain list — rows to choose from, or entries to look at. No field to
-   * fill in, no embedded editor or selector, and no footer action of its own (only `curation`,
-   * `editing` and `quality` have one, see ActionBarService.actions).
-   *
-   * That is what makes the bottom edge free for something else: the session bar shows on exactly
-   * these screens (see UserBarComponent.visible). Elsewhere the bottom edge belongs to the screen.
+   * The screen is a plain list of rows or entries — no form, no embedded editor or selector, no
+   * footer action. Its bottom edge is free, which is where the session bar shows (UserBarComponent).
    */
   plain?: boolean;
   /**
-   * Highlighted in the main menu — for the entry the current page makes the obvious next step. A
-   * predicate when that only holds sometimes: an entry reporting that it found *nothing* is not a
-   * next step, so it drops the highlight rather than shouting about an empty finding.
-   */
-  prominent?: boolean | ((conditions: Conditions) => boolean);
-  /**
-   * The menu's centre: rendered larger than the other entries and set off from them, because the
-   * panel is *about* this one and the rest are what else can be done.
-   *
-   * Unlike {@link prominent} it does not depend on the conditions: it is the entry's role, not a
-   * verdict about the open page. So the row keeps its size through all of its states — the menu does
-   * not resize under the user when the answer it is waiting for arrives.
+   * The menu's centre, rendered as a card of its own instead of as one of the rows (MenuComponent).
+   * Independent of the conditions, so the entry keeps its shape in every state it reports.
    */
   focal?: boolean;
   /**
-   * The section is waiting on something and the answer is what the entry reports (see the *Inhalt
-   * erkannt* entry while the recognition runs). Rendered as a spinner on the menu row, which stays
-   * disabled meanwhile — the row is already the place the answer will appear, so it says "still
-   * checking" there instead of appearing out of nowhere once the answer is in.
+   * The section is waiting on an answer that its own entry will report. The menu shows a spinner and
+   * the entry stays disabled meanwhile.
    */
   loading?: (conditions: Conditions) => boolean;
   /**
@@ -182,10 +158,8 @@ export const SECTIONS: readonly AppSection[] = [
     id: 'login',
     label: 'Login',
     description: 'Bei der Edu-Sharing-Instanz anmelden',
-    // Judged on the *session*, not on `loggedIn`: where no login is required the panel already works,
-    // and the screen would be unreachable — but signing in is still the user's to choose (it is what
-    // turns a guest into themselves, with their own contents and permissions). Reached from the user
-    // bar, not from the menu; the landing logic still uses `loggedIn`, so a guest is never sent here.
+    // On the session, not on `loggedIn`: a guest may sign in although nothing demands it. Reached
+    // from the user bar; the landing logic uses `loggedIn`, so a guest is never sent here.
     visible: (c) => !c.hasSession,
     tabs: [{ id: 'login', label: 'Anmelden' }]
   },
@@ -193,10 +167,8 @@ export const SECTIONS: readonly AppSection[] = [
   // ---- Main menu ----------------------------------------------------------
   {
     id: 'content-options',
-    // The row is the recognition's *report*, so it is listed in every one of its three outcomes and
-    // names the one that holds: a content was found, none was, or the answer is still outstanding.
-    // Reporting all three is what makes the finding trustworthy — an entry that is simply absent
-    // leaves the user guessing whether the panel looked at this page at all.
+    // The entry is the recognition's report, so it stays listed in all three outcomes and names the
+    // one that holds: a content was found, none was, or the answer is still outstanding.
     label: (c) =>
       c.hasActiveNode
         ? 'Inhalt erkannt'
@@ -214,9 +186,8 @@ export const SECTIONS: readonly AppSection[] = [
           : 'Das Repository hat zu dieser Seite keinen Inhalt',
     visible: requiresLogin(),
     menu: true,
-    // Enterable for any active node: picking one from the Verlauf or den eigenen Inhalten leads
-    // here too. Without one there is nothing to choose between, so the row stays visible and
-    // disabled and says why — see AppSection.enabled.
+    // Any active node, so picking one from the Verlauf or den eigenen Inhalten leads here too.
+    // Without one there is nothing to choose between — see AppSection.enabled.
     enabled: (c) => c.hasActiveNode,
     disabledHint: (c) =>
       c.recognizingContent
@@ -225,11 +196,8 @@ export const SECTIONS: readonly AppSection[] = [
     loading: (c) => !c.hasActiveNode && c.recognizingContent,
     // Its screen offers the same kind of rows as the menu — a choice of what to do with the content.
     plain: true,
-    // It leads the menu and is its centre — the panel exists for the content of the open page, and
-    // everything below this row is what else can be done. It is *highlighted* only while there
-    // actually is a content: with nothing found the row is a report, not an offer.
+    // The panel exists for the content of the open page; everything below is what else can be done.
     focal: true,
-    prominent: (c) => c.hasActiveNode,
     tabs: [{ id: 'content-options', label: 'Inhaltsoptionen' }]
   },
   {

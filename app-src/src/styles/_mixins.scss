@@ -2,7 +2,7 @@
 //   1. Generic primitives are emitted as global `.es-*` classes in styles.scss and used
 //      directly in component templates (works despite emulated encapsulation because
 //      global class *rules* still apply to component DOM).
-//   2. Chrome-specific patterns (menu-item, status-chip, action bar) are `@include`d in
+//   2. Chrome-specific patterns (menu rows, status-chip, action bar) are `@include`d in
 //      the owning component's scoped .scss, keeping their DOM-specific layout local while
 //      the look lives here.
 //
@@ -144,21 +144,60 @@
   overflow: hidden;
 }
 
-// A full-width clickable menu row: leading icon, title + description block, trailing
-// chevron. Basis for the main menu and the add-content list.
-@mixin menu-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px;
-  background: var(--es-surface);
-  border: none;
-  text-align: left;
-  color: var(--es-text);
+/**
+ * The panel's menu look, applied to the `<ul>` holding the rows: one surface with hairlines between the
+ * entries, each row a leading blue icon, a title with its description, and a trailing chevron.
+ *
+ * Covers the rows' own elements too, so a menu is one `@include` and the panel's menus cannot drift
+ * apart. Their templates share the class names: `.menu-item` with `.mi-icon`, `.mi-main`, `.mi-title`,
+ * `.mi-desc`, `.chevron`.
+ */
+@mixin menu-rows {
+  @include list-reset;
 
-  &:hover:not([disabled]) { background: #f0f4f9; }
-  &[disabled] { opacity: 0.5; cursor: not-allowed; }
+  > li { border-bottom: 1px solid var(--es-border); }
+
+  .menu-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    background: none;
+    border: none;
+    text-align: left;
+    color: var(--es-text);
+    cursor: pointer;
+
+    &:hover:not([disabled]) { background: var(--es-hint-bg); }
+    &[disabled] { opacity: 0.5; cursor: not-allowed; }
+  }
+
+  // Blue and larger than the text: the icon is what the eye picks the row by.
+  .mi-icon {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    color: var(--es-blue);
+
+    ::ng-deep svg { width: 34px; height: 34px; display: block; }
+  }
+
+  .mi-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+  .mi-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+  .mi-desc { font-size: 13px; color: var(--es-muted); line-height: 1.35; }
+  .chevron { flex: 0 0 auto; width: 20px; height: 20px; color: var(--es-blue); }
+}
+
+/**
+ * Lets a menu inside a padded screen body reach the panel's edges, so its hairlines span the whole
+ * surface. Cancels {@link screen-body}'s padding for this one block.
+ */
+@mixin menu-rows-full-width {
+  margin: 0 calc(-1 * var(--es-space-4));
+  // Its own surface: the rows are transparent, so without this they sit on the screen's grey ground.
+  background: var(--es-surface);
+  border-top: 1px solid var(--es-border);
 }
 
 // ---- Status chip (persistent condition indicators) -------------------------
