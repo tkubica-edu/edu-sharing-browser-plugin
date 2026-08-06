@@ -10,26 +10,3 @@
   display: block;
   width: 100%;
 }
-
-// The wrapper renders the group's whole form; only the picture is wanted, so everything around it is
-// hidden — which widgets a view has is the repository's MDS to decide, not ours.
-//
-// `::ng-deep` because the element is created imperatively and carries no encapsulation attribute of
-// this component; the rules are anchored on `.pw-host` so they cannot leak into the editor elsewhere.
-// Selected by containment (`:has`), since the widget order differs per repository.
-.pw-host ::ng-deep {
-  // The form's own chrome around the views — the "show extended fields" switch.
-  es-mds-editor-core > *:not(.mds-views) { display: none; }
-
-  // A view without the preview widget has nothing to contribute at all.
-  es-mds-editor-view:not(:has(es-mds-editor-widget-preview)) { display: none; }
-
-  // The view's own heading ("Allg. Informationen") names the form, not the picture.
-  .view-wrapper > .heading-container { display: none; }
-
-  // Inside the remaining view: every other widget of it.
-  .content > *:not(:has(es-mds-editor-widget-preview)) { display: none; }
-
-  // The picture itself, sized for the panel instead of the repository's own layout.
-  es-mds-editor-widget-preview img { max-width: 100%; height: auto; }
-}

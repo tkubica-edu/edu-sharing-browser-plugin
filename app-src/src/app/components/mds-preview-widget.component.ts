@@ -17,7 +17,7 @@ const EDITOR_TAG = 'edu-sharing-mds-editor-wrapper';
  * one edu-sharing uses for its own preview sidebar — a single view, so little of the form has to be
  * hidden. A metadata set without that group renders nothing at all, silently.
  */
-const PREVIEW_GROUP = 'preview_sidebar_edit';
+const PREVIEW_GROUP = 'browser_extension_preview';
 
 /**
  * The node in the shape the MDS machinery requires, which is stricter than the `Node` type says: every
@@ -111,7 +111,7 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
     const element = document.createElement(EDITOR_TAG) as MdsEditorElement;
     element.embedded = true;
     // 'viewer': the form renders what the node has and no widget offers an edit (see the class doc).
-    element.editorMode = 'viewer';
+    element.editorMode = 'inline';
     element.groupId = this.groupId();
     element.setId = this.setId();
     element.repository = HOME_REPOSITORY;
