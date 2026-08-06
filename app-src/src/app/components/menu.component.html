@@ -7,7 +7,7 @@
 
       <button class="focus-card" (click)="navigation.go(section.id)"
               [disabled]="section.disabled"
-              [attr.title]="section.disabled ? section.disabledHint : contentTitle()">
+              [attr.title]="contentTitle()">
         <span class="fc-tile">
           @if (contentPreview(); as preview) {
             <img class="fc-thumb" [class.is-icon]="preview.isIcon" [src]="preview.url" alt=""
@@ -20,8 +20,10 @@
         <span class="fc-main">
           <!-- Named by the content once there is one; else the section's label reports the state. -->
           <span class="fc-title">{{ contentTitle() ?? section.label }}</span>
+          <!-- Without a content the card reports the state, so the line under it is the reason
+               there is none (see entryDescription). -->
           @if (!contentTitle()) {
-            <span class="fc-desc">{{ section.description }}</span>
+            <span class="fc-desc">{{ entryDescription(section) }}</span>
           }
         </span>
 
@@ -35,12 +37,11 @@
   <ul class="menu-list">
     @for (section of rowSections(); track section.id) {
       <li>
-        <!-- A section that does not apply right now stays listed and disabled, saying why in its
-             tooltip (e.g. "Inhalt erschließen" for a page whose content is already in the
-             repository) — see AppSection.enabled. -->
+        <!-- A section that does not apply right now stays listed and disabled, and its description
+             line says why (e.g. "Inhalt erschließen" for a page whose content is already in the
+             repository) — see AppSection.enabled and entryDescription. -->
         <button class="menu-item" (click)="navigation.go(section.id)"
-                [disabled]="section.disabled"
-                [attr.title]="section.disabled ? section.disabledHint : null">
+                [disabled]="section.disabled">
           <span class="mi-icon" [innerHTML]="icons.icon(section.id)"></span>
           <span class="mi-main">
             <span class="mi-title">
@@ -49,7 +50,7 @@
                 <span class="mi-count">{{ history.entries().length }}</span>
               }
             </span>
-            <span class="mi-desc">{{ section.description }}</span>
+            <span class="mi-desc">{{ entryDescription(section) }}</span>
           </span>
           <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>

@@ -1,0 +1,54 @@
+// Geometry and timing of edu-sharing's own spinner. The one number everything derives from is the
+// hexagon's width; the cells are narrower than that on purpose, so each hexagon reaches into the
+// next one and the three read as one overlapping shape.
+:host {
+  --es-spinner-size: 50px;
+
+  display: block;
+}
+
+.sp-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--es-spinner-size);
+}
+
+.sp-cell {
+  flex: 0 0 auto;
+  width: calc(var(--es-spinner-size) * 0.6);
+  height: var(--es-spinner-size);
+
+  // The overhang of the last hexagon has nowhere to go, so it is given the room here — otherwise
+  // the flex box centres 3 × 0.6 of the width and the shape sits visibly off to the right.
+  &:last-child {
+    width: var(--es-spinner-size);
+  }
+}
+
+.sp-hex {
+  display: block;
+  width: var(--es-spinner-size);
+  height: var(--es-spinner-size);
+  // The hexagon is wider than it is tall, so the SVG letterboxes it inside the square box and the
+  // pulse turns around its centre — as in the original, where it was a centred background image.
+  animation: sp-spin 2s infinite ease-in;
+
+  // The stagger. Short enough that the three are never in step, long enough that the shrink travels
+  // visibly from left to right.
+  &--1 { animation-delay: 0.1s; }
+  &--2 { animation-delay: 0.25s; }
+  &--3 { animation-delay: 0.5s; }
+}
+
+@keyframes sp-spin {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.5) rotate(90deg); }
+  100% { transform: scale(1); }
+}
+
+// Movement is the decoration, not the message: the three hexagons stand still and whatever text
+// accompanies them still says that something is happening.
+@media (prefers-reduced-motion: reduce) {
+  .sp-hex { animation: none; }
+}

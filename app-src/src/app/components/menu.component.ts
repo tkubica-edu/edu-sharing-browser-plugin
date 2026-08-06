@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 
 import { CurationService } from '../services/curation.service';
 import { HistoryService } from '../services/history.service';
-import { NavigationService } from '../services/navigation.service';
+import { NavigationService, SectionView } from '../services/navigation.service';
 import { OptionIconService } from '../services/option-icon.service';
 
 // The main menu: the sections marked `menu`, filtered to those visible for the current conditions.
@@ -37,6 +37,17 @@ export class MenuComponent {
 
   /** The card's headline once there is a content. */
   protected readonly contentTitle = this.curation.contentTitle;
+
+  /**
+   * What an entry says under its title. For one that cannot be entered that is the reason why —
+   * which is the more useful of the two texts, and the one the user is owed.
+   *
+   * It used to be the button's `title` and so was never read: a disabled control takes no pointer
+   * events, so the browser has nothing to show a tooltip for. Hence it is written out here.
+   */
+  protected entryDescription(section: SectionView): string {
+    return (section.disabled && section.disabledHint) || section.description;
+  }
 
   /** The preview URL that failed to load, so it is not tried again; null while none has. */
   private readonly brokenPreview = signal<string | null>(null);

@@ -107,8 +107,9 @@ export interface AppSection {
    */
   enabled?: (conditions: Conditions) => boolean;
   /**
-   * Why the section cannot be entered, shown as its tooltip. A function when it is disabled for more
-   * than one reason and the user is owed the one that applies.
+   * Why the section cannot be entered. Written out in place of the description while it is disabled
+   * — a tooltip would never be seen, as a disabled control takes no pointer events. A function when
+   * it is disabled for more than one reason and the user is owed the one that applies.
    */
   disabledHint?: string | ((conditions: Conditions) => string);
   /** The section's sub steps, in tab order. Never empty. */
