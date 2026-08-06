@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { ClientutilsV1Service } from 'ngx-edu-sharing-api';
 import { firstValueFrom } from 'rxjs';
 
@@ -40,30 +40,33 @@ export class PageRecognitionService {
   private readonly conditions = inject(ConditionsService);
   private readonly curation = inject(CurationService);
 
-  /** True while the recognition is in flight, so the shell can say the page is still being checked. */
-  readonly checking = signal(false);
-
   /**
    * Recognise the open page's content and adopt it. Answers whether one was found.
+   *
+   * Reports being under way through `ConditionsService.recognizingContent`, and clears it on every
+   * way out — the *Inhalt erkannt* entry says "wird geprüft" until then and "kein Inhalt erkannt"
+   * afterwards, so leaving it set would leave the panel checking forever.
    *
    * Silent on every failure: this is a bonus (a guest session may not be allowed to read the node or
    * to run the lookup, and an unreachable page is not an error either) — without it the user simply
    * gets the *Inhalt erschließen* offer they would have got anyway.
    */
   async recognize(): Promise<boolean> {
-    // Nothing to recognise where the plugin speaks for the page (see the class comment), without a
-    // session to ask under, or when the panel already works on something — adopting would refuse
+    // Without a session there is nothing to ask under — and the login runs this again (see
+    // AppComponent), so the question stays open rather than being answered with "no content".
+    if (!this.auth.authorized()) return false;
+    // On an insert host the plugin speaks for the page (see the class comment): its answer is what
+    // settles the recognition there, so this one leaves the state alone — see
+    // AppComponent.askHostForItsDocument.
+    if (this.conditions.onlyOfficePresent()) return false;
+    // Nothing to recognise either when the panel already works on something — adopting would refuse
     // anyway, and the answer would be thrown away.
-    if (
-      this.conditions.onlyOfficePresent() ||
-      !this.auth.authorized() ||
-      this.curation.activeNode() ||
-      this.curation.hasUnsavedWork()
-    ) {
+    if (this.curation.activeNode() || this.curation.hasUnsavedWork()) {
+      this.conditions.recognizingContent.set(false);
       return false;
     }
     const url = this.conditions.activeUrl();
-    this.checking.set(true);
+    this.conditions.recognizingContent.set(true);
     try {
       // What the page itself says it shows, first and in place of any lookup.
       const named = nodeIdFromRepositoryUrl(url);
@@ -85,7 +88,7 @@ export class PageRecognitionService {
     } catch {
       return false;
     } finally {
-      this.checking.set(false);
+      this.conditions.recognizingContent.set(false);
     }
   }
 }

@@ -4,6 +4,18 @@
 /** Every property as `string[]`; `null`/`undefined` entries are dropped. */
 export type MdsValues = Record<string, string[]>;
 
+/**
+ * The first usable string of a single property value — the payloads carry a value as a scalar *or*
+ * as an array (a node's stored properties are always arrays, an agent result often is not), and a
+ * reader that wants one string should not have to care which.
+ *
+ * `null` for anything that is not a non-blank string, so a caller can chain fallbacks with `??`.
+ */
+export function firstString(value: unknown): string | null {
+  if (Array.isArray(value)) return firstString(value[0]);
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
 /** Coerce arbitrary property values to the `string[]` shape MDS and the repository expect. */
 export function toMdsValues(values: Record<string, unknown> | null | undefined): MdsValues {
   const result: MdsValues = {};

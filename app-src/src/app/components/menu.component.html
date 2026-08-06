@@ -8,7 +8,20 @@
         <button class="menu-item" (click)="navigation.go(section.id)"
                 [disabled]="section.disabled"
                 [attr.title]="section.disabled ? section.disabledHint : null">
-          <span class="mi-icon" [innerHTML]="icons.icon(section.id)"></span>
+          <!-- The recognised content shows itself: what the repository has of it stands where the
+               section's icon is, so the row is recognisable as *this* material rather than as the
+               option in general. Its rendered thumbnail as a framed image, its bare type icon as an
+               icon — and the section's own icon when there is neither, see
+               MenuComponent.contentPreview. -->
+          <!-- Only while the row actually reports a content: with none recognised the row says so,
+               and a picture next to that sentence would contradict it — an unsaved Erschließung has
+               a preview image but no content the row could open. -->
+          @if (section.id === 'content-options' && !section.disabled && contentPreview(); as preview) {
+            <img class="mi-preview" [class.is-icon]="preview.isIcon" [src]="preview.url" alt=""
+                 (error)="dropBrokenPreview(preview.url)" />
+          } @else {
+            <span class="mi-icon" [innerHTML]="icons.icon(section.id)"></span>
+          }
           <span class="mi-main">
             <span class="mi-title">
               {{ section.label }}
@@ -18,8 +31,15 @@
             </span>
             <span class="mi-desc">{{ section.description }}</span>
           </span>
-          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+          <!-- A section still waiting on its answer (Inhalt erkannt while the page is being checked)
+               shows a spinner where the chevron would be: there is nothing to go to yet, and the row
+               is where the answer will appear — see AppSection.loading. -->
+          @if (section.loading) {
+            <span class="mi-spinner" aria-hidden="true"></span>
+          } @else {
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+          }
         </button>
       </li>
     }

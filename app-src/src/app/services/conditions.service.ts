@@ -49,6 +49,16 @@ export class ConditionsService {
   /** True while the metadata editor screen is open. */
   readonly editMode = signal(false);
 
+  /**
+   * Whether it is still open what the active page's content is — set by PageRecognitionService (and,
+   * on an insert host, by the panel's request for the host's document; see AppComponent).
+   *
+   * True to begin with: on boot nothing has answered yet, and reporting "kein Inhalt" before anyone
+   * looked would be a finding the panel has not made. Only once this is false does the absence of a
+   * content mean there is none — see the *Inhalt erkannt* section, which says both.
+   */
+  readonly recognizingContent = signal(true);
+
   // Debug mode counts as an insert host on any page: it simulates the plugin's answers, so the
   // OnlyOffice-only options must be reachable without an editor.
   readonly onlyOfficePresent = computed(() => {
@@ -90,6 +100,7 @@ export class ConditionsService {
     hasActiveNode: this.hasActiveNode(),
     hasDetectedNode: this.hasDetectedNode(),
     hasEditableMetadata: this.hasEditableMetadata(),
-    editMode: this.editMode()
+    editMode: this.editMode(),
+    recognizingContent: this.recognizingContent()
   }));
 }

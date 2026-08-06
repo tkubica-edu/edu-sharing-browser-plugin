@@ -39,6 +39,32 @@
   ::ng-deep svg { width: 26px; height: 26px; display: block; }
 }
 
+// The recognised content's own preview, in the icon's place. Wider than the icon (previews are
+// landscape) but no taller, so a row does not change height when a preview arrives or fails; the
+// image is cropped rather than fitted, since a letterboxed thumbnail this small reads as an empty
+// box.
+.mi-preview {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 26px;
+  border-radius: 3px;
+  border: 1px solid var(--es-border);
+  background: #fff;
+  object-fit: cover;
+
+  // The repository's type icon rather than a rendered thumbnail (preview.isIcon): a transparent
+  // glyph standing for the kind of material, so it is shown at the icon's size and whole — a frame
+  // around it would claim it is a picture of the content.
+  &.is-icon {
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 0;
+    background: none;
+    object-fit: contain;
+  }
+}
+
 .mi-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .mi-title { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 6px; }
 
@@ -55,3 +81,27 @@
 .mi-desc { font-size: 12px; color: var(--es-muted); line-height: 1.35; }
 
 .chevron { flex: 0 0 auto; width: 20px; height: 20px; color: var(--es-muted); }
+
+// Stands in for the chevron while the entry waits on its answer (see AppSection.loading), so it
+// takes the chevron's size and the row's layout does not shift when the answer arrives.
+.mi-spinner {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  margin: 3px;
+  // Deliberately darker than a border would be: the row it sits on is disabled while it spins, and
+  // the dimming applies to it too.
+  border: 2px solid #b6c6d8;
+  border-top-color: var(--es-blue);
+  border-radius: 50%;
+  animation: mi-spin 0.9s linear infinite;
+}
+
+@keyframes mi-spin {
+  to { transform: rotate(360deg); }
+}
+
+// The rotation only says "still working"; the row's own text says it too, so it can stand still.
+@media (prefers-reduced-motion: reduce) {
+  .mi-spinner { animation: none; }
+}

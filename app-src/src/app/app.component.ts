@@ -163,12 +163,9 @@ export class AppComponent implements OnInit {
     this.browserExtension.signalReady();
     await this.consumePendingNode();
 
-    // On an OnlyOffice page, ask once for the open document's identity so it becomes the node the
-    // app works on (the effect above adopts it). Fire-and-forget: the plugin is an optional
-    // background plugin, so awaiting it would stall the boot until the timeout.
-    if (this.conditions.onlyOfficePresent() && !this.onlyOfficeDocument.currentDocument()) {
-      void this.onlyOfficeDocument.requestInfo().catch(() => null);
-    }
+    // Fire-and-forget: the plugin is an optional background plugin, so awaiting it would stall the
+    // boot until the timeout.
+    if (this.conditions.onlyOfficePresent()) void this.askHostForItsDocument();
 
     // Last: the boot is done, which releases the page recognition (see the effect above).
     this.booted.set(true);
@@ -222,6 +219,26 @@ export class AppComponent implements OnInit {
     this.conditions.activeUrl.set(url);
     this.curation.releaseDetectedContent();
     void this.pageRecognition.recognize();
+  }
+
+  /**
+   * On an OnlyOffice page, ask once for the open document's identity so it becomes the node the app
+   * works on (the effect in the constructor adopts it).
+   *
+   * This is the recognition for such a page — the plugin states the document instead of the URL
+   * being looked up (see PageRecognitionService) — so it also settles `recognizingContent`: the
+   * *Inhalt erkannt* entry keeps saying "wird geprüft" until the plugin answers, and reports "kein
+   * Inhalt erkannt" once it did not (the plugin is optional and may be switched off, in which case
+   * the request runs into its timeout).
+   */
+  private async askHostForItsDocument(): Promise<void> {
+    try {
+      if (!this.onlyOfficeDocument.currentDocument()) await this.onlyOfficeDocument.requestInfo();
+    } catch {
+      // No answer, no content — the failure itself is the finding and needs no report of its own.
+    } finally {
+      this.conditions.recognizingContent.set(false);
+    }
   }
 
   /** Read and clear the node persisted by panel-host while the sidebar was closed or booting. */

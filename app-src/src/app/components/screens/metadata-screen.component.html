@@ -12,19 +12,42 @@
       }
     </p>
 
-    @if (metadataAgent.lastRun()?.source; as source) {
-      <p class="src-title" [title]="source.url">{{ source.title || source.url }}</p>
-    }
+    <!-- What is being described, next to the numbers describing it: the content's picture — the
+         node's preview, or the image the agent found on the page (see
+         CurationService.contentPreview). The MDS editor below takes no image of its own, so this is
+         the only place in this step where the content shows itself. -->
+    <div class="source-row">
+      @if (curation.contentPreview(); as preview) {
+        <img class="source-preview" [class.is-icon]="preview.isIcon" [src]="preview.url" alt=""
+             (error)="hideBrokenImage($event)" />
+      }
+      <div class="source-main">
+        @if (metadataAgent.lastRun()?.source; as source) {
+          <p class="src-title" [title]="source.url">{{ source.title || source.url }}</p>
+        }
 
-    @if (metadataAgent.lastRun()?.parsed; as parsed) {
-      <div class="es-result-sub">
-        <span class="es-chip">{{ parsed.fieldsExtracted ?? '–' }} / {{ parsed.fieldsTotal ?? '–' }} Felder</span>
-        @if (curation.activeNode(); as node) {
-          <span class="es-chip">Node: {{ node.name ?? node.nodeId }}</span>
+        @if (metadataAgent.lastRun()?.parsed; as parsed) {
+          <div class="es-result-sub">
+            <span class="es-chip">{{ parsed.fieldsExtracted ?? '–' }} / {{ parsed.fieldsTotal ?? '–' }} Felder</span>
+            @if (curation.activeNode(); as node) {
+              <span class="es-chip">Node: {{ node.name ?? node.nodeId }}</span>
+            }
+          </div>
         }
       </div>
-    }
+    </div>
   </section>
+
+  <!-- EXPERIMENT: the repository's own preview widget (the native MDS `<preview>`), next to the
+       editor rather than inside it — see MdsPreviewWidgetComponent. It renders a *node's* picture, so
+       it only appears for a node that has one: before the first save there is no node at all, and a
+       node without a preview would leave an empty card. -->
+  @if (nodeWithPreview(); as node) {
+    <section class="es-card preview-widget-card">
+      <p class="es-muted card-label">Vorschau des Nodes (MDS-Widget)</p>
+      <es-mds-preview-widget [node]="node"></es-mds-preview-widget>
+    </section>
+  }
 
   @if (curation.editorMetadata(); as metadata) {
     <section class="es-card">

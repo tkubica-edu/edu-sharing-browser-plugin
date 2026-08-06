@@ -1,15 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 
+import { firstString } from '../../util/mds-values';
 import { AdditionalWebComponentService } from '../../services/additional-web-component.service';
 import { CurationService } from '../../services/curation.service';
 import { PreviewNodeComponent } from '../preview-node.component';
 import { WloCanvasComponent } from '../wlo-canvas.component';
-
-/** First string of a metadata value, which the payloads carry as a scalar or as an array. */
-function firstString(value: unknown): string | null {
-  if (Array.isArray(value)) return firstString(value[0]);
-  return typeof value === 'string' && value.trim() ? value : null;
-}
 
 // "Vorschau", the first sub step of the Inhaltsübersicht: shows the active node. The footer's next
 // steps come from ActionBarService.
@@ -42,12 +37,16 @@ export class PreviewScreenComponent {
     );
   });
 
-  /** The preview image the agent found for the content, if any. */
+  /**
+   * The content's picture (see CurationService.contentPreview); `''` when there is none — that is
+   * what the WLO canvas' `previewImage` input reads as "no image".
+   *
+   * The repository's bare *type* icon is left out here: this screen is the content's own page and
+   * shows the node itself right below, so a generic type glyph on top of it would say nothing.
+   */
   protected readonly previewImage = computed(() => {
-    const metadata = this.curation.editorMetadata();
-    return (
-      firstString(metadata?.['preview_image_url']) ?? firstString(metadata?.['preview:url']) ?? ''
-    );
+    const preview = this.curation.contentPreview();
+    return preview && !preview.isIcon ? preview.url : '';
   });
 
   protected hideBrokenImage(event: Event): void {

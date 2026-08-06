@@ -5,6 +5,33 @@
 
 .src-title { font-weight: 600; word-break: break-word; margin: 8px 0 0; }
 
+// The content's picture beside what is said about it. `align-items: start` so the image stays at the
+// top of a source title that wraps to several lines.
+.source-row { display: flex; align-items: start; gap: var(--es-space-3); }
+.source-main { min-width: 0; flex: 1; }
+
+.source-preview {
+  flex: 0 0 auto;
+  width: 72px;
+  height: 48px;
+  margin-top: 8px;
+  border-radius: 4px;
+  border: 1px solid var(--es-border);
+  background: #fff;
+  object-fit: cover;
+
+  // Only the repository's type icon, not a picture of the material (see
+  // CurationService.contentPreview) — shown whole and unframed, like an icon.
+  &.is-icon {
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 0;
+    background: none;
+    object-fit: contain;
+  }
+}
+
 .raw { padding: 12px 14px; }
 .raw summary { cursor: pointer; font-size: 12px; color: var(--es-muted); font-weight: 600; }
 .raw pre {
@@ -20,3 +47,7 @@
 
 .fields { @include m.field-list; margin: 8px 0 0; }
 .val { @include m.field-value; }
+
+// EXPERIMENT: the card holding the native MDS preview widget.
+.preview-widget-card { padding: 12px 14px; }
+.card-label { margin: 0 0 8px; font-size: 12px; font-weight: 600; }

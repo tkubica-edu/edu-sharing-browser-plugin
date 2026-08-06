@@ -60,6 +60,21 @@ export interface Conditions {
   hasEditableMetadata: boolean;
   /** The metadata editor is currently open. */
   editMode: boolean;
+  /** Nothing has answered yet what this page's content is — the recognition is still running.
+   *  Only once this is false does "no content" mean there is none (see PageRecognitionService). */
+  recognizingContent: boolean;
+}
+
+/**
+ * A text that may depend on the conditions — for an entry that *names its own state* instead of
+ * only being disabled by it: "Inhalt erkannt" also has to say "Kein Inhalt erkannt" and "Inhalt
+ * wird geprüft", because the row is the one place the finding is reported.
+ */
+export type SectionText = string | ((conditions: Conditions) => string);
+
+/** Resolve a {@link SectionText} against the conditions that hold right now. */
+export function sectionText(text: SectionText, conditions: Conditions): string {
+  return typeof text === 'function' ? text(conditions) : text;
 }
 
 /** One sub step of a section, offered as a tab. */
@@ -81,10 +96,10 @@ export interface SectionTab {
 export interface AppSection {
   id: SectionId;
   /** How the section is named where it is *entered* — the main-menu row, the topbar icon. */
-  label: string;
+  label: SectionText;
   /** Heading shown while the section is open; defaults to {@link label} when unset. */
   title?: string;
-  description: string;
+  description: SectionText;
   visible: (conditions: Conditions) => boolean;
   /**
    * Whether the section can be entered right now; defaults to always. Like a tab's
@@ -103,13 +118,18 @@ export interface AppSection {
   /** Listed as an entry of the main menu. Without it the section is only reachable from the flow. */
   menu?: boolean;
   /**
-   * Extra condition for *listing* the section in the main menu, on top of {@link visible}, which
-   * governs reachability. For a section that stays open-able from within the flow while only being
-   * *offered* in the menu under narrower circumstances.
+   * Highlighted in the main menu — for the entry the current page makes the obvious next step. A
+   * predicate when that only holds sometimes: an entry reporting that it found *nothing* is not a
+   * next step, so it drops the highlight rather than shouting about an empty finding.
    */
-  listed?: (conditions: Conditions) => boolean;
-  /** Highlighted in the main menu — for the entry the current page makes the obvious next step. */
-  prominent?: boolean;
+  prominent?: boolean | ((conditions: Conditions) => boolean);
+  /**
+   * The section is waiting on something and the answer is what the entry reports (see the *Inhalt
+   * erkannt* entry while the recognition runs). Rendered as a spinner on the menu row, which stays
+   * disabled meanwhile — the row is already the place the answer will appear, so it says "still
+   * checking" there instead of appearing out of nowhere once the answer is in.
+   */
+  loading?: (conditions: Conditions) => boolean;
   /**
    * Offered as an icon in the topbar instead of as a menu entry — for Einstellungen, which is not
    * an action on content but an always-available utility. It stays in this registry, so visibility,
@@ -145,23 +165,39 @@ export const SECTIONS: readonly AppSection[] = [
   // ---- Main menu ----------------------------------------------------------
   {
     id: 'content-options',
-    label: 'Inhalt erkannt',
+    // The row is the recognition's *report*, so it is listed in every one of its three outcomes and
+    // names the one that holds: a content was found, none was, or the answer is still outstanding.
+    // Reporting all three is what makes the finding trustworthy — an entry that is simply absent
+    // leaves the user guessing whether the panel looked at this page at all.
+    label: (c) =>
+      c.hasActiveNode
+        ? 'Inhalt erkannt'
+        : c.recognizingContent
+          ? 'Inhalt wird geprüft'
+          : 'Kein Inhalt erkannt',
     // The menu row announces the *finding*; the screen it opens is the choice of what to do with
     // it — and that choice is also where the Verlauf and die eigenen Inhalte lead.
     title: 'Inhaltsoptionen',
-    description: 'Der geöffnete Inhalt wurde erkannt — bearbeiten oder ansehen',
-    // Reachable for any active node: picking one from the Verlauf or den eigenen Inhalten leads
-    // here too.
-    visible: requiresLogin((c) => c.hasActiveNode),
+    description: (c) =>
+      c.hasActiveNode
+        ? 'Der geöffnete Inhalt wurde erkannt — bearbeiten oder ansehen'
+        : c.recognizingContent
+          ? 'Es wird geprüft, ob das Repository diese Seite schon als Inhalt hat'
+          : 'Das Repository hat zu dieser Seite keinen Inhalt',
+    visible: requiresLogin(),
     menu: true,
-    // …but *offered* in the menu only for a node that was detected on its own (a DOCUMENT_INFO from
-    // the OnlyOffice plugin, a PREVIEW_NODE). Only then is it a finding about the open page rather
-    // than something the user navigated to — and a picked node is released again when the user
-    // returns to the menu (see CurationService.releaseChosenContent). Further ways of detecting a
-    // content are to follow, and each one widens exactly this condition.
-    listed: (c) => c.hasDetectedNode,
-    // It leads the menu and is highlighted: a recognised content is what the user came for.
-    prominent: true,
+    // Enterable for any active node: picking one from the Verlauf or den eigenen Inhalten leads
+    // here too. Without one there is nothing to choose between, so the row stays visible and
+    // disabled and says why — see AppSection.enabled.
+    enabled: (c) => c.hasActiveNode,
+    disabledHint: (c) =>
+      c.recognizingContent
+        ? 'Es wird noch geprüft, ob diese Seite bereits ein Inhalt im Repository ist.'
+        : 'Zu dieser Seite wurde kein Inhalt erkannt — sie kann über „Inhalt erschließen“ erschlossen werden.',
+    loading: (c) => !c.hasActiveNode && c.recognizingContent,
+    // It leads the menu and is highlighted while there *is* a content: a recognised content is what
+    // the user came for. With nothing found the row is a report, not an offer.
+    prominent: (c) => c.hasActiveNode,
     tabs: [{ id: 'content-options', label: 'Inhaltsoptionen' }]
   },
   {

@@ -1,7 +1,7 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 
 import {
-  AppSection, Conditions, SECTIONS, ScreenId, SectionId, SectionTab
+  AppSection, Conditions, SECTIONS, ScreenId, SectionId, SectionTab, sectionText
 } from '../model/navigation';
 import { ConditionsService } from './conditions.service';
 import { CurationService } from './curation.service';
@@ -12,12 +12,18 @@ export interface TabView extends SectionTab {
 }
 
 /**
- * A section as the main menu renders it: its definition plus whether it can be entered, with the
- * reason already resolved to the one that applies right now (see AppSection.disabledHint).
+ * A section as the main menu renders it: its definition with everything that depends on the current
+ * conditions already resolved — its texts, whether it can be entered, and the reason that applies
+ * right now (see AppSection.label and AppSection.disabledHint).
  */
-export interface SectionView extends Omit<AppSection, 'disabledHint'> {
+export interface SectionView
+  extends Omit<AppSection, 'label' | 'description' | 'disabledHint' | 'prominent' | 'loading'> {
+  label: string;
+  description: string;
   disabled: boolean;
   disabledHint?: string;
+  prominent: boolean;
+  loading: boolean;
 }
 
 /** A visited step: a section plus the sub step that was open in it. */
@@ -61,34 +67,27 @@ export class NavigationService {
     const previous = this.previousStep();
     const section = previous && this.sectionOf(previous.section);
     return section && previous.section !== 'menu'
-      ? `Zurück zu „${section.title ?? section.label}“`
+      ? `Zurück zu „${section.title ?? sectionText(section.label, this.conditions.snapshot())}“`
       : 'Zurück zum Hauptmenü';
   });
 
   /**
-   * The sections listed in the main menu, in registry order, filtered by the conditions, each with
-   * whether it can be entered right now. A section may be reachable without being offered here —
-   * see AppSection.listed.
+   * The sections listed in the main menu, in registry order, filtered by the conditions, each
+   * resolved for the state that holds right now — its texts and whether it can be entered.
    */
   readonly menuSections = computed<readonly SectionView[]>(() => {
     const conditions = this.conditions.snapshot();
-    return SECTIONS.filter(
-      (section) =>
-        section.menu && section.visible(conditions) && (section.listed?.(conditions) ?? true),
-    ).map((section) => ({
-      ...section,
-      disabled: !this.isEnabled(section, conditions),
-      disabledHint:
-        typeof section.disabledHint === 'function'
-          ? section.disabledHint(conditions)
-          : section.disabledHint
-    }));
+    return SECTIONS.filter((section) => section.menu && section.visible(conditions)).map((section) =>
+      this.viewOf(section, conditions),
+    );
   });
 
   /** The utility sections, shown as topbar icons rather than as menu entries. */
-  readonly topbarSections = computed(() => {
+  readonly topbarSections = computed<readonly SectionView[]>(() => {
     const conditions = this.conditions.snapshot();
-    return SECTIONS.filter((section) => section.topbar && section.visible(conditions));
+    return SECTIONS.filter((section) => section.topbar && section.visible(conditions)).map(
+      (section) => this.viewOf(section, conditions),
+    );
   });
 
   /** The open section's definition; undefined on the menu. */
@@ -133,7 +132,8 @@ export class NavigationService {
   readonly title = computed(() => {
     if (this.section() === 'menu') return 'Hauptmenü';
     const section = this.currentSection();
-    return section?.title ?? section?.label ?? '';
+    if (!section) return '';
+    return section.title ?? sectionText(section.label, this.conditions.snapshot());
   });
 
   constructor() {
@@ -314,6 +314,25 @@ export class NavigationService {
     if (section.visible(withoutContent) && this.isEnabled(section, withoutContent)) {
       this.curation.releaseChosenContent();
     }
+  }
+
+  /** A section resolved for one set of conditions — everything the templates render directly. */
+  private viewOf(section: AppSection, conditions: Conditions): SectionView {
+    return {
+      ...section,
+      label: sectionText(section.label, conditions),
+      description: sectionText(section.description, conditions),
+      disabled: !this.isEnabled(section, conditions),
+      disabledHint:
+        typeof section.disabledHint === 'function'
+          ? section.disabledHint(conditions)
+          : section.disabledHint,
+      prominent:
+        typeof section.prominent === 'function'
+          ? section.prominent(conditions)
+          : section.prominent ?? false,
+      loading: section.loading?.(conditions) ?? false
+    };
   }
 
   private isEnabled(section: AppSection, conditions: Conditions): boolean {

@@ -1,0 +1,13 @@
+<div class="pw-wrap">
+  @if (bundle.error()) {
+    <p class="es-error">Vorschau-Widget konnte nicht geladen werden: {{ bundle.error() }}</p>
+  } @else if (!ready()) {
+    <p class="es-muted">Vorschau wird geladen…</p>
+  }
+
+  <!--
+    The wrapper is created imperatively into #host, not written as a tag: its `embedded` input must
+    be a property before it connects — see mount() and the component comment.
+  -->
+  <div #host class="pw-host"></div>
+</div>

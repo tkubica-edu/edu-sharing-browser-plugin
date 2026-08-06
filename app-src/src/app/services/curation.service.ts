@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { CollectionServiceUnwrapped, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 import { firstValueFrom } from 'rxjs';
 
-import { MdsValues } from '../util/mds-values';
+import { MdsValues, firstString } from '../util/mds-values';
 import { errorMessage } from '../util/errors';
 import { renderLink } from '../util/repository-links';
 import { AdditionalWebComponentService } from './additional-web-component.service';
@@ -20,6 +20,15 @@ export interface Collection {
 }
 
 /**
+ * The content's picture: an image URL plus whether it is only the repository's *type* icon rather
+ * than a rendered preview of the material — see {@link CurationService.contentPreview}.
+ */
+export interface ContentPreview {
+  url: string;
+  isIcon: boolean;
+}
+
+/**
  * How the active node became the app's content.
  *
  * - `detected` — it arrived on its own: the host page announced the document it has open
@@ -30,6 +39,14 @@ export interface Collection {
  *   {@link CurationService.releaseChosenContent}).
  */
 export type NodeSource = 'detected' | 'chosen';
+
+/**
+ * The preview image a metadata payload names, if any: the metadata agent's `preview_image_url`, or a
+ * stored `preview:url` on a node's properties. Null when it names none.
+ */
+function previewImageOf(payload: Record<string, unknown> | null | undefined): string | null {
+  return firstString(payload?.['preview_image_url']) ?? firstString(payload?.['preview:url']);
+}
 
 /**
  * Assemble a stand-in {@link Node} for a content the repository was never asked about — the one the
@@ -174,6 +191,35 @@ export class CurationService {
   readonly editorMetadata = computed<Record<string, unknown> | null>(() => {
     const payload = this.metadataAgent.lastRun()?.parsed?.raw ?? null;
     return this.activeNode() ? this.nodeMetadata() ?? payload : payload;
+  });
+
+  /**
+   * The picture of the content the app works on, for wherever it is shown as itself — the *Inhalt
+   * erkannt* entry, the metadata step, the preview.
+   *
+   * Three sources, ranked by how much each says about *this* content:
+   *
+   * 1. **The node's rendered preview** — the repository's own picture of a content it holds. Nothing
+   *    beats it.
+   * 2. **The image the metadata agent found** (`preview_image_url` — the page's `og:image` and
+   *    friends, see the content script). What a curated content has instead of 1: before the save
+   *    its node does not exist, and after it the repository has not rendered anything yet. Read from
+   *    the editor's metadata *and* from the agent's own result, because {@link editorMetadata} swaps
+   *    the payload for the node's stored properties on the first save — and those do not carry it.
+   * 3. **The node's type icon** (`preview.isIcon`: the repository answered with a 302 to
+   *    `…/mime-types/previews/<type>.svg`). It says "a link", "a PDF" — true, but nothing about this
+   *    content, so a real image from 2 comes first.
+   *
+   * Null when none of them has one — then the caller shows whatever it shows without a picture.
+   */
+  readonly contentPreview = computed<ContentPreview | null>(() => {
+    const preview = this.previewNode()?.preview;
+    if (preview?.url && !preview.isIcon) return { url: preview.url, isIcon: false };
+    const found =
+      previewImageOf(this.editorMetadata()) ??
+      previewImageOf(this.metadataAgent.lastRun()?.parsed?.raw);
+    if (found) return { url: found, isIcon: false };
+    return preview?.url ? { url: preview.url, isIcon: true } : null;
   });
 
   /** Clear the whole flow for a fresh analysis. */

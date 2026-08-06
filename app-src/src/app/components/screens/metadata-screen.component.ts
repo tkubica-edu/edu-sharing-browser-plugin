@@ -9,6 +9,7 @@ import { CurationService } from '../../services/curation.service';
 import { MetadataAgentService } from '../../services/metadata-agent.service';
 import { NavigationService } from '../../services/navigation.service';
 import { MdsEditorComponent } from '../mds-editor.component';
+import { MdsPreviewWidgetComponent } from '../mds-preview-widget.component';
 import { MetadataEditor } from '../metadata-editor';
 import { WloCanvasComponent } from '../wlo-canvas.component';
 
@@ -20,7 +21,7 @@ import { WloCanvasComponent } from '../wlo-canvas.component';
 // MetadataEditor, so everything else on this screen is identical either way.
 @Component({
   selector: 'es-metadata-screen',
-  imports: [JsonPipe, MdsEditorComponent, WloCanvasComponent],
+  imports: [JsonPipe, MdsEditorComponent, MdsPreviewWidgetComponent, WloCanvasComponent],
   templateUrl: './metadata-screen.component.html',
   styleUrl: './metadata-screen.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -40,6 +41,15 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
   private readonly editor = computed<MetadataEditor | undefined>(
     () => this.wloCanvas() ?? this.mdsEditor(),
   );
+
+  /**
+   * The node whose own preview the native MDS widget can show; null when there is none to show —
+   * see MdsPreviewWidgetComponent.
+   */
+  protected readonly nodeWithPreview = computed(() => {
+    const node = this.curation.previewNode();
+    return node?.preview?.url ? node : null;
+  });
 
   /**
    * A page this editor should erschließen as it opens (an added link, see
@@ -76,5 +86,14 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
   protected async save(values: MdsValues): Promise<void> {
     if (!(await this.curation.save(values))) return;
     this.navigation.goNextTab();
+  }
+
+  /**
+   * Drop the content's picture when it cannot be loaded — it is a foreign URL (the page's
+   * `og:image`) or a repository URL this session may not read. Nothing takes its place here: the
+   * step is about the metadata, and the picture is the extra.
+   */
+  protected hideBrokenImage(event: Event): void {
+    (event.target as HTMLImageElement).style.display = 'none';
   }
 }

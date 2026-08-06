@@ -1,0 +1,42 @@
+:host { display: block; }
+
+.pw-wrap { display: block; }
+
+// `position` + `overflow`, because the widget's own picture is built from absolutely positioned
+// layers (a blurred backdrop at `top: -30px; left: -30px` behind the image). Without a positioned,
+// clipping box around it, those layers resolve against something further up and spill over whatever
+// sits above the widget — the card's own label, for instance.
+.pw-host {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  width: 100%;
+}
+
+// The wrapper renders the group's whole form — one view with the `<preview>` widget first and the
+// rest of the node's fields after it. Only the picture is wanted here, so everything around it is
+// hidden rather than "not rendered": which widgets a view has is the repository's MDS to decide, not
+// ours, and the widget cannot be addressed on its own (see the component comment).
+//
+// `::ng-deep`, because the element is created imperatively and therefore carries no view-encapsulation
+// attribute of this component (same reason MdsEditorComponent sizes its element inline). The rules
+// are anchored on `.pw-host`, so they cannot leak into the editor rendered elsewhere on the screen.
+//
+// Selected by *containment* (`:has`) rather than by position: the view's widget order is the MDS's
+// business and may differ per repository.
+.pw-host ::ng-deep {
+  // The form's own chrome around the views — the "show extended fields" switch.
+  es-mds-editor-core > *:not(.mds-views) { display: none; }
+
+  // A view without the preview widget has nothing to contribute at all.
+  es-mds-editor-view:not(:has(es-mds-editor-widget-preview)) { display: none; }
+
+  // The view's own heading ("Allg. Informationen") names the form, not the picture.
+  .view-wrapper > .heading-container { display: none; }
+
+  // Inside the remaining view: every other widget of it.
+  .content > *:not(:has(es-mds-editor-widget-preview)) { display: none; }
+
+  // The picture itself, sized for the panel instead of the repository's own layout.
+  es-mds-editor-widget-preview img { max-width: 100%; height: auto; }
+}
