@@ -5,49 +5,50 @@
   overflow: hidden;
 }
 
+// The brand bar: the logo on a light surface, the utility icons drawn in the brand blue.
 .topbar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  background: var(--es-blue);
-  color: #fff;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--es-surface);
+  color: var(--es-blue);
+  border-bottom: 1px solid var(--es-border);
   flex: 0 0 auto;
 }
-.logo { width: 22px; height: 22px; border-radius: 4px; background: #fff; }
-.title { font-weight: 600; font-size: 14px; flex: 1; }
+.logo { width: 30px; height: 30px; flex: 0 0 auto; }
+.title { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; flex: 1; }
 
 // The topbar's icon buttons: the utility options (Verlauf, Einstellungen) and close, sharing one
 // square shape so they read as one group.
 .close,
 .topbar-btn {
-  background: rgba(255, 255, 255, 0.15);
+  background: none;
   border: none;
-  color: #fff;
-  width: 26px; height: 26px;
-  border-radius: 6px;
-  font-size: 13px;
+  color: var(--es-blue);
+  width: 32px; height: 32px;
+  border-radius: 8px;
   line-height: 1;
   flex: 0 0 auto;
-}
-.close:hover,
-.topbar-btn:hover { background: rgba(255, 255, 255, 0.3); }
-
-.topbar-btn {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
 }
+.close:hover,
+.topbar-btn:hover { background: rgba(0, 59, 124, 0.08); }
+
+.topbar-btn { position: relative; }
 // The open view's icon stays highlighted, since these two are reached from anywhere.
-.topbar-btn.is-active { background: rgba(255, 255, 255, 0.45); }
+.topbar-btn.is-active { background: rgba(0, 59, 124, 0.14); }
+
+.close svg { width: 20px; height: 20px; display: block; }
 
 .tb-icon {
   display: block;
-  width: 16px; height: 16px;
+  width: 20px; height: 20px;
 
-  ::ng-deep svg { width: 16px; height: 16px; display: block; }
+  ::ng-deep svg { width: 20px; height: 20px; display: block; }
 }
 
 // Badges pinned to the icon's top-right corner: the history entry count, and the dot marking a
@@ -55,12 +56,12 @@
 .topbar-btn .count,
 .topbar-btn .dot {
   position: absolute;
-  top: -3px; right: -3px;
-  border: 1px solid var(--es-blue);
+  top: 0; right: 0;
+  border: 1px solid var(--es-surface);
 }
 .topbar-btn .count {
-  background: #fff;
-  color: var(--es-blue);
+  background: var(--es-blue);
+  color: #fff;
   font-size: 9px;
   font-weight: 700;
   line-height: 1;

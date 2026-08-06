@@ -1,6 +1,6 @@
 <header class="topbar">
-  <img class="logo" src="../icons/32.png" alt="" (error)="hideBrokenLogo($event)" />
-  <span class="title">Edu-Sharing</span>
+  <img class="logo" src="../icons/128.png" alt="" (error)="hideBrokenLogo($event)" />
+  <span class="title">edu-sharing</span>
 
   <!-- The utility sections (Einstellungen): always reachable, so they sit here as icons next to
        the close button instead of in the main menu. -->
@@ -15,7 +15,10 @@
     </button>
   }
 
-  <button class="close" title="Schließen" aria-label="Schließen" (click)="close()">✕</button>
+  <button class="close" title="Schließen" aria-label="Schließen" (click)="close()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg>
+  </button>
 </header>
 
 <es-status-bar></es-status-bar>
