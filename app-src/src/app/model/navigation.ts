@@ -124,6 +124,15 @@ export interface AppSection {
   /** Listed as an entry of the main menu. Without it the section is only reachable from the flow. */
   menu?: boolean;
   /**
+   * The section's screen is a plain list — rows to choose from, or entries to look at. No field to
+   * fill in, no embedded editor or selector, and no footer action of its own (only `curation`,
+   * `editing` and `quality` have one, see ActionBarService.actions).
+   *
+   * That is what makes the bottom edge free for something else: the session bar shows on exactly
+   * these screens (see UserBarComponent.visible). Elsewhere the bottom edge belongs to the screen.
+   */
+  plain?: boolean;
+  /**
    * Highlighted in the main menu — for the entry the current page makes the obvious next step. A
    * predicate when that only holds sometimes: an entry reporting that it found *nothing* is not a
    * next step, so it drops the highlight rather than shouting about an empty finding.
@@ -214,6 +223,8 @@ export const SECTIONS: readonly AppSection[] = [
         ? 'Es wird noch geprüft, ob diese Seite bereits ein Inhalt im Repository ist.'
         : 'Zu dieser Seite wurde kein Inhalt erkannt — sie kann über „Inhalt erschließen“ erschlossen werden.',
     loading: (c) => !c.hasActiveNode && c.recognizingContent,
+    // Its screen offers the same kind of rows as the menu — a choice of what to do with the content.
+    plain: true,
     // It leads the menu and is its centre — the panel exists for the content of the open page, and
     // everything below this row is what else can be done. It is *highlighted* only while there
     // actually is a content: with nothing found the row is a report, not an offer.
@@ -227,6 +238,8 @@ export const SECTIONS: readonly AppSection[] = [
     description: 'Einen neuen Inhalt erstellen oder einen vorhandenen einfügen',
     visible: requiresLogin(),
     menu: true,
+    // Two rows to pick from — the ways of adding something. The forms are behind them.
+    plain: true,
     tabs: [{ id: 'add-content', label: 'Hinzufügen' }]
   },
   {
@@ -267,6 +280,8 @@ export const SECTIONS: readonly AppSection[] = [
     description: 'Zuletzt erstellte oder bearbeitete Inhalte erneut öffnen',
     visible: requiresLogin(),
     menu: true,
+    // The saved contents, as a list to look through.
+    plain: true,
     tabs: [{ id: 'history', label: 'Verlauf' }]
   },
 

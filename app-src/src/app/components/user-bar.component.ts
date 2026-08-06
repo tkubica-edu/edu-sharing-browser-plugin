@@ -20,16 +20,22 @@ export class UserBarComponent {
   private readonly navigation = inject(NavigationService);
 
   /**
-   * When the bar is shown. Two conditions today:
+   * When the bar is shown. Two conditions:
    *
    * - **The panel may work with the repository at all** — `authorized`, so it also covers the case
    *   where no login is required (the additional web component); then there is no user, but the
    *   answer "as a guest" is just as much part of the picture as a name would be.
-   * - **The main menu**, for now. Deeper in a flow the bottom edge belongs to that flow's actions
-   *   (ActionBarComponent), and the session is not what the user is working on there.
+   * - **A screen that is a plain list** — see AppSection.plain. On a form, an editor or an embedded
+   *   selector the bottom edge belongs to the screen (and in three sections to the action bar, which
+   *   would otherwise sit under a second footer).
+   *
+   * The main menu is named separately because it is the root view and has no entry in `SECTIONS`,
+   * so there is nothing there to carry the flag.
    */
   protected readonly visible = computed(
-    () => this.auth.authorized() && this.navigation.section() === 'menu',
+    () =>
+      this.auth.authorized() &&
+      (this.navigation.section() === 'menu' || !!this.navigation.currentSection()?.plain),
   );
 
   /**
