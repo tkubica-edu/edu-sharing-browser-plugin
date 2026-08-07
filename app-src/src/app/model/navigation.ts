@@ -179,7 +179,7 @@ export const SECTIONS: readonly AppSection[] = [
       c.hasActiveNode
         ? 'Inhalt erkannt'
         : c.recognizingContent
-          ? 'Inhalt wird geprüft'
+          ? 'Geöffneter Inhalt wird erkannt …'
           : 'Kein Inhalt erkannt',
     // The menu row announces the *finding*; the screen it opens is the choice of what to do with
     // it — and that choice is also where the Verlauf and die eigenen Inhalte lead.
@@ -197,7 +197,7 @@ export const SECTIONS: readonly AppSection[] = [
     enabled: (c) => c.hasActiveNode,
     disabledHint: (c) =>
       c.recognizingContent
-        ? 'Es wird noch geprüft, ob diese Seite bereits ein Inhalt im Repository ist.'
+        ? 'Die aktuelle Seite wird mit „edu-sharing“ abgeglichen.'
         : 'Zu dieser Seite wurde kein Inhalt erkannt — sie kann über „Inhalt erschließen“ erschlossen werden.',
     loading: (c) => !c.hasActiveNode && c.recognizingContent,
     // Its screen offers the same kind of rows as the menu — a choice of what to do with the content.

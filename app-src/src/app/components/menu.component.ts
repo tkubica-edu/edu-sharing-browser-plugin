@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 
 import { IconDirective } from '../directives/icon.directive';
 import { SectionId } from '../model/navigation';
@@ -6,6 +6,21 @@ import { CurationService } from '../services/curation.service';
 import { HistoryService } from '../services/history.service';
 import { NavigationService, SectionView } from '../services/navigation.service';
 import { OptionIconService } from '../services/option-icon.service';
+
+/**
+ * The Material icon for a content's `mediatype`, as the repository types it. A page recognised in the
+ * browser is a `link`, which is the fallback too: the panel's content is the open page unless the
+ * repository says otherwise.
+ */
+const TYPE_ICONS: Record<string, string> = {
+  link: 'language',
+  file: 'draft',
+  document: 'description',
+  image: 'image',
+  video: 'movie',
+  audio: 'volume_up',
+  folder: 'folder'
+};
 
 // The main menu: the sections marked `menu`, filtered to those visible for the current conditions.
 // It is the start view everywhere — nothing opens itself, so what is on offer stays visible.
@@ -83,23 +98,24 @@ export class MenuComponent {
     return (section.disabled && section.disabledHint) || section.description;
   }
 
-  /** The preview URL that failed to load, so it is not tried again; null while none has. */
-  private readonly brokenPreview = signal<string | null>(null);
-
   /**
-   * The content's picture (see CurationService.contentPreview), or null when the card falls back to the
-   * section's icon. `isIcon` decides how it is rendered, not whether — see the stylesheet.
+   * What the card says under the title, where the card has something to say about itself: whether the
+   * content is one the repository already holds or one that exists only here, and while the
+   * recognition runs, that it runs. `null` leaves the line to entryDescription — the case where there
+   * is no content and the reason for that is the more useful text.
    */
-  protected readonly contentPreview = computed(() => {
-    const preview = this.curation.contentPreview();
-    return preview && preview.url !== this.brokenPreview() ? preview : null;
-  });
-
-  /**
-   * Fall back to the icon when the preview cannot be loaded — a foreign URL, or one this session may
-   * not read. Remembered by URL, so the next content is tried on its own merits.
-   */
-  protected dropBrokenPreview(url: string): void {
-    this.brokenPreview.set(url);
+  protected cardNote(section: SectionView): string | null {
+    if (this.unsaved()) return 'Neuer Inhalt';
+    if (this.contentTitle()) return 'Bestehender Inhalt';
+    return section.loading ? this.entryDescription(section) : null;
   }
+
+  /**
+   * The kind of content the tile shows. Its *type*, not a picture of it: a screenshot of the open page
+   * says nothing the page itself does not already say, and at tile size it is unreadable — whereas the
+   * icon is legible and tells the one thing the card cannot say in words.
+   */
+  protected readonly typeIcon = computed(
+    () => TYPE_ICONS[this.curation.previewNode()?.mediatype ?? ''] ?? 'language',
+  );
 }

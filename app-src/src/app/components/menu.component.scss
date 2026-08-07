@@ -13,13 +13,13 @@
 // ---- The centre: the content of the open page ----------------------------
 
 .focus {
-  padding: 14px 16px 16px;
+  padding: 12px 14px 14px;
   border-bottom: 1px solid var(--es-border);
 }
 
 .focus-label {
-  margin: 0 0 10px;
-  font-size: 14px;
+  margin: 0 0 8px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--es-text);
 }
@@ -28,9 +28,9 @@
 .focus-card {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
-  padding: 12px;
+  padding: 10px;
   background: var(--es-surface);
   border: 1px solid var(--es-border);
   border-radius: var(--es-radius);
@@ -48,74 +48,58 @@
   }
 }
 
-// The picture's place, kept whether or not there is one: a preview, else the section's icon.
+// The type icon's place — and the spinner's while the recognition runs, so the card keeps its shape
+// through both states instead of growing a second slot for the wait.
 .fc-tile {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  width: 56px;
-  height: 56px;
-  border-radius: var(--es-radius);
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
   background: var(--es-hint-bg);
   color: var(--es-blue);
 }
 
 .fc-icon {
-  display: block;
-  width: 30px;
-  height: 30px;
-
-  ::ng-deep svg { width: 30px; height: 30px; display: block; }
+  font-size: 24px;
+  line-height: 1;
 }
 
-// Fitted, not cropped: a preview is landscape and the tile is square, so filling it would leave a
-// slice of the picture. Letterboxed against the tile's tint it stays recognisable.
-.fc-thumb {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+.fc-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
 
-  // The repository's bare type icon rather than a picture — shown at icon size (contentPreview).
-  &.is-icon {
-    width: 30px;
-    height: 30px;
-  }
-}
-
-.fc-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-
+// Read as a name, not as a headline: the card is one entry among the menu's, and a title set much
+// larger than the rows makes the panel top-heavy. Long titles (a URL as a name) wrap, up to three
+// lines — past that the card would push the menu off the panel.
 .fc-title {
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.3;
-  word-break: break-word;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .fc-desc { font-size: 12px; color: var(--es-muted); line-height: 1.35; }
 
-// The content is not in the repository yet. A chip rather than a description line, and in the
-// panel's warning tint, so it reads as a state of the card and not as more prose about it. Keeps its
-// colour on the disabled card — that is exactly the case it exists for.
-.fc-state {
-  align-self: flex-start;
-  font-size: 11px;
+// The card's state (see MenuComponent.cardNote) — in the panel's blue, so it reads as a label on the
+// content above it rather than as another sentence about it. Keeps its colour on the disabled card:
+// while the recognition runs, that line is the whole report.
+.fc-note {
+  font-size: 11.5px;
   font-weight: 600;
-  line-height: 1;
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: #fff7e6;
-  border: 1px solid #f0d492;
-  color: #7a5b00;
+  line-height: 1.35;
+  color: var(--es-blue);
 }
 
-// The card has no chevron, so the spinner sits at the trailing edge on its own.
+// Sits in the tile, at the size of the icon it stands in for.
 .fc-spinner {
-  flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  border: 2px solid #b6c6d8;
+  width: 26px;
+  height: 26px;
+  border: 3px solid #cddff0;
   border-top-color: var(--es-blue);
   border-radius: 50%;
   animation: mi-spin 0.9s linear infinite;

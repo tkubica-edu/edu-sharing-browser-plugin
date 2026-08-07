@@ -8,33 +8,28 @@
       <button class="focus-card" (click)="navigation.go(cardTarget(section))"
               [disabled]="cardDisabled(section)"
               [attr.title]="contentTitle()">
+        <!-- The tile carries the kind of content, not a picture of it (see typeIcon) — while the
+             recognition runs it carries the spinner instead, since that is what the tile stands for
+             then: the content that is not known yet. -->
         <span class="fc-tile">
-          @if (contentPreview(); as preview) {
-            <img class="fc-thumb" [class.is-icon]="preview.isIcon" [src]="preview.url" alt=""
-                 (error)="dropBrokenPreview(preview.url)" />
+          @if (section.loading) {
+            <span class="fc-spinner" aria-hidden="true"></span>
           } @else {
-            <span class="fc-icon" [innerHTML]="icons.icon(section.id)"></span>
+            <i class="fc-icon" [esIcon]="typeIcon()"></i>
           }
         </span>
 
         <span class="fc-main">
           <!-- Named by the content once there is one; else the section's label reports the state. -->
           <span class="fc-title">{{ contentTitle() ?? section.label }}</span>
-          <!-- A curated content that has no node yet looks like any other here — hence said outright
-               (see MenuComponent.unsaved). -->
-          @if (unsaved()) {
-            <span class="fc-state">Noch nicht gespeichert</span>
-          }
-          <!-- Without a content the card reports the state, so the line under it is the reason
-               there is none (see entryDescription). -->
-          @if (!contentTitle()) {
+          <!-- One line under the title: the card's own state where there is one (cardNote), else
+               the reason there is no content (entryDescription). -->
+          @if (cardNote(section); as note) {
+            <span class="fc-note">{{ note }}</span>
+          } @else {
             <span class="fc-desc">{{ entryDescription(section) }}</span>
           }
         </span>
-
-        @if (section.loading) {
-          <span class="fc-spinner" aria-hidden="true"></span>
-        }
       </button>
     </section>
   }
