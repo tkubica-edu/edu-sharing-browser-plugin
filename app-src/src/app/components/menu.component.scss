@@ -124,7 +124,15 @@
 // ---- The other options ---------------------------------------------------
 
 // The rows come from the shared mixin, so the panel's menus stay one look.
-.menu-list { @include m.menu-rows; }
+.menu-list {
+  @include m.menu-rows;
+
+  // One height for all four entries: the main menu is a list of equals, and rows of differing
+  // height read as a ranking. Their descriptions are written to fit a line (see AppSection), so the
+  // height is set rather than left to the text. A disabled entry is the exception — its hint is
+  // longer than a line and is written out in full (entryDescription), so that row may grow.
+  .menu-item { min-height: 66px; }
+}
 
 // The Verlauf entry's count badge.
 .mi-count {

@@ -7,7 +7,7 @@ import { NavigationService } from '../../services/navigation.service';
 import { LoginComponent } from '../login.component';
 import { NodesSelectorComponent, NodesSelectorOption } from '../nodes-selector.component';
 
-// "Eigene Inhalte": the shared nodes selector, restricted to the user's own workspace. The picked
+// "Meine Inhalte": the shared nodes selector, restricted to the user's own workspace. The picked
 // node becomes the app's active content — from there the flow is the same as for a detected or a
 // history node, so the *Inhaltsoptionen* screen offers the ways on — which is why the selector's own
 // button is labelled after that screen: picking a content here opens the choice, not the content.

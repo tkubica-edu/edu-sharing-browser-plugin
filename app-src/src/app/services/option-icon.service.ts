@@ -55,12 +55,29 @@ const ICONS: Record<IconId, string> = {
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.09a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
 };
 
+/**
+ * The main menu's entries carry Google Material icons instead of the drawn ones above — the panel's
+ * rows then read like the rest of edu-sharing. Names are Material Symbols ligatures, rendered by the
+ * `esIcon` directive. Only the menu is covered; everything else stays with the SVGs.
+ */
+const MATERIAL_ICONS: Partial<Record<IconId, string>> = {
+  'add-content': 'add_notes',
+  curation: 'quick_reference',
+  'own-content': 'folder_open',
+  history: 'history'
+};
+
 // The icons, shared by the three places that render navigation entries: the main menu, the tab bar
 // and the topbar (the utility sections, see AppSection.topbar).
 @Injectable({ providedIn: 'root' })
 export class OptionIconService {
   private readonly sanitizer = inject(DomSanitizer);
   private readonly cache = new Map<IconId, SafeHtml>();
+
+  /** The entry's Material icon name for {@link IconDirective}, or null where there is none. */
+  material(id: IconId): string | null {
+    return MATERIAL_ICONS[id] ?? null;
+  }
 
   /** The entry's inline icon. Trusted: the SVGs are the constants above, not user input. */
   icon(id: IconId): SafeHtml {

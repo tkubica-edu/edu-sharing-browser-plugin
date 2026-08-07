@@ -209,7 +209,7 @@ export const SECTIONS: readonly AppSection[] = [
   {
     id: 'add-content',
     label: 'Inhalt hinzufügen',
-    description: 'Einen neuen Inhalt erstellen oder einen vorhandenen einfügen',
+    description: 'Inhalt erstellen oder hochladen',
     visible: requiresLogin(),
     menu: true,
     // Two rows to pick from — the ways of adding something. The forms are behind them.
@@ -219,7 +219,7 @@ export const SECTIONS: readonly AppSection[] = [
   {
     id: 'curation',
     label: 'Inhalt erschließen',
-    description: 'Aus der aktuellen Webseite Metadaten erzeugen',
+    description: 'Aktuelle Seite als Inhalt erfassen',
     visible: requiresLogin(),
     // Two kinds of page have nothing to erschließen, and the entry stays listed on both to say which:
     //
@@ -242,8 +242,8 @@ export const SECTIONS: readonly AppSection[] = [
   },
   {
     id: 'own-content',
-    label: 'Eigene Inhalte',
-    description: 'Einen eigenen Inhalt im Repository auswählen',
+    label: 'Meine Inhalte',
+    description: 'Eigene Inhalte und Status aufrufen',
     visible: requiresLogin(),
     menu: true,
     tabs: [{ id: 'own-content', label: 'Auswählen' }]
@@ -251,7 +251,7 @@ export const SECTIONS: readonly AppSection[] = [
   {
     id: 'history',
     label: 'Verlauf',
-    description: 'Zuletzt erstellte oder bearbeitete Inhalte erneut öffnen',
+    description: 'Letzte Aktivitäten anzeigen',
     visible: requiresLogin(),
     menu: true,
     // The saved contents, as a list to look through.

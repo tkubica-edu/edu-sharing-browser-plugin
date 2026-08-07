@@ -47,7 +47,11 @@
              repository) — see AppSection.enabled and entryDescription. -->
         <button class="menu-item" (click)="navigation.go(section.id)"
                 [disabled]="section.disabled">
-          <span class="mi-icon" [innerHTML]="icons.icon(section.id)"></span>
+          @if (icons.material(section.id); as glyph) {
+            <i class="mi-icon" [esIcon]="glyph"></i>
+          } @else {
+            <span class="mi-icon" [innerHTML]="icons.icon(section.id)"></span>
+          }
           <span class="mi-main">
             <span class="mi-title">
               {{ section.label }}

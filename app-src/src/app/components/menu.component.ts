@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
+import { IconDirective } from '../directives/icon.directive';
 import { SectionId } from '../model/navigation';
 import { CurationService } from '../services/curation.service';
 import { HistoryService } from '../services/history.service';
@@ -14,6 +15,7 @@ import { OptionIconService } from '../services/option-icon.service';
 // card with the content's picture and name — the rest are rows. See AppSection.focal.
 @Component({
   selector: 'es-menu',
+  imports: [IconDirective],
   templateUrl: './menu.component.html',
   styleUrl: './menu.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
