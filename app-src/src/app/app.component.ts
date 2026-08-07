@@ -39,6 +39,7 @@ import { MetadataScreenComponent } from './components/screens/metadata-screen.co
 import { NewDocumentScreenComponent } from './components/screens/new-document-screen.component';
 import { OwnContentScreenComponent } from './components/screens/own-content-screen.component';
 import { PreviewScreenComponent } from './components/screens/preview-screen.component';
+import { QualityCheckScreenComponent } from './components/screens/quality-check-screen.component';
 import { ShareScreenComponent } from './components/screens/share-screen.component';
 import { UsagesScreenComponent } from './components/screens/usages-screen.component';
 
@@ -56,7 +57,8 @@ const DISCARD_PROMPT =
     ContentOptionsScreenComponent, CurationScreenComponent, CurationPreviewScreenComponent,
     FindContentScreenComponent,
     NewDocumentScreenComponent, AddMaterialScreenComponent, OwnContentScreenComponent,
-    MetadataScreenComponent, PreviewScreenComponent, CollectionsScreenComponent,
+    QualityCheckScreenComponent, MetadataScreenComponent, PreviewScreenComponent,
+    CollectionsScreenComponent,
     UsagesScreenComponent, ShareScreenComponent
   ],
   templateUrl: './app.component.html',

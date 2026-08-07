@@ -6,7 +6,11 @@
             [attr.aria-selected]="navigation.screen() === tab.id"
             [disabled]="tab.disabled" [title]="tab.disabled ? tab.disabledHint ?? '' : tab.label"
             (click)="navigation.goTab(tab.id)">
-      <span class="t-icon" [innerHTML]="icons.icon(tab.id)"></span>
+      @if (icons.material(tab.id); as glyph) {
+        <i class="t-icon" [esIcon]="glyph"></i>
+      } @else {
+        <span class="t-icon" [innerHTML]="icons.icon(tab.id)"></span>
+      }
       <span class="t-label">{{ tab.label }}</span>
     </button>
   }

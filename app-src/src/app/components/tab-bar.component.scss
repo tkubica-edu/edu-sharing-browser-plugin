@@ -45,9 +45,13 @@
   border-bottom-color: var(--es-blue);
 }
 
+// Either an inline SVG or a Material ligature (esIcon) — the same box for both, with the font size
+// filling it for the glyph.
 .t-icon {
   display: block;
   width: 18px; height: 18px;
+  font-size: 18px;
+  line-height: 18px;
 
   ::ng-deep svg { width: 18px; height: 18px; display: block; }
 }

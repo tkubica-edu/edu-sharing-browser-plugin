@@ -39,6 +39,8 @@ const ICONS: Record<IconId, string> = {
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M14.5 5.5l4 4"/></svg>',
   quality:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.4-3.2 8-8 9-4.8-1-8-4.6-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>',
+  'quality-check':
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>',
   metadata:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
   collections:
@@ -56,15 +58,19 @@ const ICONS: Record<IconId, string> = {
 };
 
 /**
- * The main menu's entries carry Google Material icons instead of the drawn ones above — the panel's
- * rows then read like the rest of edu-sharing. Names are Material Symbols ligatures, rendered by the
- * `esIcon` directive. Only the menu is covered; everything else stays with the SVGs.
+ * Google Material icons instead of the drawn ones above — the panel's rows and tabs then read like
+ * the rest of edu-sharing. Names are Material Symbols ligatures, rendered by the `esIcon` directive.
+ * Whatever is not listed here keeps its SVG, so the two can be mixed while this spreads.
  */
 const MATERIAL_ICONS: Partial<Record<IconId, string>> = {
+  // The main menu's entries.
   'add-content': 'add_notes',
   curation: 'quick_reference',
   'own-content': 'folder_open',
-  history: 'history'
+  history: 'history',
+  // The Qualitätsprüfung's two views.
+  'quality-check': 'check_circle',
+  metadata: 'sell'
 };
 
 // The icons, shared by the three places that render navigation entries: the main menu, the tab bar

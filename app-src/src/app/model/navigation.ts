@@ -3,9 +3,9 @@
 // flow. The same registry feeds the main menu, the tab bar, the navigation guards and the
 // landing logic.
 //
-// Three of the sections are the big steps of the content flow — Bearbeitungsmodus →
-// Qualitätssicherung → Inhaltsübersicht. They are not listed in the main menu: they are entered
-// from a node (created, selected or detected), see ContentFlowService.
+// Four of the sections are the big steps of the content flow — Bearbeitungsmodus →
+// Qualitätsprüfung → Einsortieren und weiterleiten → Inhaltsübersicht. They are not listed in the
+// main menu: they are entered from a node (created, selected or detected), see ContentFlowService.
 
 /** A leaf screen: exactly one component is rendered for it. */
 export type ScreenId =
@@ -21,6 +21,7 @@ export type ScreenId =
   | 'history'
   | 'content-options'
   | 'find-content'
+  | 'quality-check'
   | 'metadata'
   | 'collections'
   | 'preview'
@@ -43,6 +44,7 @@ export type SectionId =
   | 'content-options'
   | 'editing'
   | 'quality'
+  | 'collections'
   | 'overview';
 
 /** A snapshot of the world a section's (or tab's) visibility is decided against. */
@@ -262,12 +264,14 @@ export const SECTIONS: readonly AppSection[] = [
   // ---- Reached from a menu section ---------------------------------------
   {
     id: 'curation-preview',
-    label: 'Vorschau und Titel',
+    // Named after the step it belongs to, not after what it shows: the Erschließung runs and then
+    // asks for the picture and the title, and the user never left "Inhalt erschließen" for that.
+    label: 'Inhalt erschließen',
     description: 'Vorschaubild und Titel des erschlossenen Inhalts prüfen',
     // The second step of "Inhalt erschließen", reached the moment its run succeeded: a curated
     // result that has no node yet is exactly the state this step is about (see
     // CurationPreviewScreenComponent). Once the content is saved it falls away — the picture and the
-    // title are then the node's own, and the Qualitätssicherung is where they are edited.
+    // title are then the node's own, and the Qualitätsprüfung is where they are edited.
     visible: requiresLogin((c) => c.hasCuratedDraft),
     tabs: [{ id: 'curation-preview', label: 'Vorschau' }]
   },
@@ -315,22 +319,27 @@ export const SECTIONS: readonly AppSection[] = [
   },
   {
     id: 'quality',
-    label: 'Qualitätssicherung',
-    description: 'Metadaten prüfen und den Inhalt einsortieren',
+    label: 'Qualitätsprüfung',
+    description: 'Qualität prüfen und Metadaten bearbeiten',
     // An active node OR a fresh /generate result (the node is created on the first save).
     visible: requiresLogin((c) => c.hasEditableMetadata),
+    // Two views of the same content, in the order they are worked through: what the content's
+    // quality is, and then the metadata that is edited off the back of it. The footer walks between
+    // them (Zurück / Weiter), so the two are one step and not two — see ActionBarService.
     tabs: [
-      { id: 'metadata', label: 'Metadaten bearbeiten' },
-      // Assigning needs a node, which a freshly curated content only gets on its first save. The
-      // tab is shown from the start anyway — disabled it says "save first", whereas appearing only
-      // after the save would make the editor look like a different screen before and after saving.
-      {
-        id: 'collections',
-        label: 'Inhalte zuordnen',
-        enabled: (c) => c.hasActiveNode,
-        disabledHint: 'Erst die Metadaten speichern — danach kann der Inhalt zugeordnet werden.'
-      }
+      { id: 'quality-check', label: 'Qualität' },
+      { id: 'metadata', label: 'Metadaten' }
     ]
+  },
+  {
+    id: 'collections',
+    label: 'Einsortieren und weiterleiten',
+    description: 'Den Inhalt in Sammlungen einsortieren und weiterleiten',
+    // Its own step rather than a sub step of the Qualitätsprüfung: assigning acts on a *saved* node
+    // and is what follows the editing, not a second view of it. Hence it needs a node — a freshly
+    // curated content reaches it once the Qualitätsprüfung's save has written one.
+    visible: requiresLogin((c) => c.hasActiveNode),
+    tabs: [{ id: 'collections', label: 'Einsortieren' }]
   },
   {
     id: 'overview',

@@ -13,7 +13,7 @@ import { SessionResumeService } from './session-resume.service';
  *
  * The branch is the connector: a node that opens in a connector is being edited there, so editing
  * it means accompanying that editor (Bearbeitungsmodus) — everything else has nothing to edit
- * outside the panel and goes straight to the Qualitätssicherung. The check needs the repository's
+ * outside the panel and goes straight to the Qualitätsprüfung. The check needs the repository's
  * connector list, so it is asynchronous; {@link deciding} lets the caller show that.
  */
 @Injectable({ providedIn: 'root' })
@@ -30,7 +30,7 @@ export class ContentFlowService {
   readonly deciding = signal(false);
 
   /**
-   * "Bearbeitungsmodus": that step when the node opens in a connector, else Qualitätssicherung.
+   * "Bearbeitungsmodus": that step when the node opens in a connector, else Qualitätsprüfung.
    *
    * The connector is asked for twice over: whether there is one at all decides the branch, and the
    * one there is provides the URL that *opens* the content in it — the same for every way in (a
@@ -63,9 +63,14 @@ export class ContentFlowService {
     }
   }
 
-  /** "Qualitätssicherung": the metadata step, straight from a node — nothing to decide here. */
+  /** "Qualitätsprüfung": the quality and metadata step, straight from a node — nothing to decide. */
   showQuality(): void {
     this.navigation.go('quality');
+  }
+
+  /** "Einsortieren und weiterleiten": the step that follows it, and needs the node it saved. */
+  showCollections(): void {
+    this.navigation.go('collections');
   }
 
   /** "Inhaltsübersicht": the last big step, straight from a node. */

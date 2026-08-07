@@ -400,7 +400,7 @@ export class CurationService {
   }
 
   /**
-   * The node the Qualitätssicherung's metadata editor works on: the content's own once there is one,
+   * The node the Qualitätsprüfung's metadata editor works on: the content's own once there is one,
    * else the draft the curation stands for (see {@link draftNode}). `null` when there is neither —
    * the editor then falls back to editing a plain values map, without the widgets that need a node.
    *
@@ -427,8 +427,8 @@ export class CurationService {
    * (see `previewSrcOf`), so it is read at the one moment it matters — when the step hands over
    * ({@link applyDraftValues}) or when the save runs ({@link writePendingPreview}).
    *
-   * Two steps register: the Vorschau ("Vorschau und Titel") and, once its editor runs on a node, the
-   * Qualitätssicherung. Only one of them is ever mounted, so the single slot is enough.
+   * Two steps register: the preview step of "Inhalt erschließen" and, once its editor runs on a node, the
+   * Qualitätsprüfung. Only one of them is ever mounted, so the single slot is enough.
    */
   registerDraftPreviewSource(source: DraftPreviewSource): void {
     this.draftPreviewSource = source;

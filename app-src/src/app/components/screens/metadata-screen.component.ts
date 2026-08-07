@@ -13,8 +13,8 @@ import { MdsPreviewWidgetComponent } from '../mds-preview-widget.component';
 import { MetadataEditor } from '../metadata-editor';
 import { WloCanvasComponent } from '../wlo-canvas.component';
 
-// "Metadaten bearbeiten", the first sub step of the Qualitätssicherung: embeds a metadata editor
-// and hands its commit()/ready() to the footer (ActionBarService), which owns the save button.
+// "Metadaten", the second view of the Qualitätsprüfung: embeds a metadata editor and hands its
+// commit()/ready() to the footer (ActionBarService), whose way on carries the save.
 //
 // Which editor is embedded depends on the repository config: the WLO canvas replaces the
 // edu-sharing MDS editor while the additional web component is enabled. Both implement
@@ -63,9 +63,21 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
    */
   protected readonly editorNode = this.curation.editorNode();
 
+  /**
+   * Settles the write the footer is waiting on; null while none is in flight.
+   *
+   * The editor announces its values through an output rather than returning them, so the commit and
+   * the write it leads to are two hops apart — this carries the answer back across them.
+   */
+  private settleSave: ((saved: boolean) => void) | null = null;
+
   /** Stable object, so register/clear pair up by identity. */
   private readonly saveHandler: SaveHandler = {
-    save: () => this.editor()?.commit(),
+    save: () =>
+      new Promise<boolean>((resolve) => {
+        this.settleSave = resolve;
+        this.editor()?.commit();
+      }),
     canSave: computed(() => !!this.editor()?.ready())
   };
 
@@ -84,23 +96,25 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    // A write that never reported back (the editor did not commit) is settled as "not saved", so
+    // the footer action awaiting it ends instead of hanging on a screen that is gone.
+    this.settleSave?.(false);
+    this.settleSave = null;
     this.conditions.editMode.set(false);
     this.actionBar.clearSaveHandler(this.saveHandler);
     this.curation.clearDraftPreviewSource(this.previewSource);
   }
 
   /**
-   * Save, then move on to the next sub step ("Inhalte zuordnen"): saving the metadata is what
-   * finishes this step, so the Qualitätssicherung continues where it leads — also for a node that
-   * existed beforehand (an added material, a document found open), where the next step was open
-   * all along and staying put would leave the save looking like it did nothing.
-   *
-   * The section itself is never left — the footer's "Zur Inhaltsübersicht" is the way out, and the
-   * editor stays editable via the tab bar.
+   * Write the metadata and stay put. Where the flow goes next is the footer's business, not this
+   * screen's — the editor also reaches here through a save control of the canvas's own
+   * (WloCanvasComponent.onMetadataSubmit), and that one saves without meaning to leave.
    */
   protected async save(values: MdsValues): Promise<void> {
-    if (!(await this.curation.save(values))) return;
-    this.navigation.goNextTab();
+    const saved = await this.curation.save(values);
+    const settle = this.settleSave;
+    this.settleSave = null;
+    settle?.(saved);
   }
 
   /** Drop the content's picture when it cannot be loaded; nothing takes its place here. */

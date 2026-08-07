@@ -16,7 +16,7 @@ import { MdsPreviewWidgetComponent, PreviewEditorMode } from '../mds-preview-wid
 // stand-in the curation assembles from the run (CurationService.draftNode).
 //
 // Nothing is saved here. The footer offers the two ways on: dropping the run, or carrying it into the
-// Qualitätssicherung, where the save lives (see ActionBarService). Both of the step's values travel
+// Qualitätsprüfung, where the save lives (see ActionBarService). Both of the step's values travel
 // with it: the title through the editor's own reporting, the picture through the preview source this
 // screen registers — the widget announces it in no other way.
 @Component({

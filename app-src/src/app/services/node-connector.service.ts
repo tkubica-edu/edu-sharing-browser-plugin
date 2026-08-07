@@ -15,7 +15,7 @@ const ONLY_OFFICE_CONNECTOR_ID = 'ONLY_OFFICE';
 // Whether a node is opened *in* a connector (OnlyOffice and friends) rather than merely
 // downloaded — the fact the content flow branches on: a node that opens in a connector is edited
 // there, so the panel accompanies that editing (Bearbeitungsmodus) instead of jumping straight
-// into the Qualitätssicherung.
+// into the Qualitätsprüfung.
 @Injectable({ providedIn: 'root' })
 export class NodeConnectorService {
   private connectors = inject(ConnectorService);

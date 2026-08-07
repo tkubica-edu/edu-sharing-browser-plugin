@@ -88,9 +88,15 @@ export class ContentOptionsScreenComponent {
     options.push(
       {
         section: 'quality',
-        label: 'Qualitätssicherung',
-        description: 'Metadaten anreichern und Sammlungen zuordnen',
+        label: 'Qualitätsprüfung',
+        description: 'Qualität prüfen und Metadaten anreichern',
         run: () => this.flow.showQuality()
+      },
+      {
+        section: 'collections',
+        label: 'Einsortieren und weiterleiten',
+        description: 'Den Inhalt in Sammlungen einsortieren',
+        run: () => this.flow.showCollections()
       },
       {
         section: 'overview',

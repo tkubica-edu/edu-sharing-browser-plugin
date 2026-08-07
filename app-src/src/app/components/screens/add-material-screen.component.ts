@@ -136,7 +136,7 @@ export class AddMaterialScreenComponent implements OnDestroy {
       if (!node) return;
       // Same handover as a newly created document: hydrate the node into the flow (which records
       // it in the history), then enter the big step it calls for — for an added material that is
-      // normally the Qualitätssicherung.
+      // normally the Qualitätsprüfung.
       await this.curation.openNode(node.nodeId);
       // A link brings its own source: the page it points at. The metadata editor erschließt it as
       // it opens, so the form starts from that page instead of from the bare URL the node carries.

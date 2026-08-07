@@ -7,9 +7,12 @@ import { NavigationService } from './navigation.service';
 /**
  * What the metadata screen hands to the footer: how to save, and whether saving is possible
  * right now. `canSave` is a signal, so the footer derives its state instead of being pushed to.
+ *
+ * `save` answers whether the write succeeded, because the footer's action continues on the back of
+ * it — a step that is entered after a failed save would leave the content behind unwritten.
  */
 export interface SaveHandler {
-  save: () => void;
+  save: () => Promise<boolean>;
   canSave: Signal<boolean>;
 }
 
@@ -71,7 +74,7 @@ export class ActionBarService {
         ];
 
       // The preview step of the Erschließung: nothing is written here, so what it offers is the two
-      // ways on — dropping the run altogether, or taking it into the Qualitätssicherung, which is
+      // ways on — dropping the run altogether, or taking it into the Qualitätsprüfung, which is
       // where the save lives. The adjusted picture and title travel with it (applyDraftValues).
       case 'curation-preview':
         return [
@@ -85,7 +88,7 @@ export class ActionBarService {
             }
           },
           {
-            label: 'Zur Qualitätssicherung',
+            label: 'Qualitätsprüfung',
             disabled: false,
             run: async () => {
               // Awaited: the handover reads a picked picture out of the widget, and the next step's
@@ -97,7 +100,7 @@ export class ActionBarService {
         ];
 
       // "Bearbeitungsmodus": the content is being edited in the connector; this hands over to the
-      // Qualitätssicherung when the user is done adjusting it.
+      // Qualitätsprüfung when the user is done adjusting it.
       case 'editing':
         return [
           {
@@ -107,35 +110,50 @@ export class ActionBarService {
           }
         ];
 
-      // "Qualitätssicherung": saving belongs to the metadata sub step (the editor owns the values);
-      // moving on to the last big step is offered from either sub step.
+      // "Qualitätsprüfung": its two views are walked through rather than jumped between, so the
+      // footer carries that walk — "Weiter" out of the Qualität view, "Zurück" out of the Metadaten
+      // one. The tab bar is still on screen; this is the way through the step, not the only one.
+      //
+      // The way out of the section belongs to the Metadaten view — from the Qualität view there is
+      // nothing yet to leave.
       case 'quality': {
-        const onward: FooterAction = {
-          label: 'Zur Inhaltsübersicht',
-          disabled: !this.curation.activeNode(),
-          run: () => this.navigation.go('overview')
-        };
-        if (this.navigation.screen() !== 'metadata') return [onward];
+        if (this.navigation.screen() !== 'metadata') {
+          const next = this.navigation.nextTab();
+          return [
+            {
+              label: 'Weiter',
+              disabled: !next || next.disabled,
+              run: () => this.navigation.goNextTab()
+            }
+          ];
+        }
         const handler = this.saveHandler();
+        // Saving through the additional web component goes through the agent's `/upload`, which
+        // only ever CREATES — there is no endpoint that writes back to a node it made, and the
+        // panel session (a guest) may not edit it either (see WIDGET-REFERENZ.md, "Bestandsinhalte
+        // via Node-ID"). So once it has written one, writing again would produce a SECOND node for
+        // the same content; the way on then only goes on.
+        const written = this.additionalWebComponent.enabled() && this.curation.metadataSaved();
+        const saves = !!handler?.canSave() && !this.curation.metadataLocked() && !written;
         return [
           {
-            // Normally one label throughout: every save writes the same node, so a second wording
-            // would announce a difference there is none.
-            //
-            // With the additional web component there IS one. Saving goes through the agent's
-            // `/upload`, which only ever CREATES — there is no endpoint that writes back to a node
-            // it made, and the panel session (a guest) may not edit it either (see
-            // WIDGET-REFERENZ.md, "Bestandsinhalte via Node-ID"). So saving again produces ANOTHER
-            // node and continues with it; "Erneut speichern" says that before it happens.
-            label: this.curation.saving()
-              ? 'Speichern…'
-              : this.additionalWebComponent.enabled() && this.curation.metadataSaved()
-                ? 'Erneut speichern'
-                : 'Speichern',
-            disabled: !handler?.canSave() || this.curation.metadataLocked(),
-            run: () => handler?.save()
+            label: 'Zurück',
+            kind: 'secondary',
+            disabled: false,
+            run: () => this.navigation.goTab('quality-check')
           },
-          onward
+          {
+            // The Metadaten view has no Speichern of its own for the moment, so the way on carries
+            // the write: the content is saved and the next step entered once that succeeded — and
+            // not at all when it failed, which would leave the content behind unwritten. A content
+            // with nothing to commit simply goes on.
+            label: this.curation.saving() ? 'Speichern…' : 'Inhaltsübersicht',
+            disabled: this.curation.saving() || (!saves && !this.curation.activeNode()),
+            run: async () => {
+              if (saves && !(await handler!.save())) return;
+              this.navigation.go('overview');
+            }
+          }
         ];
       }
 

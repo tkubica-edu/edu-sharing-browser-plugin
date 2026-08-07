@@ -4,3 +4,7 @@
 .fbtn { @include m.fbtn; }
 .fbtn-primary { @include m.fbtn-primary; }
 .fbtn-secondary { @include m.fbtn-secondary; }
+
+// Three actions do not fit the panel's width as equal thirds — no label would have room. Only then
+// does the way back give up its share and size to its own word; a pair still splits evenly.
+.action-bar:has(.fbtn:nth-child(3)) .fbtn-secondary { flex: 0 1 auto; }
