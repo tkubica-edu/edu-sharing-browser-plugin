@@ -16,8 +16,9 @@
   border-bottom: 1px solid var(--es-border);
   flex: 0 0 auto;
 }
-.logo { width: 30px; height: 30px; flex: 0 0 auto; }
-.title { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; flex: 1; }
+// The full logo lockup (hexagons above the wordmark) carries the name, so no separate title text.
+.logo { height: 34px; width: auto; flex: 0 0 auto; }
+.spacer { flex: 1; }
 
 // The topbar's icon buttons: the utility options (Verlauf, Einstellungen) and close, sharing one
 // square shape so they read as one group.
