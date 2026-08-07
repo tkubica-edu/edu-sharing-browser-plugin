@@ -40,6 +40,13 @@ export interface ContentPreview {
  */
 export type NodeSource = 'detected' | 'chosen';
 
+/**
+ * Reads the picture the open step's editor currently shows, as an image source (an object URL for one
+ * the user picked in its preview widget, the preview URL otherwise) — see
+ * {@link CurationService.registerDraftPreviewSource}.
+ */
+export type DraftPreviewSource = () => string | null;
+
 /** The preview image a metadata payload names: `preview_image_url` (agent) or `preview:url` (node). */
 function previewImageOf(payload: Record<string, unknown> | null | undefined): string | null {
   return firstString(payload?.['preview_image_url']) ?? firstString(payload?.['preview:url']);
@@ -54,6 +61,9 @@ function previewImageOf(payload: Record<string, unknown> | null | undefined): st
  * `mediatype`, `properties`), so only those are filled and the cast declares the rest absent. It is
  * a *repository content* (`ccm:io`) whose file is the linked web page — which is what `mediatype`
  * and `type` say, so the usages element and the preview treat it like any other such node.
+ *
+ * `metadataset` is stated for the same reason as on the draft: an MDS editor initialised with a node
+ * resolves its set from the *node*, so a stand-in without one would resolve none at all.
  */
 function toPartialNode(nodeId: string, uploaded: UploadedNode, values: MdsValues): Node {
   return {
@@ -63,6 +73,7 @@ function toPartialNode(nodeId: string, uploaded: UploadedNode, values: MdsValues
     description: uploaded.description ?? undefined,
     type: 'ccm:io',
     mediatype: 'link',
+    metadataset: DEFAULT,
     properties: values,
     access: []
   } as unknown as Node;
@@ -97,6 +108,77 @@ function previewSource(url: string): string {
 }
 
 /**
+ * The image source the preview widget builds for a picture the user just picked in it: an object or
+ * data URL, which exists nowhere but in this browser. Anything else is the widget rendering a picture
+ * that already has a home.
+ */
+function isPickedPicture(src: string): boolean {
+  return src.startsWith('blob:') || src.startsWith('data:');
+}
+
+/** A data URL split into what a node's `preview` states inline: its type and its base64 payload. */
+const INLINE_PICTURE = /^data:([^;,]+);base64,(.*)$/s;
+
+/**
+ * Read an object URL out into a data URL. Needed because a picked picture has to survive as a *value*
+ * rather than as a reference: it goes onto the stand-in node the next step's editor is built from, and
+ * a node states an inline picture as `mimetype` + base64 `data` — see {@link toDraftPreview}.
+ *
+ * `null` when the picture cannot be read; the caller then keeps the object URL, which still renders
+ * for as long as this document lives.
+ */
+async function toDataUrl(src: string): Promise<string | null> {
+  try {
+    const blob = await (await fetch(src)).blob();
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The `preview` a stand-in node states for a picture, in whichever of the two shapes the native
+ * widget can build its image source from:
+ *
+ * - **inline** (`mimetype` + `data`) for a picture the user picked, which exists only in this browser.
+ *   It has to be this shape: to a `preview.url` the widget appends its own parameters
+ *   (`…&crop=true&width=400&height=300`), and neither a data URL nor an object URL can carry those.
+ * - **by URL** for a picture that has an address — then {@link previewSource} makes sure that append
+ *   lands in a query string rather than in the path.
+ */
+function toDraftPreview(src: string | null): Record<string, unknown> | undefined {
+  if (!src) return undefined;
+  const inline = INLINE_PICTURE.exec(src);
+  // `isIcon: false` — the widget shows the picture itself only for a real preview; for an icon it
+  // renders the repository's icon element instead, which needs a node the repository knows.
+  return inline
+    ? { mimetype: inline[1], data: inline[2], isIcon: false, width: 0, height: 0 }
+    : { url: previewSource(src), isIcon: false, width: 0, height: 0 };
+}
+
+/**
+ * Fill in the properties a title widget can be bound to, so the preview step's title field is not
+ * empty whichever of them the view group declares. edu-sharing has two for one thing: `cclom:title`,
+ * the content's title, and `cm:name`, the node's name — which is what its own preview sidebar edits,
+ * and which generated metadata never carries (see RepositoryNodeService.toCreateBody).
+ *
+ * Neither is overwritten where the metadata already has one.
+ */
+function withTitleProperties(values: MdsValues, title: string | null): MdsValues {
+  if (!title) return values;
+  return {
+    'cclom:title': [title],
+    'cm:name': [title],
+    ...values
+  };
+}
+
+/**
  * Assemble the stand-in {@link Node} for a content that has just been curated and has no node in the
  * repository yet — the one the preview step hands to the MDS editor, so the view group's `<preview>`
  * and title widgets have a node to work on (see {@link CurationService.draftNode}).
@@ -105,9 +187,13 @@ function previewSource(url: string): string {
  * rather than off its own inputs: `metadataset` (the editor's `setId` input only applies to a
  * node-less editor, so a draft without it would resolve no metadata set) and `access`
  * (see {@link DRAFT_ACCESS}).
+ *
+ * The set is always the repository default, never the `metadataset` of the agent's payload: that
+ * names the agent's own extraction template (`learning_material.json`), not a set the repository
+ * knows — asking for it 404s and the step stays blank.
  */
-function toDraftNode(values: MdsValues, title: string | null, previewUrl: string | null): Node {
-  return {
+function toDraftNode(values: MdsValues, title: string | null, previewSrc: string | null): Node {
+  let node = {
     ref: { id: DRAFT_NODE_ID, repo: HOME_REPOSITORY },
     name: title ?? DRAFT_NAME,
     title: title ?? undefined,
@@ -116,13 +202,11 @@ function toDraftNode(values: MdsValues, title: string | null, previewUrl: string
     metadataset: DEFAULT,
     aspects: [],
     access: DRAFT_ACCESS,
-    properties: values,
-    // `isIcon: false` — the widget shows the picture itself only for a real preview; for an icon it
-    // renders the repository's icon element instead, which needs a node the repository knows.
-    preview: previewUrl
-      ? { url: previewSource(previewUrl), isIcon: false, width: 0, height: 0 }
-      : undefined
-  } as unknown as Node;
+    properties: withTitleProperties(values, title),
+    preview: toDraftPreview(previewSrc)
+  };
+  console.log(node);
+  return node as unknown as Node;
 }
 
 /**
@@ -211,6 +295,15 @@ export class CurationService {
   /** What the preview step's editor last reported; see {@link reportDraftValues}. */
   private readonly draftValues = signal<MdsValues | null>(null);
 
+  /** Reads the preview step's picture while that step is open; see {@link registerDraftPreviewSource}. */
+  private draftPreviewSource: DraftPreviewSource | null = null;
+
+  /**
+   * The picture the preview step handed over, waiting for a node to be written to; see
+   * {@link writePendingPreview}.
+   */
+  private readonly pendingPreview = signal<string | null>(null);
+
   /** Set once the metadata was written at least once; see {@link metadataSaved}. */
   private readonly saved = signal(false);
 
@@ -262,17 +355,22 @@ export class CurationService {
   );
 
   /**
-   * The content's picture, for wherever it is shown as itself. Three sources, ranked by how much each
+   * The content's picture, for wherever it is shown as itself. Four sources, ranked by how much each
    * says about *this* content; null when none of them has one.
    *
-   * 1. The node's rendered preview — the repository's own picture of a content it holds.
-   * 2. The image the metadata agent found (`preview_image_url`, the page's `og:image`), which is what
+   * 1. A picture the user picked in a step's preview widget, once that step handed it over. It
+   *    outranks the rest because it is a decision rather than a finding — and because it is what the
+   *    save will write, so every view of the content has to agree with it beforehand.
+   * 2. The node's rendered preview — the repository's own picture of a content it holds.
+   * 3. The image the metadata agent found (`preview_image_url`, the page's `og:image`), which is what
    *    a curated content has instead. Read from the editor's metadata *and* from the agent's result,
    *    since {@link editorMetadata} swaps in the node's stored properties on the first save.
-   * 3. The node's type icon (`preview.isIcon`) — true of the kind of material, but not of this one,
+   * 4. The node's type icon (`preview.isIcon`) — true of the kind of material, but not of this one,
    *    so a real image comes first.
    */
   readonly contentPreview = computed<ContentPreview | null>(() => {
+    const picked = this.pendingPreview();
+    if (picked) return { url: picked, isIcon: false };
     const preview = this.previewNode()?.preview;
     if (preview?.url && !preview.isIcon) return { url: preview.url, isIcon: false };
     const found =
@@ -294,12 +392,29 @@ export class CurationService {
    */
   draftNode(): Node | null {
     if (this.metadataAgent.lastRun()?.ok !== true) return null;
-    const preview = this.contentPreview();
     return toDraftNode(
       toMdsEditorValues(this.editorMetadata()),
       this.contentTitle(),
-      preview && !preview.isIcon ? preview.url : null,
+      this.currentPreviewSrc(),
     );
+  }
+
+  /** The content's picture as an image source, dropping a mere type icon — see {@link contentPreview}. */
+  private currentPreviewSrc(): string | null {
+    const preview = this.contentPreview();
+    return preview && !preview.isIcon ? preview.url : null;
+  }
+
+  /**
+   * The node the Qualitätssicherung's metadata editor works on: the content's own once there is one,
+   * else the draft the curation stands for (see {@link draftNode}). `null` when there is neither —
+   * the editor then falls back to editing a plain values map, without the widgets that need a node.
+   *
+   * A method for the same reason as {@link draftNode}: the editor re-initialises on every `nodes`
+   * change, so the caller reads it once as the screen opens.
+   */
+  editorNode(): Node | null {
+    return this.previewNode() ?? this.draftNode();
   }
 
   /**
@@ -313,20 +428,108 @@ export class CurationService {
   }
 
   /**
-   * Write the preview step's edits into the curated result, so every step after it works on them: the
-   * metadata editor opens on the adjusted title and the save writes it.
+   * Let the step that is open say which picture its editor shows, for as long as it is open. Pulled
+   * rather than pushed: the native preview widget announces a picked picture through no output at all
+   * (see `previewSrcOf`), so it is read at the one moment it matters — when the step hands over
+   * ({@link applyDraftValues}) or when the save runs ({@link writePendingPreview}).
    *
-   * It is the agent's payload that is rewritten, because that payload *is* the flow's metadata as long
-   * as there is no node (see {@link editorMetadata}). The display fields are re-derived from the
-   * merged values rather than patched, so the field views stay consistent with them.
+   * Two steps register: the Vorschau ("Vorschau und Titel") and, once its editor runs on a node, the
+   * Qualitätssicherung. Only one of them is ever mounted, so the single slot is enough.
    */
-  applyDraftValues(): void {
+  registerDraftPreviewSource(source: DraftPreviewSource): void {
+    this.draftPreviewSource = source;
+  }
+
+  /** Counterpart of {@link registerDraftPreviewSource}; pairs by identity. */
+  clearDraftPreviewSource(source: DraftPreviewSource): void {
+    if (this.draftPreviewSource === source) this.draftPreviewSource = null;
+  }
+
+  /**
+   * Take everything the preview step holds into the curated result, so the steps after it work on it:
+   * the metadata editor opens on the adjusted title, and the save writes both it and the picture.
+   *
+   * The values go into the agent's payload, because that payload *is* the flow's metadata as long as
+   * there is no node (see {@link editorMetadata}); the display fields are re-derived from the merged
+   * values rather than patched, so the field views stay consistent with them. The picture cannot
+   * travel that way — it is content, not a property — so it is parked until there is a node to write
+   * it to (see {@link writePendingPreview}).
+   */
+  async applyDraftValues(): Promise<void> {
+    // Read before the guard below: a run whose widgets the user never touched still shows a picture,
+    // and that picture is exactly what the step was there to confirm.
+    this.pendingPreview.set(await this.resolveDraftPreview(this.draftPreviewSource?.() ?? null));
     const values = this.draftValues();
     const run = this.metadataAgent.lastRun();
     if (!values || !run?.parsed) return;
     this.draftValues.set(null);
     const raw = { ...run.parsed.raw, ...values };
     this.metadataAgent.restore({ ...run, parsed: this.metadataAgent.parse(raw) });
+  }
+
+  /**
+   * Turn what the preview widget shows into the picture to write after the save.
+   *
+   * An object or data URL is one the user picked in the widget and exists nowhere else — that source
+   * is taken as it is. Anything else is the widget's own rendering of the node preview, scaled and
+   * cache-busted (`…&crop=true&width=400&height=300&dontcache=…`); for that the original URL is used
+   * instead, so the node gets the full picture rather than a 400×300 crop of it.
+   */
+  private draftPreviewOf(src: string | null): string | null {
+    if (!src) return null;
+    return isPickedPicture(src) ? src : this.currentPreviewSrc();
+  }
+
+  /**
+   * {@link draftPreviewOf}, plus reading an object URL out into a data URL: a picked picture has to
+   * travel as a value, because the node the *next* step's editor is built from states it inline
+   * (see {@link toDraftPreview}) — otherwise that step would keep showing the picture the run found
+   * while the save writes the one the user chose.
+   */
+  private async resolveDraftPreview(src: string | null): Promise<string | null> {
+    const picture = this.draftPreviewOf(src);
+    if (!picture?.startsWith('blob:')) return picture;
+    return (await toDataUrl(picture)) ?? picture;
+  }
+
+  /**
+   * A picture the user picked in the editor that is open right now — and *only* that. Unlike
+   * {@link draftPreviewOf} an unchanged picture is not taken: at save time the widget usually shows
+   * the node's own preview, and writing that back onto the same node would upload it to itself on
+   * every save.
+   */
+  private pickedPreviewSrc(): string | null {
+    const src = this.draftPreviewSource?.() ?? null;
+    return src && isPickedPicture(src) ? src : null;
+  }
+
+  /**
+   * Write the picture the preview step carried over onto the node that has just been saved. It could
+   * not be written any earlier: a preview is content, so it goes to a node (`changePreview`) — and
+   * until this save there was none, the step worked on a stand-in (see {@link draftNode}).
+   *
+   * The picture can also come from the editor that is open right now: since its own preview widget
+   * runs on a node too, a picture picked *there* has the same nowhere to go. It is read at save time
+   * for the same reason the preview step's is read at hand-over — the widget reports it in no other
+   * way. That one wins: it is the later of the two, chosen after seeing what the preview step passed
+   * on, and only a deliberately picked picture counts as one at all (see {@link pickedPreviewSrc}).
+   *
+   * A bonus, never a reason for the save to fail: the metadata is written either way, and a source
+   * that will not hand the picture out (or a repository that refuses it) simply leaves the node with
+   * whatever preview it derived itself. Cleared as soon as it is attempted, so a second save does not
+   * upload it again over a picture that may have been replaced in the meantime.
+   */
+  private async writePendingPreview(nodeId: string): Promise<void> {
+    const src = this.pickedPreviewSrc() ?? this.pendingPreview();
+    if (!src) return;
+    this.pendingPreview.set(null);
+    try {
+      const image = await (await fetch(src)).blob();
+      if (!image.type.startsWith('image/')) return;
+      await this.repositoryNodes.setPreview(nodeId, image);
+    } catch {
+      /* the node keeps the preview the repository derived for it */
+    }
   }
 
   /** Clear the whole flow for a fresh analysis. */
@@ -527,6 +730,8 @@ export class CurationService {
       this.setActiveNode(saved.nodeId, saved.name);
       this.resultPending.set(false);
       this.saved.set(true);
+      // Before the reload below, so the node comes back already carrying it.
+      await this.writePendingPreview(saved.nodeId);
       // Load the full hydrated node once: its properties re-seed the editor (so re-editing
       // uses the stored values) and the node itself feeds the preview.
       try {
@@ -573,6 +778,10 @@ export class CurationService {
       }
       this.resultPending.set(false);
       this.saved.set(true);
+      // The preview step's picture is dropped rather than written here: the agent creates the node
+      // with its own privileges, so the panel session (a guest) may not upload a preview to it. What
+      // the page itself offers the agent already has — `preview_image_url` travelled in the payload.
+      this.pendingPreview.set(null);
       if (outcome.node?.nodeId) await this.applyUploadedNode(outcome.node, values);
       return true;
     } catch (cause: unknown) {
@@ -705,6 +914,7 @@ export class CurationService {
   private resetNodeState(): void {
     this.resultPending.set(false);
     this.draftValues.set(null);
+    this.pendingPreview.set(null);
     this.saved.set(false);
     this.activeNode.set(null);
     this.nodeSource.set(null);

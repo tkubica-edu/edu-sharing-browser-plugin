@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
+import { SectionId } from '../model/navigation';
 import { CurationService } from '../services/curation.service';
 import { HistoryService } from '../services/history.service';
 import { NavigationService, SectionView } from '../services/navigation.service';
@@ -37,6 +38,37 @@ export class MenuComponent {
 
   /** The card's headline once there is a content. */
   protected readonly contentTitle = this.curation.contentTitle;
+
+  /**
+   * The content shown on the card exists only in the panel — curated, but never written to the
+   * repository. Said on the card, because it otherwise looks exactly like one for a saved content:
+   * same picture, same title. What is missing is the node behind them, and closing the panel loses it.
+   */
+  protected readonly unsaved = this.curation.hasUnsavedWork;
+
+  /**
+   * The step an unsaved draft belongs to, while there is one and it can be entered — `null` otherwise.
+   * Checked against the registry rather than assumed, so the card never offers a target
+   * {@link NavigationService.go} would refuse.
+   */
+  private readonly draftStep = computed<SectionId | null>(() =>
+    this.unsaved() && this.navigation.isVisible('curation-preview') ? 'curation-preview' : null,
+  );
+
+  /**
+   * Where the card leads. Normally into the section it stands for; while it carries an unsaved draft
+   * back into that draft's own step — its picture and title are all there is of the content, and that
+   * step is where they are worked on. Inhaltsoptionen could do nothing with it: everything it offers
+   * acts on a node, which is exactly what a draft does not have yet.
+   */
+  protected cardTarget(section: SectionView): SectionId {
+    return this.draftStep() ?? section.id;
+  }
+
+  /** …and the card is enterable then, even though its own section is not (it wants a node). */
+  protected cardDisabled(section: SectionView): boolean {
+    return this.draftStep() ? false : section.disabled;
+  }
 
   /**
    * What an entry says under its title. For one that cannot be entered that is the reason why —

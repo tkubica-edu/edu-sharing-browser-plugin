@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { HOME_REPOSITORY, Node, NodeService } from 'ngx-edu-sharing-api';
+import { HOME_REPOSITORY, Node, NodeService, NodeServiceUnwrapped } from 'ngx-edu-sharing-api';
 
 import { MdsValues, toMdsValues } from '../util/mds-values';
 
@@ -20,6 +20,9 @@ export interface NodeSummary {
 @Injectable({ providedIn: 'root' })
 export class RepositoryNodeService {
   private readonly nodes = inject(NodeService);
+  // The generated NodeV1Service (exported as NodeServiceUnwrapped) — the NodeService wrapper does
+  // not cover the preview upload.
+  private readonly nodesUnwrapped = inject(NodeServiceUnwrapped);
 
   /** Create a child (`ccm:io`) in the user's inbox with the given MDS properties. */
   async createInInbox(values: MdsValues): Promise<NodeSummary> {
@@ -52,6 +55,26 @@ export class RepositoryNodeService {
       this.nodes.editNodeMetadata(nodeId, body, { versionComment: 'METADATA_UPDATE' })
     );
     return { nodeId: node.ref.id, name: node.name };
+  }
+
+  /**
+   * Set the node's preview picture — a multipart upload that REPLACES whatever preview it has, and
+   * the only way to give a node a picture of its own: a preview is content, not a property, so it
+   * cannot travel with the metadata (see {@link CurationService.writePendingPreview}).
+   *
+   * No version is created for it: the picture belongs to the metadata being written, not to a new
+   * revision of the document.
+   */
+  async setPreview(nodeId: string, image: Blob): Promise<void> {
+    await firstValueFrom(
+      this.nodesUnwrapped.changePreview({
+        repository: HOME_REPOSITORY,
+        node: nodeId,
+        mimetype: image.type || 'image/png',
+        createVersion: false,
+        body: { image }
+      })
+    );
   }
 
   /**

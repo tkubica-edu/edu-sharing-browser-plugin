@@ -1,6 +1,8 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject, viewChild
+} from '@angular/core';
 
-import { CurationService } from '../../services/curation.service';
+import { CurationService, DraftPreviewSource } from '../../services/curation.service';
 import { MdsValues } from '../../util/mds-values';
 import { MdsPreviewWidgetComponent } from '../mds-preview-widget.component';
 
@@ -13,7 +15,9 @@ import { MdsPreviewWidgetComponent } from '../mds-preview-widget.component';
 // stand-in the curation assembles from the run (CurationService.draftNode).
 //
 // Nothing is saved here. The footer offers the two ways on: dropping the run, or carrying it into the
-// Qualitätssicherung, where the save lives (see ActionBarService).
+// Qualitätssicherung, where the save lives (see ActionBarService). Both of the step's values travel
+// with it: the title through the editor's own reporting, the picture through the preview source this
+// screen registers — the widget announces it in no other way.
 @Component({
   selector: 'es-curation-preview-screen',
   imports: [MdsPreviewWidgetComponent],
@@ -21,8 +25,14 @@ import { MdsPreviewWidgetComponent } from '../mds-preview-widget.component';
   styleUrl: './curation-preview-screen.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class CurationPreviewScreenComponent {
+export class CurationPreviewScreenComponent implements OnInit, OnDestroy {
   private readonly curation = inject(CurationService);
+
+  private readonly widget = viewChild(MdsPreviewWidgetComponent);
+
+  /** Stable function, so register/clear pair up by identity. */
+  private readonly previewSource: DraftPreviewSource = () =>
+    this.widget()?.currentPreviewSrc() ?? null;
 
   /**
    * The node the editor works on, read ONCE as the screen is built: it is derived from the metadata
@@ -30,6 +40,14 @@ export class CurationPreviewScreenComponent {
    * node that kept tracking would rebuild the form on every keystroke.
    */
   protected readonly draftNode = this.curation.draftNode();
+
+  ngOnInit(): void {
+    this.curation.registerDraftPreviewSource(this.previewSource);
+  }
+
+  ngOnDestroy(): void {
+    this.curation.clearDraftPreviewSource(this.previewSource);
+  }
 
   /** Hand every change to the curation, which applies it when this step is left. */
   protected onValuesChange(values: MdsValues): void {

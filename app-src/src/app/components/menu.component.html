@@ -5,8 +5,8 @@
     <section class="focus">
       <h2 class="focus-label">Geöffneter Inhalt</h2>
 
-      <button class="focus-card" (click)="navigation.go(section.id)"
-              [disabled]="section.disabled"
+      <button class="focus-card" (click)="navigation.go(cardTarget(section))"
+              [disabled]="cardDisabled(section)"
               [attr.title]="contentTitle()">
         <span class="fc-tile">
           @if (contentPreview(); as preview) {
@@ -20,6 +20,11 @@
         <span class="fc-main">
           <!-- Named by the content once there is one; else the section's label reports the state. -->
           <span class="fc-title">{{ contentTitle() ?? section.label }}</span>
+          <!-- A curated content that has no node yet looks like any other here — hence said outright
+               (see MenuComponent.unsaved). -->
+          @if (unsaved()) {
+            <span class="fc-state">Noch nicht gespeichert</span>
+          }
           <!-- Without a content the card reports the state, so the line under it is the reason
                there is none (see entryDescription). -->
           @if (!contentTitle()) {

@@ -4,7 +4,8 @@ import {
 } from '@angular/core';
 import { DEFAULT, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 
-import { MdsValues, toMdsEditorValues } from '../util/mds-values';
+import { MdsValues } from '../util/mds-values';
+import { forMdsEditor, previewSrcOf } from '../util/mds-node';
 import { loadWebComponentBundle } from '../services/web-component-bundle.service';
 
 const EDITOR_TAG = 'edu-sharing-mds-editor-wrapper';
@@ -19,7 +20,7 @@ const EDITOR_TAG = 'edu-sharing-mds-editor-wrapper';
  *   reported via {@link MdsPreviewWidgetComponent.valuesChange} and committed by the caller. This is
  *   the mode for a node the repository does not have (yet).
  */
-export type PreviewEditorMode = 'inline' | 'nodes';
+export type PreviewEditorMode = 'inline' | 'nodes' | 'form';
 
 /**
  * MDS view group whose form contains the native `<preview>` widget.
@@ -30,22 +31,6 @@ export type PreviewEditorMode = 'inline' | 'nodes';
  * hidden. A metadata set without that group renders nothing at all, silently.
  */
 const PREVIEW_GROUP = 'browser_extension_preview';
-
-/**
- * The node in the shape the MDS machinery requires, which is stricter than the `Node` type says: every
- * widget reduces over the property it is bound to and calls `.filter()` on the value, so a scalar
- * property throws inside the bundle and the whole form fails to render. The app does hand out such
- * nodes — a content the repository will not return is substituted by a stand-in built from the agent's
- * payload (`CurationService.applyStoredEntry`). `aspects` and `access` are reduced over likewise.
- */
-function forMdsEditor(node: Node): Node {
-  return {
-    ...node,
-    properties: toMdsEditorValues(node.properties),
-    aspects: node.aspects ?? [],
-    access: node.access ?? []
-  };
-}
 
 /** The wrapper element, typed for the inputs we set. */
 interface MdsEditorElement extends HTMLElement {
@@ -70,7 +55,8 @@ interface MdsEditorElement extends HTMLElement {
  *
  * What the user changes here is *not* saved by this component. In `inline` mode the preview widget
  * writes the picture to the node itself; everything else is reported through {@link valuesChange} and
- * is the caller's to commit — embedded mode hides the wrapper's own save.
+ * is the caller's to commit — embedded mode hides the wrapper's own save. The picture is read back by
+ * {@link MdsPreviewWidgetComponent.currentPreviewSrc}, since it travels through no output at all.
  */
 @Component({
   selector: 'es-mds-preview-widget',
@@ -93,7 +79,7 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
   readonly setId = input(DEFAULT);
 
   /** How the group's widgets are rendered — see {@link PreviewEditorMode}. */
-  readonly editorMode = input<PreviewEditorMode>('inline');
+  readonly editorMode = input<PreviewEditorMode>('form');
 
   /**
    * The current values of the group's widgets, on every change. A SUBSET of the node's properties:
@@ -113,6 +99,11 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
   private readonly onValuesChange = (event: Event): void => {
     this.valuesChange.emit((event as CustomEvent).detail as MdsValues);
   };
+
+  /** The picture the group's preview widget currently shows — see {@link previewSrcOf}. */
+  currentPreviewSrc(): string | null {
+    return previewSrcOf(this.element);
+  }
 
   constructor() {
     // Same as MdsEditorComponent: every input is set as a property BEFORE the element is appended

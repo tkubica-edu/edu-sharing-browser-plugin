@@ -95,6 +95,21 @@
 
 .fc-desc { font-size: 12px; color: var(--es-muted); line-height: 1.35; }
 
+// The content is not in the repository yet. A chip rather than a description line, and in the
+// panel's warning tint, so it reads as a state of the card and not as more prose about it. Keeps its
+// colour on the disabled card — that is exactly the case it exists for.
+.fc-state {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #fff7e6;
+  border: 1px solid #f0d492;
+  color: #7a5b00;
+}
+
 // The card has no chevron, so the spinner sits at the trailing edge on its own.
 .fc-spinner {
   flex: 0 0 auto;

@@ -87,8 +87,10 @@ export class ActionBarService {
           {
             label: 'Zur Qualitätssicherung',
             disabled: false,
-            run: () => {
-              this.curation.applyDraftValues();
+            run: async () => {
+              // Awaited: the handover reads a picked picture out of the widget, and the next step's
+              // editor is built from the node that picture goes on.
+              await this.curation.applyDraftValues();
               this.navigation.go('quality');
             }
           }

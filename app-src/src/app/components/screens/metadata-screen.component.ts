@@ -5,7 +5,7 @@ import { MdsValues } from '../../util/mds-values';
 import { ActionBarService, SaveHandler } from '../../services/action-bar.service';
 import { AdditionalWebComponentService } from '../../services/additional-web-component.service';
 import { ConditionsService } from '../../services/conditions.service';
-import { CurationService } from '../../services/curation.service';
+import { CurationService, DraftPreviewSource } from '../../services/curation.service';
 import { MetadataAgentService } from '../../services/metadata-agent.service';
 import { NavigationService } from '../../services/navigation.service';
 import { MdsEditorComponent } from '../mds-editor.component';
@@ -55,20 +55,38 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
    */
   protected readonly sourceUrl = this.curation.takeExtractionUrl();
 
+  /**
+   * The node the MDS editor works on, read ONCE for the same reason as `sourceUrl`: the wrapper
+   * re-initialises whenever its `nodes` change, so a node that kept tracking would rebuild the form
+   * on every keystroke. Without it the editor falls back to editing a plain values map — and its
+   * `<preview>` widget, which insists on a node, would not render at all.
+   */
+  protected readonly editorNode = this.curation.editorNode();
+
   /** Stable object, so register/clear pair up by identity. */
   private readonly saveHandler: SaveHandler = {
     save: () => this.editor()?.commit(),
     canSave: computed(() => !!this.editor()?.ready())
   };
 
+  /**
+   * Lets the save pick up a picture the user swapped in the editor's own preview widget. Stable
+   * function, so register/clear pair up by identity — the same arrangement the preview step makes
+   * (CurationService.registerDraftPreviewSource).
+   */
+  private readonly previewSource: DraftPreviewSource = () =>
+    this.mdsEditor()?.currentPreviewSrc() ?? null;
+
   ngOnInit(): void {
     this.conditions.editMode.set(true);
     this.actionBar.registerSaveHandler(this.saveHandler);
+    this.curation.registerDraftPreviewSource(this.previewSource);
   }
 
   ngOnDestroy(): void {
     this.conditions.editMode.set(false);
     this.actionBar.clearSaveHandler(this.saveHandler);
+    this.curation.clearDraftPreviewSource(this.previewSource);
   }
 
   /**

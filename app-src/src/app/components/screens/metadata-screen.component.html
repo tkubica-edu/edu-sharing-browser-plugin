@@ -57,7 +57,10 @@
                        [sourceUrl]="sourceUrl"
                        (save)="save($event)"></es-wlo-canvas>
       } @else {
-        <es-mds-editor [metadata]="metadata" (save)="save($event)"></es-mds-editor>
+        <!-- The node, where the content has one to give: the group's native widgets (`<preview>`)
+             are hidden without it — see MdsEditorComponent.node. -->
+        <es-mds-editor [metadata]="metadata" [node]="editorNode"
+                       (save)="save($event)"></es-mds-editor>
       }
     </section>
   }
