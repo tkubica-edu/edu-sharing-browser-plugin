@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
-import { AuthenticationService, LoginInfo } from 'ngx-edu-sharing-api';
+import { AuthenticationService, LoginInfo, User, UserService } from 'ngx-edu-sharing-api';
 
 import { APP_CONFIG, toApiRootUrl } from '../config';
 import { BOOT_ROOT_URL } from '../app.config';
@@ -16,6 +16,7 @@ const RESTORE_TIMEOUT_MS = 8000;
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly authentication = inject(AuthenticationService);
+  private readonly userApi = inject(UserService);
   private readonly browserExtension = inject(BrowserExtensionService);
   private readonly bootRootUrl = inject(BOOT_ROOT_URL);
   private readonly additionalWebComponent = inject(AdditionalWebComponentService);
@@ -25,6 +26,12 @@ export class AuthService {
   /** True for a valid, non-guest repository session. */
   readonly loggedIn = signal(false);
   readonly username = signal<string | null>(null);
+  /**
+   * The signed-in user's person record, fetched once the session is established — it carries the
+   * profile the user is named by (first/last name), which the login name alone does not. Null while
+   * it is still being fetched, and whenever the request fails: {@link username} is what remains.
+   */
+  readonly currentUser = signal<User | null>(null);
   readonly error = signal<string | null>(null);
   /** True when the repository URL was edited to differ from the bootstrapped one. */
   readonly needsReload = signal(false);
@@ -131,12 +138,29 @@ export class AuthService {
     this.loggedIn.set(true);
     this.username.set(username);
     this.error.set(null);
+    void this.loadCurrentUser();
   }
 
   private applyLogout(error: string | null): void {
     this.loggedIn.set(false);
     this.username.set(null);
+    this.currentUser.set(null);
     this.error.set(error);
+  }
+
+  /**
+   * Fetch the person behind the session. Best-effort and never awaited by the login: the session is
+   * valid either way, and everything that shows a name falls back to the login name.
+   */
+  private async loadCurrentUser(): Promise<void> {
+    try {
+      const entry = await firstValueFrom(
+        this.userApi.observeCurrentUser().pipe(timeout(RESTORE_TIMEOUT_MS)),
+      );
+      this.currentUser.set(entry?.person ?? null);
+    } catch {
+      this.currentUser.set(null);
+    }
   }
 
   private describeError(cause: unknown): string {

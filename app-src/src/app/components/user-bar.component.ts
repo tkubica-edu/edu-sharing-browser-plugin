@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
+import { AuthorityNamePipe } from '../pipes/authority-name.pipe';
 import { AuthService } from '../services/auth.service';
 import { NavigationService } from '../services/navigation.service';
 
@@ -13,11 +14,13 @@ import { NavigationService } from '../services/navigation.service';
   selector: 'es-user-bar',
   templateUrl: './user-bar.component.html',
   styleUrl: './user-bar.component.scss',
+  providers: [AuthorityNamePipe],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UserBarComponent {
   private readonly auth = inject(AuthService);
   private readonly navigation = inject(NavigationService);
+  private readonly authorityName = inject(AuthorityNamePipe);
 
   /**
    * When the bar is shown:
@@ -43,9 +46,17 @@ export class UserBarComponent {
 
   /** What the bar says, in the two states it has. */
   protected readonly title = computed(() => (this.guest() ? 'Gastzugang' : 'Angemeldet'));
-  protected readonly subtitle = computed(() =>
-    this.guest() ? 'Kein Login erforderlich' : this.auth.username() || '–',
-  );
+  /**
+   * Who the session belongs to, said the way the repository says it everywhere else — the profile's
+   * name via {@link AuthorityNamePipe}, not the login name. The login name is the fallback the pipe
+   * itself ends on, and what is shown while the person record is still on its way (or did not come).
+   */
+  protected readonly subtitle = computed(() => {
+    if (this.guest()) return 'Kein Login erforderlich';
+    const user = this.auth.currentUser();
+    const name = user ? this.authorityName.transform(user) : null;
+    return (name === 'invalid' ? null : name) || this.auth.username() || '–';
+  });
 
   /** The row's tooltip: what folding it out would offer. */
   protected readonly hint = computed(() => {
