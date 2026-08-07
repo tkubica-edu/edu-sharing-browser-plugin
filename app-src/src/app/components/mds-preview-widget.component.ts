@@ -17,8 +17,10 @@ const EDITOR_TAG = 'edu-sharing-mds-editor-wrapper';
  *   its own save for the picture, which writes straight to the node. For a node the repository
  *   holds.
  * - `nodes` — the widgets as a form, edited like any other. Nothing writes by itself; the values are
- *   reported via {@link MdsPreviewWidgetComponent.valuesChange} and committed by the caller. This is
- *   the mode for a node the repository does not have (yet).
+ *   reported via {@link MdsPreviewWidgetComponent.valuesChange} and committed by the caller. For a
+ *   node the repository holds.
+ * - `form` — the same form, minus everything the wrapper only does for a node it can ask the
+ *   repository about. The mode for a stand-in — see `EDITOR_MODE_FOR_DRAFT`.
  */
 export type PreviewEditorMode = 'inline' | 'nodes' | 'form';
 

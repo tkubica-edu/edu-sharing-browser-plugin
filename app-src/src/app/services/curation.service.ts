@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { CollectionServiceUnwrapped, DEFAULT, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 import { firstValueFrom } from 'rxjs';
 
+import { DRAFT_NODE_ID } from '../util/mds-node';
 import { MdsValues, firstString, toMdsEditorValues } from '../util/mds-values';
 import { errorMessage } from '../util/errors';
 import { renderLink } from '../util/repository-links';
@@ -78,13 +79,6 @@ function toPartialNode(nodeId: string, uploaded: UploadedNode, values: MdsValues
     access: []
   } as unknown as Node;
 }
-
-/**
- * Stands where a node id belongs on the draft node below. It identifies nothing in the repository —
- * the content does not exist there yet — so no request must ever be built from it; it is only there
- * because the MDS machinery reads `ref.id` while rendering.
- */
-const DRAFT_NODE_ID = '-draft-';
 
 /** Name of a draft whose metadata carries no title yet. Never written anywhere. */
 const DRAFT_NAME = 'Neuer Inhalt';

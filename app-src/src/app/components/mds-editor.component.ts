@@ -5,7 +5,7 @@ import {
 import { DEFAULT, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 
 import { MdsValues, toMdsEditorValues } from '../util/mds-values';
-import { forMdsEditor, previewSrcOf } from '../util/mds-node';
+import { EDITOR_MODE_FOR_DRAFT, forMdsEditor, isDraftNode, previewSrcOf } from '../util/mds-node';
 import { MetadataEditor, MetadataSeed } from './metadata-editor';
 import { loadWebComponentBundle } from '../services/web-component-bundle.service';
 
@@ -146,7 +146,9 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
       // Node mode. Both modes emit the FULL live values of the rendered group via
       // currentValuesChange (the instance maps every widget's value, not a diff against the node),
       // so commit() and the save path are the same either way.
-      element.editorMode = 'nodes';
+      // A stand-in renders in the draft's mode: the form is the same, but the wrapper stops asking
+      // the repository about a node it does not have (see EDITOR_MODE_FOR_DRAFT).
+      element.editorMode = isDraftNode(node) ? EDITOR_MODE_FOR_DRAFT : 'nodes';
       element.nodes = [forMdsEditor(node)];
       // The node is already in hand, and a stand-in is one the repository could not hand back at
       // all — re-fetching it would fail rather than improve anything.

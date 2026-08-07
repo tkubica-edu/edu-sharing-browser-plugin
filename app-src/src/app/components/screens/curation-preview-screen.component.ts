@@ -3,8 +3,9 @@ import {
 } from '@angular/core';
 
 import { CurationService, DraftPreviewSource } from '../../services/curation.service';
+import { EDITOR_MODE_FOR_DRAFT } from '../../util/mds-node';
 import { MdsValues } from '../../util/mds-values';
-import { MdsPreviewWidgetComponent } from '../mds-preview-widget.component';
+import { MdsPreviewWidgetComponent, PreviewEditorMode } from '../mds-preview-widget.component';
 
 // The second step of "Inhalt erschließen": the picture and the title of what was just read off the
 // page, before anything of it is written.
@@ -40,6 +41,9 @@ export class CurationPreviewScreenComponent implements OnInit, OnDestroy {
    * node that kept tracking would rebuild the form on every keystroke.
    */
   protected readonly draftNode = this.curation.draftNode();
+
+  /** The step always works on the stand-in, so it always renders in its mode. */
+  protected readonly editorMode: PreviewEditorMode = EDITOR_MODE_FOR_DRAFT;
 
   ngOnInit(): void {
     this.curation.registerDraftPreviewSource(this.previewSource);

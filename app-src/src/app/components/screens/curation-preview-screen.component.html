@@ -6,11 +6,12 @@
     </p>
   </section>
 
-  <!-- The view group renders both the picture and the title; `nodes` mode, because the draft has no
-       node behind it that a widget could write to on its own (see MdsPreviewWidgetComponent). -->
+  <!-- The view group renders both the picture and the title; `form` mode, because the draft has no
+       node behind it — neither one a widget could write to on its own, nor one the repository could
+       be asked about (see EDITOR_MODE_FOR_DRAFT). -->
   @if (draftNode; as node) {
     <section class="es-card preview-card">
-      <es-mds-preview-widget [node]="node" editorMode="nodes"
+      <es-mds-preview-widget [node]="node" [editorMode]="editorMode"
                              (valuesChange)="onValuesChange($event)"></es-mds-preview-widget>
     </section>
   } @else {
