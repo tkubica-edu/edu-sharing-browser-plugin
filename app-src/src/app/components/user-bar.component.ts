@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
+import { IconDirective } from '../directives/icon.directive';
 import { AuthorityNamePipe } from '../pipes/authority-name.pipe';
 import { AuthService } from '../services/auth.service';
 import { NavigationService } from '../services/navigation.service';
@@ -12,6 +13,7 @@ import { NavigationService } from '../services/navigation.service';
 // shell renders it unconditionally.
 @Component({
   selector: 'es-user-bar',
+  imports: [IconDirective],
   templateUrl: './user-bar.component.html',
   styleUrl: './user-bar.component.scss',
   providers: [AuthorityNamePipe],

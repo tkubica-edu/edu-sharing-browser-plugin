@@ -37,8 +37,8 @@
   border-radius: 50%;
   background: var(--es-hint-bg);
   color: var(--es-blue);
-
-  svg { width: 22px; height: 22px; display: block; }
+  // The glyph's own size — an icon font has no box to scale, unlike the SVG this replaced.
+  font-size: 22px;
 }
 
 .ub-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
