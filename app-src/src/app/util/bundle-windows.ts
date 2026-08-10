@@ -1,17 +1,25 @@
 /**
- * Compensation for the one place where the edu-sharing web-component bundle opens a window itself.
+ * Compensation for every place where the edu-sharing web-component bundle opens a window itself.
  *
  * The bundle is a repository app: it builds such URLs from the DOM's base href, which is the
- * *repository* in its own deployment but the **extension** in ours. `<edu-sharing-add-with-connector>`
- * pre-opens a tab on its loading route before creating the node
- * (`window.open(uiService.getLoadingSpinnerUrl())`, i.e. `<base>components/loading`) and navigates
- * that same tab to the connector once the node exists. With our base that first URL is a
- * `chrome-extension://…` path that does not exist, so the tab dies on an extension error page
- * instead of ending up in the editor.
+ * *repository* in its own deployment but the **extension** in ours. So each of them comes out as a
+ * `chrome-extension://…` path that does not exist, and the window dies on an extension error page.
+ * Two of them are reached from the panel:
  *
- * Rewriting the URL to the repository fixes it at the root: the tab opens on the repository's own
- * loading route, and the bundle's later navigation to the connector then happens in a tab that
- * lives on the right origin.
+ * - `<edu-sharing-add-with-connector>` pre-opens a tab on its loading route before creating the node
+ *   (`window.open(uiService.getLoadingSpinnerUrl())`, i.e. `<base>components/loading`) and navigates
+ *   that same tab to the connector once the node exists.
+ * - the native preview widget's "Aus der Suche auswählen" opens the repository's search with a reurl
+ *   (`UIHelper.openSearchWithReurl(…, 'WINDOW')`, i.e. `<base>components/search?…&reurl=WINDOW`) and
+ *   waits for the picked node to come back through `window.opener.postMessage`.
+ *
+ * Rewriting the URL to the repository fixes both at the root: the window opens on the repository's
+ * own route, so the bundle's later navigation happens on the right origin and the session cookie
+ * applies. That is what {@link installBundleWindowRedirect} does, and it is the default for every
+ * such URL.
+ *
+ * A caller can take one of those windows over instead ({@link captureBundleEditorWindow}), for the
+ * case where the panel cannot follow where the window would go.
  */
 
 /** Path the bundle's own routes start with (its `UIConstants.ROUTER_PREFIX`). */
@@ -48,9 +56,54 @@ export function repositoryWindowUrl(rawUrl: string, repositoryUrl: string): stri
 }
 
 /**
+ * Answers a window the bundle wants to open instead of the repository redirect, for the URL it was
+ * asked about. Returning null passes the call on to the redirect.
+ */
+type WindowTakeover = (rawUrl: string) => Window | null;
+
+/**
+ * The takeover currently claiming the bundle's windows, if any. At most one: the screens registering
+ * it are leaves of the navigation, so two are never mounted at once — and two claims on the same
+ * window would have no defined winner anyway.
+ */
+let takeover: WindowTakeover | null = null;
+
+/** The native `window.open`, kept from before the patch so the redirect can call through. */
+let nativeOpen: typeof window.open | null = null;
+
+/** Where the redirect currently sends the bundle's windows; set by the install below. */
+let currentRepositoryUrl: () => string = () => '';
+
+/**
+ * Send every window the bundle opens on one of its own routes to the repository instead of to the
+ * extension, for the rest of the document's life. Idempotent — the first call patches, later ones
+ * only refresh where "the repository" points.
+ *
+ * Not scoped to a screen, unlike the takeover below: this is a correction of the bundle's base href
+ * and belongs to the bundle, whose lifetime is the document's. It is a no-op for every real web URL
+ * (those are passed through untouched), so nothing that does not come from the bundle's own routes
+ * is affected — and the one screen that does not want its window opened at all claims it explicitly.
+ */
+export function installBundleWindowRedirect(repositoryUrl: () => string): void {
+  currentRepositoryUrl = repositoryUrl;
+  if (nativeOpen) return;
+  nativeOpen = window.open;
+  window.open = (url?: string | URL, target?: string, features?: string): Window | null => {
+    const raw = url instanceof URL ? url.href : url ?? '';
+    const rewritten = repositoryWindowUrl(raw, currentRepositoryUrl());
+    // A real web URL (the connector link itself, a permalink) — not ours to interfere with.
+    if (rewritten === null) return nativeOpen!.call(window, url, target, features);
+    // `target`/`features` are the bundle's own and are passed on unchanged: the caller keeps the
+    // handle it expects (the preview widget closes the window it opened), and no `noopener` is added
+    // — the picked node comes back through `window.opener.postMessage`.
+    return takeover?.(raw) ?? nativeOpen!.call(window, rewritten, target, features);
+  };
+}
+
+/**
  * Take over the window the bundle opens for the editor, for as long as a screen embedding such an
- * element is mounted. Returns the undo — patching `window` is global, so it must not outlive that
- * screen.
+ * element is mounted. Returns the undo — the claim is global, so it must not outlive that screen
+ * (the redirect it is registered on stays either way).
  *
  * A tab we cannot reach is worse than no tab: the panel lives in *this* tab and cannot be injected
  * into a new one, so the editor opening there means the user ends up in front of the document
@@ -58,27 +111,23 @@ export function repositoryWindowUrl(rawUrl: string, repositoryUrl: string): stri
  * and the URL the bundle assigns to it goes to `onEditorUrl` instead. The caller then takes its own
  * tab there, where the panel comes back with the page (see ContentFlowService.openNodePage).
  *
- * Only the bundle's *own* (extension-origin) URLs are taken over — those are the ones it builds
- * from our base href and that lead nowhere. A window it opens on a real web URL is passed straight
- * through, so nothing else the bundle might do is affected.
+ * Only the bundle's *own* (extension-origin) URLs reach here — those are the ones it builds from our
+ * base href and that lead nowhere. A window it opens on a real web URL is passed straight through,
+ * so nothing else the bundle might do is affected.
  */
 export function captureBundleEditorWindow(
   repositoryUrl: () => string,
   onEditorUrl: (url: string) => void,
 ): () => void {
-  // The reference itself, not a bound copy: the undo has to put back exactly what was there, or
-  // repeated mount/unmount cycles would leave a stack of wrappers behind.
-  const original = window.open;
-  window.open = (url?: string | URL, target?: string, features?: string): Window | null => {
-    const raw = url instanceof URL ? url.href : url ?? '';
-    if (repositoryWindowUrl(raw, repositoryUrl()) === null) {
-      // A real web URL — not ours to interfere with.
-      return original.call(window, url, target, features);
-    }
-    return stubWindow(repositoryUrl, onEditorUrl);
-  };
+  // Installed from here too, not just by the bundle service: the screen is constructed before the
+  // bundle has finished loading, so this must not depend on which of the two ran first.
+  installBundleWindowRedirect(repositoryUrl);
+  const claim: WindowTakeover = () => stubWindow(repositoryUrl, onEditorUrl);
+  takeover = claim;
   return () => {
-    window.open = original;
+    // Only if it is still ours — a later claim is the one in force, and dropping that one instead
+    // would leave the screen holding it without a takeover.
+    if (takeover === claim) takeover = null;
   };
 }
 

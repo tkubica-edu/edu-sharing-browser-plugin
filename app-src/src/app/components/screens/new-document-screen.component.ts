@@ -43,7 +43,8 @@ export class NewDocumentScreenComponent implements OnDestroy {
   /**
    * Undo for the `window.open` takeover: the dialog's own editor tab is suppressed, because the
    * panel cannot follow into it — the flow takes *this* tab to the editor instead
-   * ({@link ContentFlowService.edit}). This screen only, since patching `window` is global.
+   * ({@link ContentFlowService.edit}). This screen only, since the claim is global; without it the
+   * window would open on the repository, which is what every other bundle window wants.
    *
    * The URL the dialog wanted is only logged. It is not used to navigate: it arrives whenever the
    * dialog gets round to it, while the flow needs the target at a defined moment — and the flow

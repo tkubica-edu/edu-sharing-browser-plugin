@@ -2,6 +2,7 @@ import { Injectable, Signal, inject, signal } from '@angular/core';
 import browser from 'webextension-polyfill';
 
 import { errorMessage } from '../util/errors';
+import { installBundleWindowRedirect } from '../util/bundle-windows';
 import { AuthService } from './auth.service';
 import { MetadataAgentApiService } from './metadata-agent-api.service';
 
@@ -93,6 +94,11 @@ export class WebComponentBundleService {
 
   private async loadEntries(bundle: WebComponentBundle): Promise<void> {
     this.publishEnvironment(bundle);
+    // The edu bundle opens windows on its own routes and builds them from the DOM's base href — the
+    // extension here, so they lead nowhere. Redirecting them to the repository is a correction of
+    // that base, so it lives as long as the bundle does rather than being scoped to a screen; see
+    // installBundleWindowRedirect.
+    if (bundle === 'edu') installBundleWindowRedirect(() => this.auth.repositoryUrl());
     const { styles, scripts } = await this.entriesOf(bundle);
     for (const href of styles) this.addLink(href);
     for (const script of scripts) await this.addScript(script);
