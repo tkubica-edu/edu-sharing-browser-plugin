@@ -3,24 +3,10 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { IconDirective } from '../directives/icon.directive';
 import { SectionId } from '../model/navigation';
 import { CurationService } from '../services/curation.service';
+import { ContentCardComponent } from './content-card.component';
 import { HistoryService } from '../services/history.service';
 import { NavigationService, SectionView } from '../services/navigation.service';
 import { OptionIconService } from '../services/option-icon.service';
-
-/**
- * The Material icon for a content's `mediatype`, as the repository types it. A page recognised in the
- * browser is a `link`, which is the fallback too: the panel's content is the open page unless the
- * repository says otherwise.
- */
-const TYPE_ICONS: Record<string, string> = {
-  link: 'language',
-  file: 'draft',
-  document: 'description',
-  image: 'image',
-  video: 'movie',
-  audio: 'volume_up',
-  folder: 'folder'
-};
 
 // The main menu: the sections marked `menu`, filtered to those visible for the current conditions.
 // It is the start view everywhere — nothing opens itself, so what is on offer stays visible.
@@ -30,7 +16,7 @@ const TYPE_ICONS: Record<string, string> = {
 // card with the content's picture and name — the rest are rows. See AppSection.focal.
 @Component({
   selector: 'es-menu',
-  imports: [IconDirective],
+  imports: [ContentCardComponent, IconDirective],
   templateUrl: './menu.component.html',
   styleUrl: './menu.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -40,7 +26,7 @@ export class MenuComponent {
   protected readonly icons = inject(OptionIconService);
   // For the Verlauf entry's count badge.
   protected readonly history = inject(HistoryService);
-  // For the recognised content's own picture and name on the focal card.
+  // For what the focal card says about the content it shows — the card names it itself.
   private readonly curation = inject(CurationService);
 
   /** The centre of the menu, rendered as a card; empty when no focal section applies right now. */
@@ -53,8 +39,8 @@ export class MenuComponent {
     this.navigation.menuSections().filter((section) => !section.focal),
   );
 
-  /** The card's headline once there is a content. */
-  protected readonly contentTitle = this.curation.contentTitle;
+  /** Whether there is a content at all — which decides what the card's note says. */
+  private readonly contentTitle = this.curation.contentTitle;
 
   /**
    * The content shown on the card exists only in the panel — curated, but never written to the
@@ -109,13 +95,4 @@ export class MenuComponent {
     if (this.contentTitle()) return 'Bestehender Inhalt';
     return section.loading ? this.entryDescription(section) : null;
   }
-
-  /**
-   * The kind of content the tile shows. Its *type*, not a picture of it: a screenshot of the open page
-   * says nothing the page itself does not already say, and at tile size it is unreadable — whereas the
-   * icon is legible and tells the one thing the card cannot say in words.
-   */
-  protected readonly typeIcon = computed(
-    () => TYPE_ICONS[this.curation.previewNode()?.mediatype ?? ''] ?? 'language',
-  );
 }

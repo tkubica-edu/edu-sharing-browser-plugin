@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 
 import { Conditions } from '../model/navigation';
+import { AdditionalWebComponentService } from './additional-web-component.service';
 import { AuthService } from './auth.service';
 import { CurationService } from './curation.service';
 import { DebugService } from './debug.service';
@@ -42,6 +43,7 @@ export class ConditionsService {
   private readonly auth = inject(AuthService);
   private readonly curation = inject(CurationService);
   private readonly debug = inject(DebugService);
+  private readonly webComponent = inject(AdditionalWebComponentService);
 
   /** The active browser tab's URL (set by the shell on boot). */
   readonly activeUrl = signal<string | null>(null);
@@ -98,6 +100,10 @@ export class ConditionsService {
   // belongs to. Narrower than the above: a saved node has editable metadata but nothing pending.
   readonly hasCuratedDraft = this.curation.hasUnsavedWork;
 
+  // The repository config's own switch, which decides more than which editor is embedded: it is
+  // also what makes the editorial forwarding a step of the flow (see the `collections` section).
+  readonly additionalWebComponent = this.webComponent.enabled;
+
   /** The snapshot handed to every option's visible() predicate. */
   readonly snapshot = computed<Conditions>(() => ({
     onlyOfficePresent: this.onlyOfficePresent(),
@@ -109,6 +115,7 @@ export class ConditionsService {
     hasEditableMetadata: this.hasEditableMetadata(),
     hasCuratedDraft: this.hasCuratedDraft(),
     editMode: this.editMode(),
-    recognizingContent: this.recognizingContent()
+    recognizingContent: this.recognizingContent(),
+    additionalWebComponent: this.additionalWebComponent()
   }));
 }

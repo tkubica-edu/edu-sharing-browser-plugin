@@ -23,7 +23,8 @@ export type ScreenId =
   | 'find-content'
   | 'quality-check'
   | 'metadata'
-  | 'collections'
+  | 'editorial-forward'
+  | 'personal-storage'
   | 'preview'
   | 'usages'
   | 'share';
@@ -72,6 +73,8 @@ export interface Conditions {
   /** The recognition has not answered yet what this page's content is (PageRecognitionService).
    *  Only once this is false does "no content" mean there is none. */
   recognizingContent: boolean;
+  /** The repository config enabled the additional web component — see AdditionalWebComponentService. */
+  additionalWebComponent: boolean;
 }
 
 /** A text that may depend on the conditions — for an entry that names its own state. */
@@ -326,20 +329,42 @@ export const SECTIONS: readonly AppSection[] = [
     // Two views of the same content, in the order they are worked through: what the content's
     // quality is, and then the metadata that is edited off the back of it. The footer walks between
     // them (Zurück / Weiter), so the two are one step and not two — see ActionBarService.
+    //
+    // The quality view belongs to the additional web component, like the forwarding step does: the
+    // criteria are what an editorial team judges a submitted content by, and where nothing is
+    // submitted there is nobody they are answered for. Without it the step is the Metadaten view
+    // alone — which is why the section itself needs no condition of its own.
     tabs: [
-      { id: 'quality-check', label: 'Qualität' },
+      { id: 'quality-check', label: 'Qualität', visible: (c) => c.additionalWebComponent },
       { id: 'metadata', label: 'Metadaten' }
     ]
   },
   {
     id: 'collections',
     label: 'Einsortieren und weiterleiten',
-    description: 'Den Inhalt in Sammlungen einsortieren und weiterleiten',
-    // Its own step rather than a sub step of the Qualitätsprüfung: assigning acts on a *saved* node
-    // and is what follows the editing, not a second view of it. Hence it needs a node — a freshly
-    // curated content reaches it once the Qualitätsprüfung's save has written one.
-    visible: requiresLogin((c) => c.hasActiveNode),
-    tabs: [{ id: 'collections', label: 'Einsortieren' }]
+    description: 'Den Inhalt an eine Redaktion weiterleiten und in der eigenen Ablage einsortieren',
+    // Editable metadata, NOT a node: this is the last part of the first big step, and the content is
+    // written at the end of it (see ActionBarService) — so a freshly curated content reaches it
+    // before it has a node at all.
+    //
+    // Both of its sub steps are optional (see the tabs), and a step with nothing in it is no step:
+    // where neither applies the section falls away entirely and the flow goes on to the
+    // Inhaltsübersicht, whose entry carries the save then.
+    visible: requiresLogin(
+      (c) => c.hasEditableMetadata && (c.additionalWebComponent || c.hasSession),
+    ),
+    // Forwarding first: it is what the curated content is *for* where the additional web component
+    // is enabled — the personal filing is the private copy on top of it.
+    tabs: [
+      {
+        id: 'editorial-forward',
+        label: 'An Redaktionen weiterleiten',
+        visible: (c) => c.additionalWebComponent
+      },
+      // A session of the user's own, not `loggedIn`: a private filing place is one a *person* has —
+      // the guest session the additional web component brings has none.
+      { id: 'personal-storage', label: 'Persönliche Ablage', visible: (c) => c.hasSession }
+    ]
   },
   {
     id: 'overview',

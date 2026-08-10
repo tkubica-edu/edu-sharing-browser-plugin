@@ -63,9 +63,13 @@ export class ContentFlowService {
     }
   }
 
-  /** "Qualitätsprüfung": the quality and metadata step, straight from a node — nothing to decide. */
+  /**
+   * "Qualitätsprüfung": the quality and metadata step, straight from a node — nothing to decide.
+   * On the Qualität tab: that is what the step is entered for, and the metadata are worked on off
+   * the back of it.
+   */
   showQuality(): void {
-    this.navigation.go('quality');
+    this.navigation.go('quality', { tab: 'quality-check' });
   }
 
   /** "Einsortieren und weiterleiten": the step that follows it, and needs the node it saved. */
@@ -73,9 +77,14 @@ export class ContentFlowService {
     this.navigation.go('collections');
   }
 
-  /** "Inhaltsübersicht": the last big step, straight from a node. */
+  /** "Inhaltsübersicht": the last big step, straight from a node — on its Vorschau tab. */
   showOverview(): void {
-    this.navigation.go('overview');
+    this.navigation.go('overview', { tab: 'preview' });
+  }
+
+  /** "Freigabe": the sharing tab of the Inhaltsübersicht, offered as a step of its own. */
+  showShare(): void {
+    this.navigation.go('overview', { tab: 'share' });
   }
 
   /**

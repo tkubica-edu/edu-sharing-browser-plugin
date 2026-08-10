@@ -3,8 +3,12 @@ import { ChangeDetectionStrategy, Component, output } from '@angular/core';
 import { Collection } from '../services/curation.service';
 import { NodesSelectorComponent, NodesSelectorOption, SelectedNode } from './nodes-selector.component';
 
-// "Einsortieren in Sammlungen": the shared nodes selector configured as a collection picker.
-// The selector owns its apply button, so this component only reports the confirmed choice.
+// The shared nodes selector configured as a collection picker. The selector owns its apply button,
+// so this component only reports the confirmed choice.
+//
+// Nothing embeds it at the moment: the screen it belonged to ("Einsortieren in Sammlungen") is now
+// the "Persönliche Ablage" sub step, whose own component is supplied later — this is what that one
+// is expected to build on, together with CurationService.assignToCollections.
 @Component({
   selector: 'es-collection-selector',
   imports: [NodesSelectorComponent],

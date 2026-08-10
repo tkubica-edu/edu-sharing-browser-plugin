@@ -1,37 +1,16 @@
 <div class="menu">
   <!-- The panel's centre as its own group: a heading, and a card showing the content — its picture and
-       title, or what the recognition reports instead (see AppSection.focal). -->
+       title, or what the recognition reports instead (see AppSection.focal). The card is the shared
+       one; pressing it opens the Inhaltsoptionen, which show it again as "Gewählter Inhalt". -->
   @for (section of focalSections(); track section.id) {
-    <section class="focus">
-      <h2 class="focus-label">Geöffneter Inhalt</h2>
-
-      <button class="focus-card" (click)="navigation.go(cardTarget(section))"
-              [disabled]="cardDisabled(section)"
-              [attr.title]="contentTitle()">
-        <!-- The tile carries the kind of content, not a picture of it (see typeIcon) — while the
-             recognition runs it carries the spinner instead, since that is what the tile stands for
-             then: the content that is not known yet. -->
-        <span class="fc-tile">
-          @if (section.loading) {
-            <span class="fc-spinner" aria-hidden="true"></span>
-          } @else {
-            <i class="fc-icon" [esIcon]="typeIcon()"></i>
-          }
-        </span>
-
-        <span class="fc-main">
-          <!-- Named by the content once there is one; else the section's label reports the state. -->
-          <span class="fc-title">{{ contentTitle() ?? section.label }}</span>
-          <!-- One line under the title: the card's own state where there is one (cardNote), else
-               the reason there is no content (entryDescription). -->
-          @if (cardNote(section); as note) {
-            <span class="fc-note">{{ note }}</span>
-          } @else {
-            <span class="fc-desc">{{ entryDescription(section) }}</span>
-          }
-        </span>
-      </button>
-    </section>
+    <es-content-card heading="Geöffneter Inhalt"
+                     [fallbackTitle]="section.label"
+                     [note]="cardNote(section)"
+                     [description]="entryDescription(section)"
+                     [loading]="section.loading"
+                     [interactive]="true"
+                     [disabled]="cardDisabled(section)"
+                     (activate)="navigation.go(cardTarget(section))" />
   }
 
   <ul class="menu-list">

@@ -2,15 +2,32 @@
 
 :host { display: block; }
 
-.node-title {
-  margin: var(--es-space-2) 0 0;
-  font-size: 13px;
+// The card reaches the panel's edges, like the menu's does — the screen's padding is cancelled for
+// it, and its own bottom hairline is the line the rows below start under.
+es-content-card {
+  display: block;
+  margin: calc(-1 * var(--es-space-4)) calc(-1 * var(--es-space-4)) 0;
+  background: var(--es-surface);
+}
+
+// The link under the title, to the content's page in the repository.
+.details-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  font-size: 12px;
   font-weight: 600;
-  word-break: break-word;
+  color: var(--es-blue);
+
+  svg { width: 13px; height: 13px; }
 }
 
 // The main menu's row look: these ways on are menu options one level down, not form buttons.
 .option-list {
   @include m.menu-rows;
   @include m.menu-rows-full-width;
+
+  // The card above already draws the line the rows start under.
+  border-top: none;
 }

@@ -5,14 +5,22 @@ import { CurationService } from './curation.service';
 import { NavigationService } from './navigation.service';
 
 /**
- * What the metadata screen hands to the footer: how to save, and whether saving is possible
- * right now. `canSave` is a signal, so the footer derives its state instead of being pushed to.
+ * What the metadata screen hands to the footer: how to get the editor's values out of it, and
+ * whether that is possible right now. `canSave` is a signal, so the footer derives its state
+ * instead of being pushed to.
  *
- * `save` answers whether the write succeeded, because the footer's action continues on the back of
- * it — a step that is entered after a failed save would leave the content behind unwritten.
+ * Both ways out answer whether they succeeded, because the footer's action continues on the back of
+ * it — a step that is entered after a failed one would leave the content behind unwritten.
  */
 export interface SaveHandler {
+  /** Commit the editor and WRITE what it holds — for the step that ends with the save. */
   save: () => Promise<boolean>;
+  /**
+   * Commit the editor and hand its values to the flow WITHOUT writing them (see
+   * CurationService.hold) — for leaving the Metadaten view while steps still follow it. The editor
+   * is gone from then on, so this is the one moment its values can still be read.
+   */
+  collect: () => Promise<boolean>;
   canSave: Signal<boolean>;
 }
 
@@ -110,12 +118,13 @@ export class ActionBarService {
           }
         ];
 
-      // "Qualitätsprüfung": its two views are walked through rather than jumped between, so the
-      // footer carries that walk — "Weiter" out of the Qualität view, "Zurück" out of the Metadaten
-      // one. The tab bar is still on screen; this is the way through the step, not the only one.
+      // "Qualitätsprüfung": its views are walked through rather than jumped between, so the footer
+      // carries that walk — "Weiter" out of the Qualität view, "Zurück" out of the Metadaten one.
+      // The tab bar is still on screen; this is the way through the step, not the only one.
       //
       // The way out of the section belongs to the Metadaten view — from the Qualität view there is
-      // nothing yet to leave.
+      // nothing yet to leave. Which is the whole step where the Qualität view does not apply (see
+      // the registry), and the walk is then a single view with the way on under it.
       case 'quality': {
         if (this.navigation.screen() !== 'metadata') {
           const next = this.navigation.nextTab();
@@ -127,35 +136,46 @@ export class ActionBarService {
             }
           ];
         }
-        const handler = this.saveHandler();
-        // Saving through the additional web component goes through the agent's `/upload`, which
-        // only ever CREATES — there is no endpoint that writes back to a node it made, and the
-        // panel session (a guest) may not edit it either (see WIDGET-REFERENZ.md, "Bestandsinhalte
-        // via Node-ID"). So once it has written one, writing again would produce a SECOND node for
-        // the same content; the way on then only goes on.
-        const written = this.additionalWebComponent.enabled() && this.curation.metadataSaved();
-        const saves = !!handler?.canSave() && !this.curation.metadataLocked() && !written;
-        return [
-          {
-            label: 'Zurück',
-            kind: 'secondary',
-            disabled: false,
-            run: () => this.navigation.goTab('quality-check')
-          },
-          {
-            // The Metadaten view has no Speichern of its own for the moment, so the way on carries
-            // the write: the content is saved and the next step entered once that succeeded — and
-            // not at all when it failed, which would leave the content behind unwritten. A content
-            // with nothing to commit simply goes on.
-            label: this.curation.saving() ? 'Speichern…' : 'Inhaltsübersicht',
-            disabled: this.curation.saving() || (!saves && !this.curation.activeNode()),
-            run: async () => {
-              if (saves && !(await handler!.save())) return;
-              this.navigation.go('overview');
+        // Only where the Qualität view is on offer at all (it is not without the additional web
+        // component, see the registry): the way back through a step is a way back to a view, and
+        // one that does not apply is not one — the button would refuse itself.
+        const back: FooterAction[] = this.navigation.tabs().some((tab) => tab.id === 'quality-check')
+          ? [
+              {
+                label: 'Zurück',
+                kind: 'secondary',
+                disabled: false,
+                run: () => this.navigation.goTab('quality-check')
+              }
+            ]
+          : [];
+        // "Einsortieren und weiterleiten" is the rest of this same big step, so the content is not
+        // written on the way there — the editor's values are only taken out of the view that is
+        // about to close (see SaveHandler.collect), and the save waits for the end of the step.
+        // Where that step does not apply at all (neither of its sub steps does), this IS the end of
+        // it and the way on carries the write.
+        if (this.navigation.isVisible('collections')) {
+          const handler = this.saveHandler();
+          return [
+            ...back,
+            {
+              label: 'Einsortieren und weiterleiten',
+              disabled: this.curation.metadataLocked(),
+              run: async () => {
+                if (handler?.canSave() && !(await handler.collect())) return;
+                this.navigation.go('collections');
+              }
             }
-          }
-        ];
+          ];
+        }
+        return [...back, this.finishAction()];
       }
+
+      // "Einsortieren und weiterleiten": the last part of the first big step, and therefore where
+      // the content is written — see {@link finishAction}. Only the way on: the way back is the
+      // topbar's back button, and between the two sub steps it is the tab bar.
+      case 'collections':
+        return [this.finishAction()];
 
       // Every other section owns its own primary action (selector insert, login form, the
       // "Inhaltsoptionen" choice, …).
@@ -163,4 +183,40 @@ export class ActionBarService {
         return [];
     }
   });
+
+  /**
+   * The way out of the first big step and into the Inhaltsübersicht — the one action that writes.
+   *
+   * The content is created here and nowhere earlier: everything the step collected (the quality
+   * criteria, the metadata, and what the sub steps of "Einsortieren und weiterleiten" will collect)
+   * belongs to one content, so it is written once, at the end. The next step is entered only once
+   * that succeeded — going on after a failed save would leave the content behind unwritten.
+   *
+   * Two ways to write it, depending on where the step ends. With the Metadaten view still on screen
+   * the editor commits and its values are written directly; from a later sub step there is no editor
+   * left, so what it handed over on its way out is written (CurationService.saveCollected).
+   *
+   * A content that has nothing left to write simply goes on — see CurationService.hasCollectedValues
+   * and, for the additional web component, `written` below.
+   */
+  private finishAction(): FooterAction {
+    const handler = this.navigation.screen() === 'metadata' ? this.saveHandler() : null;
+    // Saving through the additional web component goes through the agent's `/upload`, which only
+    // ever CREATES — there is no endpoint that writes back to a node it made, and the panel session
+    // (a guest) may not edit it either (see WIDGET-REFERENZ.md, "Bestandsinhalte via Node-ID"). So
+    // once it has written one, writing again would produce a SECOND node for the same content; the
+    // way on then only goes on.
+    const written = this.additionalWebComponent.enabled() && this.curation.metadataSaved();
+    const ready = handler ? handler.canSave() : this.curation.hasCollectedValues();
+    const saves = ready && !this.curation.metadataLocked() && !written;
+    return {
+      label: this.curation.saving() ? 'Speichern…' : 'Inhaltsübersicht',
+      disabled: this.curation.saving() || (!saves && !this.curation.activeNode()),
+      run: async () => {
+        const save = handler ? () => handler.save() : () => this.curation.saveCollected();
+        if (saves && !(await save())) return;
+        this.navigation.go('overview');
+      }
+    };
+  }
 }

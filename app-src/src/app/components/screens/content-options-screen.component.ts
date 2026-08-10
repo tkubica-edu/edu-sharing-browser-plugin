@@ -6,11 +6,17 @@ import { ContentFlowService } from '../../services/content-flow.service';
 import { CurationService } from '../../services/curation.service';
 import { NavigationService } from '../../services/navigation.service';
 import { NodeConnectorService } from '../../services/node-connector.service';
-import { OptionIconService } from '../../services/option-icon.service';
+import { IconId, OptionIconService } from '../../services/option-icon.service';
+import { ContentCardComponent } from '../content-card.component';
 
-/** One way on from a known content. `section` is the step it leads to — its icon, and its condition. */
+/**
+ * One way on from a known content. `section` is the step it leads to — its condition, and the icon
+ * it is picked by unless `icon` names another: two of the options lead into the same section (its
+ * Vorschau and its Freigabe), and a row is told apart by its icon before it is read.
+ */
 interface ContentOption {
   section: SectionId;
+  icon?: IconId;
   label: string;
   description: string;
   run: () => void | Promise<void>;
@@ -21,11 +27,12 @@ interface ContentOption {
 // from the Verlauf, or picked from den eigenen Inhalten. It offers the ways on as main-menu-style
 // rows.
 //
-// "Bearbeitungsmodus" is the one that depends on the content rather than on the panel's state: it
+// "Inhalt bearbeiten" is the one that depends on the content rather than on the panel's state: it
 // applies to a content that opens in a connector, which the repository's connector list decides
 // (see NodeConnectorService) — so the row appears once that answer is in.
 @Component({
   selector: 'es-content-options-screen',
+  imports: [ContentCardComponent],
   templateUrl: './content-options-screen.component.html',
   styleUrl: './content-options-screen.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -62,30 +69,31 @@ export class ContentOptionsScreenComponent {
   }
 
   /**
-   * The ways on that apply right now, in the order they are offered.
+   * The ways on that apply right now, in the order they are offered: looking at the content first,
+   * then working on it, then passing it on.
    *
-   * Editing is offered for a content that opens in a connector, and on the insert host itself —
-   * there the editor is on screen, which is that same statement made by the page. What the row then
-   * does is not decided here: {@link ContentFlowService.edit} opens the connector, or goes straight
-   * to the Bearbeitungsmodus when the content is already open in it.
+   * Two of them are a *tab* of a section rather than the section itself — the Vorschau and the
+   * Freigabe of the Inhaltsübersicht. They are offered separately because they are separate errands:
+   * looking at a content and handing it out are not the same visit, and neither should have to be
+   * found behind the other's tab bar.
+   *
+   * Editing is offered for a content that opens in a connector — the repository's connector list
+   * decides, so the row waits for that answer. What the row then does is not decided here:
+   * {@link ContentFlowService.edit} opens the connector, or goes straight to the Bearbeitungsmodus
+   * when the content is already open in it.
    *
    * Each option is checked against its target section as well, so none of them offers a step that
    * {@link NavigationService.go} would refuse.
    */
   protected readonly options = computed<readonly ContentOption[]>(() => {
     const conditions = this.conditions.snapshot();
-    const options: ContentOption[] = [];
-    if (this.opensInConnector() || conditions.onlyOfficePresent) {
-      options.push({
-        section: 'editing',
-        label: 'Bearbeitungsmodus',
-        description: conditions.onlyOfficePresent
-          ? 'Inhalte in OnlyOffice einfügen'
-          : 'Im Connector öffnen und Inhalte einfügen',
-        run: () => this.flow.edit()
-      });
-    }
-    options.push(
+    const options: ContentOption[] = [
+      {
+        section: 'overview',
+        label: 'Inhaltsübersicht',
+        description: 'Vorschau und Nutzung des Inhalts ansehen',
+        run: () => this.flow.showOverview()
+      },
       {
         section: 'quality',
         label: 'Qualitätsprüfung',
@@ -95,16 +103,25 @@ export class ContentOptionsScreenComponent {
       {
         section: 'collections',
         label: 'Einsortieren und weiterleiten',
-        description: 'Den Inhalt in Sammlungen einsortieren',
+        description: 'Den Inhalt weiterleiten und in der eigenen Ablage einsortieren',
         run: () => this.flow.showCollections()
-      },
-      {
-        section: 'overview',
-        label: 'Inhaltsübersicht',
-        description: 'Vorschau, Nutzung und Teilen des Inhalts',
-        run: () => this.flow.showOverview()
-      },
-    );
+      }
+    ];
+    if (this.opensInConnector()) {
+      options.push({
+        section: 'editing',
+        label: 'Inhalt bearbeiten',
+        description: 'Im Connector öffnen und bearbeiten',
+        run: () => this.flow.edit()
+      });
+    }
+    options.push({
+      section: 'overview',
+      icon: 'share',
+      label: 'Freigabe',
+      description: 'Den Inhalt für andere freigeben',
+      run: () => this.flow.showShare()
+    });
     return options.filter((option) => this.navigation.isVisible(option.section, conditions));
   });
 }

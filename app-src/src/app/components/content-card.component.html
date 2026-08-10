@@ -1,0 +1,40 @@
+<section class="focus">
+  <h2 class="focus-label">{{ heading() }}</h2>
+
+  <!-- The same card either way — a way on is a button, a statement is not. -->
+  @if (interactive()) {
+    <button class="focus-card" (click)="activate.emit()" [disabled]="disabled()"
+            [attr.title]="contentTitle()">
+      <ng-container [ngTemplateOutlet]="body" />
+    </button>
+  } @else {
+    <div class="focus-card is-static" [attr.title]="contentTitle()">
+      <ng-container [ngTemplateOutlet]="body" />
+    </div>
+  }
+</section>
+
+<ng-template #body>
+  <!-- The tile carries the kind of content, not a picture of it (see typeIcon) — while the
+       recognition runs it carries the spinner instead, since that is what the tile stands for
+       then: the content that is not known yet. -->
+  <span class="fc-tile">
+    @if (loading()) {
+      <span class="fc-spinner" aria-hidden="true"></span>
+    } @else {
+      <i class="fc-icon" [esIcon]="typeIcon()"></i>
+    }
+  </span>
+
+  <span class="fc-main">
+    <!-- Named by the content once there is one; else the fallback reports the state. -->
+    <span class="fc-title">{{ contentTitle() ?? fallbackTitle() }}</span>
+    <!-- One line under the title: the card's own state where there is one, else the description. -->
+    @if (note(); as note) {
+      <span class="fc-note">{{ note }}</span>
+    } @else if (description()) {
+      <span class="fc-desc">{{ description() }}</span>
+    }
+    <ng-content />
+  </span>
+</ng-template>

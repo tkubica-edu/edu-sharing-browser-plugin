@@ -1,0 +1,106 @@
+:host { display: block; }
+
+.focus {
+  padding: 12px 14px 14px;
+  border-bottom: 1px solid var(--es-border);
+}
+
+.focus-label {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--es-text);
+}
+
+// A card, because it shows a *thing* (a content) rather than a way on — hence also no chevron.
+.focus-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px;
+  background: var(--es-surface);
+  border: 1px solid var(--es-border);
+  border-radius: var(--es-radius);
+  text-align: left;
+  color: var(--es-text);
+  cursor: pointer;
+
+  &:hover:not([disabled]):not(.is-static) { background: var(--es-hint-bg); }
+
+  // Nothing recognised, or still checking: the card stays and carries the report, only greyed out.
+  &[disabled] {
+    cursor: not-allowed;
+
+    .fc-title, .fc-tile { color: var(--es-muted); }
+  }
+
+  // The card that only names the content it is about — nothing to press, so nothing to invite it.
+  &.is-static { cursor: default; }
+}
+
+// The type icon's place — and the spinner's while the recognition runs, so the card keeps its shape
+// through both states instead of growing a second slot for the wait.
+.fc-tile {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: var(--es-hint-bg);
+  color: var(--es-blue);
+}
+
+.fc-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.fc-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+
+// Read as a name, not as a headline: the card is one entry among the menu's, and a title set much
+// larger than the rows makes the panel top-heavy. Long titles (a URL as a name) wrap, up to three
+// lines — past that the card would push the menu off the panel.
+.fc-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.fc-desc { font-size: 12px; color: var(--es-muted); line-height: 1.35; }
+
+// The card's state — in the panel's blue, so it reads as a label on the content above it rather
+// than as another sentence about it. Keeps its colour on the disabled card: while the recognition
+// runs, that line is the whole report.
+.fc-note {
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--es-blue);
+}
+
+// Sits in the tile, at the size of the icon it stands in for.
+.fc-spinner {
+  width: 26px;
+  height: 26px;
+  border: 3px solid #cddff0;
+  border-top-color: var(--es-blue);
+  border-radius: 50%;
+  animation: fc-spin 0.9s linear infinite;
+}
+
+@keyframes fc-spin {
+  to { transform: rotate(360deg); }
+}
+
+// The card's own text says "still working" too, so the rotation can stand still.
+@media (prefers-reduced-motion: reduce) {
+  .fc-spinner { animation: none; }
+}

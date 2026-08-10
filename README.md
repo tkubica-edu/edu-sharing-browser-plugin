@@ -102,11 +102,17 @@ The options:
   downloads, plays, and the embeddings/collections the node is used in). Its `nodes` input is a
   *selection*, so the hydrated node goes in as a single-element array; the element fetches the
   numbers itself through the repository session. Shown for an active node, like the preview.
-- **Einsortieren in Sammlungen** — `edu-sharing-nodes-selector` as a collection picker. Its
-  contract is callback-based (`option.optionConfig.onNodesChoosen`), so the component owns the
-  callback and the add itself runs in the sidebar via ngx-edu-sharing-api's
-  `CollectionServiceUnwrapped.addToCollection` (the generated `CollectionV1Service`, exported
-  under that alias since 10.0.2 — the `CollectionService` wrapper is read-only).
+- **Einsortieren und weiterleiten** — the last part of the first big step, with two sub steps that
+  are each offered only where they apply: *An Redaktionen weiterleiten* while the repository config
+  enables the additional web component, *Persönliche Ablage* for a session of the user's own. Both
+  are placeholders for the components that will fill them. Where neither applies the step falls away
+  and the flow goes straight to the *Inhaltsübersicht*. **The content is written at the end of this
+  step and nowhere earlier**: the quality criteria, the metadata the editor handed over
+  (`CurationService.hold`) and whatever the sub steps collect are saved in one go
+  (`CurationService.saveCollected`), so *Speichern…* appears on the way into the *Inhaltsübersicht*.
+  The collection picker (`es-collection-selector`, `edu-sharing-nodes-selector` in `collections`
+  mode → `CollectionServiceUnwrapped.addToCollection`) is unused for the moment; it is what the
+  *Persönliche Ablage* screen is expected to build on.
 - **Neues OnlyOffice-Dokument** — mounts `edu-sharing-add-with-connector`, which opens the
   OnlyOffice create dialog; the new node is hydrated into the flow and opens in the preview.
 - **Inhalt suchen** — only on an insert host (URL matches `/src/tools/onlyoffice`): the same
