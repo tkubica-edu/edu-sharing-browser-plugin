@@ -5,6 +5,16 @@
     <p class="es-muted">Editor wird geladen…</p>
   }
 
+  @if (hasAiSuggestions()) {
+    <!-- What the colour means, and what the fields that are not filled in yet are waiting for: a
+         multi-value widget (Schlagwörter, Themenbaum) offers each proposal as a chip and takes it
+         over only when it is pressed — see MdsEditorComponent.withoutAiFields. -->
+    <p class="ai-note">
+      Farbig markierte Werte sind KI-Vorschläge. Vorschläge für mehrwertige Felder werden als
+      Chips angeboten und erst mit dem Übernehmen Teil des Inhalts.
+    </p>
+  }
+
   <!--
     <edu-sharing-mds-editor-wrapper> is created imperatively into #host rather than used as a
     template tag, because its inputs must be set as properties before it connects — see mount()

@@ -1,10 +1,11 @@
 import {
-  afterRenderEffect, ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, ElementRef,
-  OnDestroy, input, output, signal, viewChild
+  afterRenderEffect, ChangeDetectionStrategy, Component, computed, CUSTOM_ELEMENTS_SCHEMA,
+  ElementRef, OnDestroy, input, output, signal, viewChild
 } from '@angular/core';
 import { DEFAULT, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 
 import { MdsValues, toMdsEditorValues } from '../util/mds-values';
+import { NodeSuggestions, aiSuggestionsFor } from '../util/mds-suggestions';
 import { EDITOR_MODE_FOR_DRAFT, forMdsEditor, isDraftNode } from '../util/mds-node';
 import { MetadataEditor, MetadataSeed } from './metadata-editor';
 import { loadWebComponentBundle } from '../services/web-component-bundle.service';
@@ -21,6 +22,7 @@ interface MdsEditorElement extends HTMLElement {
   editorMode?: string;
   nodes?: Node[];
   nodeRefetch?: boolean;
+  suggestions?: NodeSuggestions[];
 }
 
 // Embeds <edu-sharing-mds-editor-wrapper> as a REAL custom element (no iframe).
@@ -41,6 +43,9 @@ interface MdsEditorElement extends HTMLElement {
 //
 // Three of the view's widgets are hidden by this component's stylesheet, because the screen shows them
 // above the form already — see mds-editor.component.scss.
+//
+// What the metadata agent filled is handed to the editor as its own KI-Vorschläge rather than as
+// plain values, so the form shows which fields a machine proposed — see {@link aiFields}.
 @Component({
   selector: 'es-mds-editor',
   templateUrl: './mds-editor.component.html',
@@ -76,6 +81,20 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
 
   /** True once the element is mounted and can be committed. */
   readonly ready = signal(false);
+
+  /**
+   * The properties the metadata agent filled, handed to the editor as suggestions instead of as
+   * values — empty when the seed names none (a node the panel did not curate), and in value mode,
+   * where the widgets do not subscribe to suggestions at all (see mount()).
+   *
+   * They have to be *withheld* from the seed for the marking to happen: a widget only takes a
+   * suggestion on while its own value is empty, and colours only what it took on. So a proposed
+   * value reaches the form through one door or the other, never both.
+   */
+  private readonly aiFields = signal<readonly string[]>([]);
+
+  /** Whether the form carries KI-Vorschläge — the note above it says what that means for them. */
+  protected readonly hasAiSuggestions = computed(() => this.aiFields().length > 0);
 
   private element: MdsEditorElement | null = null;
   /** The full normalized metadata handed to the editor (all generated fields). */
@@ -137,6 +156,15 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
     this.latestValues = this.initialValues;
 
     const node = this.node();
+    // The agent's fields, as the editor's own suggestions. Node mode only: the fan-out that hands a
+    // suggestion to its widget is set up in `initWithNodes`, so a form built on a values map never
+    // sees them (`nodes` is what decides that, not `editorMode` — a draft's form is built on its
+    // stand-in node too). Set before the element connects, like every other input.
+    const suggestions = node ? aiSuggestionsFor(this.metadata(), node.ref.id) : null;
+    if (suggestions) {
+      element.suggestions = [suggestions];
+      this.aiFields.set(Object.keys(suggestions.suggestions));
+    }
     if (node) {
       // Node mode. Both modes emit the FULL live values of the rendered group via
       // currentValuesChange (the instance maps every widget's value, not a diff against the node),
@@ -144,7 +172,9 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
       // A stand-in renders in the draft's mode: the form is the same, but the wrapper stops asking
       // the repository about a node it does not have (see EDITOR_MODE_FOR_DRAFT).
       element.editorMode = isDraftNode(node) ? EDITOR_MODE_FOR_DRAFT : 'nodes';
-      element.nodes = [forMdsEditor(node)];
+      // Without the proposed properties: they arrive as suggestions instead (see aiFields), and a
+      // widget that already holds the value would neither offer nor mark it.
+      element.nodes = [forMdsEditor(this.withoutAiFields(node))];
       // The node is already in hand, and a stand-in is one the repository could not hand back at
       // all — re-fetching it would fail rather than improve anything.
       element.nodeRefetch = false;
@@ -160,5 +190,23 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
     this.host().nativeElement.appendChild(element);
     this.element = element;
     this.ready.set(true);
+  }
+
+  /**
+   * The node without the properties that are offered as suggestions — what the form is built on.
+   *
+   * Nothing is lost by it: a suggestion a single-value widget can take is applied by that widget the
+   * moment the form is built, and one that is left standing (a chip the user does not press) simply
+   * never becomes a value — which for a *saved* node means the stored one stays, since the editor
+   * reports only the widgets that changed. A draft has nothing stored, so an ignored proposal is one
+   * the content is saved without; the note above the form says as much.
+   */
+  private withoutAiFields(node: Node): Node {
+    const withheld = this.aiFields();
+    if (!withheld.length) return node;
+    const properties = Object.fromEntries(
+      Object.entries(node.properties ?? {}).filter(([key]) => !withheld.includes(key)),
+    );
+    return { ...node, properties };
   }
 }

@@ -4,6 +4,14 @@
 
 .mds-host { display: block; width: 100%; }
 
+// In the bundle's own KI colour, so the sentence and the values it is about read as one thing.
+.ai-note {
+  margin: 0 0 var(--es-space-3);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--aiColor, var(--es-blue));
+}
+
 // The picture, the file name and the title are already on screen above this form, rendered by the
 // native preview widget (MdsPreviewWidgetComponent) — so the view's own widgets for the three are
 // hidden here: one question, one field.
