@@ -213,29 +213,6 @@ input[type='checkbox'] {
   right: 0;
 }
 
-.criteria-buttons {
-  display: flex;
-  justify-content: center;
-}
-
-// A pill, because it closes the sheet rather than continuing the panel's own footer chain.
-.confirm {
-  padding: 11px 26px;
-  border: none;
-  border-radius: 999px;
-  background: var(--qc-accent);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-
-  &:hover:not([disabled]) { filter: brightness(1.12); }
-  &[disabled] { opacity: 0.45; cursor: not-allowed; }
-
-  // Given, not merely unavailable: it reports a state, so it stays fully legible.
-  &.is-confirmed[disabled] { opacity: 1; }
-}
-
 .note {
   margin: 0;
   font-size: 13px;
@@ -279,3 +256,10 @@ input[type='checkbox'] {
 }
 
 .note-error { color: var(--qc-error); }
+
+// The confirmation this view no longer asks for, only reports.
+.note-confirmed {
+  color: var(--qc-accent);
+  font-weight: 700;
+  text-align: center;
+}

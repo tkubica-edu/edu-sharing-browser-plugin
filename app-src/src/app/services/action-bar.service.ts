@@ -119,20 +119,41 @@ export class ActionBarService {
         ];
 
       // "Qualitätsprüfung": its views are walked through rather than jumped between, so the footer
-      // carries that walk — "Weiter" out of the Qualität view, "Zurück" out of the Metadaten one.
+      // carries that walk — the way on out of the Qualität view, "Zurück" out of the Metadaten one.
       // The tab bar is still on screen; this is the way through the step, not the only one.
       //
       // The way out of the section belongs to the Metadaten view — from the Qualität view there is
       // nothing yet to leave. Which is the whole step where the Qualität view does not apply (see
       // the registry), and the walk is then a single view with the way on under it.
       case 'quality': {
+        // The Qualität view: its way on IS the confirmation — the criteria decide whether the content
+        // may be published, so going on without giving it would walk past the one question this view
+        // asks. It is available once the criteria allow it (CurationService.qualityCriteriaMet, which
+        // the view reports), and the Metadaten sub step is locked until then for the same reason.
+        //
+        // Once given it is the plain "Weiter" again: the confirmation is a statement about the
+        // content, made once — coming back to this view later must still lead on.
         if (this.navigation.screen() !== 'metadata') {
           const next = this.navigation.nextTab();
+          if (this.curation.qualityConfirmed()) {
+            return [
+              {
+                label: 'Weiter',
+                disabled: !next || next.disabled,
+                run: () => this.navigation.goNextTab()
+              }
+            ];
+          }
           return [
             {
-              label: 'Weiter',
-              disabled: !next || next.disabled,
-              run: () => this.navigation.goNextTab()
+              label: 'Qualität bestätigen',
+              disabled: !this.curation.qualityCriteriaMet(),
+              run: async () => {
+                await this.curation.confirmQuality();
+                // Only on the back of a confirmation that held: one the repository refused is
+                // reported in the view (CurationService.qualityError), which is here.
+                if (this.curation.qualityConfirmed()) this.navigation.goNextTab();
+              }
             }
           ];
         }

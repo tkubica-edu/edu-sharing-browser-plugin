@@ -352,6 +352,18 @@ export class CurationService {
   /** Why a confirmation could not be recorded; null while none failed. */
   readonly qualityError = signal<string | null>(null);
 
+  /**
+   * Whether the quality criteria allow the confirmation to be given — what the Qualität view reports
+   * of its knock-out criteria (QualityCriteriaComponent.knockoutSatisfiedChange).
+   *
+   * Held here rather than in that view, because both things that hang off it outlive it: the footer's
+   * "Qualität bestätigen", and the Metadaten sub step, which stays locked until the criteria are
+   * answered. False to begin with — an unread set demands nothing yet, but neither has it allowed
+   * anything.
+   */
+  private readonly criteriaSatisfied = signal(false);
+  readonly qualityCriteriaMet = this.criteriaSatisfied.asReadonly();
+
   /** Set while a confirmation waits for the node the save will create. */
   private qualityPending = false;
 
@@ -558,6 +570,11 @@ export class CurationService {
    */
   saveCollected(): Promise<boolean> {
     return this.save({});
+  }
+
+  /** Take over what the Qualität view reports of its criteria — see {@link qualityCriteriaMet}. */
+  reportQualityCriteria(satisfied: boolean): void {
+    this.criteriaSatisfied.set(satisfied);
   }
 
   /**
@@ -1114,6 +1131,8 @@ export class CurationService {
     this.quality.set(false);
     this.qualityError.set(null);
     this.qualityPending = false;
+    // The criteria belong to the content that is going: the next one's view reports its own.
+    this.criteriaSatisfied.set(false);
     this.pendingPreview.set(null);
     this.saved.set(false);
     this.activeNode.set(null);

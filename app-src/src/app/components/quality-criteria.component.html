@@ -118,14 +118,10 @@
       <p class="note note-error">{{ message }}</p>
     }
 
-    <!-- Only the knock-out criteria gate this: the editorial ones describe the content's quality,
-         they do not stand in the way of publishing it. Once given, the button reports the
-         confirmation rather than offering it again. -->
-    <div class="criteria-buttons">
-      <button type="button" class="confirm" [class.is-confirmed]="confirmed()"
-              [disabled]="!allKnockoutMet() || confirmed()" (click)="onConfirm()">
-        {{ confirmed() ? 'Qualität bestätigt' : 'Qualität bestätigen' }}
-      </button>
-    </div>
+    <!-- The confirmation is given elsewhere (the host offers it, see knockoutSatisfiedChange); what
+         belongs here is the state it left behind. -->
+    @if (confirmed()) {
+      <p class="note note-confirmed">Die Qualität ist bestätigt.</p>
+    }
   }
 </section>

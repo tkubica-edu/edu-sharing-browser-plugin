@@ -75,8 +75,8 @@ function asList(value: unknown): string[] {
 }
 
 /**
- * "Fachliche Qualitätskriterien": the two lists of criteria a content is judged by, and the
- * confirmation that follows from them.
+ * "Fachliche Qualitätskriterien": the two lists of criteria a content is judged by, and — reported
+ * rather than asked for here — whether they allow the confirmation that follows from them.
  *
  * Deliberately self-contained, so it can be built as a custom element of its own later. It takes the
  * content's properties in and reports the changed ones back out — it writes nothing itself and knows
@@ -138,8 +138,13 @@ export class QualityCriteriaComponent {
   /** The properties this view changed, each one whole. The host decides when they are written. */
   readonly propertiesChange = output<CriteriaProperties>();
 
-  /** Raised when the quality is confirmed. What that records is the host's to decide. */
-  readonly confirm = output<void>();
+  /**
+   * Whether the knock-out criteria stand in the way of nothing any more — see
+   * {@link knockoutSatisfied}. Reported because the confirmation that hangs off it is the host's: it
+   * offers it wherever its own actions live (in the panel, the footer's "Qualität bestätigen"), and
+   * this view is what knows when it may be given.
+   */
+  readonly knockoutSatisfiedChange = output<boolean>();
 
   /** The metadata set's definition; null until it is loaded. */
   private readonly mds = signal<MdsDefinition | null>(null);
@@ -203,6 +208,10 @@ export class QualityCriteriaComponent {
       this.judged = true;
       void this.judge(criteria, resource, text);
     });
+
+    // Report the gate whenever it moves — on the first read of the set, and on every click that
+    // changes what the criteria answer.
+    effect(() => this.knockoutSatisfiedChange.emit(this.knockoutSatisfied()));
   }
 
   /** The knock-out criteria, in the order the metadata set lists them. */
@@ -238,6 +247,19 @@ export class QualityCriteriaComponent {
     () =>
       this.editorialCriteria().length > 0 &&
       this.editorialCriteria().every((criterion) => this.isEditorialMet(criterion))
+  );
+
+  /**
+   * Whether the knock-out criteria hold the content back no longer: every one of them is met, or the
+   * set defines none at all — criteria that do not exist cannot be answered, and a content would
+   * otherwise be stuck behind a list nobody can tick. Only these gate it: the editorial criteria
+   * describe the content's quality, they do not stand in the way of publishing it.
+   *
+   * False while the set is still being read: what it will demand is not known yet, and a gate that
+   * opens for a moment because nothing has loaded is worse than one that opens late.
+   */
+  private readonly knockoutSatisfied = computed(
+    () => !this.loading() && (this.knockoutCriteria().length === 0 || this.allKnockoutMet()),
   );
 
   /**
@@ -339,10 +361,6 @@ export class QualityCriteriaComponent {
   protected setAll(): void {
     this.setAllKnockout();
     this.setAllEditorial();
-  }
-
-  protected onConfirm(): void {
-    this.confirm.emit();
   }
 
   /** What is wrong right now: this view's own complaint, else whatever the host reports. */

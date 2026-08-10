@@ -6,4 +6,4 @@
                      [confirmed]="curation.qualityConfirmed()"
                      [problem]="curation.qualityError()"
                      (propertiesChange)="record($event)"
-                     (confirm)="confirm()"></es-quality-criteria>
+                     (knockoutSatisfiedChange)="reportCriteria($event)"></es-quality-criteria>

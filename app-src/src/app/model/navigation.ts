@@ -75,6 +75,9 @@ export interface Conditions {
   recognizingContent: boolean;
   /** The repository config enabled the additional web component — see AdditionalWebComponentService. */
   additionalWebComponent: boolean;
+  /** The Qualitätsprüfung's knock-out criteria are answered, so the quality may be confirmed
+   *  (QualityCriteriaComponent reports it, CurationService holds it). */
+  qualityCriteriaMet: boolean;
 }
 
 /** A text that may depend on the conditions — for an entry that names its own state. */
@@ -336,7 +339,16 @@ export const SECTIONS: readonly AppSection[] = [
     // alone — which is why the section itself needs no condition of its own.
     tabs: [
       { id: 'quality-check', label: 'Qualität', visible: (c) => c.additionalWebComponent },
-      { id: 'metadata', label: 'Metadaten' }
+      {
+        id: 'metadata',
+        label: 'Metadaten',
+        // Behind the Qualität view's own gate, and only where that view exists: the criteria decide
+        // whether the content may be published at all, so they are answered before it is described.
+        // Visible and disabled meanwhile — the tab is the step that is still to come, not one that
+        // appears out of nowhere once the boxes are ticked (see SectionTab.enabled).
+        enabled: (c) => !c.additionalWebComponent || c.qualityCriteriaMet,
+        disabledHint: 'Zuerst die Kriterien für die Such-Veröffentlichung erfüllen.'
+      }
     ]
   },
   {

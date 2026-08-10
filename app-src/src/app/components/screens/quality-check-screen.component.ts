@@ -10,10 +10,13 @@ import { judgeableText } from '../../services/content-judge.service';
 // confirmation that follows from them.
 //
 // The view itself is QualityCriteriaComponent, which is self-contained (see its own notes) — this
-// screen hands it the content's metadata and takes what it reports back into the curation. Neither
-// the criteria nor the confirmation are written here: at this point in the flow the content usually
-// has no node yet, so both wait for the save that creates one (CurationService.recordValues and
-// .confirmQuality).
+// screen hands it the content's metadata and takes what it reports back into the curation: the
+// criteria it recorded, and whether they allow the quality to be confirmed. The confirmation itself
+// is offered by the footer (ActionBarService), which is where this step's actions live.
+//
+// Neither the criteria nor the confirmation are written here: at this point in the flow the content
+// usually has no node yet, so both wait for the save that creates one (CurationService.recordValues
+// and .confirmQuality).
 //
 // That view also has two services judge the content, and what it needs for that is the open page. This
 // screen reads it and hands it over: reading the page is the extension's business, and the view stays
@@ -56,8 +59,13 @@ export class QualityCheckScreenComponent implements OnInit {
     this.curation.recordValues(values);
   }
 
-  protected confirm(): void {
-    void this.curation.confirmQuality();
+  /**
+   * Pass the view's gate on to the flow, which is where both things that hang off it live: the
+   * footer's "Qualität bestätigen" and the Metadaten sub step it unlocks. Kept in the curation and
+   * not here, because both outlive this screen.
+   */
+  protected reportCriteria(satisfied: boolean): void {
+    this.curation.reportQualityCriteria(satisfied);
   }
 
   /**

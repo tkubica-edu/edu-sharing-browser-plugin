@@ -104,6 +104,9 @@ export class ConditionsService {
   // also what makes the editorial forwarding a step of the flow (see the `collections` section).
   readonly additionalWebComponent = this.webComponent.enabled;
 
+  // What the Qualität view reports of its criteria — the gate the Metadaten sub step sits behind.
+  readonly qualityCriteriaMet = this.curation.qualityCriteriaMet;
+
   /** The snapshot handed to every option's visible() predicate. */
   readonly snapshot = computed<Conditions>(() => ({
     onlyOfficePresent: this.onlyOfficePresent(),
@@ -116,6 +119,7 @@ export class ConditionsService {
     hasCuratedDraft: this.hasCuratedDraft(),
     editMode: this.editMode(),
     recognizingContent: this.recognizingContent(),
-    additionalWebComponent: this.additionalWebComponent()
+    additionalWebComponent: this.additionalWebComponent(),
+    qualityCriteriaMet: this.qualityCriteriaMet()
   }));
 }
