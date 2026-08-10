@@ -332,18 +332,6 @@ export class CurationService {
   private readonly recordedValues = signal<MdsValues>({});
 
   /**
-   * What the metadata editor committed while the flow still had steps to go — the values of the
-   * Metadaten view, held from the moment that view is left until the save at the end of the first
-   * big step (see {@link hold} and {@link saveCollected}).
-   *
-   * Separate from {@link recordedValues} although both wait for the same save, because they say
-   * different things about their fields: these ARE the editor's values, so a field the metadata
-   * agent filled is still the agent's — see {@link fieldOrigins}, where only the recorded ones
-   * count as the user's own answer.
-   */
-  private readonly heldValues = signal<MdsValues>({});
-
-  /**
    * The quality was confirmed in the Qualitätsprüfung. Kept as state of the flow rather than read
    * back from the node: the confirmation is usually given before there is a node at all, and it is
    * the same statement either way — see {@link confirmQuality}.
@@ -413,10 +401,7 @@ export class CurationService {
    * since. Without this a step that was merely passed through would update the node with nothing.
    */
   readonly hasCollectedValues = computed(
-    () =>
-      !this.activeNode() ||
-      Object.keys(this.recordedValues()).length > 0 ||
-      Object.keys(this.heldValues()).length > 0,
+    () => !this.activeNode() || Object.keys(this.recordedValues()).length > 0,
   );
 
   /**
@@ -435,10 +420,7 @@ export class CurationService {
     const payload = this.metadataAgent.lastRun()?.parsed?.raw ?? null;
     const base = this.activeNode() ? this.nodeMetadata() ?? payload : payload;
     const recorded = this.recordedValues();
-    // The editor's own held values on top of them: they are the later word on the same fields, and
-    // it is the editor's — a step that recorded a property before it was edited must not win.
-    const collected = { ...recorded, ...this.heldValues() };
-    const values = Object.keys(collected).length ? { ...(base ?? {}), ...collected } : base;
+    const values = Object.keys(recorded).length ? { ...(base ?? {}), ...recorded } : base;
     if (!values) return null;
     return { ...values, _origins: fieldOrigins(values, payload?.['_origins'], recorded) };
   });
@@ -513,18 +495,17 @@ export class CurationService {
    * A method for the same reason as {@link draftNode}: the editor re-initialises on every `nodes`
    * change, so the caller reads it once as the screen opens.
    *
-   * Everything the flow has collected but not written yet ({@link recordValues}, {@link hold}) is
-   * laid over the node's stored properties — for a *draft* that already happened (it is built from
-   * {@link editorMetadata}), but a saved node carries what the repository holds, which is not yet
-   * what the flow does. Without this the editor would open on the older values and commit them back
-   * over the newer ones.
+   * What other steps recorded ({@link recordValues}) is laid over the node's stored properties — for
+   * a *draft* that already happened (it is built from {@link editorMetadata}), but a saved node
+   * carries what the repository holds, which is not yet what the flow does. Without this the editor
+   * would open on the older values and commit them back over the newer ones.
    */
   editorNode(): Node | null {
     const node = this.previewNode();
     if (!node) return this.draftNode();
-    const collected = { ...this.recordedValues(), ...this.heldValues() };
-    if (!Object.keys(collected).length) return node;
-    return { ...node, properties: { ...node.properties, ...collected } };
+    const recorded = this.recordedValues();
+    if (!Object.keys(recorded).length) return node;
+    return { ...node, properties: { ...node.properties, ...recorded } };
   }
 
   /**
@@ -550,25 +531,8 @@ export class CurationService {
   }
 
   /**
-   * Take the metadata editor's committed values over WITHOUT writing them — the hand-over when the
-   * Metadaten view is left for the steps that still follow it (see ActionBarService). The editor is
-   * gone from there on, so this is the flow's copy of what it held; the save at the end of the step
-   * writes it (see {@link saveCollected}).
-   *
-   * The picture goes with them for the same reason: it is read off the widget that is on screen and
-   * nowhere else (see {@link pickedPreviewSrc}), so a picture picked here would otherwise be lost
-   * with the view that shows it.
-   */
-  async hold(values: MdsValues): Promise<void> {
-    this.heldValues.update((held) => ({ ...held, ...values }));
-    const picked = await this.resolveDraftPreview(this.pickedPreviewSrc());
-    if (picked) this.pendingPreview.set(picked);
-  }
-
-  /**
-   * Write everything the flow has collected: the values the editor handed over ({@link hold}) and
-   * what the other steps recorded ({@link recordValues}). The save at the END of the first big step,
-   * where there is no editor left to commit.
+   * Write what the flow collected outside the metadata editor ({@link recordValues}) — the save at
+   * the end of the first big step for a content whose editor is not there to commit.
    */
   saveCollected(): Promise<boolean> {
     return this.save({});
@@ -915,11 +879,7 @@ export class CurationService {
     // What other steps recorded goes underneath, so a property the editor carries too is the
     // editor's: it is the metadata's own authority, and it was seeded with the recorded values
     // anyway (see editorMetadata). A property it does not carry survives from where it was set.
-    //
-    // Between the two, what the editor handed over on its way out ({@link hold}): it IS the editor's
-    // word, so it outranks the other steps — but only until an editor that is open right now says
-    // otherwise, which is what `values` is when the save comes from one.
-    values = { ...this.recordedValues(), ...this.heldValues(), ...values };
+    values = { ...this.recordedValues(), ...values };
     // With the additional web component every save goes through the agent's upload — not just the
     // first one. The nodes it writes belong to the agent's own privileges, so the session the panel
     // runs under (a guest) may neither read nor edit them: an update in place is not available for
@@ -939,7 +899,6 @@ export class CurationService {
       this.saved.set(true);
       // Written now, so the node's own properties are what the steps read back from here on.
       this.recordedValues.set({});
-      this.heldValues.set({});
       await this.writePendingQuality(saved.nodeId);
       // Before the reload below, so the node comes back already carrying it.
       await this.writePendingPreview(saved.nodeId);
@@ -991,7 +950,6 @@ export class CurationService {
       this.saved.set(true);
       // Uploaded with the rest of the values, so they are the node's metadata from here on.
       this.recordedValues.set({});
-      this.heldValues.set({});
       // The preview step's picture is dropped rather than written here: the agent creates the node
       // with its own privileges, so the panel session (a guest) may not upload a preview to it. What
       // the page itself offers the agent already has — `preview_image_url` travelled in the payload.
@@ -1156,7 +1114,6 @@ export class CurationService {
     this.resultPending.set(false);
     this.draftValues.set(null);
     this.recordedValues.set({});
-    this.heldValues.set({});
     this.quality.set(false);
     this.qualityError.set(null);
     this.qualityPending = false;

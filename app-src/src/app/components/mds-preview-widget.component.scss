@@ -2,6 +2,16 @@
 
 .pw-wrap { display: block; }
 
+// Locked while a save is in flight: block the interaction here rather than relying on the wrapper
+// honouring anything on an already-mounted editor. `inert` covers the keyboard as well, which
+// pointer-events alone does not. Same treatment as the editor below it (wlo-canvas.component.scss),
+// so the whole form reads as one locked thing.
+.pw-wrap.is-locked {
+  opacity: 0.65;
+  pointer-events: none;
+  user-select: none;
+}
+
 // The widget's picture is built from absolutely positioned layers (a blurred backdrop behind the
 // image), which need a positioned, clipping box or they spill over whatever sits above the widget.
 .pw-host {

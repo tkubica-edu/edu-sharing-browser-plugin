@@ -1,4 +1,6 @@
-<div class="pw-wrap">
+<!-- `inert` locks the keyboard too (the class below only stops the pointer), so a locked group cannot
+     be edited by tabbing into it either — the same lock as WloCanvasComponent's. -->
+<div class="pw-wrap" [class.is-locked]="locked()" [attr.inert]="locked() ? '' : null">
   @if (bundle.error()) {
     <p class="es-error">Vorschau-Widget konnte nicht geladen werden: {{ bundle.error() }}</p>
   } @else if (!ready()) {

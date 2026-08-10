@@ -102,17 +102,18 @@ The options:
   downloads, plays, and the embeddings/collections the node is used in). Its `nodes` input is a
   *selection*, so the hydrated node goes in as a single-element array; the element fetches the
   numbers itself through the repository session. Shown for an active node, like the preview.
-- **Einsortieren und weiterleiten** — the last part of the first big step, with two sub steps that
-  are each offered only where they apply: *An Redaktionen weiterleiten* while the repository config
-  enables the additional web component, *Persönliche Ablage* for a session of the user's own. Both
-  are placeholders for the components that will fill them. Where neither applies the step falls away
-  and the flow goes straight to the *Inhaltsübersicht*. **The content is written at the end of this
-  step and nowhere earlier**: the quality criteria, the metadata the editor handed over
-  (`CurationService.hold`) and whatever the sub steps collect are saved in one go
-  (`CurationService.saveCollected`), so *Speichern…* appears on the way into the *Inhaltsübersicht*.
-  The collection picker (`es-collection-selector`, `edu-sharing-nodes-selector` in `collections`
-  mode → `CollectionServiceUnwrapped.addToCollection`) is unused for the moment; it is what the
-  *Persönliche Ablage* screen is expected to build on.
+- **Einsortieren und weiterleiten** — where the content is filed and handed on, *before* it is
+  described: the flow runs *Inhalt erschließen* → Vorschau → **Einsortieren und weiterleiten** →
+  *Qualitätsprüfung* → *Inhaltsübersicht*. Two sub steps, each offered only where it applies: *An
+  Redaktionen weiterleiten* while the repository config enables the additional web component,
+  *Persönliche Ablage* for a session of the user's own. Both are placeholders for the components that
+  will fill them. Where neither applies the step falls away and the preview leads straight into the
+  *Qualitätsprüfung*. Nothing is written here — **the content is created by the one save at the end
+  of the Qualitätsprüfung**, which writes the quality criteria, whatever the steps recorded and the
+  metadata the editor commits in one go (so *Speichern…* appears on the way into the
+  *Inhaltsübersicht*). The collection picker (`es-collection-selector`, `edu-sharing-nodes-selector`
+  in `collections` mode → `CollectionServiceUnwrapped.addToCollection`) is unused for the moment; it
+  is what the *Persönliche Ablage* screen is expected to build on.
 - **Neues OnlyOffice-Dokument** — mounts `edu-sharing-add-with-connector`, which opens the
   OnlyOffice create dialog; the new node is hydrated into the flow and opens in the preview.
 - **Inhalt suchen** — only on an insert host (URL matches `/src/tools/onlyoffice`): the same

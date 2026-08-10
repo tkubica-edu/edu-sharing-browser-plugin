@@ -84,6 +84,15 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
   readonly editorMode = input<PreviewEditorMode>('form');
 
   /**
+   * Locks the group: the picture and its fields stay visible but can no longer be changed. For the
+   * window in which the values have left the editor and are being written (see
+   * CurationService.metadataLocked) — the same lock the canvas below takes, since the two are one
+   * form as far as the save is concerned: it reads this group's values too
+   * (MetadataScreenComponent.previewOverrides), so a change made here mid-write would land nowhere.
+   */
+  readonly locked = input(false);
+
+  /**
    * The current values of the group's widgets, on every change. A SUBSET of the node's properties:
    * only what this group renders.
    */

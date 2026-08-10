@@ -7,7 +7,7 @@ import { CurationService } from '../../services/curation.service';
 // is something a person has, see the `collections` section in the navigation registry.
 //
 // A placeholder for now — the component that picks the place is supplied later. Nothing is written
-// here either: the content is created by the save that ends this step (ActionBarService).
+// here either: the content is created by the save at the end of the Qualitätsprüfung behind it.
 @Component({
   selector: 'es-personal-storage-screen',
   templateUrl: './personal-storage-screen.component.html',

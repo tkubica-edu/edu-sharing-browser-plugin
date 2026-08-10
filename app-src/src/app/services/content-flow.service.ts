@@ -72,7 +72,7 @@ export class ContentFlowService {
     this.navigation.go('quality', { tab: 'quality-check' });
   }
 
-  /** "Einsortieren und weiterleiten": the step that follows it, and needs the node it saved. */
+  /** "Einsortieren und weiterleiten": where the content is filed, ahead of the Qualitätsprüfung. */
   showCollections(): void {
     this.navigation.go('collections');
   }

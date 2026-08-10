@@ -7,8 +7,8 @@ import { CurationService } from '../../services/curation.service';
 // the additional web component (see the `collections` section in the navigation registry).
 //
 // A placeholder for now — the component that does the forwarding is supplied later. What already
-// holds is where it sits in the flow: nothing is written here, the content is created by the save
-// that ends this step (ActionBarService), so this view works on a content that has no node yet.
+// holds is where it sits in the flow: nothing is written here, the content is created by the save at
+// the end of the Qualitätsprüfung behind it — so this view works on a content that has no node yet.
 @Component({
   selector: 'es-editorial-forward-screen',
   templateUrl: './editorial-forward-screen.component.html',

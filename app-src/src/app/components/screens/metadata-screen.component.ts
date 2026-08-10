@@ -14,9 +14,8 @@ import { MetadataEditor } from '../metadata-editor';
 import { WloCanvasComponent } from '../wlo-canvas.component';
 
 // "Metadaten", the second view of the Qualitätsprüfung: embeds a metadata editor and hands its
-// commit()/ready() to the footer (ActionBarService), whose way on takes the values out of it —
-// written straight away where this is the end of the big step, held for the save at the end of it
-// where "Einsortieren und weiterleiten" still follows (see SaveHandler).
+// commit()/ready() to the footer (ActionBarService), whose way on carries the save — this is the
+// last view of the first big step, so the content is written on the way out of it.
 //
 // Which editor is embedded depends on the repository config: the WLO canvas replaces the
 // edu-sharing MDS editor while the additional web component is enabled. Both implement
@@ -70,27 +69,19 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
   private previewValues: MdsValues = {};
 
   /**
-   * Settles the commit the footer is waiting on; null while none is in flight.
+   * Settles the write the footer is waiting on; null while none is in flight.
    *
    * The editor announces its values through an output rather than returning them, so the commit and
-   * what is done with the values are two hops apart — this carries the answer back across them.
+   * the write it leads to are two hops apart — this carries the answer back across them.
    */
   private settleSave: ((saved: boolean) => void) | null = null;
 
-  /**
-   * What the pending commit does with the values. Null means writing them, which is what a commit
-   * the footer did not ask for is: the WLO canvas has a save control of its own
-   * ({@link WloCanvasComponent.onMetadataSubmit}), and that one means to save.
-   */
-  private sink: ((values: MdsValues) => Promise<boolean>) | null = null;
-
   /** Stable object, so register/clear pair up by identity. */
   private readonly saveHandler: SaveHandler = {
-    save: () => this.commit(null),
-    collect: () =>
-      this.commit(async (values) => {
-        await this.curation.hold(values);
-        return true;
+    save: () =>
+      new Promise<boolean>((resolve) => {
+        this.settleSave = resolve;
+        this.editor()?.commit();
       }),
     canSave: computed(() => !!this.editor()?.ready())
   };
@@ -111,11 +102,10 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    // A commit that never reported back (the editor did not commit) is settled as "not done", so
+    // A write that never reported back (the editor did not commit) is settled as "not saved", so
     // the footer action awaiting it ends instead of hanging on a screen that is gone.
     this.settleSave?.(false);
     this.settleSave = null;
-    this.sink = null;
     this.conditions.editMode.set(false);
     this.actionBar.clearSaveHandler(this.saveHandler);
     this.curation.clearDraftPreviewSource(this.previewSource);
@@ -141,32 +131,15 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Ask the editor for its values and answer what became of them — the one hop the footer awaits.
-   * `sink` decides what that is; see {@link save}.
-   */
-  private commit(sink: ((values: MdsValues) => Promise<boolean>) | null): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
-      this.settleSave = resolve;
-      this.sink = sink;
-      this.editor()?.commit();
-    });
-  }
-
-  /**
-   * Take the committed values wherever the pending commit wants them, and stay put. Where the flow
-   * goes next is the footer's business, not this screen's.
-   *
-   * Writing is the default, because the editor also reaches here through a save control of the
-   * canvas's own (WloCanvasComponent.onMetadataSubmit) — that one saves without meaning to leave.
+   * Write the metadata and stay put. Where the flow goes next is the footer's business, not this
+   * screen's — the editor also reaches here through a save control of the canvas's own
+   * (WloCanvasComponent.onMetadataSubmit), and that one saves without meaning to leave.
    */
   protected async save(values: MdsValues): Promise<void> {
-    const all = { ...values, ...this.previewOverrides() };
-    const sink = this.sink;
-    this.sink = null;
-    const done = sink ? await sink(all) : await this.curation.save(all);
+    const saved = await this.curation.save({ ...values, ...this.previewOverrides() });
     const settle = this.settleSave;
     this.settleSave = null;
-    settle?.(done);
+    settle?.(saved);
   }
 
   /** Drop the content's picture when it cannot be loaded; nothing takes its place here. */

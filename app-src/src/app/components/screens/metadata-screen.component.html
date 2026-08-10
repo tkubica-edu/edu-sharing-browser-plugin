@@ -8,8 +8,8 @@
           weitergeführt wird — der bereits gespeicherte bleibt unverändert bestehen.
         }
       } @else {
-        Prüfe und ergänze die Metadaten. Gespeichert wird der Inhalt am Ende des Schritts —
-        über die Schaltfläche unten geht es dorthin weiter.
+        Prüfe und ergänze die Metadaten. Die Schaltfläche unten speichert den Inhalt und führt
+        zur Inhaltsübersicht.
       }
     </p>
 
@@ -43,7 +43,7 @@
        mds-editor.component.scss). -->
   @if (editorNode; as node) {
     <section class="es-card preview-widget-card">
-      <es-mds-preview-widget [node]="node"
+      <es-mds-preview-widget [node]="node" [locked]="curation.metadataLocked()"
                              (valuesChange)="onPreviewValuesChange($event)"></es-mds-preview-widget>
     </section>
   }

@@ -94,17 +94,19 @@ export class ContentOptionsScreenComponent {
         description: 'Vorschau und Nutzung des Inhalts ansehen',
         run: () => this.flow.showOverview()
       },
-      {
-        section: 'quality',
-        label: 'Qualitätsprüfung',
-        description: 'Qualität prüfen und Metadaten anreichern',
-        run: () => this.flow.showQuality()
-      },
+      // The two working steps in the order the flow walks them: where the content goes is settled
+      // before it is described, and the Qualitätsprüfung is what ends with the save.
       {
         section: 'collections',
         label: 'Einsortieren und weiterleiten',
         description: 'Den Inhalt weiterleiten und in der eigenen Ablage einsortieren',
         run: () => this.flow.showCollections()
+      },
+      {
+        section: 'quality',
+        label: 'Qualitätsprüfung',
+        description: 'Qualität prüfen und Metadaten anreichern',
+        run: () => this.flow.showQuality()
       }
     ];
     if (this.opensInConnector()) {

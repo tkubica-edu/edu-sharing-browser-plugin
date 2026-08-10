@@ -1,26 +1,19 @@
 import { Injectable, Signal, computed, inject, signal } from '@angular/core';
 
+import { SectionId } from '../model/navigation';
 import { AdditionalWebComponentService } from './additional-web-component.service';
 import { CurationService } from './curation.service';
 import { NavigationService } from './navigation.service';
 
 /**
- * What the metadata screen hands to the footer: how to get the editor's values out of it, and
- * whether that is possible right now. `canSave` is a signal, so the footer derives its state
- * instead of being pushed to.
+ * What the metadata screen hands to the footer: how to save, and whether saving is possible
+ * right now. `canSave` is a signal, so the footer derives its state instead of being pushed to.
  *
- * Both ways out answer whether they succeeded, because the footer's action continues on the back of
- * it — a step that is entered after a failed one would leave the content behind unwritten.
+ * `save` answers whether the write succeeded, because the footer's action continues on the back of
+ * it — a step that is entered after a failed save would leave the content behind unwritten.
  */
 export interface SaveHandler {
-  /** Commit the editor and WRITE what it holds — for the step that ends with the save. */
   save: () => Promise<boolean>;
-  /**
-   * Commit the editor and hand its values to the flow WITHOUT writing them (see
-   * CurationService.hold) — for leaving the Metadaten view while steps still follow it. The editor
-   * is gone from then on, so this is the one moment its values can still be read.
-   */
-  collect: () => Promise<boolean>;
   canSave: Signal<boolean>;
 }
 
@@ -82,9 +75,13 @@ export class ActionBarService {
         ];
 
       // The preview step of the Erschließung: nothing is written here, so what it offers is the two
-      // ways on — dropping the run altogether, or taking it into the Qualitätsprüfung, which is
-      // where the save lives. The adjusted picture and title travel with it (applyDraftValues).
-      case 'curation-preview':
+      // ways on — dropping the run altogether, or carrying it into the step that follows. The
+      // adjusted picture and title travel with it (applyDraftValues).
+      case 'curation-preview': {
+        // Where the content goes is asked before it is described, so "Einsortieren und weiterleiten"
+        // is next — unless neither of its sub steps applies, and then the Qualitätsprüfung behind it
+        // is (see the registry).
+        const next: SectionId = this.navigation.isVisible('collections') ? 'collections' : 'quality';
         return [
           {
             label: 'Abbrechen',
@@ -96,16 +93,17 @@ export class ActionBarService {
             }
           },
           {
-            label: 'Qualitätsprüfung',
+            label: next === 'collections' ? 'Einsortieren und weiterleiten' : 'Qualitätsprüfung',
             disabled: false,
             run: async () => {
               // Awaited: the handover reads a picked picture out of the widget, and the next step's
               // editor is built from the node that picture goes on.
               await this.curation.applyDraftValues();
-              this.navigation.go('quality');
+              this.navigation.go(next);
             }
           }
         ];
+      }
 
       // "Bearbeitungsmodus": the content is being edited in the connector; this hands over to the
       // Qualitätsprüfung when the user is done adjusting it.
@@ -170,33 +168,23 @@ export class ActionBarService {
               }
             ]
           : [];
-        // "Einsortieren und weiterleiten" is the rest of this same big step, so the content is not
-        // written on the way there — the editor's values are only taken out of the view that is
-        // about to close (see SaveHandler.collect), and the save waits for the end of the step.
-        // Where that step does not apply at all (neither of its sub steps does), this IS the end of
-        // it and the way on carries the write.
-        if (this.navigation.isVisible('collections')) {
-          const handler = this.saveHandler();
-          return [
-            ...back,
-            {
-              label: 'Einsortieren und weiterleiten',
-              disabled: this.curation.metadataLocked(),
-              run: async () => {
-                if (handler?.canSave() && !(await handler.collect())) return;
-                this.navigation.go('collections');
-              }
-            }
-          ];
-        }
+        // The Metadaten view ends the first big step, so its way on carries the write — see
+        // {@link finishAction}.
         return [...back, this.finishAction()];
       }
 
-      // "Einsortieren und weiterleiten": the last part of the first big step, and therefore where
-      // the content is written — see {@link finishAction}. Only the way on: the way back is the
-      // topbar's back button, and between the two sub steps it is the tab bar.
+      // "Einsortieren und weiterleiten": where the content is filed and handed on, before it is
+      // described and written. Nothing is saved here — the way on leads into the Qualitätsprüfung,
+      // whose own way out writes the content with everything the flow collected. Only the way on:
+      // the way back is the topbar's back button, and between the two sub steps it is the tab bar.
       case 'collections':
-        return [this.finishAction()];
+        return [
+          {
+            label: 'Qualitätsprüfung',
+            disabled: false,
+            run: () => this.navigation.go('quality')
+          }
+        ];
 
       // Every other section owns its own primary action (selector insert, login form, the
       // "Inhaltsoptionen" choice, …).
@@ -206,16 +194,16 @@ export class ActionBarService {
   });
 
   /**
-   * The way out of the first big step and into the Inhaltsübersicht — the one action that writes.
+   * The way out of the Qualitätsprüfung and into the Inhaltsübersicht — the one action that writes.
    *
-   * The content is created here and nowhere earlier: everything the step collected (the quality
-   * criteria, the metadata, and what the sub steps of "Einsortieren und weiterleiten" will collect)
-   * belongs to one content, so it is written once, at the end. The next step is entered only once
-   * that succeeded — going on after a failed save would leave the content behind unwritten.
+   * The content is created here and nowhere earlier: everything the flow collected (the quality
+   * criteria, where the content was filed, and the metadata the editor commits now) belongs to one
+   * content, so it is written once, at the end. The next step is entered only once that succeeded —
+   * going on after a failed save would leave the content behind unwritten.
    *
-   * Two ways to write it, depending on where the step ends. With the Metadaten view still on screen
-   * the editor commits and its values are written directly; from a later sub step there is no editor
-   * left, so what it handed over on its way out is written (CurationService.saveCollected).
+   * The editor is on screen here, so it commits and its values are written. Without one — it has not
+   * mounted, or the section carries no Metadaten view — what the other steps recorded is written on
+   * its own (CurationService.saveCollected).
    *
    * A content that has nothing left to write simply goes on — see CurationService.hasCollectedValues
    * and, for the additional web component, `written` below.

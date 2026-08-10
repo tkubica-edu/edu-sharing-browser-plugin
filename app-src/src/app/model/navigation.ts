@@ -4,7 +4,7 @@
 // landing logic.
 //
 // Four of the sections are the big steps of the content flow — Bearbeitungsmodus →
-// Qualitätsprüfung → Einsortieren und weiterleiten → Inhaltsübersicht. They are not listed in the
+// Einsortieren und weiterleiten → Qualitätsprüfung → Inhaltsübersicht. They are not listed in the
 // main menu: they are entered from a node (created, selected or detected), see ContentFlowService.
 
 /** A leaf screen: exactly one component is rendered for it. */
@@ -324,14 +324,44 @@ export const SECTIONS: readonly AppSection[] = [
     ]
   },
   {
+    id: 'collections',
+    label: 'Einsortieren und weiterleiten',
+    description: 'Den Inhalt an eine Redaktion weiterleiten und in der eigenen Ablage einsortieren',
+    // Editable metadata, NOT a node: where the content goes is decided before it is written, and the
+    // save that writes it comes at the end of the Qualitätsprüfung behind this — so a freshly curated
+    // content reaches this step before it has a node at all.
+    //
+    // Both of its sub steps are optional (see the tabs), and a step with nothing in it is no step:
+    // where neither applies the section falls away entirely and the flow goes straight on to the
+    // Qualitätsprüfung.
+    visible: requiresLogin(
+      (c) => c.hasEditableMetadata && (c.additionalWebComponent || c.hasSession),
+    ),
+    // Forwarding first: it is what the curated content is *for* where the additional web component
+    // is enabled — the personal filing is the private copy on top of it.
+    tabs: [
+      {
+        id: 'editorial-forward',
+        label: 'An Redaktionen weiterleiten',
+        visible: (c) => c.additionalWebComponent
+      },
+      // A session of the user's own, not `loggedIn`: a private filing place is one a *person* has —
+      // the guest session the additional web component brings has none.
+      { id: 'personal-storage', label: 'Persönliche Ablage', visible: (c) => c.hasSession }
+    ]
+  },
+  {
     id: 'quality',
     label: 'Qualitätsprüfung',
     description: 'Qualität prüfen und Metadaten bearbeiten',
-    // An active node OR a fresh /generate result (the node is created on the first save).
+    // An active node OR a fresh /generate result (the node is created by this step's own save).
     visible: requiresLogin((c) => c.hasEditableMetadata),
     // Two views of the same content, in the order they are worked through: what the content's
     // quality is, and then the metadata that is edited off the back of it. The footer walks between
     // them (Zurück / Weiter), so the two are one step and not two — see ActionBarService.
+    //
+    // The last step before the Inhaltsübersicht, and therefore the one that writes the content:
+    // everything the flow collected is saved on the way out of the Metadaten view.
     //
     // The quality view belongs to the additional web component, like the forwarding step does: the
     // criteria are what an editorial team judges a submitted content by, and where nothing is
@@ -349,33 +379,6 @@ export const SECTIONS: readonly AppSection[] = [
         enabled: (c) => !c.additionalWebComponent || c.qualityCriteriaMet,
         disabledHint: 'Zuerst die Kriterien für die Such-Veröffentlichung erfüllen.'
       }
-    ]
-  },
-  {
-    id: 'collections',
-    label: 'Einsortieren und weiterleiten',
-    description: 'Den Inhalt an eine Redaktion weiterleiten und in der eigenen Ablage einsortieren',
-    // Editable metadata, NOT a node: this is the last part of the first big step, and the content is
-    // written at the end of it (see ActionBarService) — so a freshly curated content reaches it
-    // before it has a node at all.
-    //
-    // Both of its sub steps are optional (see the tabs), and a step with nothing in it is no step:
-    // where neither applies the section falls away entirely and the flow goes on to the
-    // Inhaltsübersicht, whose entry carries the save then.
-    visible: requiresLogin(
-      (c) => c.hasEditableMetadata && (c.additionalWebComponent || c.hasSession),
-    ),
-    // Forwarding first: it is what the curated content is *for* where the additional web component
-    // is enabled — the personal filing is the private copy on top of it.
-    tabs: [
-      {
-        id: 'editorial-forward',
-        label: 'An Redaktionen weiterleiten',
-        visible: (c) => c.additionalWebComponent
-      },
-      // A session of the user's own, not `loggedIn`: a private filing place is one a *person* has —
-      // the guest session the additional web component brings has none.
-      { id: 'personal-storage', label: 'Persönliche Ablage', visible: (c) => c.hasSession }
     ]
   },
   {
