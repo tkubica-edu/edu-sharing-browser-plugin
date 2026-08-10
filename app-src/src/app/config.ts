@@ -12,6 +12,15 @@ export const APP_CONFIG = {
   // Which repository the metadata agent writes to on POST /upload — the agent knows its targets by
   // name, so this is its key, not a URL (see MetadataUploadService).
   uploadRepository: 'staging',
+  /**
+   * The metadata set the quality criteria are defined in (QualityCriteriaComponent).
+   *
+   * Named rather than taken from the repository's default set, because the two are not the same
+   * thing here: staging's default is "Contentbuffet", which knows neither `virtual:unmetLegalCriteria`
+   * nor `ccm:oeh_buffet_criteria` — the criteria belong to the WLO set. A repository whose default
+   * set does define them can be pointed at `-default-` instead.
+   */
+  qualityMetadataSet: 'mds_oeh',
   storageKeys: {
     repositoryUrl: 'eduSharingRepoUrl',
     history: 'eduSharingHistory',

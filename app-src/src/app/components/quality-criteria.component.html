@@ -1,0 +1,77 @@
+<section class="criteria-panel">
+  <h2 class="panel-title">Fachliche Qualitätskriterien</h2>
+
+  @if (loading()) {
+    <p class="note">Die Qualitätskriterien werden geladen …</p>
+  } @else if (!hasCriteria()) {
+    <p class="note">Das Metadatenset hält für diesen Inhalt keine Qualitätskriterien bereit.</p>
+  } @else {
+    <!-- Two lists side by side while there is room; under each other once there is not. They are
+         judged independently — only the left one gates the confirmation. -->
+    <div class="criteria-group">
+      <div class="criteria-column">
+        <h3>Such-Veröffentlichung</h3>
+        <ul class="criteria">
+          @for (criterion of knockoutCriteria(); track criterion.id) {
+            <li>
+              <label class="check">
+                <input type="checkbox" [checked]="isMet(criterion)"
+                       (change)="setCriterion(criterion, $any($event.target).checked)" />
+                <span class="label">{{ captionOf(criterion) }}</span>
+              </label>
+            </li>
+          }
+        </ul>
+      </div>
+
+      <div class="criteria-column">
+        <h3>Qualität für die Redaktion</h3>
+        <ul class="criteria">
+          @for (criterion of editorialCriteria(); track criterion.id) {
+            <li>
+              <label class="check">
+                <input type="checkbox" [checked]="isEditorialMet(criterion)"
+                       (change)="setEditorialCriterion(criterion, $any($event.target).checked)" />
+                <span class="label">{{ captionOf(criterion) }}</span>
+              </label>
+            </li>
+          }
+        </ul>
+      </div>
+    </div>
+
+    <!-- The three ways to fulfil a whole list at once. Each is disabled once its list is complete —
+         it is a shortcut to a state, not a toggle, so there is nothing left for it to do then. -->
+    <div class="criteria-bulk">
+      <label class="check">
+        <input type="checkbox" [checked]="allKnockoutMet()"
+               [disabled]="allKnockoutMet()" (change)="setAllKnockout()" />
+        <span class="label">alle Suchkriterien</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" [checked]="allEditorialMet()"
+               [disabled]="allEditorialMet()" (change)="setAllEditorial()" />
+        <span class="label">alle redaktionellen</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" [checked]="allKnockoutMet() && allEditorialMet()"
+               [disabled]="allKnockoutMet() && allEditorialMet()" (change)="setAll()" />
+        <span class="label">alle auswählen</span>
+      </label>
+    </div>
+
+    @if (problemShown(); as message) {
+      <p class="note note-error">{{ message }}</p>
+    }
+
+    <!-- Only the knock-out criteria gate this: the editorial ones describe the content's quality,
+         they do not stand in the way of publishing it. Once given, the button reports the
+         confirmation rather than offering it again. -->
+    <div class="criteria-buttons">
+      <button type="button" class="confirm" [class.is-confirmed]="confirmed()"
+              [disabled]="!allKnockoutMet() || confirmed()" (click)="onConfirm()">
+        {{ confirmed() ? 'Qualität bestätigt' : 'Qualität bestätigen' }}
+      </button>
+    </div>
+  }
+</section>

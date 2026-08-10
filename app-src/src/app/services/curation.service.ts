@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { CollectionServiceUnwrapped, DEFAULT, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 import { firstValueFrom } from 'rxjs';
 
+import { WorkflowStatus } from '../model/workflow';
 import { DRAFT_NODE_ID } from '../util/mds-node';
 import { MdsValues, firstString, toMdsEditorValues } from '../util/mds-values';
 import { errorMessage } from '../util/errors';
@@ -289,6 +290,30 @@ export class CurationService {
   /** What the preview step's editor last reported; see {@link reportDraftValues}. */
   private readonly draftValues = signal<MdsValues | null>(null);
 
+  /**
+   * Properties recorded by a step that is not the metadata editor — the Qualitätsprüfung's criteria.
+   *
+   * Held here rather than written where they are set, because at that point there is usually no node
+   * to write them to: a curated content becomes one only on the save at the end of the flow. So they
+   * join the metadata like everything else the flow collects, and that one save writes them all.
+   * See {@link recordValues}.
+   */
+  private readonly recordedValues = signal<MdsValues>({});
+
+  /**
+   * The quality was confirmed in the Qualitätsprüfung. Kept as state of the flow rather than read
+   * back from the node: the confirmation is usually given before there is a node at all, and it is
+   * the same statement either way — see {@link confirmQuality}.
+   */
+  private readonly quality = signal(false);
+  readonly qualityConfirmed = this.quality.asReadonly();
+
+  /** Why a confirmation could not be recorded; null while none failed. */
+  readonly qualityError = signal<string | null>(null);
+
+  /** Set while a confirmation waits for the node the save will create. */
+  private qualityPending = false;
+
   /** Reads the preview step's picture while that step is open; see {@link registerDraftPreviewSource}. */
   private draftPreviewSource: DraftPreviewSource | null = null;
 
@@ -331,10 +356,16 @@ export class CurationService {
    * Metadata fed to the editor: the active node's properties if present, else the agent
    * payload. Falls back to the payload while the node metadata loads, so the editor never
    * briefly unmounts.
+   *
+   * What other steps have recorded ({@link recordValues}) lies on top, so the flow has ONE picture of
+   * the content's metadata: the step that recorded them reads its own values back from here, and the
+   * editor is seeded with them rather than committing over them as if they were never set.
    */
   readonly editorMetadata = computed<Record<string, unknown> | null>(() => {
     const payload = this.metadataAgent.lastRun()?.parsed?.raw ?? null;
-    return this.activeNode() ? this.nodeMetadata() ?? payload : payload;
+    const base = this.activeNode() ? this.nodeMetadata() ?? payload : payload;
+    const recorded = this.recordedValues();
+    return Object.keys(recorded).length ? { ...(base ?? {}), ...recorded } : base;
   });
 
   /**
@@ -406,9 +437,18 @@ export class CurationService {
    *
    * A method for the same reason as {@link draftNode}: the editor re-initialises on every `nodes`
    * change, so the caller reads it once as the screen opens.
+   *
+   * What other steps recorded ({@link recordValues}) is laid over the node's stored properties — for
+   * a *draft* that already happened (it is built from {@link editorMetadata}), but a saved node
+   * carries what the repository holds, which is not yet what the flow does. Without this the editor
+   * would open on the older values and commit them back over the newer ones.
    */
   editorNode(): Node | null {
-    return this.previewNode() ?? this.draftNode();
+    const node = this.previewNode();
+    if (!node) return this.draftNode();
+    const recorded = this.recordedValues();
+    if (!Object.keys(recorded).length) return node;
+    return { ...node, properties: { ...node.properties, ...recorded } };
   }
 
   /**
@@ -419,6 +459,38 @@ export class CurationService {
    */
   reportDraftValues(values: MdsValues): void {
     this.draftValues.set(values);
+  }
+
+  /**
+   * Take over properties a step outside the metadata editor has recorded — the Qualitätsprüfung's
+   * criteria. They show up in {@link editorMetadata} at once and are written by the next
+   * {@link save}, which is where the content gets its node in the first place.
+   *
+   * Merged per property rather than replacing the lot, so two steps recording different properties
+   * do not overwrite each other.
+   */
+  recordValues(values: MdsValues): void {
+    this.recordedValues.update((recorded) => ({ ...recorded, ...values }));
+  }
+
+  /**
+   * Confirm the content's quality: a workflow status on its node
+   * ({@link WorkflowStatus.ELEMENT_LEGALLY_APPROVED}).
+   *
+   * A status is written to a node, and at the step this is given there usually is none yet — so a
+   * content that has one is confirmed on the spot, and a content that has not is confirmed by the
+   * save that creates it (see {@link writePendingQuality}). Either way the confirmation itself holds
+   * from the moment it is given: it is a statement about the content, not about the node.
+   */
+  async confirmQuality(): Promise<void> {
+    this.quality.set(true);
+    this.qualityError.set(null);
+    const nodeId = this.activeNode()?.nodeId;
+    if (!nodeId) {
+      this.qualityPending = true;
+      return;
+    }
+    await this.writeQualityStatus(nodeId);
   }
 
   /**
@@ -707,6 +779,10 @@ export class CurationService {
    */
   async save(values: MdsValues): Promise<boolean> {
     if (!this.auth.authorized()) return false;
+    // What other steps recorded goes underneath, so a property the editor carries too is the
+    // editor's: it is the metadata's own authority, and it was seeded with the recorded values
+    // anyway (see editorMetadata). A property it does not carry survives from where it was set.
+    values = { ...this.recordedValues(), ...values };
     // With the additional web component every save goes through the agent's upload — not just the
     // first one. The nodes it writes belong to the agent's own privileges, so the session the panel
     // runs under (a guest) may neither read nor edit them: an update in place is not available for
@@ -724,6 +800,9 @@ export class CurationService {
       this.setActiveNode(saved.nodeId, saved.name);
       this.resultPending.set(false);
       this.saved.set(true);
+      // Written now, so the node's own properties are what the steps read back from here on.
+      this.recordedValues.set({});
+      await this.writePendingQuality(saved.nodeId);
       // Before the reload below, so the node comes back already carrying it.
       await this.writePendingPreview(saved.nodeId);
       // Load the full hydrated node once: its properties re-seed the editor (so re-editing
@@ -772,11 +851,16 @@ export class CurationService {
       }
       this.resultPending.set(false);
       this.saved.set(true);
+      // Uploaded with the rest of the values, so they are the node's metadata from here on.
+      this.recordedValues.set({});
       // The preview step's picture is dropped rather than written here: the agent creates the node
       // with its own privileges, so the panel session (a guest) may not upload a preview to it. What
       // the page itself offers the agent already has — `preview_image_url` travelled in the payload.
       this.pendingPreview.set(null);
-      if (outcome.node?.nodeId) await this.applyUploadedNode(outcome.node, values);
+      if (outcome.node?.nodeId) {
+        await this.applyUploadedNode(outcome.node, values);
+        await this.writePendingQuality(outcome.node.nodeId);
+      }
       return true;
     } catch (cause: unknown) {
       this.saveError.set(errorMessage(cause));
@@ -901,6 +985,30 @@ export class CurationService {
     this.nodeMetadata.set(node.properties as MdsValues);
   }
 
+  /** Hand a confirmation given before the save on to the node the save produced. */
+  private async writePendingQuality(nodeId: string): Promise<void> {
+    if (!this.qualityPending) return;
+    this.qualityPending = false;
+    await this.writeQualityStatus(nodeId);
+  }
+
+  /**
+   * Record the confirmed quality on the node. A failure is reported rather than thrown: it comes
+   * after the metadata was written, and losing that save over the status would be the worse outcome
+   * — the content is saved, only its confirmation did not get through.
+   */
+  private async writeQualityStatus(nodeId: string): Promise<void> {
+    try {
+      await this.repositoryNodes.addWorkflowStatus(
+        nodeId,
+        WorkflowStatus.ELEMENT_LEGALLY_APPROVED
+      );
+    } catch (cause: unknown) {
+      this.quality.set(false);
+      this.qualityError.set('Die Qualität konnte nicht bestätigt werden: ' + errorMessage(cause));
+    }
+  }
+
   private setActiveNode(nodeId: string, name: string | null): void {
     this.activeNode.set({ nodeId, name, link: renderLink(this.auth.repositoryUrl(), nodeId) });
   }
@@ -908,6 +1016,10 @@ export class CurationService {
   private resetNodeState(): void {
     this.resultPending.set(false);
     this.draftValues.set(null);
+    this.recordedValues.set({});
+    this.quality.set(false);
+    this.qualityError.set(null);
+    this.qualityPending = false;
     this.pendingPreview.set(null);
     this.saved.set(false);
     this.activeNode.set(null);

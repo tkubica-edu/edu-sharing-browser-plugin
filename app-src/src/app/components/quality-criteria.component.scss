@@ -1,0 +1,157 @@
+// Self-contained on purpose (no shared mixins, no import of the panel's tokens): this component is
+// meant to be built as a custom element of its own, where none of that travels with it. It reads the
+// panel's variables where they exist and falls back to its own values where they do not, so it looks
+// right in the panel and still looks like itself outside it.
+:host {
+  --qc-accent: var(--es-blue, #003b7c);
+  --qc-text: var(--es-text, #1c2733);
+  --qc-muted: var(--es-muted, #63707e);
+  --qc-border: var(--es-border, #dfe3e8);
+  --qc-surface: var(--es-surface, #ffffff);
+  --qc-error: var(--es-error, #a3271f);
+
+  display: block;
+  color: var(--qc-text);
+}
+
+.criteria-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 12px 20px;
+}
+
+// Centred headings, as the criteria are a sheet of their own rather than a section of the screen.
+.panel-title {
+  margin: 0;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--qc-accent);
+}
+
+h3 {
+  margin: 0 0 10px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--qc-accent);
+}
+
+// Two columns while the width allows it, stacked once it does not — the component is as wide as
+// wherever it is embedded, which in the panel is a sidebar and elsewhere may be a page.
+.criteria-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 20px;
+
+  > .criteria-column {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+}
+
+.criteria {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+// The bulk row reads as one line of shortcuts under the lists, wrapping rather than squeezing.
+.criteria-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  padding-top: 4px;
+  border-top: 1px solid var(--qc-border);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+
+  &:has(input:disabled) { cursor: default; }
+}
+
+// Drawn rather than native: the box is the loudest mark in the view, and its size and colour are
+// what make the two lists readable at a glance.
+input[type='checkbox'] {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border: 2px solid var(--qc-accent);
+  border-radius: 4px;
+  background: var(--qc-surface);
+  cursor: inherit;
+
+  &:checked {
+    background: var(--qc-accent);
+
+    // The tick, as a rotated corner — no glyph, so it needs no icon font to be there.
+    &::after {
+      content: '';
+      display: block;
+      width: 5px;
+      height: 10px;
+      margin: 1px auto 0;
+      border: solid #fff;
+      border-width: 0 2.5px 2.5px 0;
+      transform: rotate(45deg);
+    }
+  }
+
+  // A shortcut that has nothing left to do, and a box locked while a write runs: still legible as
+  // checked, clearly not something to press.
+  &:disabled {
+    border-color: #b6c6d8;
+    &:checked { background: #b6c6d8; }
+  }
+
+  &:focus-visible { outline: 2px solid var(--qc-accent); outline-offset: 2px; }
+}
+
+.label {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--qc-text);
+  overflow-wrap: anywhere;
+}
+
+.criteria-buttons {
+  display: flex;
+  justify-content: center;
+}
+
+// A pill, because it closes the sheet rather than continuing the panel's own footer chain.
+.confirm {
+  padding: 11px 26px;
+  border: none;
+  border-radius: 999px;
+  background: var(--qc-accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover:not([disabled]) { filter: brightness(1.12); }
+  &[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+  // Given, not merely unavailable: it reports a state, so it stays fully legible.
+  &.is-confirmed[disabled] { opacity: 1; }
+}
+
+.note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--qc-muted);
+}
+
+.note-error { color: var(--qc-error); }

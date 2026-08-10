@@ -78,6 +78,22 @@ export class RepositoryNodeService {
   }
 
   /**
+   * Record a workflow status on the node — an entry in its workflow history, which is how the
+   * repository tracks the editorial ladder (see WorkflowStatus). It is a history, not a property:
+   * writing one adds a step, it does not overwrite the step before it.
+   */
+  async addWorkflowStatus(nodeId: string, status: string, comment = ''): Promise<void> {
+    await firstValueFrom(
+      this.nodesUnwrapped.addWorkflowHistory({
+        repository: HOME_REPOSITORY,
+        node: nodeId,
+        // `editor` and `time` are filled in by the repository.
+        body: { status, comment }
+      })
+    );
+  }
+
+  /**
    * Load the full (hydrated) node. Its `properties` re-seed the MDS editor for re-editing, and
    * the node object itself feeds the preview element (whose `node` input is the Node object
    * rather than an id).

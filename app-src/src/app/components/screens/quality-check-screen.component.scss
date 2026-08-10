@@ -1,10 +1,2 @@
+// The criteria component brings its own layout and padding — the screen is only its place.
 :host { display: block; }
-
-// The content's name, read as a heading of the view rather than as more of its prose.
-.node-title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
