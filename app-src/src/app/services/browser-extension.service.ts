@@ -8,6 +8,23 @@ export interface PageSource {
   favIconUrl?: string;
 }
 
+/**
+ * What the content script reads off the open page (`content/content.js`), as far as anything here uses
+ * it. It carries a good deal more — the page's Open Graph, breadcrumbs, tags, JSON-LD — which
+ * {@link PageData.formattedText} already contains as text.
+ *
+ * The three texts are the same page in decreasing preparation: `formattedText` is the metadata blocks
+ * followed by the main content, `mainContent` is that content alone, `text` the fallback for a page
+ * whose main content could not be told apart from its chrome.
+ */
+export interface PageData {
+  url: string;
+  title: string;
+  mainContent?: string;
+  formattedText?: string;
+  text?: string;
+}
+
 /** Reply of the background worker's `analyze.run` message. */
 export interface AnalyzeResponse {
   success: boolean;
@@ -130,6 +147,18 @@ export class BrowserExtensionService {
       | { success?: boolean; tab?: PageSource }
       | null;
     return response?.success ? response.tab ?? null : null;
+  }
+
+  /**
+   * Read the open page, by injecting the content script into it. `null` for a page that cannot be read
+   * at all — an extension or browser page, one whose injection the browser refuses — which is a
+   * possible outcome rather than an error: what needs the page's text says so itself.
+   */
+  async extractPageData(): Promise<PageData | null> {
+    const response = (await browser.runtime
+      .sendMessage({ action: 'tabs.extractPageData' })
+      .catch(() => null)) as { success?: boolean; data?: PageData } | null;
+    return response?.success ? response.data ?? null : null;
   }
 
   async storageGet<T>(key: string, fallback: T): Promise<T> {

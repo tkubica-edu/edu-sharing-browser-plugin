@@ -7,6 +7,34 @@ export const APP_CONFIG = {
    * (see config.js).
    */
   agentApiUrl: 'https://metadata-agent-api.vercel.app',
+  /**
+   * MetalookUp, which evaluates a resource and answers with the metadata it could extract from it
+   * (`POST /api/evaluation`, see MetalookupService). The host root — the base its own OpenAPI
+   * declares (`…/sw`) does not route.
+   */
+  metalookupApiUrl: 'https://metalookup-2.staging.openeduhub.net',
+  /**
+   * Sent as `X-API-KEY` where the MetalookUp deployment demands one. Empty leaves the header off
+   * altogether, which is how an unauthenticated deployment is reached — and how the demand becomes
+   * visible in the first place, as the answer's status.
+   */
+  metalookupApiKey: '',
+  /**
+   * ContentJudge, which judges a content against evaluation schemes by LLM (`POST /evaluate/`, see
+   * ContentJudgeService).
+   */
+  contentJudgeApiUrl: 'https://llm-contentjudge.staging.openeduhub.net',
+  /**
+   * `user:password` for the Basic auth that guards the ContentJudge deployment. It guards the whole
+   * host, the API's own docs included; the API itself asks for nothing. Empty leaves the header off,
+   * and the answer is then the `401` of that guard.
+   */
+  contentJudgeBasicAuth: '',
+  /**
+   * Which schemes a content is judged against. Every one of them is a separate LLM pass, so few — the
+   * API takes at most ten, and `GET /schemes/` lists what a deployment actually has.
+   */
+  contentJudgeSchemes: ['sachrichtigkeit', 'neutralitaet'],
   defaultRepositoryUrl: 'https://repository.staging.openeduhub.net/edu-sharing',
  //defaultRepositoryUrl: 'http://repository.127.0.0.1.nip.io:8100/edu-sharing',
   // Which repository the metadata agent writes to on POST /upload — the agent knows its targets by
