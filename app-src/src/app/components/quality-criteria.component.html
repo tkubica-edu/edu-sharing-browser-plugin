@@ -8,7 +8,22 @@
       <span class="spinner" aria-hidden="true"></span>
       Der Inhalt wird geprüft …
     </p>
-  } @else if (hasAiAnswers()) {
+  }
+
+  <!-- Who was asked and what came of it. Named per judge, because they answer about different things:
+       an empty result from one of them is not the same as "nothing found" — see JudgeState. Why a judge
+       was skipped or how it failed is in its tooltip. -->
+  @if (judgesAsked()) {
+    <p class="note ai-status">
+      @for (status of judgeStatuses(); track status.judge) {
+        <span class="ai-judge" [class.is-done]="status.state === 'done'"
+              [class.is-failed]="status.state === 'failed'"
+              [attr.title]="status.detail">{{ status.judge }}: {{ judgeStateLabel(status) }}</span>
+      }
+    </p>
+  }
+
+  @if (hasAiAnswers()) {
     <!-- What the colour means, for as long as anything on screen is in it. -->
     <p class="note ai-legend">Lila: von der KI geprüft und ausgefüllt.</p>
   }
@@ -36,17 +51,20 @@
                   {{ captionOf(criterion) }}
                   <!-- What the machine made of this criterion, beside the box rather than in it — the
                        box stays the human's answer (see QualityCriteriaComponent.judgements). -->
-                  @if (judgementOf(criterion); as judged) {
+                  @for (judged of judgementsOf(criterion); track judged.scheme) {
                     <span class="judged" [class.is-met]="judged.met === true"
                           [class.is-unmet]="judged.met === false"
-                          [title]="judged.reasoning ? null : judgementTitle(judged)">
+                          [attr.title]="judged.reasoning ? null : judgementTitle(judged)">
                       <!-- The mark of the machine, and the way to its argument: hovering (or focusing,
                            for a keyboard and for a tap) opens the reasoning it gave. Where there is
-                           one, which scheme judged is stated in there rather than as a native tooltip —
-                           two tooltips over one line would fight each other. -->
+                           one, which check judged is stated in there rather than as a native tooltip —
+                           two tooltips over one line would fight each other. `attr.title`, so that
+                           second tooltip is really absent then: a property binding would set the DOM
+                           property to null, which reflects as the *string* "null". -->
                       @if (judged.reasoning; as reasoning) {
                         <span class="ai-hint" tabindex="0" role="img"
-                              aria-label="Begründung der KI-Einschätzung">✦<span class="ai-reasoning"
+                              aria-label="Begründung der maschinellen Einschätzung"><i class="ai-glyph"
+                              esIcon="smart_toy"></i><span class="ai-reasoning"
                               role="note"><span class="ai-source">{{ judgementTitle(judged) }}</span>{{ reasoning }}</span></span>
                       }
                       {{ judgementText(judged) }}
@@ -70,17 +88,20 @@
                        (change)="setEditorialCriterion(criterion, $any($event.target).checked)" />
                 <span class="label">
                   {{ captionOf(criterion) }}
-                  @if (judgementOf(criterion); as judged) {
+                  @for (judged of judgementsOf(criterion); track judged.scheme) {
                     <span class="judged" [class.is-met]="judged.met === true"
                           [class.is-unmet]="judged.met === false"
-                          [title]="judged.reasoning ? null : judgementTitle(judged)">
+                          [attr.title]="judged.reasoning ? null : judgementTitle(judged)">
                       <!-- The mark of the machine, and the way to its argument: hovering (or focusing,
                            for a keyboard and for a tap) opens the reasoning it gave. Where there is
-                           one, which scheme judged is stated in there rather than as a native tooltip —
-                           two tooltips over one line would fight each other. -->
+                           one, which check judged is stated in there rather than as a native tooltip —
+                           two tooltips over one line would fight each other. `attr.title`, so that
+                           second tooltip is really absent then: a property binding would set the DOM
+                           property to null, which reflects as the *string* "null". -->
                       @if (judged.reasoning; as reasoning) {
                         <span class="ai-hint" tabindex="0" role="img"
-                              aria-label="Begründung der KI-Einschätzung">✦<span class="ai-reasoning"
+                              aria-label="Begründung der maschinellen Einschätzung"><i class="ai-glyph"
+                              esIcon="smart_toy"></i><span class="ai-reasoning"
                               role="note"><span class="ai-source">{{ judgementTitle(judged) }}</span>{{ reasoning }}</span></span>
                       }
                       {{ judgementText(judged) }}

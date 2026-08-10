@@ -6,19 +6,18 @@ import {
   DEFAULT, HOME_REPOSITORY, MdsDefinition, MdsService, MdsValue, MdsWidget
 } from 'ngx-edu-sharing-api';
 
-import { ContentJudgeEvaluation, ContentJudgeService } from '../services/content-judge.service';
-import { MetalookupResource, MetalookupService } from '../services/metalookup.service';
-import {
-  CriterionJudgement, judgementsForCriteria, schemesForCriteria
-} from '../util/quality-schemes';
+import { IconDirective } from '../directives/icon.directive';
+// Type-only: the answers are fetched by the service, this view only reads what came back.
+import type { ContentJudgeEvaluation } from '../services/content-judge.service';
+import type { MetalookupEvaluation } from '../services/metalookup.service';
+import { JudgeStatus, QualityJudgeService } from '../services/quality-judge.service';
+import { CriterionJudgement, judgementsForCriteria } from '../util/quality-schemes';
 
 /** Every property as `string[]` — the shape the repository and the MDS editor both expect. */
 export type CriteriaProperties = Record<string, string[]>;
 
 /** Log prefix for what this view finds out about the content, as everywhere else in the extension. */
 const LOG_QUALITY = '[edu-sharing][quality]';
-const LOG_METALOOKUP = '[edu-sharing][metalookup]';
-const LOG_CONTENT_JUDGE = '[edu-sharing][contentjudge]';
 
 /**
  * The valuespace ids a criterion's value carries in `alternativeIds` — from the quality vocabulary
@@ -88,40 +87,25 @@ function asList(value: unknown): string[] {
  * panel the criteria are collected with the rest of the metadata and written by the single save at
  * the end of the flow, which is where a curated content gets its node in the first place.
  *
- * It also has two services judge the content on its own, because the criteria are what they are asked
- * about: MetalookUp measures the resource itself, and ContentJudge assesses its text against the
- * schemes the criteria map to (see `schemesForCriteria`). What ContentJudge finds in order is reported
- * as an answer to that criterion, like a click on its box would be; the rest is shown beside it.
- * The content they judge comes in as {@link pageUrl} / {@link pageText} / {@link nodeId} rather than
- * being read here — reading the open page is the extension's business, and staying out of it is what
- * keeps this component shippable on its own.
+ * The content is also judged by machine, and this view is where that judgement lands: what the check
+ * found in order is reported as an answer to that criterion, like a click on its box would be, and the
+ * rest is shown beside it. The checking itself happens elsewhere and much earlier (QualityJudgeService,
+ * started as soon as the content is erschlossen), so by the time this view opens the answer is usually
+ * already there — and where it is not, the wait is the tail of it.
  */
 @Component({
   selector: 'es-quality-criteria',
+  imports: [IconDirective],
   templateUrl: './quality-criteria.component.html',
   styleUrl: './quality-criteria.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class QualityCriteriaComponent {
   private readonly mdsService = inject(MdsService);
-  private readonly metalookup = inject(MetalookupService);
-  private readonly contentJudge = inject(ContentJudgeService);
+  private readonly qualityJudge = inject(QualityJudgeService);
 
   /** What the content records right now — its node properties, or the metadata standing in for them. */
   readonly properties = input<Record<string, unknown> | null>(null);
-
-  /** The address of the content being judged; empty while none is known. */
-  readonly pageUrl = input('');
-
-  /**
-   * The content's text as ContentJudge should judge it — already picked and cut to the length the API
-   * accepts (see `judgeableText`, which the host applies to the page it read). Empty means the page
-   * yielded nothing to judge, which is an outcome rather than an error.
-   */
-  readonly pageText = input('');
-
-  /** The repository's id for the content, where it already has one; empty otherwise. */
-  readonly nodeId = input('');
 
   /** The metadata set the criteria are defined in; the repository's primary one unless given. */
   readonly metadataSet = input(DEFAULT);
@@ -159,13 +143,14 @@ export class QualityCriteriaComponent {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
 
-  /**
-   * Whether a check is still running. Read off the services rather than tracked here: each of them
-   * already knows, and they finish at their own pace — the spinner is gone once the slower one is.
-   */
-  protected readonly checking = computed(
-    () => this.metalookup.running() || this.contentJudge.running()
-  );
+  /** Whether a check is still out — the spinner is gone once the slower of the two judges is back. */
+  protected readonly checking = this.qualityJudge.running;
+
+  /** What each judge did, so an empty result is not mistaken for "nothing found". */
+  protected readonly judgeStatuses = this.qualityJudge.statuses;
+
+  /** Whether anything was asked at all; before that there is nothing to report. */
+  protected readonly judgesAsked = this.qualityJudge.asked;
 
   /**
    * The criteria whose answer the check put there rather than a person — what is drawn in the machine's
@@ -179,34 +164,37 @@ export class QualityCriteriaComponent {
   /** Whether anything on screen carries a machine's answer — for the legend that explains the colour. */
   protected readonly hasAiAnswers = computed(() => this.aiAnswered().length > 0);
 
-  /** Whether the two services have been asked about this content; see {@link judge}. */
-  private judged = false;
+  /** The answers already taken over, so the same state is not applied twice; see the constructor. */
+  private takenJudgement: ContentJudgeEvaluation | null = null;
+  private takenMeasurement: MetalookupEvaluation | null = null;
 
   /**
-   * What ContentJudge answered per criterion, keyed by criterion id — empty until it answered.
+   * What the judges answered per criterion, keyed by criterion id — several answers where several
+   * checks bear on one criterion, empty until anything answered.
    *
-   * Shown beside every criterion, whichever way it went; a criterion it found in order is also ticked
-   * (see {@link tickJudged}). Kept as its own state rather than derived from the record, because the
-   * record only holds the answer — the score behind it, and the wording the scheme gave it, are here.
+   * Shown beside every criterion, whichever way each went; a criterion they *all* found in order is
+   * also ticked (see {@link tickJudged}). Kept as its own state rather than derived from the record,
+   * because the record only holds the answer — the score behind it and the wording are here.
    */
-  private readonly judgements = signal<Record<string, CriterionJudgement>>({});
+  private readonly judgements = signal<Record<string, CriterionJudgement[]>>({});
 
   constructor() {
     // The criteria belong to the set, so they are re-read whenever it (or the repository) changes.
     effect(() => void this.load(this.metadataSet(), this.repository()));
 
-    // Judge once, as soon as there is both something to ask about and something to ask with: the
-    // criteria decide which schemes ContentJudge is given, the content is what both services judge.
-    // Once per mounting of this view — a re-judgement on every change of the record would ask the same
-    // question of the same content again.
+    // Take the judgements over as soon as the criteria to map them onto are there. The two judges answer
+    // at their own pace and either can be the later one — the checks are usually done before this view
+    // opens, and a slow one lands while the criteria are already on screen. Each state of the answers is
+    // applied once, so the second judge arriving adds to what the first said instead of replacing it.
     effect(() => {
       const criteria = this.criterionIds();
-      const resource = { url: this.pageUrl(), nodeId: this.nodeId() };
-      const text = this.pageText();
-      if (this.judged || !criteria.length) return;
-      if (!resource.url && !resource.nodeId && !text) return;
-      this.judged = true;
-      void this.judge(criteria, resource, text);
+      const judgement = this.qualityJudge.evaluation();
+      const measurement = this.qualityJudge.measured();
+      if (!criteria.length || (!judgement && !measurement)) return;
+      if (judgement === this.takenJudgement && measurement === this.takenMeasurement) return;
+      this.takenJudgement = judgement;
+      this.takenMeasurement = measurement;
+      this.takeJudgements(criteria, judgement, measurement);
     });
 
     // Report the gate whenever it moves — on the first read of the set, and on every click that
@@ -289,9 +277,9 @@ export class QualityCriteriaComponent {
     return criterion.caption || criterion.id;
   }
 
-  /** What the machine made of this criterion; null while nothing judged it — see {@link judgements}. */
-  protected judgementOf(criterion: MdsValue): CriterionJudgement | null {
-    return this.judgements()[criterion.id] ?? null;
+  /** What the machines made of this criterion; empty while nothing judged it — see {@link judgements}. */
+  protected judgementsOf(criterion: MdsValue): readonly CriterionJudgement[] {
+    return this.judgements()[criterion.id] ?? [];
   }
 
   /** Whether this criterion's answer is the machine's — see {@link aiAnswered}. */
@@ -308,11 +296,27 @@ export class QualityCriteriaComponent {
     return judgement.label ? `${judgement.label} (${value})` : value;
   }
 
-  /** Which scheme said it, and how sure it was — for the row's tooltip. */
+  /** What a judge's state is called where it is reported. */
+  protected judgeStateLabel(status: JudgeStatus): string {
+    switch (status.state) {
+      case 'running':
+        return 'läuft …';
+      case 'done':
+        return 'geprüft';
+      case 'skipped':
+        return 'übersprungen';
+      case 'failed':
+        return 'fehlgeschlagen';
+      default:
+        return 'nicht gestartet';
+    }
+  }
+
+  /** Who said it, by which check, and how sure — for the row's tooltip. */
   protected judgementTitle(judgement: CriterionJudgement): string {
     const confidence =
       judgement.confidence === null ? '' : `, Konfidenz ${Math.round(judgement.confidence * 100)} %`;
-    return `ContentJudge: ${judgement.scheme}${confidence}`;
+    return `${judgement.source}: ${judgement.scheme}${confidence}`;
   }
 
   /** Record a knock-out criterion as met or as violated — one property each. */
@@ -367,110 +371,41 @@ export class QualityCriteriaComponent {
   protected readonly problemShown = computed(() => this.error() ?? this.problem());
 
   /**
-   * Have both services judge the content, side by side. `allSettled`, so one that fails — a service
-   * that is down, a credential that is missing — leaves the other's answer standing.
-   *
-   * Nothing of what comes back is applied to the criteria yet; it is logged, and what to make of it is
-   * the next question.
+   * Take both answers apart per criterion, so every box can say what the machines made of it — the same
+   * maps that chose the checks decide which result belongs to which criterion.
    */
-  private async judge(
+  private takeJudgements(
     criteria: readonly string[],
-    resource: MetalookupResource,
-    text: string
-  ): Promise<void> {
-    console.log(`${LOG_QUALITY} criteria`, {
-      legal: this.knockoutCriteria().map((criterion) => ({
-        id: criterion.id,
-        caption: this.captionOf(criterion),
-        met: this.isMet(criterion)
-      })),
-      editorial: this.editorialCriteria().map((criterion) => ({
-        id: criterion.id,
-        caption: this.captionOf(criterion),
-        met: this.isEditorialMet(criterion)
-      }))
-    });
-    const schemes = schemesForCriteria(criteria);
-    console.log(`${LOG_QUALITY} schemes`, schemes);
-    await Promise.allSettled([
-      this.runMetalookup(resource),
-      this.runContentJudge(criteria, text, schemes.schemes)
-    ]);
-  }
-
-  /**
-   * MetalookUp retrieves the resource itself, so it is given what identifies it: the address, and the
-   * node id for a content the repository already holds. It takes either, and with both it can choose.
-   */
-  private async runMetalookup(resource: MetalookupResource): Promise<void> {
-    if (!resource.url && !resource.nodeId) {
-      console.log(`${LOG_METALOOKUP} skipped — the content has neither an address nor a node`);
-      return;
-    }
-    try {
-      // Built here only to log what goes out; the call assembles its own, from the same pure method.
-      console.log(`${LOG_METALOOKUP} → request`, this.metalookup.requestBody(resource));
-      console.log(`${LOG_METALOOKUP} ← response`, await this.metalookup.evaluate(resource));
-    } catch (cause: unknown) {
-      console.warn(`${LOG_METALOOKUP} evaluation failed`, cause);
-    }
-  }
-
-  /** ContentJudge judges the content's text against one scheme per criterion that has one. */
-  private async runContentJudge(
-    criteria: readonly string[],
-    text: string,
-    schemes: readonly string[]
-  ): Promise<void> {
-    if (!schemes.length) {
-      console.log(`${LOG_CONTENT_JUDGE} skipped — no criterion maps to a scheme`);
-      return;
-    }
-    if (!text) {
-      console.log(`${LOG_CONTENT_JUDGE} skipped — the content yielded too little text to judge`);
-      return;
-    }
-    try {
-      // The schemes and how much text they get — not the text itself, which is up to 50000 characters
-      // and would bury the answer it is logged next to.
-      console.log(`${LOG_CONTENT_JUDGE} → request`, { schemes, textLength: text.length });
-      const evaluation = await this.contentJudge.evaluate(text, schemes);
-      console.log(`${LOG_CONTENT_JUDGE} ← response`, evaluation);
-      this.takeJudgements(criteria, evaluation);
-    } catch (cause: unknown) {
-      console.warn(`${LOG_CONTENT_JUDGE} evaluation failed`, cause);
-    }
-  }
-
-  /**
-   * Take the answer apart per criterion, so every box can say what the machine made of it — the same
-   * map that chose the schemes decides which result belongs to which criterion.
-   */
-  private takeJudgements(criteria: readonly string[], evaluation: ContentJudgeEvaluation): void {
-    const judgements = judgementsForCriteria(criteria, evaluation);
+    judgement: ContentJudgeEvaluation | null,
+    measurement: MetalookupEvaluation | null
+  ): void {
+    const judgements = judgementsForCriteria(criteria, judgement, measurement);
     this.judgements.set(judgements);
     console.log(
       `${LOG_QUALITY} judgement`,
-      Object.values(judgements).map((judgement) => ({
-        caption: this.captionById(judgement.criterion),
-        ...judgement
-      }))
+      Object.values(judgements)
+        .flat()
+        .map((found) => ({ caption: this.captionById(found.criterion), ...found }))
     );
     this.tickJudged(judgements);
   }
 
   /**
-   * Tick every criterion the check found in order, and record it as the machine's answer where the
+   * Tick every criterion the checks found in order, and record it as the machine's answer where the
    * valuespace can say so.
    *
-   * Only where nothing is recorded yet. The judgement arrives about a minute after the view opened, so
-   * the user may have answered in the meantime — and their answer is the one that counts. The same goes
-   * for a content that already carries one, an "Ungeprüft" included: what is there is not overwritten.
+   * *Every* check: where two of them bear on one criterion, one failure is enough to leave it open — a
+   * content whose security headers are missing is not confirmed by an LLM finding its prose harmless.
+   *
+   * Only where nothing is recorded yet. The answers arrive about a minute after the content was
+   * erschlossen, so the user may have answered in the meantime — and their answer is the one that
+   * counts. The same goes for a content that already carries one, an "Ungeprüft" included: what is there
+   * is not overwritten.
    *
    * A failed check ticks nothing and records nothing: the box already reads as unanswered, and the
    * verdict beside it says what was found.
    */
-  private tickJudged(judgements: Record<string, CriterionJudgement>): void {
+  private tickJudged(judgements: Record<string, CriterionJudgement[]>): void {
     const values: CriteriaProperties = {};
     const editorial = [...this.valueOfProperty(EDITORIAL_PROPERTY)];
     // Coarse on purpose: the editorial criteria share one property, so a single click of the user's
@@ -479,9 +414,8 @@ export class QualityCriteriaComponent {
     const ticked: string[] = [];
     const left: Record<string, string> = {};
 
-    for (const judgement of Object.values(judgements)) {
-      const criterion = judgement.criterion;
-      if (judgement.met !== true) continue;
+    for (const [criterion, found] of Object.entries(judgements)) {
+      if (!found.every((judgement) => judgement.met === true)) continue;
       if (this.isEditorial(criterion)) {
         if (editorialAnswered || editorial.includes(criterion)) {
           left[criterion] = 'already answered';

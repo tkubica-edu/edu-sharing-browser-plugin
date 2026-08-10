@@ -1,8 +1,5 @@
 <es-quality-criteria [properties]="properties()"
                      [metadataSet]="metadataSet"
-                     [pageUrl]="pageUrl()"
-                     [pageText]="pageText()"
-                     [nodeId]="nodeId"
                      [confirmed]="curation.qualityConfirmed()"
                      [problem]="curation.qualityError()"
                      (propertiesChange)="record($event)"

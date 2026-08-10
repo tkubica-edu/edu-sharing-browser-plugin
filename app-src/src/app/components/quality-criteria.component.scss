@@ -158,24 +158,44 @@ input[type='checkbox'] {
 .ai-hint {
   position: relative;
   cursor: help;
-  font-size: 12px;
 
   &:focus-visible { outline: 2px solid var(--qc-ai); outline-offset: 1px; }
+}
+
+// The one glyph this component takes from the panel's icon font (see IconDirective). Sized and lifted
+// to sit on the line of the verdict rather than on top of it.
+.ai-glyph {
+  font-size: 15px;
+  line-height: 1;
+  vertical-align: -3px;
 }
 
 // Why the machine judged that way, in its own words. Hidden until the mark is hovered or focused, and
 // wide enough to be read: it is several paragraphs of Markdown, so the line breaks it brought are kept
 // and the whole thing scrolls rather than growing over the sheet.
+//
+// Two things make that scrolling actually possible. It starts exactly at the mark's lower edge — any
+// gap between the two is neither, so the pointer on its way down would leave both and the popover
+// would close before it is reached. And it fades out on a delay instead of vanishing, which gives the
+// pointer the moment it needs to cross into it. Both are why this hides by `visibility` rather than by
+// `display`: only the former can be transitioned.
 .ai-reasoning {
-  display: none;
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    visibility 0s linear 0.3s,
+    opacity 0.12s linear 0.3s;
   position: absolute;
   z-index: 3;
-  top: calc(100% + 4px);
+  top: 100%;
   left: 0;
   width: 280px;
   max-width: 80vw;
-  max-height: 220px;
+  max-height: 240px;
   overflow-y: auto;
+  // The panel behind it stays put once the end of the text is reached.
+  overscroll-behavior: contain;
+  margin-top: 4px;
   padding: 8px 10px;
   border: 1px solid var(--qc-border);
   border-left: 3px solid var(--qc-ai);
@@ -188,6 +208,16 @@ input[type='checkbox'] {
   white-space: pre-wrap;
   text-align: left;
   cursor: text;
+
+  // The bridge across that 4px of margin: transparent, part of the popover, and therefore hovered.
+  &::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: 0;
+    right: 0;
+    height: 5px;
+  }
 }
 
 // Which scheme said it, above its own words.
@@ -204,7 +234,10 @@ input[type='checkbox'] {
 .ai-hint:hover .ai-reasoning,
 .ai-hint:focus .ai-reasoning,
 .ai-hint:focus-within .ai-reasoning {
-  display: block;
+  visibility: visible;
+  opacity: 1;
+  // Opening is immediate; only the closing waits (see the delays above).
+  transition-delay: 0s;
 }
 
 // The right-hand column would push its popover past the sheet, so there it opens the other way.
@@ -220,14 +253,35 @@ input[type='checkbox'] {
   color: var(--qc-muted);
 }
 
-// The wait and what it explains afterwards: both are about the machine, so both are in its colour.
+// The wait, who was asked, and what the colour means: all three are about the machines, so all three
+// are in their colour.
 .checking,
+.ai-status,
 .ai-legend {
   display: flex;
   align-items: center;
   gap: 8px;
   justify-content: center;
   color: var(--qc-ai);
+}
+
+.ai-status {
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 11px;
+}
+
+// One judge's state. Marked by a glyph as well as by colour, since colour alone says nothing here.
+.ai-judge {
+  &::before { content: '◦ '; }
+  &.is-done::before { content: '✓ '; }
+
+  // A judge that did not answer is a malfunction rather than a verdict, so it is not in the machines'
+  // colour but in the one everything broken uses.
+  &.is-failed {
+    color: var(--qc-error);
+    &::before { content: '✗ '; }
+  }
 }
 
 // Drawn rather than an icon, like the checkbox tick: this component carries no icon font of its own.

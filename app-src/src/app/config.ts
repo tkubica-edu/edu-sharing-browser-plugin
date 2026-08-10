@@ -17,6 +17,27 @@ export interface CriterionScheme {
   readonly threshold: number;
 }
 
+/** One of MetalookUp's checks, and the criterion it answers — see `APP_CONFIG.qualityMetalookupRules`. */
+export interface MetalookupRule {
+  /**
+   * How the check is recognised in the answer: a distinctive part of the `description` it reports.
+   *
+   * Its `propertyId` would be the obvious key and cannot be used: MetalookUp's sidecars each carry it
+   * as a deployment variable (`DYNACONF_PROPERTY_ID` in every sidecar's `score.yml`, and in
+   * `k8s/manifests.yml`), and staging has nearly all of them set to the same copy-pasted
+   * `ccm:oeh_text_reading_time`. Until those are set per service, the description is the only thing that
+   * tells one check from another. It is a constant in each sidecar's source, not free text.
+   */
+  readonly match: string;
+  /** What the check is called where its result is shown; MetalookUp reports no name of its own. */
+  readonly label: string;
+  /** The criterion it answers, by the id the metadata set gives it. */
+  readonly criterion: string;
+  readonly met: SchemeDirection;
+  /** MetalookUp rates from 0 to 1, and higher is better (its DTO's "0 to 5" is out of date). */
+  readonly threshold: number;
+}
+
 // Sidebar defaults. The repository URL is a user-editable default; where the metadata agent is
 // follows from it (see MetadataAgentApiService), so it is not configured as a URL of its own.
 export const APP_CONFIG = {
@@ -49,6 +70,12 @@ export const APP_CONFIG = {
    * and the answer is then the `401` of that guard.
    */
   contentJudgeBasicAuth: '',
+  /**
+   * How ContentJudge fetches a page it is pointed at by address (`crawler_method`): `simple` reads the
+   * HTML as served, `browser` renders it first. `simple` unless a page's content only appears with its
+   * JavaScript — rendering costs time on a request that already takes a minute.
+   */
+  contentJudgeCrawlerMethod: 'simple' as 'simple' | 'browser',
   /**
    * Which ContentJudge scheme judges which quality criterion, and how its answer is read — the map
    * that both turns the criteria of the Qualitätsprüfung into what the service is asked for and turns
@@ -99,6 +126,65 @@ export const APP_CONFIG = {
     didactics_valid: { scheme: 'didactics_gate', met: 'atLeast', threshold: 3 },
     accessible: null
   } as Record<string, CriterionScheme | null>,
+  /**
+   * Which of MetalookUp's checks answers which quality criterion — the counterpart of
+   * `qualityCriterionSchemes` for the other judge (see `judgementsForCriteria`).
+   *
+   * MetalookUp measures the resource rather than reading it, so it answers where an LLM cannot: it is
+   * the only judge for Barrierearmut (an AXE audit of the rendered page) and for Urheberrecht (the
+   * licence stated in the content) — for both of those ContentJudge has no scheme at all.
+   *
+   * Several checks may answer the same criterion; each is then shown and counted on its own, and the
+   * criterion is only met while none of them fails. A check the answer does not carry is simply absent,
+   * and one that reports no value ("No files to extract") does not count either way.
+   *
+   * Left out on purpose, for want of a criterion they would honestly answer: the JavaScript check, the
+   * blacklist for paywalls and pop-ups, the file extraction and the malicious-extension check.
+   */
+  qualityMetalookupRules: [
+    {
+      match: 'Accessibility audit',
+      label: 'Barrierefreiheit (AXE)',
+      criterion: 'accessible',
+      met: 'atLeast',
+      threshold: 0.9
+    },
+    {
+      match: 'GDPR safety standards',
+      label: 'DSGVO-Indikatoren',
+      criterion: 'ccm:oeh_quality_data_privacy',
+      met: 'atLeast',
+      threshold: 1
+    },
+    {
+      match: 'Indicators for insufficient security',
+      label: 'Sicherheits-Header',
+      criterion: 'ccm:oeh_quality_data_privacy',
+      met: 'atLeast',
+      threshold: 1
+    },
+    {
+      match: 'iframe embedding',
+      label: 'iframe-Absicherung',
+      criterion: 'ccm:oeh_quality_data_privacy',
+      met: 'atLeast',
+      threshold: 1
+    },
+    {
+      match: 'potentially malicious links',
+      label: 'Verdächtige Links',
+      criterion: 'ccm:oeh_quality_data_privacy',
+      met: 'atLeast',
+      threshold: 1
+    },
+    {
+      match: 'content for license information',
+      label: 'Lizenzangabe',
+      criterion: 'ccm:oeh_quality_copyright_law',
+      met: 'atLeast',
+      threshold: 0.5
+    }
+  ] as readonly MetalookupRule[],
   defaultRepositoryUrl: 'https://repository.staging.openeduhub.net/edu-sharing',
  //defaultRepositoryUrl: 'http://repository.127.0.0.1.nip.io:8100/edu-sharing',
   // Which repository the metadata agent writes to on POST /upload — the agent knows its targets by

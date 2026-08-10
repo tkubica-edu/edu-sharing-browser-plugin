@@ -15,6 +15,22 @@ const JUDGE_TIMEOUT_MS = 300_000;
 const TEXT_MIN_LENGTH = 10;
 const TEXT_MAX_LENGTH = 50_000;
 
+/**
+ * What ContentJudge should judge, and how it gets at it — the API's three input sources
+ * (`EvaluationRequest.source`), each with the one field it requires:
+ *
+ * - `url` — the service crawls the page itself. For a content that *is* a web page: it then sees the
+ *   whole page rather than the extract this extension could read off it.
+ * - `nodeid` — the service reads metadata and text from the repository. For a content the repository
+ *   holds as a file. Resolved against **ContentJudge's own** configured repository, not the panel's.
+ * - `text` — the text travels with the request. The fallback for a content that is neither reachable by
+ *   address nor stored as a node.
+ */
+export type ContentJudgeInput =
+  | { source: 'url'; url: string }
+  | { source: 'nodeid'; nodeId: string }
+  | { source: 'text'; text: string };
+
 /** One scheme's verdict on the content. */
 export interface ContentJudgeResult {
   scheme_id: string;
@@ -45,16 +61,23 @@ export interface ContentJudgeEvaluation {
 /**
  * The page's text as ContentJudge should judge it, or `null` when the page has too little to judge.
  *
- * The plainest text wins, opposite to what the background worker prefers for the metadata agent
- * (`buildGenerateBody`): the agent wants `formattedText`, because the metadata blocks it prepends (Open
- * Graph, JSON-LD, breadcrumbs) are what it extracts metadata *from*. A judgement about factual accuracy
- * or neutrality is about the prose instead, and those blocks would only be noise in front of it.
+ * `formattedText` first, because the API takes no context of its own: `EvaluationRequest` carries a
+ * text, a url or a node id and nothing besides, so whatever the judge should know has to be *in* the
+ * text. That is exactly what the content script builds there (`buildFormattedText`): address, title,
+ * canonical url, meta description and keywords, Open Graph, Dublin Core, LRMI, licence, publication
+ * date, author, breadcrumbs, JSON-LD — and then the main content under `=== HAUPTINHALT ===`.
+ *
+ * Not noise in front of the prose, as long as the criteria are these: Urheberrecht is answered by the
+ * licence block, Datenschutz and Aktualität by the meta data, Medial passend by the images — the
+ * judgements that came back complained about missing source transparency and unclear authorship, which
+ * is precisely what those blocks state. The plainer texts stay as the fallback for a page that offers
+ * no such block at all.
  *
  * Cut to the length the API accepts: it rejects anything longer outright, and a judgement of the first
  * 50000 characters says more than no judgement at all.
  */
 export function judgeableText(page: PageData | null): string | null {
-  const text = (page?.mainContent || page?.formattedText || page?.text || '').trim();
+  const text = (page?.formattedText || page?.mainContent || page?.text || '').trim();
   if (text.length < TEXT_MIN_LENGTH) return null;
   return text.length > TEXT_MAX_LENGTH ? text.slice(0, TEXT_MAX_LENGTH) : text;
 }
@@ -80,24 +103,36 @@ export class ContentJudgeService {
   /** Why the last judgement produced no answer; null when it did. */
   readonly error = signal<string | null>(null);
 
-  /** The request as it goes out, for the caller to log — see {@link evaluate}. */
-  requestBody(text: string, schemes: readonly string[]): Record<string, unknown> {
-    return { source: 'text', text, schemes };
+  /**
+   * The request as it goes out — the API's own field names, and only the ones the chosen source needs
+   * (see {@link ContentJudgeInput}). Also what the caller logs.
+   */
+  requestBody(input: ContentJudgeInput, schemes: readonly string[]): Record<string, unknown> {
+    const source = { schemes, source: input.source };
+    if (input.source === 'url') {
+      return { ...source, url: input.url, crawler_method: APP_CONFIG.contentJudgeCrawlerMethod };
+    }
+    if (input.source === 'nodeid') return { ...source, node_id: input.nodeId };
+    return { ...source, text: input.text };
   }
 
   /**
-   * Judge a text against the given schemes — which they are is the caller's decision (in the panel
-   * they follow from the quality criteria, see `schemesForCriteria`).
+   * Judge a content against the given schemes — what is judged and which schemes those are is the
+   * caller's decision (in the panel: the content's kind and the quality criteria, see
+   * QualityJudgeService and `schemesForCriteria`).
    *
    * Rejects when the service cannot be reached, answers with a status the request cannot be served
    * under, or sends something that is not a JSON object; {@link error} carries that for the view
    * either way.
    */
-  async evaluate(text: string, schemes: readonly string[]): Promise<ContentJudgeEvaluation> {
+  async evaluate(
+    input: ContentJudgeInput,
+    schemes: readonly string[]
+  ): Promise<ContentJudgeEvaluation> {
     this.running.set(true);
     this.error.set(null);
     try {
-      const evaluation = await this.postEvaluation(this.requestBody(text, schemes));
+      const evaluation = await this.postEvaluation(this.requestBody(input, schemes));
       this.lastEvaluation.set(evaluation);
       return evaluation;
     } catch (cause: unknown) {

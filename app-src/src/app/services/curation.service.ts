@@ -14,6 +14,7 @@ import { HistoryEntry, HistoryService } from './history.service';
 import { MetadataAgentService } from './metadata-agent.service';
 import { MetadataUploadService } from './metadata-upload.service';
 import { NodeSummary, RepositoryNodeService } from './repository-node.service';
+import { QualityJudgeService } from './quality-judge.service';
 
 /** A collection the content was added to. */
 export interface Collection {
@@ -257,6 +258,7 @@ export class CurationService {
   private readonly metadataUpload = inject(MetadataUploadService);
   private readonly additionalWebComponent = inject(AdditionalWebComponentService);
   private readonly repositoryNodes = inject(RepositoryNodeService);
+  private readonly qualityJudge = inject(QualityJudgeService);
   private readonly history = inject(HistoryService);
   // The generated CollectionV1Service (exported as CollectionServiceUnwrapped) — the read-only
   // CollectionService wrapper does not cover adding a node.
@@ -744,6 +746,11 @@ export class CurationService {
    * Run the metadata agent for the active tab, dropping any previous node. Returns true on
    * success so the caller can advance to the preview step. Nothing is written to the
    * history here — an entry is recorded only once a node is actually saved (see {@link save}).
+   *
+   * The quality judges are set going on the way out, without being waited for: they are about the same
+   * page the agent just read, and they take about a minute — a minute the user spends on the steps that
+   * follow rather than in front of a spinner. Their answer is read wherever it is shown
+   * (QualityJudgeService).
    */
   async analyze(): Promise<boolean> {
     if (!this.auth.authorized()) return false;
@@ -751,7 +758,29 @@ export class CurationService {
     const outcome = await this.metadataAgent.run();
     const ok = outcome.ok && !!outcome.parsed && !!outcome.source;
     this.resultPending.set(ok);
+    if (ok) this.judgeQuality();
     return ok;
+  }
+
+  /**
+   * The page this content is about — the one that was erschlossen, not the one the browser happens to
+   * show. Restored along with a content from the Verlauf, so it holds for those too.
+   */
+  readonly contentUrl = computed(() => this.metadataAgent.lastRun()?.source?.url ?? null);
+
+  /**
+   * Have the content's quality judged, once (see QualityJudgeService). Public so the step that *shows*
+   * the judgement can ask for one as well, for a content that never came through {@link analyze}.
+   *
+   * What identifies the content is named here rather than in the service: the active tab is emphatically
+   * not it — a content picked from the Verlauf or a document the host page has open has nothing to do
+   * with the page that is on screen, and judging that page would answer about the wrong thing.
+   */
+  judgeQuality(): void {
+    this.qualityJudge.start({
+      url: this.contentUrl(),
+      nodeId: this.activeNode()?.nodeId ?? null
+    });
   }
 
   /**
@@ -1131,6 +1160,8 @@ export class CurationService {
     this.quality.set(false);
     this.qualityError.set(null);
     this.qualityPending = false;
+    // A judgement is about one content; the next one starts without it rather than inheriting it.
+    this.qualityJudge.reset();
     // The criteria belong to the content that is going: the next one's view reports its own.
     this.criteriaSatisfied.set(false);
     this.pendingPreview.set(null);

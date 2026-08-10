@@ -1,11 +1,12 @@
-// The way between the quality criteria and ContentJudge, in both directions: which schemes a set of
-// criteria is judged by, and what the schemes' answers say about each of them. The map itself is
-// configuration (APP_CONFIG.qualityCriterionSchemes) — what is here is the reading of it, so the rule
-// has one place and the view that asks stays free of it.
+// The way between the quality criteria and the two judges: which ContentJudge schemes a set of criteria
+// is judged by, and what either judge's answer says about each of them. The maps themselves are
+// configuration (APP_CONFIG.qualityCriterionSchemes / .qualityMetalookupRules) — what is here is the
+// reading of them, so the rule has one place and the view that asks stays free of it.
 
-import { APP_CONFIG, CriterionScheme } from '../config';
-// Type-only, so this leaf utility does not pull the service (and Angular with it) into the bundle.
+import { APP_CONFIG, CriterionScheme, MetalookupRule, SchemeDirection } from '../config';
+// Type-only, so this leaf utility does not pull the services (and Angular with them) into the bundle.
 import type { ContentJudgeEvaluation, ContentJudgeResult } from '../services/content-judge.service';
+import type { MetalookupEvaluation } from '../services/metalookup.service';
 
 /**
  * How many schemes one request may name (`EvaluationRequest.schemes`, max_length 10). Every scheme is
@@ -23,11 +24,16 @@ export interface CriteriaSchemes {
   dropped: string[];
 }
 
-/** What a scheme answered about one criterion — see {@link judgementsForCriteria}. */
+/** Which judge an answer came from — they measure different things and are told apart in the view. */
+export type JudgementSource = 'ContentJudge' | 'MetalookUp';
+
+/** What a judge answered about one criterion — see {@link judgementsForCriteria}. */
 export interface CriterionJudgement {
   /** The criterion, by the id the metadata set gives it. */
   criterion: string;
-  /** The scheme that judged it. */
+  /** Which of the two judges said it. */
+  source: JudgementSource;
+  /** What answered: ContentJudge's scheme id, or the name the config gives MetalookUp's check. */
   scheme: string;
   /** The scheme's number, `null` when it answered nothing that can be read as one. */
   value: number | null;
@@ -73,26 +79,77 @@ export function schemesForCriteria(criterionIds: readonly string[]): CriteriaSch
 }
 
 /**
- * What the evaluation says about each criterion, keyed by criterion id.
+ * Every scheme the map holds, for a judgement that has to start before the metadata set has been read
+ * (see QualityJudgeService): which criteria a set actually defines is not known then, and the map is
+ * written for exactly the criteria of that set anyway. A scheme too many costs one LLM pass; waiting
+ * for the set would cost the whole head start.
+ */
+export function configuredSchemes(): CriteriaSchemes {
+  return schemesForCriteria(Object.keys(APP_CONFIG.qualityCriterionSchemes));
+}
+
+/**
+ * What both judges said about each criterion, keyed by criterion id — several answers per criterion
+ * where several checks bear on it.
  *
- * Driven by the criteria rather than by the answer, because that is the direction the view reads in:
- * every criterion that has a scheme *and* an answer for it gets a judgement, the rest get none. A
- * scheme answering for two criteria judges both — the map, not the answer, decides what a result is
- * about.
+ * Driven by the criteria rather than by the answers, because that is the direction the view reads in:
+ * a criterion nothing judged gets no entry, and an answer about nothing the criteria ask is left out.
+ * The maps, not the answers, decide what a result is about.
  */
 export function judgementsForCriteria(
   criterionIds: readonly string[],
-  evaluation: ContentJudgeEvaluation | null
-): Record<string, CriterionJudgement> {
-  const results = new Map((evaluation?.results ?? []).map((result) => [result.scheme_id, result]));
-  const judgements: Record<string, CriterionJudgement> = {};
+  judgement: ContentJudgeEvaluation | null,
+  measurement: MetalookupEvaluation | null
+): Record<string, CriterionJudgement[]> {
+  const results = new Map((judgement?.results ?? []).map((result) => [result.scheme_id, result]));
+  const judgements: Record<string, CriterionJudgement[]> = {};
+  const add = (found: CriterionJudgement) => {
+    (judgements[found.criterion] ??= []).push(found);
+  };
   for (const criterion of criterionIds) {
     const mapped = APP_CONFIG.qualityCriterionSchemes[criterion];
     const result = mapped ? results.get(mapped.scheme) : undefined;
-    if (!mapped || !result) continue;
-    judgements[criterion] = toJudgement(criterion, mapped, result);
+    if (mapped && result) add(toJudgement(criterion, mapped, result));
+    for (const rule of rulesFor(criterion)) {
+      const measured = measurementOf(rule, measurement);
+      if (measured) add(measured);
+    }
   }
   return judgements;
+}
+
+/** MetalookUp's checks that bear on this criterion, in the order the config lists them. */
+function rulesFor(criterion: string): readonly MetalookupRule[] {
+  return APP_CONFIG.qualityMetalookupRules.filter((rule) => rule.criterion === criterion);
+}
+
+/**
+ * What MetalookUp's answer holds for one of its checks; `null` when the check is not in there, or when
+ * it reports no value — "No files to extract" is not an answer to anything.
+ *
+ * Its whole description travels on as the reasoning: it is where the check says what it found, and for
+ * several of them that is the only useful part (a list of missing security headers, the licence it
+ * recognised, the number of accessibility violations).
+ */
+function measurementOf(
+  rule: MetalookupRule,
+  measurement: MetalookupEvaluation | null
+): CriterionJudgement | null {
+  const found = (measurement?.featureExtractions ?? []).find((extraction) =>
+    (extraction.description ?? '').includes(rule.match)
+  );
+  const value = asNumber(found?.value);
+  if (!found || value === null) return null;
+  return {
+    criterion: rule.criterion,
+    source: 'MetalookUp',
+    scheme: rule.label,
+    value,
+    label: rule.label,
+    confidence: asNumber(found.confidence),
+    reasoning: found.description?.trim() || null,
+    met: meets(value, rule)
+  };
 }
 
 function toJudgement(
@@ -103,6 +160,7 @@ function toJudgement(
   const value = asNumber(result.value);
   return {
     criterion,
+    source: 'ContentJudge',
     scheme: mapped.scheme,
     value,
     label: asLabel(result.label),
@@ -112,8 +170,8 @@ function toJudgement(
   };
 }
 
-/** Whether a number answers its criterion — which way round that is, is the scheme's own scale. */
-function meets(value: number, mapped: CriterionScheme): boolean {
+/** Whether a number answers its criterion — which way round that is, is the check's own scale. */
+function meets(value: number, mapped: { met: SchemeDirection; threshold: number }): boolean {
   return mapped.met === 'atMost' ? value <= mapped.threshold : value >= mapped.threshold;
 }
 
