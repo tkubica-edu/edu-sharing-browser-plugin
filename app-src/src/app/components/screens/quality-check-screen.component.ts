@@ -13,21 +13,18 @@ const LOG_CONTENT_JUDGE = '[edu-sharing][contentjudge]';
 
 // "Qualität", the first of the Qualitätsprüfung's two views: the content's quality criteria, and the
 // confirmation that follows from them.
-// "Qualität", the first of the Qualitätsprüfung's two views: what the content's quality is, before the
-// metadata are worked on in the second.
 //
 // The view itself is QualityCriteriaComponent, which is self-contained (see its own notes) — this
 // screen hands it the content's metadata and takes what it reports back into the curation. Neither
 // the criteria nor the confirmation are written here: at this point in the flow the content usually
 // has no node yet, so both wait for the save that creates one (CurationService.recordValues and
 // .confirmQuality).
-// Two services judge it, and they judge different things: MetalookUp measures the resource itself
-// (security headers, paywalls, accessibility), ContentJudge has an LLM assess its text against
-// evaluation schemes. They run side by side and neither waits for or depends on the other.
 //
-// What they answer goes to the console only: which of it belongs on screen is not decided yet, so the
-// view is unchanged by them and names the content as before. Nothing here writes to the repository, so
-// the step can be walked through in either direction.
+// Alongside that, two services judge the content on their own, and they judge different things:
+// MetalookUp measures the resource itself (security headers, paywalls, accessibility), ContentJudge
+// has an LLM assess its text against evaluation schemes. They run side by side, neither waits for the
+// other, and what they answer goes to the console only — which of it belongs next to the criteria is
+// not decided yet, so they leave the view alone.
 @Component({
   selector: 'es-quality-check-screen',
   imports: [QualityCriteriaComponent],
@@ -36,8 +33,12 @@ const LOG_CONTENT_JUDGE = '[edu-sharing][contentjudge]';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class QualityCheckScreenComponent implements OnInit {
-  /** Protected, unlike the judges below: the template names the content this step is about. */
+  /** Protected, unlike the services below: the template binds the confirmation state off it. */
   protected readonly curation = inject(CurationService);
+
+  private readonly metalookup = inject(MetalookupService);
+  private readonly contentJudge = inject(ContentJudgeService);
+  private readonly browserExtension = inject(BrowserExtensionService);
 
   /**
    * The content's metadata, read ONCE as the view opens. Recording a criterion feeds back into this
@@ -56,10 +57,6 @@ export class QualityCheckScreenComponent implements OnInit {
   protected confirm(): void {
     void this.curation.confirmQuality();
   }
-
-  private readonly metalookup = inject(MetalookupService);
-  private readonly contentJudge = inject(ContentJudgeService);
-  private readonly browserExtension = inject(BrowserExtensionService);
 
   /**
    * Judge once as the view is built, not from an effect: the screen is rebuilt whenever the step's tab
