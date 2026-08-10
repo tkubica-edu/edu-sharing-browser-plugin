@@ -6,14 +6,25 @@ import {
   DEFAULT, HOME_REPOSITORY, MdsDefinition, MdsService, MdsValue, MdsWidget
 } from 'ngx-edu-sharing-api';
 
+import { ContentJudgeEvaluation, ContentJudgeService } from '../services/content-judge.service';
+import { MetalookupResource, MetalookupService } from '../services/metalookup.service';
+import {
+  CriterionJudgement, judgementsForCriteria, schemesForCriteria
+} from '../util/quality-schemes';
+
 /** Every property as `string[]` — the shape the repository and the MDS editor both expect. */
 export type CriteriaProperties = Record<string, string[]>;
 
+/** Log prefix for what this view finds out about the content, as everywhere else in the extension. */
+const LOG_QUALITY = '[edu-sharing][quality]';
+const LOG_METALOOKUP = '[edu-sharing][metalookup]';
+const LOG_CONTENT_JUDGE = '[edu-sharing][contentjudge]';
+
 /**
  * The valuespace ids a criterion's value carries in `alternativeIds` — from the quality vocabulary
- * (https://vocabs.openeduhub.de/w3id.org/openeduhub/vocabs/quality). A criterion is *met* when the
- * property holds the value that maps to MET, or holds nothing at all: nothing recorded means nothing
- * objected to, which is how a content that was never judged starts out.
+ * (https://vocabs.openeduhub.de/w3id.org/openeduhub/vocabs/quality). A criterion is *met* only while
+ * the property holds the value that maps to MET: a content nothing is recorded for is unjudged, and
+ * unjudged is not the same as in order.
  */
 const CRITERION_MET = '3';
 const CRITERION_VIOLATED = '0';
@@ -26,6 +37,22 @@ const CRITERION_VIOLATED = '0';
  */
 const PLAIN_MET = '1';
 const PLAIN_VIOLATED = '0';
+
+/**
+ * The vocabulary term a machine's all-clear is recorded as, where the criterion's valuespace states one
+ * ("keine Auffälligkeiten gefunden (Maschine)"). Four of the knock-out criteria use that findings
+ * vocabulary; the others are a 0–5 rating (Neutralität, Datenschutz) or a plain yes/no, and there a
+ * machine's answer cannot be told from a person's — see {@link autoMetValue}.
+ *
+ * Matched by the term at the end of the value's URI rather than through `alternativeIds`, because on a
+ * rating scale those mean the rating: `2` there is two stars, not "no machine findings".
+ */
+const AUTO_MET_TERM = 'no_auto_findings';
+
+/** A valuespace id's own term — the last segment of the vocabulary URI, or the bare id. */
+function termOf(id: string): string {
+  return id.split('/').pop() || id;
+}
 
 /**
  * The widget listing the knock-out criteria. Its *values* are the criteria, and each value's id is
@@ -60,6 +87,14 @@ function asList(value: unknown): string[] {
  * Reporting rather than writing is also what lets it judge a content that does not exist yet: in the
  * panel the criteria are collected with the rest of the metadata and written by the single save at
  * the end of the flow, which is where a curated content gets its node in the first place.
+ *
+ * It also has two services judge the content on its own, because the criteria are what they are asked
+ * about: MetalookUp measures the resource itself, and ContentJudge assesses its text against the
+ * schemes the criteria map to (see `schemesForCriteria`). What ContentJudge finds in order is reported
+ * as an answer to that criterion, like a click on its box would be; the rest is shown beside it.
+ * The content they judge comes in as {@link pageUrl} / {@link pageText} / {@link nodeId} rather than
+ * being read here — reading the open page is the extension's business, and staying out of it is what
+ * keeps this component shippable on its own.
  */
 @Component({
   selector: 'es-quality-criteria',
@@ -69,9 +104,24 @@ function asList(value: unknown): string[] {
 })
 export class QualityCriteriaComponent {
   private readonly mdsService = inject(MdsService);
+  private readonly metalookup = inject(MetalookupService);
+  private readonly contentJudge = inject(ContentJudgeService);
 
   /** What the content records right now — its node properties, or the metadata standing in for them. */
   readonly properties = input<Record<string, unknown> | null>(null);
+
+  /** The address of the content being judged; empty while none is known. */
+  readonly pageUrl = input('');
+
+  /**
+   * The content's text as ContentJudge should judge it — already picked and cut to the length the API
+   * accepts (see `judgeableText`, which the host applies to the page it read). Empty means the page
+   * yielded nothing to judge, which is an outcome rather than an error.
+   */
+  readonly pageText = input('');
+
+  /** The repository's id for the content, where it already has one; empty otherwise. */
+  readonly nodeId = input('');
 
   /** The metadata set the criteria are defined in; the repository's primary one unless given. */
   readonly metadataSet = input(DEFAULT);
@@ -104,22 +154,54 @@ export class QualityCriteriaComponent {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
 
-  /** Whether the unrecorded criteria have been asserted; see {@link reportUnrecordedAsMet}. */
-  private defaultsReported = false;
+  /**
+   * Whether a check is still running. Read off the services rather than tracked here: each of them
+   * already knows, and they finish at their own pace — the spinner is gone once the slower one is.
+   */
+  protected readonly checking = computed(
+    () => this.metalookup.running() || this.contentJudge.running()
+  );
+
+  /**
+   * The criteria whose answer the check put there rather than a person — what is drawn in the machine's
+   * colour, so nobody takes a filled-in box for someone's decision.
+   *
+   * A criterion the user answers themselves drops out of it again (see {@link takeOver}): the mark says
+   * where the value came from, and from then on it comes from somewhere else.
+   */
+  private readonly aiAnswered = signal<readonly string[]>([]);
+
+  /** Whether anything on screen carries a machine's answer — for the legend that explains the colour. */
+  protected readonly hasAiAnswers = computed(() => this.aiAnswered().length > 0);
+
+  /** Whether the two services have been asked about this content; see {@link judge}. */
+  private judged = false;
+
+  /**
+   * What ContentJudge answered per criterion, keyed by criterion id — empty until it answered.
+   *
+   * Shown beside every criterion, whichever way it went; a criterion it found in order is also ticked
+   * (see {@link tickJudged}). Kept as its own state rather than derived from the record, because the
+   * record only holds the answer — the score behind it, and the wording the scheme gave it, are here.
+   */
+  private readonly judgements = signal<Record<string, CriterionJudgement>>({});
 
   constructor() {
     // The criteria belong to the set, so they are re-read whenever it (or the repository) changes.
     effect(() => void this.load(this.metadataSet(), this.repository()));
 
-    // Both halves have to be there: the criteria to assert, and the record to see what is already
-    // answered. Asserting against a content whose properties have not arrived yet would take
-    // "nothing recorded" for an answer and overwrite the answers it actually holds.
+    // Judge once, as soon as there is both something to ask about and something to ask with: the
+    // criteria decide which schemes ContentJudge is given, the content is what both services judge.
+    // Once per mounting of this view — a re-judgement on every change of the record would ask the same
+    // question of the same content again.
     effect(() => {
-      const criteria = this.knockoutCriteria();
-      const properties = this.properties();
-      if (this.defaultsReported || !criteria.length || !properties) return;
-      this.defaultsReported = true;
-      this.reportUnrecordedAsMet();
+      const criteria = this.criterionIds();
+      const resource = { url: this.pageUrl(), nodeId: this.nodeId() };
+      const text = this.pageText();
+      if (this.judged || !criteria.length) return;
+      if (!resource.url && !resource.nodeId && !text) return;
+      this.judged = true;
+      void this.judge(criteria, resource, text);
     });
   }
 
@@ -131,6 +213,14 @@ export class QualityCriteriaComponent {
   /** The editorial criteria, likewise. */
   protected readonly editorialCriteria = computed<readonly MdsValue[]>(
     () => this.widget(EDITORIAL_PROPERTY)?.values ?? []
+  );
+
+  /**
+   * Every criterion the content is judged by, both lists in the order they are shown. The ids are what
+   * a scheme is looked up by — see {@link schemesForCriteria}.
+   */
+  private readonly criterionIds = computed<readonly string[]>(() =>
+    [...this.knockoutCriteria(), ...this.editorialCriteria()].map((criterion) => criterion.id)
   );
 
   /** Whether there is anything to show — a set was loaded and it defines criteria. */
@@ -151,13 +241,20 @@ export class QualityCriteriaComponent {
   );
 
   /**
-   * Whether a knock-out criterion is met: the record holds exactly the value that means met, or
-   * holds nothing for it. Everything else counts as not met — including the vocabulary's own
-   * "Ungeprüft" and its machine-checked answers, which are findings rather than a confirmation.
+   * Whether a knock-out criterion is met: the record holds a value that says so — the one a person's
+   * confirmation writes, or the one a machine's all-clear writes. Everything else counts as not met:
+   * nothing recorded at all, the vocabulary's own "Ungeprüft", and any kind of finding.
+   *
+   * So every box starts empty, and a tick is something that was actually established. The confirmation
+   * hangs off these boxes (see the template), which is why nothing here may be assumed.
    */
   protected isMet(criterion: MdsValue): boolean {
     const recorded = this.valueOfProperty(criterion.id)[0];
-    return !recorded || recorded === this.valueFor(criterion.id, CRITERION_MET);
+    if (!recorded) return false;
+    return (
+      recorded === this.valueFor(criterion.id, CRITERION_MET) ||
+      recorded === this.autoMetValue(criterion.id)
+    );
   }
 
   /** Whether an editorial criterion is met: its id is among the property's values. */
@@ -170,6 +267,32 @@ export class QualityCriteriaComponent {
     return criterion.caption || criterion.id;
   }
 
+  /** What the machine made of this criterion; null while nothing judged it — see {@link judgements}. */
+  protected judgementOf(criterion: MdsValue): CriterionJudgement | null {
+    return this.judgements()[criterion.id] ?? null;
+  }
+
+  /** Whether this criterion's answer is the machine's — see {@link aiAnswered}. */
+  protected isAiAnswered(criterion: MdsValue): boolean {
+    return this.aiAnswered().includes(criterion.id);
+  }
+
+  /**
+   * The verdict in one line: the scheme's own wording, and the number behind it. Cut to two decimals —
+   * the rubrics answer with a weighted average, and its third decimal says nothing.
+   */
+  protected judgementText(judgement: CriterionJudgement): string {
+    const value = judgement.value === null ? '–' : String(Math.round(judgement.value * 100) / 100);
+    return judgement.label ? `${judgement.label} (${value})` : value;
+  }
+
+  /** Which scheme said it, and how sure it was — for the row's tooltip. */
+  protected judgementTitle(judgement: CriterionJudgement): string {
+    const confidence =
+      judgement.confidence === null ? '' : `, Konfidenz ${Math.round(judgement.confidence * 100)} %`;
+    return `ContentJudge: ${judgement.scheme}${confidence}`;
+  }
+
   /** Record a knock-out criterion as met or as violated — one property each. */
   protected setCriterion(criterion: MdsValue, met: boolean): void {
     const value = this.valueFor(criterion.id, met ? CRITERION_MET : CRITERION_VIOLATED);
@@ -179,12 +302,14 @@ export class QualityCriteriaComponent {
       this.error.set(`Für „${this.captionOf(criterion)}“ ist kein passender Wert hinterlegt.`);
       return;
     }
+    this.takeOver([criterion.id]);
     this.report({ [criterion.id]: [value] });
   }
 
   /** Record an editorial criterion by adding it to the property's values, or taking it out. */
   protected setEditorialCriterion(criterion: MdsValue, met: boolean): void {
     const current = this.valueOfProperty(EDITORIAL_PROPERTY);
+    this.takeOver([criterion.id]);
     this.report({
       [EDITORIAL_PROPERTY]: met
         ? [...current.filter((id) => id !== criterion.id), criterion.id]
@@ -199,14 +324,15 @@ export class QualityCriteriaComponent {
       const value = this.valueFor(criterion.id, CRITERION_MET);
       if (value) met[criterion.id] = [value];
     }
+    this.takeOver(Object.keys(met));
     this.report(met);
   }
 
   /** Fulfil every editorial criterion at once: the property holds all of their ids. */
   protected setAllEditorial(): void {
-    this.report({
-      [EDITORIAL_PROPERTY]: this.editorialCriteria().map((criterion) => criterion.id)
-    });
+    const criteria = this.editorialCriteria().map((criterion) => criterion.id);
+    this.takeOver(criteria);
+    this.report({ [EDITORIAL_PROPERTY]: criteria });
   }
 
   /** Both lists at once. */
@@ -221,6 +347,176 @@ export class QualityCriteriaComponent {
 
   /** What is wrong right now: this view's own complaint, else whatever the host reports. */
   protected readonly problemShown = computed(() => this.error() ?? this.problem());
+
+  /**
+   * Have both services judge the content, side by side. `allSettled`, so one that fails — a service
+   * that is down, a credential that is missing — leaves the other's answer standing.
+   *
+   * Nothing of what comes back is applied to the criteria yet; it is logged, and what to make of it is
+   * the next question.
+   */
+  private async judge(
+    criteria: readonly string[],
+    resource: MetalookupResource,
+    text: string
+  ): Promise<void> {
+    console.log(`${LOG_QUALITY} criteria`, {
+      legal: this.knockoutCriteria().map((criterion) => ({
+        id: criterion.id,
+        caption: this.captionOf(criterion),
+        met: this.isMet(criterion)
+      })),
+      editorial: this.editorialCriteria().map((criterion) => ({
+        id: criterion.id,
+        caption: this.captionOf(criterion),
+        met: this.isEditorialMet(criterion)
+      }))
+    });
+    const schemes = schemesForCriteria(criteria);
+    console.log(`${LOG_QUALITY} schemes`, schemes);
+    await Promise.allSettled([
+      this.runMetalookup(resource),
+      this.runContentJudge(criteria, text, schemes.schemes)
+    ]);
+  }
+
+  /**
+   * MetalookUp retrieves the resource itself, so it is given what identifies it: the address, and the
+   * node id for a content the repository already holds. It takes either, and with both it can choose.
+   */
+  private async runMetalookup(resource: MetalookupResource): Promise<void> {
+    if (!resource.url && !resource.nodeId) {
+      console.log(`${LOG_METALOOKUP} skipped — the content has neither an address nor a node`);
+      return;
+    }
+    try {
+      // Built here only to log what goes out; the call assembles its own, from the same pure method.
+      console.log(`${LOG_METALOOKUP} → request`, this.metalookup.requestBody(resource));
+      console.log(`${LOG_METALOOKUP} ← response`, await this.metalookup.evaluate(resource));
+    } catch (cause: unknown) {
+      console.warn(`${LOG_METALOOKUP} evaluation failed`, cause);
+    }
+  }
+
+  /** ContentJudge judges the content's text against one scheme per criterion that has one. */
+  private async runContentJudge(
+    criteria: readonly string[],
+    text: string,
+    schemes: readonly string[]
+  ): Promise<void> {
+    if (!schemes.length) {
+      console.log(`${LOG_CONTENT_JUDGE} skipped — no criterion maps to a scheme`);
+      return;
+    }
+    if (!text) {
+      console.log(`${LOG_CONTENT_JUDGE} skipped — the content yielded too little text to judge`);
+      return;
+    }
+    try {
+      // The schemes and how much text they get — not the text itself, which is up to 50000 characters
+      // and would bury the answer it is logged next to.
+      console.log(`${LOG_CONTENT_JUDGE} → request`, { schemes, textLength: text.length });
+      const evaluation = await this.contentJudge.evaluate(text, schemes);
+      console.log(`${LOG_CONTENT_JUDGE} ← response`, evaluation);
+      this.takeJudgements(criteria, evaluation);
+    } catch (cause: unknown) {
+      console.warn(`${LOG_CONTENT_JUDGE} evaluation failed`, cause);
+    }
+  }
+
+  /**
+   * Take the answer apart per criterion, so every box can say what the machine made of it — the same
+   * map that chose the schemes decides which result belongs to which criterion.
+   */
+  private takeJudgements(criteria: readonly string[], evaluation: ContentJudgeEvaluation): void {
+    const judgements = judgementsForCriteria(criteria, evaluation);
+    this.judgements.set(judgements);
+    console.log(
+      `${LOG_QUALITY} judgement`,
+      Object.values(judgements).map((judgement) => ({
+        caption: this.captionById(judgement.criterion),
+        ...judgement
+      }))
+    );
+    this.tickJudged(judgements);
+  }
+
+  /**
+   * Tick every criterion the check found in order, and record it as the machine's answer where the
+   * valuespace can say so.
+   *
+   * Only where nothing is recorded yet. The judgement arrives about a minute after the view opened, so
+   * the user may have answered in the meantime — and their answer is the one that counts. The same goes
+   * for a content that already carries one, an "Ungeprüft" included: what is there is not overwritten.
+   *
+   * A failed check ticks nothing and records nothing: the box already reads as unanswered, and the
+   * verdict beside it says what was found.
+   */
+  private tickJudged(judgements: Record<string, CriterionJudgement>): void {
+    const values: CriteriaProperties = {};
+    const editorial = [...this.valueOfProperty(EDITORIAL_PROPERTY)];
+    // Coarse on purpose: the editorial criteria share one property, so a single click of the user's
+    // makes the whole list theirs — there is no telling which of its entries they decided about.
+    const editorialAnswered = !!this.changes()[EDITORIAL_PROPERTY];
+    const ticked: string[] = [];
+    const left: Record<string, string> = {};
+
+    for (const judgement of Object.values(judgements)) {
+      const criterion = judgement.criterion;
+      if (judgement.met !== true) continue;
+      if (this.isEditorial(criterion)) {
+        if (editorialAnswered || editorial.includes(criterion)) {
+          left[criterion] = 'already answered';
+          continue;
+        }
+        editorial.push(criterion);
+        ticked.push(criterion);
+        continue;
+      }
+      if (this.valueOfProperty(criterion).length) {
+        left[criterion] = 'already answered';
+        continue;
+      }
+      const met = this.autoMetValue(criterion) ?? this.valueFor(criterion, CRITERION_MET);
+      if (!met) {
+        left[criterion] = 'the valuespace states no value for met';
+        continue;
+      }
+      values[criterion] = [met];
+      ticked.push(criterion);
+    }
+
+    if (editorial.length > this.valueOfProperty(EDITORIAL_PROPERTY).length) {
+      values[EDITORIAL_PROPERTY] = editorial;
+    }
+    if (Object.keys(values).length) this.report(values);
+    // Marked as the machine's before anything else can happen to them, so the boxes it just filled in
+    // are never briefly indistinguishable from the user's own.
+    this.aiAnswered.set(ticked);
+    console.log(`${LOG_QUALITY} ticked`, { ticked, left });
+  }
+
+  /** Whether a criterion belongs to the editorial list rather than to the knock-out one. */
+  private isEditorial(criterion: string): boolean {
+    return this.editorialCriteria().some((candidate) => candidate.id === criterion);
+  }
+
+  /** A criterion's caption by its id, from whichever of the two lists holds it. */
+  private captionById(criterion: string): string {
+    const found = [...this.knockoutCriteria(), ...this.editorialCriteria()].find(
+      (candidate) => candidate.id === criterion
+    );
+    return found ? this.captionOf(found) : criterion;
+  }
+
+  /**
+   * Take these criteria over as the user's own: whatever the machine answered for them, the answer is
+   * now theirs, so it stops being drawn as the machine's — see {@link aiAnswered}. The judgement itself
+   * stays beside the criterion; it is a finding, and a person disagreeing with it does not unmake it.
+   */
+  private takeOver(criteria: readonly string[]): void {
+    this.aiAnswered.update((answered) => answered.filter((id) => !criteria.includes(id)));
+  }
 
   /** Remember a change and hand it on, so the two never disagree. */
   private report(values: CriteriaProperties): void {
@@ -238,6 +534,14 @@ export class QualityCriteriaComponent {
   /** The widget with this id, from the loaded set. */
   private widget(id: string): MdsWidget | undefined {
     return this.mds()?.widgets?.find((widget: MdsWidget) => widget.id === id);
+  }
+
+  /**
+   * The value id that records a MACHINE's all-clear on this criterion, where its valuespace offers one;
+   * `undefined` where it does not — see {@link AUTO_MET_TERM}.
+   */
+  private autoMetValue(property: string): string | undefined {
+    return this.widget(property)?.values?.find((value) => termOf(value.id) === AUTO_MET_TERM)?.id;
   }
 
   /**
@@ -270,24 +574,4 @@ export class QualityCriteriaComponent {
     }
   }
 
-  /**
-   * Report every knock-out criterion that nothing is recorded for as met.
-   *
-   * The left column shows those as ticked — an unrecorded criterion is an unobjected one — but until
-   * they are reported that tick is the *absence* of a value, and a content saved from here would
-   * carry none of them. So what the view asserts is written down as soon as it can assert it, and
-   * the saved content says what it showed rather than merely having looked that way.
-   *
-   * Only the unrecorded ones: a criterion the content already answers keeps its answer, findings
-   * and "Ungeprüft" included.
-   */
-  private reportUnrecordedAsMet(): void {
-    const defaults: CriteriaProperties = {};
-    for (const criterion of this.knockoutCriteria()) {
-      if (this.valueOfProperty(criterion.id).length) continue;
-      const met = this.valueFor(criterion.id, CRITERION_MET);
-      if (met) defaults[criterion.id] = [met];
-    }
-    if (Object.keys(defaults).length) this.report(defaults);
-  }
 }

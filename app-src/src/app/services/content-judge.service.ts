@@ -5,10 +5,11 @@ import { PageData } from './browser-extension.service';
 import { errorMessage } from '../util/errors';
 
 /**
- * How long to wait for a judgement. Every scheme is its own LLM pass, so this grows with
- * `APP_CONFIG.contentJudgeSchemes` — generous rather than tight.
+ * How long to wait for a judgement. Every scheme is its own LLM pass, and a `derived` scheme
+ * orchestrates the passes of all its parts — a request of master gates is a multiple of the work a
+ * single-pass one is. So: generous rather than tight.
  */
-const JUDGE_TIMEOUT_MS = 120_000;
+const JUDGE_TIMEOUT_MS = 300_000;
 
 /** The text bounds the API enforces (`EvaluationRequest.text`, min_length/max_length). */
 const TEXT_MIN_LENGTH = 10;
@@ -80,20 +81,23 @@ export class ContentJudgeService {
   readonly error = signal<string | null>(null);
 
   /** The request as it goes out, for the caller to log — see {@link evaluate}. */
-  requestBody(text: string): Record<string, unknown> {
-    return { source: 'text', text, schemes: APP_CONFIG.contentJudgeSchemes };
+  requestBody(text: string, schemes: readonly string[]): Record<string, unknown> {
+    return { source: 'text', text, schemes };
   }
 
   /**
-   * Judge a text. Rejects when the service cannot be reached, answers with a status the request cannot
-   * be served under, or sends something that is not a JSON object; {@link error} carries that for the
-   * view either way.
+   * Judge a text against the given schemes — which they are is the caller's decision (in the panel
+   * they follow from the quality criteria, see `schemesForCriteria`).
+   *
+   * Rejects when the service cannot be reached, answers with a status the request cannot be served
+   * under, or sends something that is not a JSON object; {@link error} carries that for the view
+   * either way.
    */
-  async evaluate(text: string): Promise<ContentJudgeEvaluation> {
+  async evaluate(text: string, schemes: readonly string[]): Promise<ContentJudgeEvaluation> {
     this.running.set(true);
     this.error.set(null);
     try {
-      const evaluation = await this.postEvaluation(this.requestBody(text));
+      const evaluation = await this.postEvaluation(this.requestBody(text, schemes));
       this.lastEvaluation.set(evaluation);
       return evaluation;
     } catch (cause: unknown) {

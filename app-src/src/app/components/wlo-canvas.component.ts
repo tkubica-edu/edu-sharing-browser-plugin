@@ -34,12 +34,18 @@ interface CanvasConfig {
   showContentType: boolean;
   showContentTypeOnly: boolean;
   showResetButton: boolean;
+  highlightAi: boolean;
 }
 
 /**
  * The two presets the bundle documents for embedded use (see its own
  * `examples/canvas-parameter-demo.html`): "Plugin" for editing, "Detail (readonly)" for showing
  * the properties. Kept verbatim so they stay comparable with that reference.
+ *
+ * `highlightAi` is the plugin's own addition rather than part of those presets: the fields the
+ * metadata agent filled are marked where they can also be corrected, since there the colour asks the
+ * user to check them. A view that only shows the properties states what the content *is* and has
+ * nothing to ask, so it leaves them unmarked.
  */
 const CONFIGS: Record<WloCanvasMode, CanvasConfig> = {
   edit: {
@@ -53,7 +59,8 @@ const CONFIGS: Record<WloCanvasMode, CanvasConfig> = {
     showFloatingControls: false,
     showContentType: true,
     showContentTypeOnly: false,
-    showResetButton: true
+    showResetButton: true,
+    highlightAi: true
   },
   detail: {
     layout: 'detail',
@@ -66,7 +73,8 @@ const CONFIGS: Record<WloCanvasMode, CanvasConfig> = {
     showFloatingControls: false,
     showContentType: true,
     showContentTypeOnly: true,
-    showResetButton: false
+    showResetButton: false,
+    highlightAi: false
   }
 };
 
@@ -91,6 +99,10 @@ export class WloCanvasComponent implements MetadataEditor {
    * `importJsonData` reads `metadata || <the payload>` plus `metadataset`, `_origins`,
    * `_source_text` and `preview_image_url`), so an analysis result and a node's stored
    * properties both work.
+   *
+   * Its `_origins` decide which fields count as the agent's — a payload without them marks every
+   * filled field as generated, so the seed states the provenance of all of them (see
+   * CurationService.editorMetadata).
    */
   readonly metadata = input.required<MetadataSeed>();
 

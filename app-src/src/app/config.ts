@@ -1,3 +1,22 @@
+/**
+ * Which way a scheme's number has to go for the criterion it judges to count as met:
+ *
+ * - `atLeast` — the higher the better. The 0–5 rubrics, and the legal gates whose top value is the
+ *   compliant one (`criminal_law_gate` 2 = LEGAL, `data_privacy_gate` 3 = COMPLIANT).
+ * - `atMost` — the lower the better. `protection_of_minors_gate` answers an age rating (0, 6, 12, 16,
+ *   18, and 100 for jugendgefährdend), so its scale runs the other way.
+ */
+export type SchemeDirection = 'atLeast' | 'atMost';
+
+/** What judges one quality criterion — see `APP_CONFIG.qualityCriterionSchemes`. */
+export interface CriterionScheme {
+  /** The deployment's own scheme id (`GET /schemes/`). */
+  readonly scheme: string;
+  readonly met: SchemeDirection;
+  /** The value the answer has to reach (`atLeast`) or stay under (`atMost`) to count as met. */
+  readonly threshold: number;
+}
+
 // Sidebar defaults. The repository URL is a user-editable default; where the metadata agent is
 // follows from it (see MetadataAgentApiService), so it is not configured as a URL of its own.
 export const APP_CONFIG = {
@@ -31,10 +50,55 @@ export const APP_CONFIG = {
    */
   contentJudgeBasicAuth: '',
   /**
-   * Which schemes a content is judged against. Every one of them is a separate LLM pass, so few — the
-   * API takes at most ten, and `GET /schemes/` lists what a deployment actually has.
+   * Which ContentJudge scheme judges which quality criterion, and how its answer is read — the map
+   * that both turns the criteria of the Qualitätsprüfung into what the service is asked for and turns
+   * what it answers back into a verdict per criterion (see `schemesForCriteria`,
+   * `judgementsForCriteria`).
+   *
+   * Keyed by the criterion's id as the metadata set states it: a node property for the knock-out
+   * criteria (`virtual:unmetLegalCriteria`, where every value *is* a property), a bare value id for
+   * the editorial ones (`ccm:oeh_buffet_criteria`, values of that one property).
+   *
+   * `null` says the deployment has no scheme for that criterion; it is then reported as unjudged
+   * rather than answered by a scheme that means something else. Listed all the same, so the map shows
+   * every criterion that was considered.
+   *
+   * Every scheme here is a MASTER GATE, which aggregates all part checks of its area — thorough, but
+   * many LLM passes each. Where that takes too long, the single-pass scheme of the same area is named
+   * beside it; its scale is the same 0–5 one, so only the id changes.
+   *
+   * The thresholds follow each scheme's own scale (`output_range` of its definition): the rubrics run
+   * 0–5, where 3 is "Befriedigend" — the point at which the criterion is taken as answered rather
+   * than merely not failed.
    */
-  contentJudgeSchemes: ['sachrichtigkeit', 'neutralitaet'],
+  qualityCriterionSchemes: {
+    // single pass: strafrecht_gate. 0–2, 2 = LEGAL, 1 = Prüfung erforderlich.
+    'ccm:oeh_quality_criminal_law': { scheme: 'criminal_law_gate', met: 'atLeast', threshold: 2 },
+    // single pass: jugendschutz_gate. An age rating: 0/6/12/16/18, and 100 for jugendgefährdend —
+    // which is the one the criterion is about, so anything up to 18 passes it.
+    'ccm:oeh_quality_protection_of_minors': {
+      scheme: 'protection_of_minors_gate',
+      met: 'atMost',
+      threshold: 18
+    },
+    // 0–3, 3 = COMPLIANT; 1 and 2 each fail one of the two halves (DSGVO, Transparenz).
+    'ccm:oeh_quality_data_privacy': { scheme: 'data_privacy_gate', met: 'atLeast', threshold: 3 },
+    // single pass: persoenlichkeitsrechte_gate. 0–3, 3 = COMPLIANT.
+    'ccm:oeh_quality_personal_law': { scheme: 'personal_law_gate', met: 'atLeast', threshold: 3 },
+    // single pass: neutralitaet
+    'ccm:oeh_quality_neutralness': { scheme: 'neutrality_gate', met: 'atLeast', threshold: 3 },
+    'ccm:oeh_quality_copyright_law': null,
+    'ccm:oeh_quality_relevancy_for_education': null,
+    // single pass: sachrichtigkeit
+    content_valid: { scheme: 'factual_accuracy_gate', met: 'atLeast', threshold: 3 },
+    // single pass: sprachliche_angemessenheit
+    speech_valid: { scheme: 'linguistic_appropriateness_gate', met: 'atLeast', threshold: 3 },
+    // single pass: medial_passend
+    medial_relevant: { scheme: 'media_appropriate_gate', met: 'atLeast', threshold: 3 },
+    // single pass: didaktik_methodik
+    didactics_valid: { scheme: 'didactics_gate', met: 'atLeast', threshold: 3 },
+    accessible: null
+  } as Record<string, CriterionScheme | null>,
   defaultRepositoryUrl: 'https://repository.staging.openeduhub.net/edu-sharing',
  //defaultRepositoryUrl: 'http://repository.127.0.0.1.nip.io:8100/edu-sharing',
   // Which repository the metadata agent writes to on POST /upload — the agent knows its targets by

@@ -18,6 +18,9 @@
 
     With a `sourceUrl` the canvas erschließt that page itself on mount ('url' mode + autoExtract —
     what its own URL input would trigger); without one both stay off and nothing is extracted.
+
+    `highlightAi` colours the values the metadata agent filled; which fields those are it takes from
+    the payload's `_origins` (see the `metadata` input).
   -->
   @if (bundle.ready()) {
     <metadata-agent-canvas
@@ -38,7 +41,7 @@
       [showFieldActions]="config().showFieldActions && !locked()"
       [showResetButton]="config().showResetButton && !locked()"
       [language]="'de'"
-      [highlightAi]="false"
+      [highlightAi]="config().highlightAi"
       [showStatusBar]="false"
       [showSaveButton]="false"
       [showUploadButton]="false"

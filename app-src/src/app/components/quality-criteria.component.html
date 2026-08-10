@@ -1,6 +1,18 @@
 <section class="criteria-panel">
   <h2 class="panel-title">Fachliche Qualitätskriterien</h2>
 
+  <!-- While a check is out. `role="status"`, so it is announced rather than only drawn — the wait is a
+       minute long, and until it is over the criteria show what the content already answered. -->
+  @if (checking()) {
+    <p class="note checking" role="status">
+      <span class="spinner" aria-hidden="true"></span>
+      Der Inhalt wird geprüft …
+    </p>
+  } @else if (hasAiAnswers()) {
+    <!-- What the colour means, for as long as anything on screen is in it. -->
+    <p class="note ai-legend">Lila: von der KI geprüft und ausgefüllt.</p>
+  }
+
   <!-- The record is as necessary as the criteria: every box shows what the content answers, and a
        click rewrites that answer — so neither is offered before it is known what it answers now. -->
   @if (loading() || !properties()) {
@@ -18,8 +30,29 @@
             <li>
               <label class="check">
                 <input type="checkbox" [checked]="isMet(criterion)"
+                       [class.is-ai]="isAiAnswered(criterion)"
                        (change)="setCriterion(criterion, $any($event.target).checked)" />
-                <span class="label">{{ captionOf(criterion) }}</span>
+                <span class="label">
+                  {{ captionOf(criterion) }}
+                  <!-- What the machine made of this criterion, beside the box rather than in it — the
+                       box stays the human's answer (see QualityCriteriaComponent.judgements). -->
+                  @if (judgementOf(criterion); as judged) {
+                    <span class="judged" [class.is-met]="judged.met === true"
+                          [class.is-unmet]="judged.met === false"
+                          [title]="judged.reasoning ? null : judgementTitle(judged)">
+                      <!-- The mark of the machine, and the way to its argument: hovering (or focusing,
+                           for a keyboard and for a tap) opens the reasoning it gave. Where there is
+                           one, which scheme judged is stated in there rather than as a native tooltip —
+                           two tooltips over one line would fight each other. -->
+                      @if (judged.reasoning; as reasoning) {
+                        <span class="ai-hint" tabindex="0" role="img"
+                              aria-label="Begründung der KI-Einschätzung">✦<span class="ai-reasoning"
+                              role="note"><span class="ai-source">{{ judgementTitle(judged) }}</span>{{ reasoning }}</span></span>
+                      }
+                      {{ judgementText(judged) }}
+                    </span>
+                  }
+                </span>
               </label>
             </li>
           }
@@ -33,8 +66,27 @@
             <li>
               <label class="check">
                 <input type="checkbox" [checked]="isEditorialMet(criterion)"
+                       [class.is-ai]="isAiAnswered(criterion)"
                        (change)="setEditorialCriterion(criterion, $any($event.target).checked)" />
-                <span class="label">{{ captionOf(criterion) }}</span>
+                <span class="label">
+                  {{ captionOf(criterion) }}
+                  @if (judgementOf(criterion); as judged) {
+                    <span class="judged" [class.is-met]="judged.met === true"
+                          [class.is-unmet]="judged.met === false"
+                          [title]="judged.reasoning ? null : judgementTitle(judged)">
+                      <!-- The mark of the machine, and the way to its argument: hovering (or focusing,
+                           for a keyboard and for a tap) opens the reasoning it gave. Where there is
+                           one, which scheme judged is stated in there rather than as a native tooltip —
+                           two tooltips over one line would fight each other. -->
+                      @if (judged.reasoning; as reasoning) {
+                        <span class="ai-hint" tabindex="0" role="img"
+                              aria-label="Begründung der KI-Einschätzung">✦<span class="ai-reasoning"
+                              role="note"><span class="ai-source">{{ judgementTitle(judged) }}</span>{{ reasoning }}</span></span>
+                      }
+                      {{ judgementText(judged) }}
+                    </span>
+                  }
+                </span>
               </label>
             </li>
           }

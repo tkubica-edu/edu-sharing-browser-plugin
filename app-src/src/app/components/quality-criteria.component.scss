@@ -9,6 +9,9 @@
   --qc-border: var(--es-border, #dfe3e8);
   --qc-surface: var(--es-surface, #ffffff);
   --qc-error: var(--es-error, #a3271f);
+  // Everything a machine put there is drawn in this one colour, so it is recognisable as such wherever
+  // it turns up: a box it filled in, its judgements, and the wait for them.
+  --qc-ai: var(--es-ai, #6d28d9);
 
   display: block;
   color: var(--qc-text);
@@ -58,6 +61,9 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 8px;
+
+  // The anchor of the reasoning popover — it hangs off the row it belongs to.
+  > li { position: relative; }
 }
 
 // The bulk row reads as one line of shortcuts under the lists, wrapping rather than squeezing.
@@ -107,6 +113,13 @@ input[type='checkbox'] {
     }
   }
 
+  // Filled in by the check, not by the user — see QualityCriteriaComponent.aiAnswered. A click on it
+  // makes the answer the user's, and with that it turns into an ordinary box again.
+  &.is-ai {
+    border-color: var(--qc-ai);
+    &:checked { background: var(--qc-ai); }
+  }
+
   // A shortcut that has nothing left to do, and a box locked while a write runs: still legible as
   // checked, clearly not something to press.
   &:disabled {
@@ -122,6 +135,82 @@ input[type='checkbox'] {
   line-height: 1.35;
   color: var(--qc-text);
   overflow-wrap: anywhere;
+}
+
+// The machine's verdict, on its own line under the criterion: it belongs to the criterion but is not
+// the answer to it, so it reads as a footnote rather than as a second label. In the machine's colour
+// throughout, whichever way it went — it is its statement either way, and which way is what the glyph
+// in front of it says. (Colour alone would say nothing here anyway, since every verdict shares it.)
+.judged {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--qc-ai);
+
+  &::before { content: '◦ '; }
+  &.is-met::before { content: '✓ '; }
+  &.is-unmet::before { content: '✗ '; }
+}
+
+// The machine's mark, and the handle for its argument. Focusable, so the reasoning is reachable by
+// keyboard and by tap as well — hover alone would leave both out.
+.ai-hint {
+  position: relative;
+  cursor: help;
+  font-size: 12px;
+
+  &:focus-visible { outline: 2px solid var(--qc-ai); outline-offset: 1px; }
+}
+
+// Why the machine judged that way, in its own words. Hidden until the mark is hovered or focused, and
+// wide enough to be read: it is several paragraphs of Markdown, so the line breaks it brought are kept
+// and the whole thing scrolls rather than growing over the sheet.
+.ai-reasoning {
+  display: none;
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 280px;
+  max-width: 80vw;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--qc-border);
+  border-left: 3px solid var(--qc-ai);
+  border-radius: 6px;
+  background: var(--qc-surface);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 18%);
+  color: var(--qc-text);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  text-align: left;
+  cursor: text;
+}
+
+// Which scheme said it, above its own words.
+.ai-source {
+  display: block;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--qc-border);
+  color: var(--qc-ai);
+  font-weight: 700;
+  white-space: normal;
+}
+
+.ai-hint:hover .ai-reasoning,
+.ai-hint:focus .ai-reasoning,
+.ai-hint:focus-within .ai-reasoning {
+  display: block;
+}
+
+// The right-hand column would push its popover past the sheet, so there it opens the other way.
+.criteria-column:last-child .ai-reasoning {
+  left: auto;
+  right: 0;
 }
 
 .criteria-buttons {
@@ -152,6 +241,41 @@ input[type='checkbox'] {
   font-size: 13px;
   line-height: 1.4;
   color: var(--qc-muted);
+}
+
+// The wait and what it explains afterwards: both are about the machine, so both are in its colour.
+.checking,
+.ai-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  color: var(--qc-ai);
+}
+
+// Drawn rather than an icon, like the checkbox tick: this component carries no icon font of its own.
+.spinner {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--qc-border);
+  border-top-color: var(--qc-ai);
+  border-radius: 50%;
+  animation: qc-spin 0.8s linear infinite;
+}
+
+// Name prefixed: keyframes are global even in an emulated-encapsulation component.
+@keyframes qc-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+// Still a ring, just not turning — with the text beside it that reads as "busy" all the same.
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
 }
 
 .note-error { color: var(--qc-error); }

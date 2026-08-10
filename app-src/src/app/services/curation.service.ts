@@ -55,6 +55,35 @@ function previewImageOf(payload: Record<string, unknown> | null | undefined): st
 }
 
 /**
+ * Provenance per metadata field, the `_origins` map an editor marks the generated fields by (the WLO
+ * canvas colours them): `'ai'` for what the metadata agent filled, `'user'` for everything else.
+ *
+ * Stated for EVERY field, because a field the map does not mention counts as generated — as does
+ * every field of a payload that carries no map at all. So the properties of a node, which say nothing
+ * about where they came from, would otherwise all be presented as the agent's work.
+ *
+ * `generated` is the agent run's own map: it still holds once its values have been written to a node,
+ * since those are the very values it filled. `recorded` names what the flow set outside the agent
+ * (see {@link CurationService.recordValues}) and therefore outranks it.
+ *
+ * Only namespaced keys are field names (`cclom:title`); the rest is envelope (`metadataset`,
+ * `preview_image_url`, …), the same line {@link toMdsEditorValues} draws.
+ */
+function fieldOrigins(
+  values: Record<string, unknown>,
+  generated: unknown,
+  recorded: MdsValues,
+): Record<string, 'ai' | 'user'> {
+  const byAgent = (generated ?? {}) as Record<string, unknown>;
+  const origins: Record<string, 'ai' | 'user'> = {};
+  for (const key of Object.keys(values)) {
+    if (!key.includes(':')) continue;
+    origins[key] = byAgent[key] === 'ai' && !(key in recorded) ? 'ai' : 'user';
+  }
+  return origins;
+}
+
+/**
  * Assemble a stand-in {@link Node} for a content the repository was never asked about — the one the
  * metadata agent's `/upload` created and described itself (see
  * {@link CurationService.applyUploadedNode}).
@@ -360,12 +389,17 @@ export class CurationService {
    * What other steps have recorded ({@link recordValues}) lies on top, so the flow has ONE picture of
    * the content's metadata: the step that recorded them reads its own values back from here, and the
    * editor is seeded with them rather than committing over them as if they were never set.
+   *
+   * Carries `_origins` for the whole set, so an editor that marks the generated fields marks the
+   * agent's and only the agent's — see {@link fieldOrigins}.
    */
   readonly editorMetadata = computed<Record<string, unknown> | null>(() => {
     const payload = this.metadataAgent.lastRun()?.parsed?.raw ?? null;
     const base = this.activeNode() ? this.nodeMetadata() ?? payload : payload;
     const recorded = this.recordedValues();
-    return Object.keys(recorded).length ? { ...(base ?? {}), ...recorded } : base;
+    const values = Object.keys(recorded).length ? { ...(base ?? {}), ...recorded } : base;
+    if (!values) return null;
+    return { ...values, _origins: fieldOrigins(values, payload?.['_origins'], recorded) };
   });
 
   /**
