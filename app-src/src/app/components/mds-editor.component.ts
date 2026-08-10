@@ -5,7 +5,7 @@ import {
 import { DEFAULT, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 
 import { MdsValues, toMdsEditorValues } from '../util/mds-values';
-import { EDITOR_MODE_FOR_DRAFT, forMdsEditor, isDraftNode, previewSrcOf } from '../util/mds-node';
+import { EDITOR_MODE_FOR_DRAFT, forMdsEditor, isDraftNode } from '../util/mds-node';
 import { MetadataEditor, MetadataSeed } from './metadata-editor';
 import { loadWebComponentBundle } from '../services/web-component-bundle.service';
 
@@ -35,9 +35,12 @@ interface MdsEditorElement extends HTMLElement {
 // methods, so the edited metadata is read from the `currentValuesChange` output.
 //
 // It runs on a NODE where the caller has one ({@link node}) and on a plain values map otherwise. The
-// difference is not cosmetic: the group's native widgets ask the editor for a node, and `<preview>`
-// hides itself outright when there is none — which is why a value-mode editor never shows a picture,
-// however much of the metadata it is handed.
+// difference is not cosmetic: some of the group's native widgets ask the editor for a node and hide
+// themselves outright when there is none, so a value-mode editor renders less of the view than a
+// node-mode one, however much of the metadata it is handed.
+//
+// Three of the view's widgets are hidden by this component's stylesheet, because the screen shows them
+// above the form already — see mds-editor.component.scss.
 @Component({
   selector: 'es-mds-editor',
   templateUrl: './mds-editor.component.html',
@@ -52,7 +55,7 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
   /**
    * The node the group's widgets work on, when the content has one to hand over (a stand-in counts —
    * see CurationService.editorNode). With it the editor runs in `nodes` mode, which is what the
-   * native widgets need: `<preview>` declares `requiresNode` and is hidden outright without one.
+   * native widgets need: several of them declare `requiresNode` and are hidden outright without one.
    *
    * `null` falls back to the value mode below, so callers that only have a payload are unaffected.
    */
@@ -116,14 +119,6 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
     const title = this.initialValues['cclom:title'];
     if (!values['cm:name']?.length && title?.length) values['cclom:title'] = title;
     this.save.emit(values);
-  }
-
-  /**
-   * The picture the group's preview widget currently shows — see {@link previewSrcOf}. Only ever
-   * non-null in node mode, since that is the only mode the widget renders in at all.
-   */
-  currentPreviewSrc(): string | null {
-    return previewSrcOf(this.element);
   }
 
   /** Create the element, set every input as a property, THEN append (see the class comment). */

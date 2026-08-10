@@ -10,6 +10,23 @@
   user-select: none;
 }
 
+// The title is shown above the editing canvas already (the native preview widget of the metadata
+// screen), so its field is hidden here — as it is in the other editor, see mds-editor.component.scss.
+// Editing only: in 'detail' mode the canvas IS the view of the properties, and hiding one of them
+// there would drop it from the content's own page.
+//
+// Recognised by the placeholder, because the canvas gives no other handle: it has no input for the
+// visibility of a single field (`show-core-fields` would take the description and the keywords with
+// it), and its DOM names no field at all — `div.canvas-field` carries the fill status and nothing
+// else. The two spellings are what the agent's `core.json` defines for `cclom:title`; which of them is
+// rendered follows the canvas' own UI language.
+.canvas-wrap[data-mode='edit'] ::ng-deep .canvas-field:has(
+    [placeholder='Titel der Ressource'],
+    [placeholder='Title of the resource']
+  ) {
+  display: none;
+}
+
 metadata-agent-canvas {
   display: block;
   width: 100%;

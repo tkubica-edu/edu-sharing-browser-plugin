@@ -36,12 +36,14 @@
     </div>
   </section>
 
-  <!-- The repository's own preview widget beside the editor (MdsPreviewWidgetComponent). It renders a
-       node's picture, so it only appears for a node that has one. -->
-  @if (nodeWithPreview(); as node) {
+  <!-- The repository's own preview widget above the editor (MdsPreviewWidgetComponent): the content's
+       picture and its file name, as the metadata set renders them. On the same node as the editor, so
+       it is there whichever editor follows — the MDS editor hides its own widgets for the two (see
+       mds-editor.component.scss). -->
+  @if (editorNode; as node) {
     <section class="es-card preview-widget-card">
-      <p class="es-muted card-label">Vorschau des Nodes (MDS-Widget)</p>
-      <es-mds-preview-widget [node]="node"></es-mds-preview-widget>
+      <es-mds-preview-widget [node]="node"
+                             (valuesChange)="onPreviewValuesChange($event)"></es-mds-preview-widget>
     </section>
   }
 

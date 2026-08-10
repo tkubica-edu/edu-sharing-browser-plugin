@@ -3,3 +3,22 @@
 .mds-wrap { display: flex; flex-direction: column; }
 
 .mds-host { display: block; width: 100%; }
+
+// The picture, the file name and the title are already on screen above this form, rendered by the
+// native preview widget (MdsPreviewWidgetComponent) — so the view's own widgets for the three are
+// hidden here: one question, one field.
+//
+// `data-element` is the way to a single widget of a group: the wrapper injects every widget into a
+// <div> carrying the widget's id from the view's HTML, and nothing else in the DOM names it.
+//
+// Hidden rather than taken out of the view — which is the metadata set's business, not the panel's.
+// The widgets therefore keep reporting their values, and a save still carries name and title; where
+// the widget above disagrees with its hidden twin, the visible answer wins (see
+// MetadataScreenComponent.save).
+:host ::ng-deep {
+  [data-element='preview'],
+  [data-element='cm:name'],
+  [data-element='cclom:title'] {
+    display: none;
+  }
+}

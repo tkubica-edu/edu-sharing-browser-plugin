@@ -1,6 +1,7 @@
 <!-- `inert` locks the keyboard too (the class below only stops the pointer), so a locked canvas
      cannot be edited by tabbing into it either. -->
-<div class="canvas-wrap" [class.is-locked]="locked()" [attr.inert]="locked() ? '' : null">
+<div class="canvas-wrap" [attr.data-mode]="mode()" [class.is-locked]="locked()"
+     [attr.inert]="locked() ? '' : null">
   @if (bundle.error()) {
     <p class="es-error">WLO-Editor konnte nicht geladen werden: {{ bundle.error() }}</p>
   } @else if (!bundle.ready()) {

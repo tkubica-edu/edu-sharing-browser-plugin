@@ -38,15 +38,12 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
   private readonly mdsEditor = viewChild(MdsEditorComponent);
   private readonly wloCanvas = viewChild(WloCanvasComponent);
 
+  /** The preview widget above the editor, for the picture it shows — see {@link previewSource}. */
+  private readonly previewWidget = viewChild(MdsPreviewWidgetComponent);
+
   private readonly editor = computed<MetadataEditor | undefined>(
     () => this.wloCanvas() ?? this.mdsEditor(),
   );
-
-  /** The node whose own preview the native MDS widget can show; null when there is none. */
-  protected readonly nodeWithPreview = computed(() => {
-    const node = this.curation.previewNode();
-    return node?.preview?.url ? node : null;
-  });
 
   /**
    * A page this editor should erschließen as it opens (an added link, see
@@ -56,12 +53,19 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
   protected readonly sourceUrl = this.curation.takeExtractionUrl();
 
   /**
-   * The node the MDS editor works on, read ONCE for the same reason as `sourceUrl`: the wrapper
-   * re-initialises whenever its `nodes` change, so a node that kept tracking would rebuild the form
-   * on every keystroke. Without it the editor falls back to editing a plain values map — and its
-   * `<preview>` widget, which insists on a node, would not render at all.
+   * The node both the preview widget and the MDS editor work on, read ONCE for the same reason as
+   * `sourceUrl`: the wrapper re-initialises whenever its `nodes` change, so a node that kept tracking
+   * would rebuild the form on every keystroke. Without it the editor falls back to editing a plain
+   * values map — and the widgets that insist on a node, `<preview>` among them, render not at all.
    */
   protected readonly editorNode = this.curation.editorNode();
+
+  /**
+   * What the preview widget last reported: the values of the group it renders, the content's file name
+   * among them. Kept here rather than handed to the curation, because it is not a *finding* but the
+   * answer to a question the form below asks as well — see {@link previewOverrides}.
+   */
+  private previewValues: MdsValues = {};
 
   /**
    * Settles the write the footer is waiting on; null while none is in flight.
@@ -82,12 +86,13 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
   };
 
   /**
-   * Lets the save pick up a picture the user swapped in the editor's own preview widget. Stable
-   * function, so register/clear pair up by identity — the same arrangement the preview step makes
+   * Lets the save pick up a picture the user swapped in the preview widget — the one element of this
+   * screen that shows the picture, in every context. Stable function, so register/clear pair up by
+   * identity: the same arrangement the preview step makes
    * (CurationService.registerDraftPreviewSource).
    */
   private readonly previewSource: DraftPreviewSource = () =>
-    this.mdsEditor()?.currentPreviewSrc() ?? null;
+    this.previewWidget()?.currentPreviewSrc() ?? null;
 
   ngOnInit(): void {
     this.conditions.editMode.set(true);
@@ -105,13 +110,32 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
     this.curation.clearDraftPreviewSource(this.previewSource);
   }
 
+  /** Take over the preview widget's values, for the save to lay over the editor's. */
+  protected onPreviewValuesChange(values: MdsValues): void {
+    this.previewValues = values;
+  }
+
+  /**
+   * The properties the preview widget answers rather than the editor below it: the widgets for them
+   * are hidden in that form (see mds-editor.component.scss), so the visible field is the one the user
+   * edited — while the hidden one keeps reporting the value it was seeded with.
+   *
+   * Empty values are dropped: the widget reports its whole group, and a field it has nothing for must
+   * not erase what the form carries.
+   */
+  private previewOverrides(): MdsValues {
+    return Object.fromEntries(
+      Object.entries(this.previewValues).filter(([, value]) => value?.length),
+    );
+  }
+
   /**
    * Write the metadata and stay put. Where the flow goes next is the footer's business, not this
    * screen's — the editor also reaches here through a save control of the canvas's own
    * (WloCanvasComponent.onMetadataSubmit), and that one saves without meaning to leave.
    */
   protected async save(values: MdsValues): Promise<void> {
-    const saved = await this.curation.save(values);
+    const saved = await this.curation.save({ ...values, ...this.previewOverrides() });
     const settle = this.settleSave;
     this.settleSave = null;
     settle?.(saved);
