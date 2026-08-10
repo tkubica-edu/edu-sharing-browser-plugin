@@ -95,23 +95,31 @@ export class QualityCriteriaComponent {
   private readonly mds = signal<MdsDefinition | null>(null);
 
   /**
-   * The changes made here, over the properties handed in. Kept because the input is not written back
-   * synchronously — a host that stores the reported values re-supplies them, and one that does not
-   * still gets a view that answers to its own clicks.
+   * The changes made here, over the properties handed in. Kept because a host is not obliged to feed
+   * the reported values back: one that stores them re-supplies them and this agrees with it, one
+   * that does not still gets a view that answers to its own clicks.
    */
   private readonly changes = signal<CriteriaProperties>({});
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
 
+  /** Whether the unrecorded criteria have been asserted; see {@link reportUnrecordedAsMet}. */
+  private defaultsReported = false;
+
   constructor() {
     // The criteria belong to the set, so they are re-read whenever it (or the repository) changes.
     effect(() => void this.load(this.metadataSet(), this.repository()));
 
-    // A different content is a different record: what was changed here is about the previous one.
+    // Both halves have to be there: the criteria to assert, and the record to see what is already
+    // answered. Asserting against a content whose properties have not arrived yet would take
+    // "nothing recorded" for an answer and overwrite the answers it actually holds.
     effect(() => {
-      this.properties();
-      this.changes.set({});
+      const criteria = this.knockoutCriteria();
+      const properties = this.properties();
+      if (this.defaultsReported || !criteria.length || !properties) return;
+      this.defaultsReported = true;
+      this.reportUnrecordedAsMet();
     });
   }
 
@@ -260,5 +268,26 @@ export class QualityCriteriaComponent {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /**
+   * Report every knock-out criterion that nothing is recorded for as met.
+   *
+   * The left column shows those as ticked — an unrecorded criterion is an unobjected one — but until
+   * they are reported that tick is the *absence* of a value, and a content saved from here would
+   * carry none of them. So what the view asserts is written down as soon as it can assert it, and
+   * the saved content says what it showed rather than merely having looked that way.
+   *
+   * Only the unrecorded ones: a criterion the content already answers keeps its answer, findings
+   * and "Ungeprüft" included.
+   */
+  private reportUnrecordedAsMet(): void {
+    const defaults: CriteriaProperties = {};
+    for (const criterion of this.knockoutCriteria()) {
+      if (this.valueOfProperty(criterion.id).length) continue;
+      const met = this.valueFor(criterion.id, CRITERION_MET);
+      if (met) defaults[criterion.id] = [met];
+    }
+    if (Object.keys(defaults).length) this.report(defaults);
   }
 }

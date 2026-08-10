@@ -1,7 +1,9 @@
 <section class="criteria-panel">
   <h2 class="panel-title">Fachliche Qualitätskriterien</h2>
 
-  @if (loading()) {
+  <!-- The record is as necessary as the criteria: every box shows what the content answers, and a
+       click rewrites that answer — so neither is offered before it is known what it answers now. -->
+  @if (loading() || !properties()) {
     <p class="note">Die Qualitätskriterien werden geladen …</p>
   } @else if (!hasCriteria()) {
     <p class="note">Das Metadatenset hält für diesen Inhalt keine Qualitätskriterien bereit.</p>

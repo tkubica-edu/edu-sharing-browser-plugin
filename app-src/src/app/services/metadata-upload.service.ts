@@ -6,15 +6,18 @@ import { BrowserExtensionService, UploadedNode } from './browser-extension.servi
 import { MetadataAgentApiService } from './metadata-agent-api.service';
 import { errorMessage } from './../util/errors';
 
-/** The envelope keys the agent's payload carries alongside the field values. */
-const ENVELOPE_KEYS = [
-  'contextName',
-  'schemaVersion',
-  'metadataset',
-  'metadataset_uri',
-  '_origins',
-  '_source_text'
-] as const;
+/**
+ * The envelope keys the agent's payload carries alongside the field values — which set the values
+ * are read against. They travel at the top level of the request, next to the fields themselves.
+ */
+const ENVELOPE_KEYS = ['contextName', 'schemaVersion', 'metadataset', 'metadataset_uri'] as const;
+
+/**
+ * The agent's own record of where its result came from. Not properties of the content, so they are
+ * not sent as fields: the page's raw text travels as `extended_text` (which is what
+ * `write_extended_data` writes), and `_origins` describes the run rather than the content.
+ */
+const SOURCE_TEXT_KEY = '_source_text';
 
 /** How a screenshot for the preview is taken; the agent's own default for an embedded canvas. */
 const SCREENSHOT_METHOD = 'pageshot';
@@ -62,9 +65,15 @@ export class MetadataUploadService {
     payload: Record<string, unknown> | null,
     sourceUrl?: string,
   ): Promise<UploadOutcome> {
-    const envelope = this.envelopeOf(payload);
     const body: Record<string, unknown> = {
-      metadata: { ...values, ...envelope },
+      // The fields go at the TOP LEVEL, one key per property — `cclom:title`, `ccm:wwwurl`, the
+      // quality criteria, all of it. What the endpoint takes under `metadata` it writes into the
+      // node's extended data instead, which is the wrong place for a property the metadata set
+      // defines: it would be stored beside the node's own fields rather than as them.
+      //
+      // Before the flags below, so a field that happened to be named like one cannot displace it.
+      ...this.envelopeOf(payload),
+      ...this.fieldsOf(values),
       repository: APP_CONFIG.uploadRepository,
       // Never here: the question is answered BEFORE anything is curated — the panel looks the open
       // page up as soon as it is opened and adopts the content the repository already holds for it
@@ -74,7 +83,7 @@ export class MetadataUploadService {
       check_duplicates: false,
       start_workflow: true,
       write_extended_data: true,
-      extended_text: envelope['_source_text'],
+      extended_text: payload?.[SOURCE_TEXT_KEY],
       preview_url: sourceUrl || (values['ccm:wwwurl'] as string[] | undefined)?.[0],
       screenshot_method: SCREENSHOT_METHOD
     };
@@ -92,6 +101,23 @@ export class MetadataUploadService {
     } catch (cause: unknown) {
       return { ok: false, error: errorMessage(cause) };
     }
+  }
+
+  /**
+   * The field values as request keys, each as the list the property is.
+   *
+   * Deliberately NOT unwrapped to a bare value when there happens to be one of it: how many values a
+   * property holds right now says nothing about how many it *takes*. `ccm:oeh_buffet_criteria` is a
+   * list of criteria, and sending the single one that is ticked as a bare string makes it a
+   * different property than the one with two ticked. The endpoint documents its fields with plain
+   * values (`"cclom:title": "…"`), and a one-element list is that same value said in the shape the
+   * repository stores it in.
+   *
+   * An empty one is left out altogether — it says nothing, and sending it would clear a field the
+   * editor never touched.
+   */
+  private fieldsOf(values: MdsValues): Record<string, unknown> {
+    return Object.fromEntries(Object.entries(values).filter(([, value]) => value?.length));
   }
 
   /** The envelope fields of an agent payload, skipping the ones it did not deliver. */

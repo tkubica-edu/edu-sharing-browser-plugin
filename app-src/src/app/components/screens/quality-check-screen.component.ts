@@ -41,11 +41,15 @@ export class QualityCheckScreenComponent implements OnInit {
   private readonly browserExtension = inject(BrowserExtensionService);
 
   /**
-   * The content's metadata, read ONCE as the view opens. Recording a criterion feeds back into this
-   * signal, and a live input would hand the component its own answer back mid-click — it already
-   * holds what it changed (see QualityCriteriaComponent.changes).
+   * The content's metadata, tracked rather than sampled: a node picked from the Verlauf or den
+   * eigenen Inhalten is still loading when this view opens, and a record read once would then stay
+   * empty — every criterion would look unanswered, and the first click would write the view's idea
+   * of the answers over the ones the content actually holds.
+   *
+   * Feeding it live is safe because recording is additive on both sides: the criteria view keeps
+   * what it changed, and the curation merges rather than replaces (see recordValues).
    */
-  protected readonly properties = this.curation.editorMetadata();
+  protected readonly properties = this.curation.editorMetadata;
 
   /** The criteria are not in every repository's default set — see APP_CONFIG.qualityMetadataSet. */
   protected readonly metadataSet = APP_CONFIG.qualityMetadataSet;
