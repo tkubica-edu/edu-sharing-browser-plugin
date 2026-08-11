@@ -181,6 +181,9 @@ export class MetadataAgentService {
     const timer = setTimeout(() => controller.abort(), EXTRACT_TIMEOUT_MS);
     try {
       const response = await fetch(`${this.agentApi.baseUrl()}/extract-field`, {
+        // The agent is the repository's own proxy, which authorizes by repository session — and a
+        // cross-origin fetch sends no cookie unless it is asked to (see MetadataAgentApiService).
+        credentials: 'include',
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({

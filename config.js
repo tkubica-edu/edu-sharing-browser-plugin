@@ -2,27 +2,26 @@
 // copy in app-src/src/app/config.ts.
 
 const EDU_SHARING_CONFIG = {
-    // Metadata-Agent API, as the background worker falls back to it. Which agent actually applies
-    // follows from the configured repository and is decided in the sidebar, which names it in every
-    // /generate and /upload message (see MetadataAgentApiService) — this is only what a message
-    // without one gets. The agent's own deployment, therefore: it needs no session, and the worker
-    // has none to offer (the repository's proxy authorizes by session cookie, 401/403 without it).
-    api: {
-        localUrl: 'http://localhost:8000',
-        url: 'https://metadata-agent-api.vercel.app',
-    },
-
     // Default repository base (user-editable; /rest is appended by the auth layer).
     repository: {
         defaultUrl: 'https://repository.staging.openeduhub.net/edu-sharing'
     },
+
+    // Where a repository proxies the metadata agent, relative to its base — the B-API endpoint that
+    // /health, /generate and /upload are appended to.
+    agentProxyPath: '/rest/bapi/api/v1/proxy/metadata-agent-canvas',
 
     network: {
         defaultTimeoutMs: 20000,
         generateTimeoutMs: 60000
     },
 
-    getApiUrl() { return this.api.url; }
+    // The agent of the DEFAULT repository, for a worker message that names no base. The sidebar
+    // names the base in every /generate and /upload message and currently pins it to this same
+    // repository (see MetadataAgentApiService) — so this is the fallback, not a second answer.
+    getApiUrl() {
+        return this.repository.defaultUrl.replace(/\/+$/, '') + this.agentProxyPath;
+    }
 };
 
 if (typeof module !== 'undefined' && module.exports) {

@@ -277,11 +277,31 @@ before the scripts run — mirroring `window.__env.EDU_SHARING_API_URL` for the 
 - **Auth** runs inside the Angular app (the library owns its HttpClient); it calls
   `GET {repo}/edu-sharing/rest/authentication/v1/validateSession` with Basic auth.
 
+### The metadata agent's address
+Every agent call — `/health`, `/generate`, `/upload`, `/extract-field` — goes to a repository's own
+B-API proxy, `{repo}/rest/bapi/api/v1/proxy/metadata-agent-canvas` (`MetadataAgentApiService`).
+
+Which repository is **pinned to the default one** for the moment
+(`APP_CONFIG.defaultRepositoryUrl`, staging: `https://repository.staging.openeduhub.net/edu-sharing`)
+— not taken from the repository URL in *Einstellungen*, so the agent stays reachable while that URL
+points somewhere without a B-API of its own. Following the configured repository again is one
+expression in that service. The two do have to agree, though: the proxy authorizes by repository
+session, so the pinned agent only answers while the panel's session is one *that* repository issued.
+
+This used to depend on `additionalWebComponent`, with every other repository served by the agent's
+public deployment. That flag answers which *editor* the metadata screen embeds, which is a different
+question from where the agent lives, so it no longer decides the address.
+
+The proxy **authorizes by repository session**, so every leg has to carry the session cookie
+explicitly (`credentials: 'include'`): a worker fetch and a cross-origin page fetch both send none by
+default. A base that is wrong, or a session the proxy refuses, is reported by the `GET /health` that
+precedes every `/generate` rather than as a failed extraction a minute later.
+
 ### Network legs & CORS
 | Leg | Where it runs | Why |
 |-----|---------------|-----|
-| `POST /generate` (Metadata-Agent API) | background service worker | background fetch is gated by `host_permissions`, not CORS/page-CSP — portable everywhere (`analyze.run`: extract the tab, generate everything) |
-| `POST /extract-field` (Metadata-Agent API) | sidebar document (`MetadataAgentService`) | same context the WLO canvas calls `/generate` from, so the request is visible in the panel's own DevTools and there is no worker build that can fall out of sync with the app. Relies on `host_permissions` for the cross-origin call, like the repository login |
+| `POST /generate`, `POST /upload` (Metadata-Agent) | background service worker | background fetch is gated by `host_permissions`, not CORS/page-CSP — portable everywhere (`analyze.run`: extract the tab, generate everything) |
+| `POST /extract-field` (Metadata-Agent) | sidebar document (`MetadataAgentService`) | same context the WLO canvas calls `/generate` from, so the request is visible in the panel's own DevTools and there is no worker build that can fall out of sync with the app. Relies on `host_permissions` for the cross-origin call, like the repository login |
 | Page content extraction | `scripting.executeScript` (background) | no cross-origin fetch |
 | Repository login | Angular `HttpClient` (library) | the library owns the call; relies on `host_permissions` bypassing CORS on Chrome/Edge/Firefox |
 

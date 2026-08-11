@@ -42,12 +42,6 @@ export interface MetalookupRule {
 // follows from it (see MetadataAgentApiService), so it is not configured as a URL of its own.
 export const APP_CONFIG = {
   /**
-   * The metadata agent's own deployment — the base used for every repository that does not bring
-   * the agent itself. Needs no session, which is why it is also the background worker's fallback
-   * (see config.js).
-   */
-  agentApiUrl: 'https://metadata-agent-api.vercel.app',
-  /**
    * MetalookUp, which evaluates a resource and answers with the metadata it could extract from it
    * (`POST /api/evaluation`, see MetalookupService). The host root — the base its own OpenAPI
    * declares (`…/sw`) does not route.

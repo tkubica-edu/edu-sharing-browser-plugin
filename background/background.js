@@ -6,12 +6,13 @@
 /* global EDU_SHARING_CONFIG */
 
 /**
- * Fallback metadata agent, for a call that arrives without one. Which agent applies follows from
- * the configured repository, and only the sidebar knows that (see MetadataAgentApiService), so it
- * names the base in every message — this is what is used when it does not.
+ * Fallback metadata agent, for a call that arrives without one. The agent is a repository's own
+ * B-API proxy, and which repository that is belongs to the sidebar (see MetadataAgentApiService),
+ * so it names the base in every message — this is what is used when it does not. The default
+ * repository's proxy, which is what the sidebar currently names anyway.
  */
 const API_URL = (typeof EDU_SHARING_CONFIG !== 'undefined' && EDU_SHARING_CONFIG.getApiUrl())
-  || 'https://metadata-agent-api.vercel.app';
+  || 'https://repository.staging.openeduhub.net/edu-sharing/rest/bapi/api/v1/proxy/metadata-agent-canvas';
 const DEFAULT_TIMEOUT_MS = (typeof EDU_SHARING_CONFIG !== 'undefined' && EDU_SHARING_CONFIG.network?.defaultTimeoutMs) || 20000;
 const GENERATE_TIMEOUT_MS = (typeof EDU_SHARING_CONFIG !== 'undefined' && EDU_SHARING_CONFIG.network?.generateTimeoutMs) || 60000;
 
@@ -25,6 +26,18 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_M
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Fetch options for a call to the metadata agent, which sits behind the repository's own proxy and
+ * authorizes by repository session (see MetadataAgentApiService).
+ *
+ * `credentials: 'include'` is what puts the session cookie on the request: a worker's fetch defaults
+ * to `same-origin`, and the agent's base never is this worker's origin — so without it every call
+ * arrives unauthenticated, however valid the panel's session is.
+ */
+function agentRequest(options = {}) {
+  return { credentials: 'include', ...options };
 }
 
 async function safeJson(response) {
@@ -206,17 +219,17 @@ function buildGenerateBody(pageData, language) {
 /**
  * `GET /health` — asked BEFORE every /generate.
  *
- * The agent is reachable under two very different bases (see config.js): its own deployment, or the
- * repository's `…/bapi/api/v1/proxy/metadata-agent-canvas`, where the endpoint authorizes by
- * repository session. A misconfigured or unauthorized base then only shows up as a failing
- * /generate — after the full generate timeout, and reported as if the extraction had failed. The
- * health call turns that into an immediate, unambiguous answer.
+ * The agent sits behind the repository's `…/bapi/api/v1/proxy/metadata-agent-canvas`, which
+ * authorizes by repository session. A base that is wrong, or a session the proxy refuses, would
+ * otherwise only show up as a failing /generate — after the full generate timeout, and reported as
+ * if the extraction had failed. The health call turns that into an immediate, unambiguous answer,
+ * and it carries the session like the call it guards.
  */
 async function callHealth(apiUrl) {
   const url = `${apiUrl}/health`;
   let response;
   try {
-    response = await fetchWithTimeout(url, { headers: { 'Accept': 'application/json' } });
+    response = await fetchWithTimeout(url, agentRequest({ headers: { 'Accept': 'application/json' } }));
   } catch (error) {
     throw new Error(`Metadata-Agent nicht erreichbar (${url}): ${error?.message || error}`);
   }
@@ -234,11 +247,11 @@ async function callGenerate(body, apiUrl) {
   await callHealth(apiUrl);
   const response = await fetchWithTimeout(
     `${apiUrl}/generate`,
-    {
+    agentRequest({
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(body)
-    },
+    }),
     GENERATE_TIMEOUT_MS
   );
   if (!response.ok) {
@@ -258,11 +271,11 @@ async function callGenerate(body, apiUrl) {
 async function callUpload(body, apiUrl) {
   const response = await fetchWithTimeout(
     `${apiUrl}/upload`,
-    {
+    agentRequest({
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(body)
-    },
+    }),
     GENERATE_TIMEOUT_MS
   );
   // A rejected upload answers with a JSON body too (`success: false`), so the payload is read
