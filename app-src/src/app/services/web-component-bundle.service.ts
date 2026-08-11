@@ -3,6 +3,7 @@ import browser from 'webextension-polyfill';
 
 import { errorMessage } from '../util/errors';
 import { installBundleWindowRedirect } from '../util/bundle-windows';
+import { installDraftRequestGuard } from '../util/bundle-requests';
 import { AuthService } from './auth.service';
 import { MetadataAgentApiService } from './metadata-agent-api.service';
 
@@ -98,7 +99,13 @@ export class WebComponentBundleService {
     // extension here, so they lead nowhere. Redirecting them to the repository is a correction of
     // that base, so it lives as long as the bundle does rather than being scoped to a screen; see
     // installBundleWindowRedirect.
-    if (bundle === 'edu') installBundleWindowRedirect(() => this.auth.repositoryUrl());
+    if (bundle === 'edu') {
+      installBundleWindowRedirect(() => this.auth.repositoryUrl());
+      // The bundle's widgets ask the repository about the node they are given, including the stand-in
+      // the curation renders a form on — which identifies nothing there. Also a correction that
+      // belongs to the bundle rather than to a screen; see installDraftRequestGuard.
+      installDraftRequestGuard();
+    }
     const { styles, scripts } = await this.entriesOf(bundle);
     for (const href of styles) this.addLink(href);
     for (const script of scripts) await this.addScript(script);

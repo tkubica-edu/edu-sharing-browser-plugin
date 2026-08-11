@@ -41,10 +41,11 @@ export function isDraftNode(node: Node | null | undefined): boolean {
  * whenever `nodes` is set, whatever the mode), still editable, still validated, and
  * `currentValuesChange` still reports every widget's live value.
  *
- * It is also the mode by which the group's native widgets recognize a form without a node behind it,
- * and the two of them the `io` set asks for unconditionally read it: the licence widget edits the
- * properties it was seeded with instead of writing to a node, and the child-objects widget renders
- * nothing at all, since a child object is an assoc of a node that exists.
+ * It is also the mode by which the group's native widgets recognize a form without a node behind it:
+ * the licence widget edits the properties it was seeded with instead of writing to a node. It does
+ * not reach every one of them — a widget that asks the repository about the node from its own
+ * `ngOnInit` never consults the mode, which is what the request guard is for (see
+ * installDraftRequestGuard).
  */
 export const EDITOR_MODE_FOR_DRAFT = 'form';
 
