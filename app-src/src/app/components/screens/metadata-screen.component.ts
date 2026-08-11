@@ -8,6 +8,7 @@ import { ConditionsService } from '../../services/conditions.service';
 import { CurationService, DraftPreviewSource } from '../../services/curation.service';
 import { MetadataAgentService } from '../../services/metadata-agent.service';
 import { NavigationService } from '../../services/navigation.service';
+import { IconDirective } from '../../directives/icon.directive';
 import { MdsEditorComponent } from '../mds-editor.component';
 import { MdsPreviewWidgetComponent } from '../mds-preview-widget.component';
 import { MetadataEditor } from '../metadata-editor';
@@ -22,7 +23,7 @@ import { WloCanvasComponent } from '../wlo-canvas.component';
 // MetadataEditor, so everything else on this screen is identical either way.
 @Component({
   selector: 'es-metadata-screen',
-  imports: [JsonPipe, MdsEditorComponent, MdsPreviewWidgetComponent, WloCanvasComponent],
+  imports: [JsonPipe, IconDirective, MdsEditorComponent, MdsPreviewWidgetComponent, WloCanvasComponent],
   templateUrl: './metadata-screen.component.html',
   styleUrl: './metadata-screen.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -145,10 +146,5 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
     const settle = this.settleSave;
     this.settleSave = null;
     settle?.(saved);
-  }
-
-  /** Drop the content's picture when it cannot be loaded; nothing takes its place here. */
-  protected hideBrokenImage(event: Event): void {
-    (event.target as HTMLImageElement).style.display = 'none';
   }
 }

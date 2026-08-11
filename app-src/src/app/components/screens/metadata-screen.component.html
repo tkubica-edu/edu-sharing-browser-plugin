@@ -1,5 +1,16 @@
 <div class="es-screen-body">
-  <section class="es-hint-card">
+  <!-- What the agent contributed to the form below: how many of the metadata set's fields it filled
+       in, and the ask to check them. The count is only shown where a run reported one. -->
+  <section class="es-hint-card agent-summary">
+    <h2>Metadaten automatisch ergänzt</h2>
+
+    @if (metadataAgent.lastRun()?.parsed; as parsed) {
+      <p class="field-count">
+        <span class="pill">{{ parsed.fieldsExtracted ?? '–' }} von {{ parsed.fieldsTotal ?? '–' }} Felder<i
+              class="pill-glyph" esIcon="smart_toy"></i></span>
+      </p>
+    }
+
     <p class="es-muted">
       @if (curation.metadataSaved()) {
         Die Metadaten sind gespeichert. Du kannst sie weiter bearbeiten und erneut speichern.
@@ -8,33 +19,9 @@
           weitergeführt wird — der bereits gespeicherte bleibt unverändert bestehen.
         }
       } @else {
-        Prüfe und ergänze die Metadaten. Die Schaltfläche unten speichert den Inhalt und führt
-        zur Inhaltsübersicht.
+        Bitte prüfe die Angaben und korrigiere oder ergänze sie bei Bedarf.
       }
     </p>
-
-    <!-- The content's picture next to what is said about it (CurationService.contentPreview). The
-         editors below take no image of their own. -->
-    <div class="source-row">
-      @if (curation.contentPreview(); as preview) {
-        <img class="source-preview" [class.is-icon]="preview.isIcon" [src]="preview.url" alt=""
-             (error)="hideBrokenImage($event)" />
-      }
-      <div class="source-main">
-        @if (metadataAgent.lastRun()?.source; as source) {
-          <p class="src-title" [title]="source.url">{{ source.title || source.url }}</p>
-        }
-
-        @if (metadataAgent.lastRun()?.parsed; as parsed) {
-          <div class="es-result-sub">
-            <span class="es-chip">{{ parsed.fieldsExtracted ?? '–' }} / {{ parsed.fieldsTotal ?? '–' }} Felder</span>
-            @if (curation.activeNode(); as node) {
-              <span class="es-chip">Node: {{ node.name ?? node.nodeId }}</span>
-            }
-          </div>
-        }
-      </div>
-    </div>
   </section>
 
   <!-- The repository's own preview widget above the editor (MdsPreviewWidgetComponent): the content's
