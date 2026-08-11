@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, viewChild } from '@angular/core';
-import { JsonPipe } from '@angular/common';
 
 import { MdsValues } from '../../util/mds-values';
 import { ActionBarService, SaveHandler } from '../../services/action-bar.service';
@@ -23,7 +22,7 @@ import { WloCanvasComponent } from '../wlo-canvas.component';
 // MetadataEditor, so everything else on this screen is identical either way.
 @Component({
   selector: 'es-metadata-screen',
-  imports: [JsonPipe, IconDirective, MdsEditorComponent, MdsPreviewWidgetComponent, WloCanvasComponent],
+  imports: [IconDirective, MdsEditorComponent, MdsPreviewWidgetComponent, WloCanvasComponent],
   templateUrl: './metadata-screen.component.html',
   styleUrl: './metadata-screen.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

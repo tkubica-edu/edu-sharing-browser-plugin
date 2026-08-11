@@ -59,24 +59,4 @@
     <section class="es-card"><p class="es-error">Speichern fehlgeschlagen: {{ error }}</p></section>
   }
 
-  @if (metadataAgent.lastRun()?.parsed; as parsed) {
-    <details class="es-card raw">
-      <summary>Extrahierte Felder ({{ parsed.fields.length }})</summary>
-      <dl class="fields">
-        @for (field of parsed.fields; track field.key) {
-          <dt>{{ field.key }}</dt>
-          <dd>
-            @for (value of field.values; track $index) {
-              <span class="val">{{ value }}</span>
-            }
-          </dd>
-        }
-      </dl>
-    </details>
-
-    <details class="es-card raw">
-      <summary>Rohdaten (JSON)</summary>
-      <pre>{{ parsed.raw | json }}</pre>
-    </details>
-  }
 </div>

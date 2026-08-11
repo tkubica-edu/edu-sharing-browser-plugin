@@ -1,5 +1,4 @@
-// "Metadaten editieren" — the agent's summary card plus the collapsible raw/field views.
-@use 'mixins' as m;
+// "Metadaten editieren" — the agent's summary card above the editor and its preview widget.
 
 :host { display: block; }
 
@@ -27,22 +26,6 @@
 
   .pill-glyph { font-size: 16px; line-height: 1; }
 }
-
-.raw { padding: 12px 14px; }
-.raw summary { cursor: pointer; font-size: 12px; color: var(--es-muted); font-weight: 600; }
-.raw pre {
-  max-height: 260px;
-  overflow: auto;
-  background: #0f1720;
-  color: #d6e2f0;
-  padding: 10px;
-  border-radius: 6px;
-  font-size: 11px;
-  margin: 8px 0 0;
-}
-
-.fields { @include m.field-list; margin: 8px 0 0; }
-.val { @include m.field-value; }
 
 // The card holding the native MDS preview widget.
 .preview-widget-card { padding: 12px 14px; }
