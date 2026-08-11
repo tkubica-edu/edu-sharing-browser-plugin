@@ -219,6 +219,12 @@ cookie when the user is logged in; as guest they rely on public access.
 - **Vorschau** (`mode="detail"`) instead of `edu-sharing-preview-sidebar`, showing the saved
   properties read-only. Saving still lands there, so the preview follows the edit as before.
 
+It also reshapes the footer buttons: the flag adds `wlo-theme` to the document element, and
+`app-src/src/styles/_wlo-theme.scss` rounds them into pills, like the buttons of the bundle itself.
+Its colours are not adopted — that palette (surface `#fcf8fd`) tints the panel violet-grey and reads
+as washed out beside its own white surfaces, so `_embedded-material.scss` goes on holding the canvas
+to the panel's colours instead.
+
 The per-mode settings are the two presets the bundle's own
 `examples/canvas-parameter-demo.html` documents — "Plugin" and "Detail (readonly)" — kept
 verbatim in `CONFIGS` so they stay comparable with that reference.

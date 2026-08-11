@@ -1,4 +1,7 @@
 @use 'tokens';
+// Must come after 'tokens': it re-declares one of its tokens under a class the repository config
+// switches on.
+@use 'wlo-theme';
 // Must come after 'tokens': it maps the panel's surface colours onto the Material tokens the
 // embedded bundles paint with.
 @use 'embedded-material';

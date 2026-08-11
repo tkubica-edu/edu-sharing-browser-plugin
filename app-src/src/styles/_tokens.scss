@@ -22,6 +22,8 @@
 
   // Radius + spacing scale — the paddings and corner radius shared across the components
   --es-radius: 8px;
+  // The corner of the wide footer buttons (`fbtn`), which a theme may round into a pill.
+  --es-fbtn-radius: 6px;
   --es-space-1: 4px;
   --es-space-2: 8px;
   --es-space-3: 10px;

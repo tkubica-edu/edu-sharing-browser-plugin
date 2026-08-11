@@ -4,6 +4,9 @@ import { ConfigService } from 'ngx-edu-sharing-api';
 /** Boolean repository-config variable that switches the additional web component on. */
 const CONFIG_VARIABLE = 'additionalWebComponent';
 
+/** Class on the document element that switches the panel over to the WLO palette. */
+const THEME_CLASS = 'wlo-theme';
+
 /**
  * The optional WLO metadata editor.
  *
@@ -14,6 +17,10 @@ const CONFIG_VARIABLE = 'additionalWebComponent';
  * repository node.
  *
  * When the variable is absent or false, the bundle is never loaded and the MDS editor is used.
+ *
+ * Enabling it also puts {@link THEME_CLASS} on the document element, which gives the footer buttons
+ * the pill shape of the bundle's own buttons (see `_wlo-theme.scss`). The panel's colours stay its
+ * own either way.
  */
 @Injectable({ providedIn: 'root' })
 export class AdditionalWebComponentService {
@@ -29,10 +36,12 @@ export class AdditionalWebComponentService {
     this.config.observeVariables().subscribe((variables) => {
       // `Variables` types every value as string, so a config that delivers the raw string
       // "true" is honoured as well as a real boolean.
-      console.log('variables', variables);
       const value = variables?.[CONFIG_VARIABLE] as unknown;
       const enabled = typeof value === 'boolean' ? value : String(value).trim() === 'true';
-      if (enabled) this.enabledState.set(true);
+      if (enabled) {
+        this.enabledState.set(true);
+        document.documentElement.classList.add(THEME_CLASS);
+      }
     });
   }
 }

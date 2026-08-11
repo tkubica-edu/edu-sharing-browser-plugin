@@ -1,0 +1,19 @@
+// What the WLO bundle changes about the panel's own look: the shape of the footer buttons.
+//
+// Active only while the repository config enables `additionalWebComponent`, which is what puts the
+// class on the document element (see AdditionalWebComponentService). Without the flag the `wlo/`
+// bundle is never loaded at all and the panel keeps the shape from `_tokens.scss`.
+//
+// Its colours are deliberately NOT adopted: the bundle's Material 3 palette (surface #fcf8fd,
+// on-surface #1b1b1f) tints the whole panel violet-grey, which reads as washed out next to the
+// panel's own white surfaces. The panel therefore keeps its colours in both cases, and
+// `_embedded-material.scss` goes on holding the canvas to them as well.
+//
+// `:root.wlo-theme` (0,2,0) outranks the `:root` of `_tokens.scss`, so the token is all it takes.
+:root.wlo-theme {
+  // The footer buttons as pills, like the bundle's own (`--mdc-outlined-button-container-shape:
+  // 9999px`). A large length rather than `50%`, which would bend the sides of a button into an
+  // ellipse instead of capping them. Scoped to the bar so the logout button in the user bar, which
+  // shares the `fbtn` shape, is not pulled along by a rule about the footer.
+  .action-bar { --es-fbtn-radius: 999px; }
+}

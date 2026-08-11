@@ -1,10 +1,22 @@
 @use 'mixins' as m;
 
-.action-bar { @include m.action-bar; }
-.fbtn { @include m.fbtn; }
+// Each action asks for its label's width and what is left of the bar stays empty between them.
+// Every footer leads with the way back and ends with the way on (see ActionBarService), so the two
+// sit at opposite ends of the panel — far enough apart that going on is not a neighbour of going
+// back. The sizing lives here rather than in the `fbtn` mixin, which the user bar shares for the
+// shape of its logout button alone.
+.action-bar {
+  @include m.action-bar;
+  justify-content: space-between;
+}
+
+.fbtn {
+  @include m.fbtn;
+
+  flex: 0 1 auto;
+  // Room for the caps of the corners, which a button stretched across the bar did not need.
+  padding-inline: 20px;
+}
+
 .fbtn-primary { @include m.fbtn-primary; }
 .fbtn-secondary { @include m.fbtn-secondary; }
-
-// Three actions do not fit the panel's width as equal thirds — no label would have room. Only then
-// does the way back give up its share and size to its own word; a pair still splits evenly.
-.action-bar:has(.fbtn:nth-child(3)) .fbtn-secondary { flex: 0 1 auto; }
