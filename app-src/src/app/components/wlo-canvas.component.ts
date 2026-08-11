@@ -161,10 +161,35 @@ export class WloCanvasComponent implements MetadataEditor {
   private readonly latest = signal<CanvasMetadata | null>(null);
 
   commit(): void {
-    const current = this.latest() ?? (this.seed() as CanvasMetadata);
+    const current = this.current();
     // Keep only the namespaced field values — the envelope (contextName, schemaVersion,
     // metadataset_uri, _source_text, …) is not node metadata.
     this.save.emit(toMdsEditorValues(current.metadata ?? current));
+  }
+
+  /**
+   * The canvas' own export, flattened into the shape it is seeded from: the envelope, with the field
+   * values next to it rather than nested under `metadata` (`importJsonData` accepts both, the rest of
+   * the app states a payload flat).
+   *
+   * This is what the content's metadata is re-read from after a save, and it carries the two things
+   * the committed values cannot:
+   *
+   * - the **envelope**, `metadataset` above all: the canvas resolves its content type — and with it
+   *   every field beyond the core ones — from that key alone. Without it a canvas seeded back from
+   *   the save has no schema to render the values against.
+   * - every value in the **shape its field has**. A single-valued field is stated as a scalar here,
+   *   whereas the committed values are `string[]` throughout (what the repository takes); seeded with
+   *   a list, such a field renders empty.
+   */
+  payload(): Record<string, unknown> | null {
+    const { metadata, ...envelope } = this.current();
+    return { ...envelope, ...((metadata ?? {}) as Record<string, unknown>) };
+  }
+
+  /** What the canvas holds right now — its last report, else what it was seeded with. */
+  private current(): CanvasMetadata {
+    return this.latest() ?? (this.seed() as CanvasMetadata);
   }
 
   /** `metadataChange` fires (debounced) on every canvas edit. */

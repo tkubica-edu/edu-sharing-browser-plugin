@@ -41,10 +41,10 @@ export function isDraftNode(node: Node | null | undefined): boolean {
  * whenever `nodes` is set, whatever the mode), still editable, still validated, and
  * `currentValuesChange` still reports every widget's live value.
  *
- * The accepted cost is the licence: its widget renders in `nodes`, `inline` and `viewer` only, so a
- * draft's form shows none, although the set asks for it unconditionally (`io` → `node_general`, no
- * `condition`, no `hideIfEmpty`) and the stand-in carries the properties. It is written on save all the
- * same (`withAgentLicense`) and shows once the content has a node, which renders in `nodes`.
+ * It is also the mode by which the group's native widgets recognize a form without a node behind it,
+ * and the two of them the `io` set asks for unconditionally read it: the licence widget edits the
+ * properties it was seeded with instead of writing to a node, and the child-objects widget renders
+ * nothing at all, since a child object is an assoc of a node that exists.
  */
 export const EDITOR_MODE_FOR_DRAFT = 'form';
 

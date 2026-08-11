@@ -180,8 +180,8 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
       // currentValuesChange (the instance maps every widget's value, not a diff against the node),
       // so commit() and the save path are the same either way.
       // A stand-in renders in the draft's mode: the form is the same, but the wrapper stops asking
-      // the repository about a node it does not have — at the price of the licence widget, which that
-      // mode does not render at all (see EDITOR_MODE_FOR_DRAFT).
+      // the repository about a node it does not have, and the group's native widgets fall back to
+      // what they can do without one (see EDITOR_MODE_FOR_DRAFT).
       element.editorMode = isDraftNode(node) ? EDITOR_MODE_FOR_DRAFT : 'nodes';
       // Without the proposed properties: they arrive as suggestions instead (see aiFields), and a
       // widget that already holds the value would neither offer nor mark it. Withheld AFTER the

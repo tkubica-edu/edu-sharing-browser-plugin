@@ -136,7 +136,12 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
    * (WloCanvasComponent.onMetadataSubmit), and that one saves without meaning to leave.
    */
   protected async save(values: MdsValues): Promise<void> {
-    const saved = await this.curation.save({ ...values, ...this.previewOverrides() });
+    // The editor's own payload travels with the values: it is what the content's metadata is read
+    // back from once it is written (see CurationService.save).
+    const saved = await this.curation.save(
+      { ...values, ...this.previewOverrides() },
+      this.editor()?.payload?.() ?? null,
+    );
     const settle = this.settleSave;
     this.settleSave = null;
     settle?.(saved);

@@ -12,6 +12,14 @@ export interface MetadataEditor {
   readonly ready: Signal<boolean>;
   /** Emit the current values through the component's `save` output. */
   commit(): void;
+  /**
+   * The payload behind the committed values, for an editor that has one of its own: the envelope it
+   * works against and every value in the shape its field has, neither of which survives the
+   * `string[]` map {@link commit} emits. It is what the content's metadata is re-read from once the
+   * save has gone through — see CurationService.save. `null`/absent where the editor has nothing to
+   * add beyond the values.
+   */
+  payload?(): MetadataSeed | null;
 }
 
 /** What an editor is seeded with: a metadata-agent payload or a node's stored properties. */

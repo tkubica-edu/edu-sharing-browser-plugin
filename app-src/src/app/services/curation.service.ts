@@ -125,6 +125,33 @@ function toPartialNode(nodeId: string, uploaded: UploadedNode, values: MdsValues
   } as unknown as Node;
 }
 
+/**
+ * The metadata of a content that has just been written, as an editor is seeded from it: the payload
+ * the save started from, with the values that were committed laid over it.
+ *
+ * Needed because the committed values are not a payload. They are what was written, so they decide
+ * what a property says — but every one of them is a `string[]` (the shape the repository takes), and
+ * the envelope is not among them at all. A WLO canvas seeded from them alone therefore resolves no
+ * content type (it reads `metadataset`) and renders a single-valued field from a list, which leaves
+ * that field empty — a saved content would show neither its title nor its description.
+ *
+ * So each value goes back into the shape the payload states for that property, and everything the
+ * payload carries besides the values stays. A property the payload does not know keeps its list
+ * shape: it comes from a step outside the editor (the quality criteria, the preview widget's name),
+ * and those are lists.
+ */
+function toSavedMetadata(
+  payload: Record<string, unknown> | null,
+  values: MdsValues,
+): Record<string, unknown> {
+  const saved: Record<string, unknown> = { ...(payload ?? {}) };
+  for (const [key, value] of Object.entries(values)) {
+    const stated = saved[key];
+    saved[key] = typeof stated === 'string' && value.length <= 1 ? value[0] ?? '' : value;
+  }
+  return saved;
+}
+
 /** Name of a draft whose metadata carries no title yet. Never written anywhere. */
 const DRAFT_NAME = 'Neuer Inhalt';
 
@@ -290,8 +317,12 @@ export class CurationService {
 
   /** How the active node arrived, for carrying it across a page change (SessionResumeService). */
   readonly nodeSourceOf = this.nodeSource.asReadonly();
-  /** The active node's stored properties, fed to the metadata editor. */
-  readonly nodeMetadata = signal<MdsValues | null>(null);
+  /**
+   * The active node's stored metadata, fed to the metadata editor. A payload rather than a plain
+   * property map: it carries the envelope an editor resolves its schema from, and states each value
+   * in the shape its field has — see {@link toSavedMetadata}.
+   */
+  readonly nodeMetadata = signal<Record<string, unknown> | null>(null);
 
   /**
    * A page the metadata editor should erschließen itself, for a content whose source is known but
@@ -931,8 +962,13 @@ export class CurationService {
    *
    * A freshly curated content takes a different route while the additional web component is
    * enabled — see {@link saveThroughAgent}.
+   *
+   * `payload` is the open editor's own view of what it committed (MetadataEditor.payload), where it
+   * has one. It is not what gets written — `values` is — but what the content's metadata is re-read
+   * from afterwards along that route, which reloads no node; see {@link toSavedMetadata}. Without one
+   * the agent's result stands in, which is what the editor started from.
    */
-  async save(values: MdsValues): Promise<boolean> {
+  async save(values: MdsValues, payload: Record<string, unknown> | null = null): Promise<boolean> {
     if (!this.auth.authorized()) return false;
     // What other steps recorded goes underneath, so a property the editor carries too is the
     // editor's: it is the metadata's own authority, and it was seeded with the recorded values
@@ -945,7 +981,7 @@ export class CurationService {
     // first one. The nodes it writes belong to the agent's own privileges, so the session the panel
     // runs under (a guest) may neither read nor edit them: an update in place is not available for
     // them, and a second save can only be another upload. See {@link saveThroughAgent}.
-    if (this.additionalWebComponent.enabled()) return this.saveThroughAgent(values);
+    if (this.additionalWebComponent.enabled()) return this.saveThroughAgent(values, payload);
     this.saving.set(true);
     this.saveError.set(null);
     try {
@@ -1001,7 +1037,10 @@ export class CurationService {
    * reason: the node belongs to the agent, so the panel session (a guest) may not add it to a
    * collection either — `/upload` files it itself (see MetadataUploadService).
    */
-  private async saveThroughAgent(values: MdsValues): Promise<boolean> {
+  private async saveThroughAgent(
+    values: MdsValues,
+    payload: Record<string, unknown> | null,
+  ): Promise<boolean> {
     this.saving.set(true);
     this.saveError.set(null);
     try {
@@ -1026,7 +1065,11 @@ export class CurationService {
       // the page itself offers the agent already has — `preview_image_url` travelled in the payload.
       this.pendingPreview.set(null);
       if (outcome.node?.nodeId) {
-        await this.applyUploadedNode(outcome.node, values);
+        await this.applyUploadedNode(
+          outcome.node,
+          values,
+          payload ?? lastRun?.parsed?.raw ?? null,
+        );
         await this.writePendingQuality(outcome.node.nodeId);
         // Written by the upload, so they are recorded as done here — after applyUploadedNode, which
         // clears the list for a node that is not the one the previous save produced.
@@ -1050,8 +1093,16 @@ export class CurationService {
    * component) is not allowed to read it. `/upload` already reports everything the following steps
    * need, so its `node` is treated as the node: its id identifies it, its `repositoryUrl` is the
    * link out, and the values just committed *are* its metadata — they are what was written.
+   *
+   * `payload` is the editor's own view of those values (else the agent result they came from): the
+   * values alone are not enough to seed an editor back from, so the node's metadata is assembled out
+   * of both — see {@link toSavedMetadata}.
    */
-  private async applyUploadedNode(uploaded: UploadedNode, values: MdsValues): Promise<void> {
+  private async applyUploadedNode(
+    uploaded: UploadedNode,
+    values: MdsValues,
+    payload: Record<string, unknown> | null,
+  ): Promise<void> {
     const nodeId = uploaded.nodeId!;
     // A re-upload produces a DIFFERENT node (see saveThroughAgent), and what the previous one was
     // assigned to says nothing about this one — so the assignments start over with it.
@@ -1066,8 +1117,10 @@ export class CurationService {
       link: uploaded.repositoryUrl ?? renderLink(this.auth.repositoryUrl(), nodeId)
     });
     // The committed values, since there are no stored properties to read: the editor keeps showing
-    // exactly what was saved, and the preview and the usages element get a node to work on.
-    this.nodeMetadata.set(values);
+    // exactly what was saved, and the preview and the usages element get a node to work on. As a
+    // payload rather than as the bare value map, so an editor seeded back from it renders them.
+    this.nodeMetadata.set(toSavedMetadata(payload, values));
+    // A node states its properties the way the repository holds them — every one of them a list.
     this.previewNode.set(toPartialNode(nodeId, uploaded, values));
     // The user curated and saved this one, so it belongs to the flow they started.
     this.nodeSource.set('chosen');
