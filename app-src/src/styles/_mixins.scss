@@ -2,7 +2,7 @@
 //   1. Generic primitives are emitted as global `.es-*` classes in styles.scss and used
 //      directly in component templates (works despite emulated encapsulation because
 //      global class *rules* still apply to component DOM).
-//   2. Chrome-specific patterns (menu rows, status-chip, action bar) are `@include`d in
+//   2. Chrome-specific patterns (menu rows, action bar) are `@include`d in
 //      the owning component's scoped .scss, keeping their DOM-specific layout local while
 //      the look lives here.
 //
@@ -205,26 +205,6 @@
   border-top: 1px solid var(--es-border);
 }
 
-// ---- Status chip (persistent condition indicators) -------------------------
-@mixin status-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  max-width: 100%;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  background: #eef1f4;
-  color: var(--es-muted);
-  border: 1px solid transparent;
-
-  &.is-on { background: #e2ecf8; color: var(--es-blue); border-color: #c5daf3; }
-}
-
 // ---- Action bar (persistent footer) ----------------------------------------
 @mixin action-bar {
   flex: 0 0 auto;
@@ -258,12 +238,12 @@
   &:hover:not([disabled]) { background: var(--es-blue-600); border-color: var(--es-blue-600); }
 }
 
-// The way out of a step (Abbrechen, Zurück), beside the way on: an outline, so it reads as the
-// lesser of the two without being hidden. It keeps its equal share of the bar — the two are a pair
-// of choices, and a shrunken one reads as an afterthought.
+// The way back out of a step, beside the way on: the primary colour as an outline, so the pair
+// reads as one set of controls and the way back is still the lesser of the two. It keeps its equal
+// share of the bar — the two are a pair of choices, and a shrunken one reads as an afterthought.
 @mixin fbtn-secondary {
   background: var(--es-surface);
-  color: var(--es-text);
-  border-color: var(--es-border);
+  color: var(--es-blue);
+  border-color: var(--es-blue);
   &:hover:not([disabled]) { background: var(--es-hint-bg); }
 }

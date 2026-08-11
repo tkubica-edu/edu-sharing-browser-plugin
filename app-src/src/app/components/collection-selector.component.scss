@@ -12,3 +12,7 @@ es-nodes-selector {
   flex: 1 1 0;
   min-height: 0;
 }
+
+// With the confirmation moved into the panel's action bar, the selector's own one would be a second
+// apply button right above it (see CollectionSelectorComponent.externalApply).
+:host(.is-bare) ::ng-deep .tab-action-bar { display: none; }

@@ -3,9 +3,10 @@
 // flow. The same registry feeds the main menu, the tab bar, the navigation guards and the
 // landing logic.
 //
-// Four of the sections are the big steps of the content flow — Bearbeitungsmodus →
-// Einsortieren und weiterleiten → Qualitätsprüfung → Inhaltsübersicht. They are not listed in the
-// main menu: they are entered from a node (created, selected or detected), see ContentFlowService.
+// Several of the sections are the big steps of the content flow — Bearbeitungsmodus → An
+// Redaktionen weiterleiten / Persönliche Ablage → Qualitätsprüfung → Inhaltsübersicht. They are not
+// listed in the main menu: they are entered from a node (created, selected or detected), see
+// ContentFlowService.
 
 /** A leaf screen: exactly one component is rendered for it. */
 export type ScreenId =
@@ -25,6 +26,7 @@ export type ScreenId =
   | 'metadata'
   | 'editorial-forward'
   | 'personal-storage'
+  | 'select-collection'
   | 'preview'
   | 'usages'
   | 'share';
@@ -45,7 +47,9 @@ export type SectionId =
   | 'content-options'
   | 'editing'
   | 'quality'
-  | 'collections'
+  | 'editorial-forward'
+  | 'personal-storage'
+  | 'select-collection'
   | 'overview';
 
 /** A snapshot of the world a section's (or tab's) visibility is decided against. */
@@ -324,31 +328,37 @@ export const SECTIONS: readonly AppSection[] = [
     ]
   },
   {
-    id: 'collections',
-    label: 'Einsortieren und weiterleiten',
-    description: 'Den Inhalt an eine Redaktion weiterleiten und in der eigenen Ablage einsortieren',
+    id: 'editorial-forward',
+    label: 'An Redaktionen weiterleiten',
+    description: 'Den Inhalt an eine oder mehrere Redaktionen weiterleiten',
     // Editable metadata, NOT a node: where the content goes is decided before it is written, and the
     // save that writes it comes at the end of the Qualitätsprüfung behind this — so a freshly curated
     // content reaches this step before it has a node at all.
     //
-    // Both of its sub steps are optional (see the tabs), and a step with nothing in it is no step:
-    // where neither applies the section falls away entirely and the flow goes straight on to the
-    // Qualitätsprüfung.
-    visible: requiresLogin(
-      (c) => c.hasEditableMetadata && (c.additionalWebComponent || c.hasSession),
-    ),
-    // Forwarding first: it is what the curated content is *for* where the additional web component
-    // is enabled — the personal filing is the private copy on top of it.
-    tabs: [
-      {
-        id: 'editorial-forward',
-        label: 'An Redaktionen weiterleiten',
-        visible: (c) => c.additionalWebComponent
-      },
-      // A session of the user's own, not `loggedIn`: a private filing place is one a *person* has —
-      // the guest session the additional web component brings has none.
-      { id: 'personal-storage', label: 'Persönliche Ablage', visible: (c) => c.hasSession }
-    ]
+    // The additional web component is what the forwarding exists for: the groups are the editorial
+    // teams a submitted content is judged by, and where nothing is submitted there is nobody to
+    // forward to. Without it the step falls away and the flow goes on to the filing behind it.
+    visible: requiresLogin((c) => c.hasEditableMetadata && c.additionalWebComponent),
+    tabs: [{ id: 'editorial-forward', label: 'An Redaktionen weiterleiten' }]
+  },
+  {
+    id: 'select-collection',
+    label: 'Sammlung auswählen',
+    description: 'Die Sammlung wählen, in die der Inhalt bei dieser Redaktion einsortiert wird',
+    // A step of the forwarding rather than one of the flow: it is entered from a group's row and
+    // returns to it, so it applies exactly where the forwarding does.
+    visible: requiresLogin((c) => c.hasEditableMetadata && c.additionalWebComponent),
+    tabs: [{ id: 'select-collection', label: 'Sammlung auswählen' }]
+  },
+  {
+    id: 'personal-storage',
+    label: 'Persönliche Ablage',
+    description: 'Den Inhalt in der eigenen Ablage einsortieren',
+    // A session of the user's own, not `loggedIn`: a private filing place is one a *person* has —
+    // the guest session the additional web component brings has none. Like the forwarding it works
+    // on editable metadata rather than on a node; see there.
+    visible: requiresLogin((c) => c.hasEditableMetadata && c.hasSession),
+    tabs: [{ id: 'personal-storage', label: 'Persönliche Ablage' }]
   },
   {
     id: 'quality',

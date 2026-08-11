@@ -1,0 +1,36 @@
+@if (groups.picking(); as group) {
+  <!-- The redaktionelle Sammlung this choice is made inside, as itself: the choice below is only
+       readable against the group it belongs to. -->
+  <section class="es-card group">
+    <div class="head">
+      <span class="logo">
+        @if (group.logoUrl; as logo) {
+          <img [src]="logo" alt="" />
+        } @else {
+          <i class="logo-glyph" esIcon="collections_bookmark"></i>
+        }
+      </span>
+      <span class="name">{{ group.collection.name }}</span>
+    </div>
+    <p class="active">
+      @if (activeCollection(); as collection) {
+        Ausgewählte Sammlung: <strong>{{ collection.name }}</strong>
+      } @else {
+        Noch keine Sammlung ausgewählt
+      }
+    </p>
+  </section>
+
+  <es-collection-selector
+    [externalApply]="true"
+    [singleSelection]="true"
+    [collectionTree]="collectionTree()"
+    (choose)="choose($event)"
+  ></es-collection-selector>
+} @else {
+  <div class="es-screen-body">
+    <p class="es-muted">
+      Dieser Schritt gehört zu einer Redaktion — wähle sie unter „An Redaktionen weiterleiten“.
+    </p>
+  </div>
+}

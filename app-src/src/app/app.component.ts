@@ -26,7 +26,6 @@ import { LoginComponent } from './components/login.component';
 import { MenuComponent } from './components/menu.component';
 import { SearchComponent } from './components/search.component';
 import { SettingsComponent } from './components/settings.component';
-import { StatusBarComponent } from './components/status-bar.component';
 import { TabBarComponent } from './components/tab-bar.component';
 import { UserBarComponent } from './components/user-bar.component';
 import { AddContentScreenComponent } from './components/screens/add-content-screen.component';
@@ -37,6 +36,7 @@ import { CurationScreenComponent } from './components/screens/curation-screen.co
 import { FindContentScreenComponent } from './components/screens/find-content-screen.component';
 import { EditorialForwardScreenComponent } from './components/screens/editorial-forward-screen.component';
 import { PersonalStorageScreenComponent } from './components/screens/personal-storage-screen.component';
+import { SelectCollectionScreenComponent } from './components/screens/select-collection-screen.component';
 import { MetadataScreenComponent } from './components/screens/metadata-screen.component';
 import { NewDocumentScreenComponent } from './components/screens/new-document-screen.component';
 import { OwnContentScreenComponent } from './components/screens/own-content-screen.component';
@@ -54,13 +54,13 @@ const DISCARD_PROMPT =
 @Component({
   selector: 'es-root',
   imports: [
-    StatusBarComponent, ActionBarComponent, TabBarComponent, UserBarComponent, MenuComponent,
+    ActionBarComponent, TabBarComponent, UserBarComponent, MenuComponent,
     LoginComponent, HistoryComponent, SettingsComponent, SearchComponent, AddContentScreenComponent,
     ContentOptionsScreenComponent, CurationScreenComponent, CurationPreviewScreenComponent,
     FindContentScreenComponent,
     NewDocumentScreenComponent, AddMaterialScreenComponent, OwnContentScreenComponent,
     QualityCheckScreenComponent, MetadataScreenComponent, PreviewScreenComponent,
-    EditorialForwardScreenComponent, PersonalStorageScreenComponent,
+    EditorialForwardScreenComponent, PersonalStorageScreenComponent, SelectCollectionScreenComponent,
     UsagesScreenComponent, ShareScreenComponent
   ],
   templateUrl: './app.component.html',

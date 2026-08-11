@@ -18,6 +18,16 @@ export interface SaveHandler {
 }
 
 /**
+ * What a screen that embeds its own picker hands to the footer: how to confirm the selection, and
+ * whether one that may be confirmed exists. Like {@link SaveHandler}, a signal so the footer derives
+ * its state instead of being pushed to.
+ */
+export interface ApplyHandler {
+  apply: () => void;
+  canApply: Signal<boolean>;
+}
+
+/**
  * An action offered in the footer for the current view. Each view can offer 0..n of these —
  * the flow is a set of offered next steps, not a forced linear chain.
  */
@@ -27,8 +37,8 @@ export interface FooterAction {
   run: () => void | Promise<void>;
   /**
    * How the button carries. Defaults to `primary` — the offered next step, which is what a footer
-   * action normally is. `secondary` is for the way *out* of a step (abandoning it), so it does not
-   * compete with going on.
+   * action normally is. `secondary` is the primary colour as an outline, for the way *back* out of
+   * a step, so it does not compete with going on.
    */
   kind?: 'primary' | 'secondary';
 }
@@ -56,6 +66,18 @@ export class ActionBarService {
     this.saveHandler.update((current) => (current === handler ? null : current));
   }
 
+  // The "Sammlung auswählen" step registers its selector while mounted, so the footer can confirm a
+  // selection it does not own.
+  private readonly applyHandler = signal<ApplyHandler | null>(null);
+
+  registerApplyHandler(handler: ApplyHandler): void {
+    this.applyHandler.set(handler);
+  }
+
+  clearApplyHandler(handler: ApplyHandler): void {
+    this.applyHandler.update((current) => (current === handler ? null : current));
+  }
+
   readonly actions = computed<FooterAction[]>(() => {
     switch (this.navigation.section()) {
       // "Inhalt erschließen": run the metadata agent on the page and hand its result to the preview
@@ -63,6 +85,7 @@ export class ActionBarService {
       // after a failure, or for a page that has changed since.
       case 'curation':
         return [
+          this.backAction(),
           {
             label: this.curation.running()
               ? 'Erschließe… (kann etwas dauern)'
@@ -75,66 +98,48 @@ export class ActionBarService {
         ];
 
       // The preview step of the Erschließung: nothing is written here, so what it offers is the two
-      // ways on — dropping the run altogether, or carrying it into the step that follows. The
-      // adjusted picture and title travel with it (applyDraftValues).
-      case 'curation-preview': {
-        // Where the content goes is asked before it is described, so "Einsortieren und weiterleiten"
-        // is next — unless neither of its sub steps applies, and then the Qualitätsprüfung behind it
-        // is (see the registry).
-        const next: SectionId = this.navigation.isVisible('collections') ? 'collections' : 'quality';
+      // ways through it. The adjusted picture and title travel with it (applyDraftValues).
+      case 'curation-preview':
         return [
+          this.backAction(),
           {
-            label: 'Abbrechen',
-            kind: 'secondary',
-            disabled: false,
-            run: () => {
-              this.curation.startNew();
-              this.navigation.openMenu();
-            }
-          },
-          {
-            label: next === 'collections' ? 'Einsortieren und weiterleiten' : 'Qualitätsprüfung',
+            label: 'Weiter',
             disabled: false,
             run: async () => {
               // Awaited: the handover reads a picked picture out of the widget, and the next step's
               // editor is built from the node that picture goes on.
               await this.curation.applyDraftValues();
-              this.navigation.go(next);
+              // Where the content goes is asked before it is described, so the filing steps come
+              // first — and where none of them applies, the Qualitätsprüfung behind them does.
+              this.navigation.go(this.nextSection('editorial-forward', 'personal-storage'));
             }
           }
         ];
-      }
 
       // "Bearbeitungsmodus": the content is being edited in the connector; this hands over to the
       // Qualitätsprüfung when the user is done adjusting it.
       case 'editing':
         return [
-          {
-            label: 'Anpassungen speichern',
-            disabled: false,
-            run: () => this.navigation.go('quality')
-          }
+          this.backAction(),
+          { label: 'Weiter', disabled: false, run: () => this.navigation.go('quality') }
         ];
 
       // "Qualitätsprüfung": its views are walked through rather than jumped between, so the footer
-      // carries that walk — the way on out of the Qualität view, "Zurück" out of the Metadaten one.
-      // The tab bar is still on screen; this is the way through the step, not the only one.
-      //
-      // The way out of the section belongs to the Metadaten view — from the Qualität view there is
-      // nothing yet to leave. Which is the whole step where the Qualität view does not apply (see
-      // the registry), and the walk is then a single view with the way on under it.
+      // carries that walk — the way on out of the Qualität view, the way back out of the Metadaten
+      // one. The tab bar is still on screen; this is the way through the step, not the only one.
       case 'quality': {
         // The Qualität view: its way on IS the confirmation — the criteria decide whether the content
         // may be published, so going on without giving it would walk past the one question this view
         // asks. It is available once the criteria allow it (CurationService.qualityCriteriaMet, which
         // the view reports), and the Metadaten sub step is locked until then for the same reason.
         //
-        // Once given it is the plain "Weiter" again: the confirmation is a statement about the
-        // content, made once — coming back to this view later must still lead on.
+        // Once the confirmation is given the way on is the plain step forward: it is a statement
+        // about the content, made once — coming back to this view later must still lead on.
         if (this.navigation.screen() !== 'metadata') {
           const next = this.navigation.nextTab();
           if (this.curation.qualityConfirmed()) {
             return [
+              this.backAction(),
               {
                 label: 'Weiter',
                 disabled: !next || next.disabled,
@@ -143,8 +148,9 @@ export class ActionBarService {
             ];
           }
           return [
+            this.backAction(),
             {
-              label: 'Qualität bestätigen',
+              label: 'Weiter',
               disabled: !this.curation.qualityCriteriaMet(),
               run: async () => {
                 await this.curation.confirmQuality();
@@ -155,48 +161,68 @@ export class ActionBarService {
             }
           ];
         }
-        // Only where the Qualität view is on offer at all (it is not without the additional web
-        // component, see the registry): the way back through a step is a way back to a view, and
-        // one that does not apply is not one — the button would refuse itself.
-        const back: FooterAction[] = this.navigation.tabs().some((tab) => tab.id === 'quality-check')
-          ? [
-              {
-                label: 'Zurück',
-                kind: 'secondary',
-                disabled: false,
-                run: () => this.navigation.goTab('quality-check')
-              }
-            ]
-          : [];
+        // Back to the Qualität view where there is one — it is not on offer without the additional
+        // web component (see the registry), and then the way back leaves the section altogether.
+        const toQuality = this.navigation.tabs().some((tab) => tab.id === 'quality-check');
+        const back: FooterAction = toQuality
+          ? {
+              label: 'Zurück',
+              kind: 'secondary',
+              disabled: false,
+              run: () => this.navigation.goTab('quality-check')
+            }
+          : this.backAction();
         // The Metadaten view ends the first big step, so its way on carries the write — see
         // {@link finishAction}.
-        return [...back, this.finishAction()];
+        return [back, this.finishAction()];
       }
 
-      // "Einsortieren und weiterleiten": where the content is filed and handed on, before it is
-      // described and written. Nothing is saved here — the way on leads into the Qualitätsprüfung,
-      // whose own way out writes the content with everything the flow collected.
-      //
-      // Its sub steps are walked through like the Qualitätsprüfung's: from the forwarding the way on
-      // is the Persönliche Ablage where that applies, and only from the last of them does it leave
-      // the section. So both are offered rather than the second being reachable via the tab bar
-      // alone — a step the footer walks past reads as one that was not meant to be filled in.
-      //
-      // Only the way on: the way back is the topbar's back button, and between the sub steps it is
-      // the tab bar.
-      case 'collections': {
-        const next = this.navigation.nextTab();
-        if (next && !next.disabled) {
-          return [{ label: next.label, disabled: false, run: () => this.navigation.goNextTab() }];
-        }
+      // "An Redaktionen weiterleiten" and "Persönliche Ablage": where the content is filed and handed
+      // on, before it is described and written. Nothing is saved here — the way on leads through the
+      // other of the two (where it applies) into the Qualitätsprüfung, whose own way out writes the
+      // content with everything the flow collected.
+      case 'editorial-forward':
         return [
+          this.backAction(),
           {
-            label: 'Qualitätsprüfung',
+            label: 'Weiter',
             disabled: false,
-            run: () => this.navigation.go('quality')
+            run: () => this.navigation.go(this.nextSection('personal-storage'))
+          }
+        ];
+
+      case 'personal-storage':
+        return [
+          this.backAction(),
+          { label: 'Weiter', disabled: false, run: () => this.navigation.go('quality') }
+        ];
+
+      // "Sammlung auswählen": the confirmation belongs to the embedded selector, which the screen
+      // registers here while it is mounted (see {@link ApplyHandler}) — so this step's controls are
+      // the same pair as every other one's.
+      case 'select-collection': {
+        const handler = this.applyHandler();
+        return [
+          this.backAction(),
+          {
+            label: 'Sammlung übernehmen',
+            disabled: !handler?.canApply(),
+            run: () => handler?.apply()
           }
         ];
       }
+
+      // "Inhaltsübersicht": the end of the flow. Nothing follows it, so the one way on is out — back
+      // to where a new errand is started.
+      case 'overview':
+        return [
+          {
+            label: 'Zurück zum Hauptmenü',
+            kind: 'secondary',
+            disabled: false,
+            run: () => this.navigation.openMenu()
+          }
+        ];
 
       // Every other section owns its own primary action (selector insert, login form, the
       // "Inhaltsoptionen" choice, …).
@@ -204,6 +230,24 @@ export class ActionBarService {
         return [];
     }
   });
+
+  /**
+   * The way back out of the open step, as every step offers it: the same walk the topbar's back
+   * button makes (NavigationService.back), named after what it does rather than after where it
+   * lands — a footer that names its targets makes each step read like a different kind of thing.
+   */
+  private backAction(): FooterAction {
+    return { label: 'Zurück', kind: 'secondary', disabled: false, run: () => this.navigation.back() };
+  }
+
+  /**
+   * The first of the given steps that applies right now, falling back to the Qualitätsprüfung — the
+   * step every filing leads into. Both filings are optional, and a step that has nothing to offer is
+   * walked past rather than shown empty (see the registry).
+   */
+  private nextSection(...candidates: readonly SectionId[]): SectionId {
+    return candidates.find((id) => this.navigation.isVisible(id)) ?? 'quality';
+  }
 
   /**
    * The way out of the Qualitätsprüfung and into the Inhaltsübersicht — the one action that writes.
@@ -231,7 +275,7 @@ export class ActionBarService {
     const ready = handler ? handler.canSave() : this.curation.hasCollectedValues();
     const saves = ready && !this.curation.metadataLocked() && !written;
     return {
-      label: this.curation.saving() ? 'Speichern…' : 'Inhaltsübersicht',
+      label: this.curation.saving() ? 'Speichern…' : 'Weiter',
       disabled: this.curation.saving() || (!saves && !this.curation.activeNode()),
       run: async () => {
         const save = handler ? () => handler.save() : () => this.curation.saveCollected();

@@ -72,9 +72,14 @@ export class ContentFlowService {
     this.navigation.go('quality', { tab: 'quality-check' });
   }
 
-  /** "Einsortieren und weiterleiten": where the content is filed, ahead of the Qualitätsprüfung. */
-  showCollections(): void {
-    this.navigation.go('collections');
+  /** "An Redaktionen weiterleiten": handing the content on, ahead of the Qualitätsprüfung. */
+  showEditorialForward(): void {
+    this.navigation.go('editorial-forward');
+  }
+
+  /** "Persönliche Ablage": filing the content in the user's own place. */
+  showPersonalStorage(): void {
+    this.navigation.go('personal-storage');
   }
 
   /** "Inhaltsübersicht": the last big step, straight from a node — on its Vorschau tab. */

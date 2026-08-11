@@ -94,13 +94,19 @@ export class ContentOptionsScreenComponent {
         description: 'Vorschau und Nutzung des Inhalts ansehen',
         run: () => this.flow.showOverview()
       },
-      // The two working steps in the order the flow walks them: where the content goes is settled
+      // The working steps in the order the flow walks them: where the content goes is settled
       // before it is described, and the Qualitätsprüfung is what ends with the save.
       {
-        section: 'collections',
-        label: 'Einsortieren und weiterleiten',
-        description: 'Den Inhalt weiterleiten und in der eigenen Ablage einsortieren',
-        run: () => this.flow.showCollections()
+        section: 'editorial-forward',
+        label: 'An Redaktionen weiterleiten',
+        description: 'Den Inhalt an eine oder mehrere Redaktionen weiterleiten',
+        run: () => this.flow.showEditorialForward()
+      },
+      {
+        section: 'personal-storage',
+        label: 'Persönliche Ablage',
+        description: 'Den Inhalt in der eigenen Ablage einsortieren',
+        run: () => this.flow.showPersonalStorage()
       },
       {
         section: 'quality',

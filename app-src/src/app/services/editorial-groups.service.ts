@@ -1,9 +1,9 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { CollectionService, ConfigService, HOME_REPOSITORY, Node, NodeService } from 'ngx-edu-sharing-api';
+import { CollectionService, ConfigService, Node } from 'ngx-edu-sharing-api';
 import { firstValueFrom } from 'rxjs';
 
 import { errorMessage } from '../util/errors';
-import { Collection } from './curation.service';
+import { Collection, CurationService, EditorialTarget } from './curation.service';
 
 /**
  * Repository-config variable naming the editorial groups a content may be forwarded to, as a list of
@@ -11,12 +11,6 @@ import { Collection } from './curation.service';
  * forwarding step then has nothing to offer.
  */
 const CONFIG_VARIABLE = 'browserExtensionEditorialGroups';
-
-/** How many children of a group's collection are read when looking for its collection folders. */
-const MAX_FOLDERS = 100;
-
-/** Collection nodes are folders (`ccm:map`); a collection's other children are its references. */
-const COLLECTION_TYPE = 'ccm:map';
 
 /**
  * One editorial group a content can be forwarded to: the collection it *is*, plus the collection
@@ -35,8 +29,18 @@ export interface EditorialGroup {
    * about this group, so the view draws its own glyph instead.
    */
   logoUrl: string | null;
-  /** The collection folders inside the group; empty when it has none. */
+  /** The collections inside the group; empty when it has none. */
   folders: readonly Collection[];
+  /**
+   * The group as the embedded selector shows it: its own collection node followed by the collection
+   * nodes inside it, each pointed at the group as its parent.
+   *
+   * Tree *data*, not a list of ids — the selector hands it straight to its tree's data source, which
+   * builds the hierarchy from each node's `parent.id` (the same shape the selector builds for its own
+   * roots). So the nodes are kept as the repository handed them over, rather than reduced to
+   * {@link folders}. See NodesSelectorComponent.collectionTree.
+   */
+  collectionTree: readonly Node[];
 }
 
 /**
@@ -72,7 +76,8 @@ function toCollection(node: Node): Collection {
 export class EditorialGroupsService {
   private readonly config = inject(ConfigService);
   private readonly collections = inject(CollectionService);
-  private readonly nodes = inject(NodeService);
+  // Where the choices this service's views make are recorded — the flow carries them to the save.
+  private readonly curation = inject(CurationService);
 
   private readonly groupsState = signal<readonly EditorialGroup[]>([]);
   /** The groups that could be loaded, in the order the config names them. */
@@ -98,6 +103,14 @@ export class EditorialGroupsService {
 
   /** The config has been read and there is nothing to forward to — see {@link configuredState}. */
   readonly none = computed(() => this.configuredState() === false);
+
+  /**
+   * The group whose collection is being picked, while the *Sammlung auswählen* step is open. It is a
+   * step of its own rather than a view inside the forwarding, so the group it belongs to lives here
+   * — both screens read it, and it survives the navigation between them.
+   */
+  private readonly pickingState = signal<EditorialGroup | null>(null);
+  readonly picking = this.pickingState.asReadonly();
 
   /** Set once the load ran, so re-entering the step does not fetch the groups again. */
   private loaded = false;
@@ -130,14 +143,77 @@ export class EditorialGroupsService {
     }
   }
 
+  /** Name the group the *Sammlung auswählen* step is entered for. */
+  pick(group: EditorialGroup): void {
+    this.pickingState.set(group);
+  }
+
+  /** Whether the content is being forwarded to this group. */
+  isSelected(group: EditorialGroup): boolean {
+    return !!this.targetOf(group);
+  }
+
+  /** The collection picked inside this group, if any. */
+  folderOf(group: EditorialGroup): Collection | undefined {
+    return this.targetOf(group)?.folder;
+  }
+
+  /** Forward to this group, or stop doing so — the checkbox's answer. */
+  toggle(group: EditorialGroup, selected: boolean): void {
+    // The picked collection goes with it: it was a choice about a forwarding that is no longer made.
+    if (!selected) return this.write(this.others(group));
+    this.write([...this.others(group), { group: group.collection }]);
+  }
+
+  /**
+   * Take a picked collection over: the content is forwarded into it rather than into the group's own
+   * collection. Picking one selects the group as well — going and choosing a collection inside it is
+   * the clearer statement of the two, and a choice that left the group unticked would take no effect.
+   */
+  chooseFolder(group: EditorialGroup, folder: Collection): void {
+    this.write([...this.others(group), { group: group.collection, folder }]);
+  }
+
+  private targetOf(group: EditorialGroup): EditorialTarget | undefined {
+    return this.curation
+      .editorialTargets()
+      .find((target) => target.group.id === group.collection.id);
+  }
+
+  /** The forwardings to every group but this one — what a change to it leaves alone. */
+  private others(group: EditorialGroup): EditorialTarget[] {
+    return this.curation
+      .editorialTargets()
+      .filter((target) => target.group.id !== group.collection.id);
+  }
+
+  /**
+   * Hand the choice to the flow, in the order the groups are listed rather than in the order they
+   * were ticked — the list is what the user reads it back off.
+   */
+  private write(targets: readonly EditorialTarget[]): void {
+    const order = this.groupsState().map((group) => group.collection.id);
+    this.curation.setEditorialTargets(
+      [...targets].sort((a, b) => order.indexOf(a.group.id) - order.indexOf(b.group.id)),
+    );
+  }
+
   /** One group, or `null` when the repository will not hand its collection back. */
   private async loadGroup(id: string): Promise<EditorialGroup | null> {
     try {
       const node = await firstValueFrom(this.collections.getCollection(id));
+      // The tree reads the hierarchy off `parent.id`, and a collection's own parent is wherever it
+      // sits in the repository — which is not necessarily the group it is being offered under.
+      // Copies, not the loaded nodes: the library hands them out of a cache it keeps for the whole
+      // session, so rewriting them in place would change what every other caller sees.
+      const children = (await this.loadChildren(id)).map((child) =>
+        child.parent ? { ...child, parent: { ...child.parent, id: node.ref.id } } : child,
+      );
       return {
         collection: toCollection(node),
         logoUrl: node.preview && !node.preview.isIcon ? node.preview.url : null,
-        folders: await this.loadFolders(id)
+        folders: children.map((child) => toCollection(child)),
+        collectionTree: [node, ...children]
       };
     } catch {
       return null;
@@ -145,26 +221,15 @@ export class EditorialGroupsService {
   }
 
   /**
-   * The collection folders inside a group. `filter: ['folders']` asks the repository to leave the
-   * group's *references* out — the contents it holds, of which there can be thousands — and the
-   * answer is narrowed to collections here as well, so a repository that ignores the filter still
-   * yields folders alone.
+   * The collections inside a group, as the repository hands them over — the selector needs the nodes
+   * themselves, not just their names (see {@link EditorialGroup.collectionTree}).
    *
-   * An empty list on failure: it reads as "no folder needed", which is the harmless of the two
-   * outcomes — the content goes to the group itself rather than to a folder that could not be shown.
+   * An empty list on failure: it reads as "no collection to choose", which is the harmless of the two
+   * outcomes — the content then goes to the group itself rather than into one that could not be shown.
    */
-  private async loadFolders(id: string): Promise<readonly Collection[]> {
+  private async loadChildren(id: string): Promise<Node[]> {
     try {
-      const children = await firstValueFrom(
-        this.nodes.getChildren(id, {
-          repository: HOME_REPOSITORY,
-          filter: ['folders'],
-          maxItems: MAX_FOLDERS
-        })
-      );
-      return (children.nodes ?? [])
-        .filter((node) => node.type === COLLECTION_TYPE || !!node.collection)
-        .map((node) => toCollection(node));
+      return await firstValueFrom(this.collections.getSubCollections(id));
     } catch {
       return [];
     }

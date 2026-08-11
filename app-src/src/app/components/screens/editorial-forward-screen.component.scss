@@ -4,50 +4,6 @@
 
 :host { display: block; }
 
-// While the folder picker is open the screen fills the panel instead of growing with its content:
-// that is what gives the selector a definite height, and with it a scroll container of its own — so
-// its apply bar and this view's head stay put rather than scrolling out of reach.
-:host(.is-picking) { height: 100%; }
-
-.picker {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.picker-head {
-  flex: 0 0 auto;
-  padding: var(--es-space-2) var(--es-space-4) var(--es-space-3);
-}
-
-// The room the head leaves over, as a definite height — the selector delegates its own height to
-// here (see collection-selector.component.scss), so without this it collapses to nothing.
-.picker es-collection-selector {
-  flex: 1 1 0;
-  min-height: 0;
-}
-
-// The way out of the picker. The topbar's back button leaves the whole step, so the view carries its
-// own — and it sits at the top, where a back button is looked for.
-.back {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--es-space-1);
-  margin-bottom: var(--es-space-2);
-  padding: 4px 6px 4px 0;
-  background: none;
-  border: none;
-  color: var(--es-blue);
-  font-size: 13px;
-  font-weight: 600;
-
-  &:hover { text-decoration: underline; }
-
-  svg { width: 16px; height: 16px; }
-}
-
-.picker-hint { margin: 0; }
-
 // The wait for the groups: the spinner over its caption, centred where the list will be.
 .loading {
   display: flex;

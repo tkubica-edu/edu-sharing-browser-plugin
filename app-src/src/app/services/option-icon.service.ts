@@ -43,14 +43,15 @@ const ICONS: Record<IconId, string> = {
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>',
   metadata:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
-  collections:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 8v6"/><path d="M9 11l3 3 3-3"/></svg>',
-  // The section's two sub steps: handing the content on (an arrow leaving a group of people), and
-  // filing it away in one's own place (a folder with the person on it).
+  // The two ways a curated content is filed: handing it on (an arrow leaving a group of people),
+  // and filing it away in one's own place (a folder with the person on it). Under the forwarding
+  // sits the choice of the collection it lands in — stacked layers with a tick.
   'editorial-forward':
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7.5" r="3"/><path d="M2.5 19v-1.5A4.5 4.5 0 0 1 7 13h1.5"/><circle cx="16.5" cy="8" r="2.2"/><path d="M12.5 17.5v-.8a4 4 0 0 1 4-4"/><path d="M13 20.5h7"/><path d="M17.5 18l3 2.5-3 2.5"/></svg>',
   'personal-storage':
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2l2 2.5H19.5A1.5 1.5 0 0 1 21 10v7.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.8" r="1.8"/><path d="M9 17.2a3.2 3.2 0 0 1 6 0"/></svg>',
+  'select-collection':
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 4-2"/><path d="M17.5 18.5l1.5 1.5 3-3.2"/></svg>',
   overview:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01"/><path d="M11.5 12h1v4h1"/></svg>',
   preview:

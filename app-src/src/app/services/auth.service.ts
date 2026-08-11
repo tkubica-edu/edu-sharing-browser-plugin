@@ -35,8 +35,6 @@ export class AuthService {
   readonly error = signal<string | null>(null);
   /** True when the repository URL was edited to differ from the bootstrapped one. */
   readonly needsReload = signal(false);
-  /** True while an existing session is being revalidated on startup. */
-  readonly restoring = signal(true);
 
   /** The library's rootUrl for the configured repository (`…/edu-sharing/rest`). */
   readonly apiRootUrl = computed(() => toApiRootUrl(this.repositoryUrl()));
@@ -45,7 +43,7 @@ export class AuthService {
    * The gate every feature is behind: a real session, OR a repository that enables the additional
    * web component — there the session is brought by the embedding host, so the panel must never ask
    * for credentials. {@link loggedIn} stays the plain fact of a repository session and is what the
-   * status bar and the login screen report; everything that only needs to know *whether it may
+   * login screen reports; everything that only needs to know *whether it may
    * work* (option visibility, the landing view, the screens' gates, the API-backed actions) uses
    * this instead.
    */
@@ -53,8 +51,8 @@ export class AuthService {
 
   /**
    * Whether a login applies at all. False with the additional web component enabled: it replaces
-   * the login necessity entirely, so not even the logged-out state is reported (nothing about a
-   * login is shown in the status bar).
+   * the login necessity entirely, so not even the logged-out state is reported — nothing about a
+   * login is shown at all.
    */
   readonly loginRequired = computed(() => !this.additionalWebComponent.enabled());
 
@@ -84,8 +82,6 @@ export class AuthService {
       if (this.isValidUser(info)) this.applyLogin(info.authorityName ?? this.username());
     } catch {
       /* no active session (or unreachable) — stay logged out */
-    } finally {
-      this.restoring.set(false);
     }
   }
 

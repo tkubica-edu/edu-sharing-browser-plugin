@@ -114,35 +114,41 @@ The options:
   downloads, plays, and the embeddings/collections the node is used in). Its `nodes` input is a
   *selection*, so the hydrated node goes in as a single-element array; the element fetches the
   numbers itself through the repository session. Shown for an active node, like the preview.
-- **Einsortieren und weiterleiten** — where the content is filed and handed on, *before* it is
-  described: the flow runs *Inhalt erschließen* → Vorschau → **Einsortieren und weiterleiten** →
-  *Qualitätsprüfung* → *Inhaltsübersicht*. Two sub steps, each offered only where it applies: *An
-  Redaktionen weiterleiten* while the repository config enables the additional web component,
-  *Persönliche Ablage* for a session of the user's own (still a placeholder for the component that
-  will fill it). Where neither applies the step falls away and the preview leads straight into the
-  *Qualitätsprüfung*. Nothing is written here — **the content is created by the one save at the end
-  of the Qualitätsprüfung**, which writes the quality criteria, whatever the steps recorded and the
-  metadata the editor commits in one go (so *Speichern…* appears on the way into the
-  *Inhaltsübersicht*). The footer walks the sub steps like the Qualitätsprüfung's: from the
-  forwarding it offers the *Persönliche Ablage* where that applies, and only from the last one does
-  it leave for the *Qualitätsprüfung*.
+- **An Redaktionen weiterleiten** / **Persönliche Ablage** — where the content is filed and handed
+  on, *before* it is described: the flow runs *Inhalt erschließen* → Vorschau → **An Redaktionen
+  weiterleiten** → **Persönliche Ablage** → *Qualitätsprüfung* → *Inhaltsübersicht*. Two steps of
+  their own, each offered only where it applies: the forwarding while the repository config enables
+  the additional web component, the *Persönliche Ablage* for a session of the user's own (still a
+  placeholder for the component that will fill it). Where neither applies they fall away and the
+  preview leads straight into the *Qualitätsprüfung*. Nothing is written here — **the content is
+  created by the one save at the end of the Qualitätsprüfung**, which writes the quality criteria,
+  whatever the steps recorded and the metadata the editor commits in one go (so *Speichern…* appears
+  on the way into the *Inhaltsübersicht*). The footer's *Weiter* walks from each step to the next one
+  that applies.
   - *An Redaktionen weiterleiten* lists the editorial groups the repository config names in
     **`browserExtensionEditorialGroups`** (`['ID1', 'ID2']`, read once per session by
     `EditorialGroupsService` → `CollectionService.getCollection`). Ticking a group forwards the
     content to it; where the group's collection has child collections
-    (`NodeService.getChildren`, folders only) one of them can be picked instead — the collection
-    picker (`es-collection-selector`, `edu-sharing-nodes-selector` in `collections` mode) opens for
-    that, and the content then goes into the picked folder *only*. The picker gets that one group's
-    collection as `parentCollections` — which is what makes a *sub* collection selectable rather than
-    merely open-able, and what keeps the choice inside the group it is recorded for — and it fills the
-    panel so its apply bar stays at the bottom edge (its own back button leads back to the list). A group without children says
-    „Kein Sammlungsordner erforderlich". The choice is held by the flow
-    (`CurationService.editorialTargets`), not written where it is made — the content has no node
-    yet — and the save behind the step carries it out: with the additional web component the
-    collection IDs travel in `/upload`'s `collection_id` (a list, however many were picked),
-    otherwise the node is created first and
+    (`NodeService.getChildren`, folders only) one of them can be picked instead — the group's row
+    leads into the **Sammlung auswählen** step for that, and the content then goes into the picked
+    collection *only*. A group without children says „Keine Sammlungsauswahl erforderlich". The
+    choice is held by the flow (`CurationService.editorialTargets`), not written where it is made —
+    the content has no node yet — and the save behind the step carries it out: with the additional
+    web component the collection IDs travel in `/upload`'s `collection_id` (a list, however many were
+    picked), otherwise the node is created first and
     `CollectionServiceUnwrapped.addToCollection` follows for each. Only collections the content is
     not in yet, so re-saving does not file it twice.
+  - **Sammlung auswählen** is a step of its own, entered from a group's row and returning to it. It
+    names the group it belongs to (`EditorialGroupsService.picking`) and what is recorded for it so
+    far, and shows the collection picker (`es-collection-selector`, `edu-sharing-nodes-selector` in
+    `collections` mode) underneath. The picker gets that one group's collection as
+    `collectionTree` — the group's collection node followed by the ones inside it, which is what
+    keeps the choice inside the group it is recorded for. Tree *data*, not a list of ids: the element
+    hands the value straight to its tree data source, which builds the hierarchy from each node's
+    `parent.id`, and shows it in place of the roots it would build itself. Its own apply bar is
+    hidden and the confirmation sits in the panel's action bar as **Sammlung übernehmen**: the screen
+    registers an `ApplyHandler` with `ActionBarService`, and the footer reads and clicks the
+    element's button through it (the element offers no API for confirming from outside).
 - **Neues OnlyOffice-Dokument** — mounts `edu-sharing-add-with-connector`, which opens the
   OnlyOffice create dialog; the new node is hydrated into the flow and opens in the preview.
 - **Inhalt suchen** — only on an insert host (URL matches `/src/tools/onlyoffice`): the same
@@ -171,8 +177,7 @@ request, the server sets a session cookie, and every later request carries it
 revalidates it (`observeLoginInfo()`, 8s timeout) and, if a valid non-guest session is
 still active, restores the logged-in state before the shell lands on a view — you don't
 re-enter credentials when reopening the panel or switching pages, and **no password is
-stored**. While it checks, the status bar shows "Anmeldung wird geprüft…". If the cookie
-is gone (browser restart, explicit logout, or Safari ITP blocking the third-party cookie)
+stored**. If the cookie is gone (browser restart, explicit logout, or Safari ITP blocking the third-party cookie)
 it resolves to guest and the login gate appears.
 
 ## Direct web-component embedding
@@ -234,9 +239,8 @@ session, so no credentials are asked for: `AuthService.authorized` (`loggedIn` *
 is what option visibility, the landing view, the screens' gates and the API-backed actions are
 behind, so the login option and the `es-login` gate never appear and every option is reachable
 without a panel login. `AuthService.loggedIn` stays the plain fact of a repository session, but nothing
-about a login is *reported* either: `AuthService.loginRequired` is false, so the status bar shows
-neither „Abgemeldet" nor „Anmeldung wird geprüft…" (an existing session is still shown, so logging
-out stays reachable). The variables are readable as guest, so the flag
+about a login is *reported* either: `AuthService.loginRequired` is false, so neither the login
+option nor the session bar's logged-out state appears. The variables are readable as guest, so the flag
 arrives while the panel is still logged out; the navigation guard then re-lands the boot's login
 view on the options menu.
 
@@ -323,7 +327,7 @@ as if it ran on an OnlyOffice page with the edu-sharing plugin active:
   hard-coded test document (`app-src/src/app/services/debug.service.ts`) instead of being
   broadcast to a page that would never reply;
 - `PREVIEW_NODE` has no request to answer, so the settings offer a button that fires one;
-- a *Debug* chip in the status bar marks the state, and every simulated event is logged as
+- the *Einstellungen* screen marks the state, and every simulated event is logged as
   `[edu-sharing][debug]`.
 
 The answers are injected through the **real** inbound path (a window message carrying the
@@ -342,23 +346,23 @@ resets per session.
    closes it — and the page must take the freed width back immediately (no empty strip), also
    after a later window resize and after closing straight out of a drag. The start view is the
    menu, which lists the options visible for the current page (on an OnlyOffice page *Inhalt
-   suchen* first, and nothing opens on its own), the status bar shows the matching chips, and the
+   suchen* first, and nothing opens on its own), and the
    topbar carries the *Verlauf* / *Einstellungen* icons.
 2. **Einstellungen** (topbar icon, reachable while logged out): the Repository-URL defaults to
    `https://repository.staging.openeduhub.net/edu-sharing` and is required. Changing it shows an
    *Übernehmen* button that reloads the sidebar so the library re-initializes against the new
    repository (a dot marks the icon until applied).
 3. **Login**: required for everything except *Einstellungen*. Enter staging credentials → the
-   status bar flips to "Angemeldet: …" and the login option disappears while the rest appear.
+   session bar flips to "Angemeldet: …" and the login option disappears while the rest appear.
    If the repository URL was changed, login is blocked until it is applied in *Einstellungen*.
 4. **Erschließen + speichern**: *Inhalt erschließen* on a content page → the metadata screen
    shows `fields_extracted / fields_total` and loads the MDS editor with the generated
    metadata. Edit, then the footer's **Speichern** → a node is created in your inbox and the
-   preview opens. The status bar gains an "Aktiver Inhalt" chip, which also clears it again.
+   preview opens, and the flow's steps become reachable for that content.
 5. **Metadaten anreichern** (OnlyOffice): open a document in the OnlyOffice editor with the
    edu-sharing plugin active, open the panel → the option appears and names the detected document.
    The footer's **Metadaten anreichern** reads the document and lands on the metadata screen with
-   the generated metadata, the status bar showing the document as *Aktiver Inhalt*. **Speichern**
+   the generated metadata, the menu naming the document under *Inhalt erkannt*. **Speichern**
    must update **that** node — check in the repository that the document's metadata changed, that
    its name/extension is unchanged, and that no new node appeared in the inbox. With the page-side
    plugin switched off (*Plugins im Hintergrund*) the screen must report the timeout instead of

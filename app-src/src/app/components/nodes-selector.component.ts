@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, computed, input } from '@angular/core';
+import { Node } from 'ngx-edu-sharing-api';
 
 import { loadWebComponentBundle } from '../services/web-component-bundle.service';
 
@@ -60,14 +61,18 @@ export class NodesSelectorComponent {
    */
   readonly allowCollectionSelection = input(false);
   /**
-   * The collections whose SUB collections may be picked, by id. With it the Sammlungen tab hands back
-   * a collection inside one of these instead of only opening it — which is what picking a collection
-   * folder needs (see EditorialForwardScreenComponent).
+   * The tree the Sammlungen tab shows instead of the one it builds itself — which is what narrows
+   * the pick to one editorial group (see SelectCollectionScreenComponent).
+   *
+   * Tree *data*, not a list of ids: the element hands the value straight to its tree data source,
+   * which builds the hierarchy from each node's `parent.id`. So it takes the collection nodes
+   * themselves, in one flat list — the group's own first and the ones inside it after it. A value
+   * holding only the roots is a tree of roots, not a tree that loads the rest on demand.
    *
    * `undefined` when the caller names none, which is the value the element sees when nobody sets the
    * property at all: every other screen embeds the selector without it.
    */
-  readonly parentCollections = input<readonly string[] | undefined>(undefined);
+  readonly collectionTree = input<readonly Node[] | undefined>(undefined);
   /** Message shown when the bundle cannot be loaded. */
   readonly errorLabel = input('Auswahl konnte nicht geladen werden');
 

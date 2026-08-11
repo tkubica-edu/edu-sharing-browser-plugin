@@ -25,8 +25,6 @@
   </button>
 </header>
 
-<es-status-bar></es-status-bar>
-
 <!-- Always shows the open section's title; the back button appears on every section except the menu
      itself and walks back through the steps the user came through (see NavigationService.back). -->
 <div class="step-header">
@@ -66,6 +64,7 @@
       @case ('metadata') { <es-metadata-screen></es-metadata-screen> }
       @case ('editorial-forward') { <es-editorial-forward-screen></es-editorial-forward-screen> }
       @case ('personal-storage') { <es-personal-storage-screen></es-personal-storage-screen> }
+      @case ('select-collection') { <es-select-collection-screen></es-select-collection-screen> }
       @case ('preview') { <es-preview-screen></es-preview-screen> }
       @case ('usages') { <es-usages-screen></es-usages-screen> }
       @case ('share') { <es-share-screen></es-share-screen> }
