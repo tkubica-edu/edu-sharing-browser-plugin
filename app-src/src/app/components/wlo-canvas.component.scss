@@ -27,6 +27,17 @@
   display: none;
 }
 
+// The canvas reserves 80px below its fields (`.layout-plugin .fields-section`) for the action bar it
+// floats over them in its own app. Embedded here it has none — saving is the panel's footer — so the
+// gap is empty screen at the end of a form the user scrolls to the bottom of.
+//
+// `:host` is in the selector for its weight alone: the rule it overrides carries two of the canvas'
+// own encapsulation attributes, and the canvas injects its styles when it mounts, hence after ours —
+// so an equally specific selector would lose on order.
+:host .canvas-wrap ::ng-deep .layout-plugin .fields-section {
+  padding-bottom: 8px;
+}
+
 metadata-agent-canvas {
   display: block;
   width: 100%;
