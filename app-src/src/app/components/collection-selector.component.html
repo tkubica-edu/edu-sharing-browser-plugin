@@ -1,7 +1,8 @@
 <es-nodes-selector
-  [option]="option"
+  [option]="option()"
   [tabBlacklist]="hiddenTabs"
   [primaryMode]="'collections'"
   [allowCollectionSelection]="true"
+  [parentCollections]="parentCollections()"
   errorLabel="Sammlungen konnten nicht geladen werden"
 ></es-nodes-selector>

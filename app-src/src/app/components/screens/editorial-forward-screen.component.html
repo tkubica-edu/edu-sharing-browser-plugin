@@ -1,17 +1,102 @@
-<div class="es-screen-body">
-  <section class="es-hint-card">
-    <p class="es-muted">
-      Wähle die Redaktion, an die
-      @if (curation.contentTitle(); as title) {
-        <strong>{{ title }}</strong>
-      } @else {
-        dieser Inhalt
-      }
-      weitergeleitet werden soll.
-    </p>
-  </section>
+<!-- Picking a collection folder takes over the whole screen: the selector brings its own tabbed UI and
+     its own apply button, and the choice is about the one group it was opened for. It fills the panel
+     exactly, so that apply button stays at the bottom edge rather than below the fold — the way back
+     is the head's own button, since the topbar's would leave the step altogether. -->
+@if (picking(); as group) {
+  <div class="picker">
+    <div class="picker-head">
+      <button type="button" class="back" (click)="cancelPicking()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+        Zurück zu den Redaktionen
+      </button>
+      <p class="picker-hint es-muted">
+        Sammlungsordner in <strong>{{ group.collection.name }}</strong> wählen, in den der Inhalt
+        einsortiert werden soll.
+      </p>
+    </div>
 
-  <section class="es-card placeholder">
-    <p class="es-muted">Die Auswahl der Redaktionen wird hier eingebunden.</p>
-  </section>
-</div>
+    <es-collection-selector
+      applyLabel="Sammlungsordner übernehmen"
+      [singleSelection]="true"
+      [parentCollections]="pickerParents()"
+      (choose)="chooseFolder($event)"
+    ></es-collection-selector>
+  </div>
+} @else {
+  <div class="es-screen-body">
+    <section class="es-hint-card">
+      <p class="es-muted">
+        Wähle die Redaktionen, an die
+        @if (curation.contentTitle(); as title) {
+          <strong>{{ title }}</strong>
+        } @else {
+          dieser Inhalt
+        }
+        weitergeleitet werden soll.
+      </p>
+    </section>
+
+    @if (groups.loading()) {
+      <p class="es-muted">Die Redaktionen werden geladen …</p>
+    } @else if (groups.error(); as message) {
+      <p class="es-error">Die Redaktionen konnten nicht geladen werden: {{ message }}</p>
+    } @else if (groups.none()) {
+      <p class="es-muted">Für dieses Repository sind keine Redaktionen konfiguriert.</p>
+    }
+
+    <ul class="groups">
+      @for (group of groups.groups(); track group.collection.id) {
+        <li class="group" [class.is-selected]="isSelected(group)">
+          <!-- The whole head is the checkbox's label, so the logo and the name toggle it too. -->
+          <label class="head">
+            <input type="checkbox" [checked]="isSelected(group)"
+                   (change)="toggle(group, $any($event.target).checked)" />
+            <span class="logo">
+              @if (group.logoUrl; as logo) {
+                <img [src]="logo" alt="" />
+              } @else {
+                <i class="logo-glyph" esIcon="collections_bookmark"></i>
+              }
+            </span>
+            <span class="name">{{ group.collection.name }}</span>
+          </label>
+
+          <!-- A group with collection folders offers the choice of one; a group without says so, so
+               the row means the same thing in both cases: where inside the group the content lands. -->
+          @if (group.folders.length) {
+            <button type="button" class="folder" (click)="openFolderPicker(group)">
+              <span class="folder-label">
+                @if (folderOf(group); as folder) {
+                  Sammlungsordner: <strong>{{ folder.name }}</strong>
+                } @else {
+                  Sammlungsordner wählen
+                }
+              </span>
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
+                   aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+            </button>
+          } @else {
+            <p class="folder-none">Kein Sammlungsordner erforderlich</p>
+          }
+        </li>
+      }
+    </ul>
+
+    <!-- Groups the config names but the repository would not hand back: named, because the list is
+         otherwise silently short and a group that is not offered cannot be forwarded to. -->
+    @if (groups.unavailable(); as missing) {
+      <p class="es-muted">
+        {{ missing }} konfigurierte
+        {{ missing === 1 ? 'Redaktion ist' : 'Redaktionen sind' }} derzeit nicht verfügbar.
+      </p>
+    }
+
+    <!-- The forwarding is carried out by the save behind this step; a refusal is reported back here,
+         which is where it can be answered by picking differently. -->
+    @if (curation.assignError(); as message) {
+      <p class="es-error">Der Inhalt konnte nicht weitergeleitet werden: {{ message }}</p>
+    }
+  </div>
+}

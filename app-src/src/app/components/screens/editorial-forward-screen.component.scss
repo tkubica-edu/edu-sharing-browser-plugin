@@ -1,5 +1,146 @@
-// "An Redaktionen weiterleiten" — a placeholder until the forwarding component is supplied; it will
-// bring its own styling, so this only marks the slot it goes into.
+// "An Redaktionen weiterleiten" — one card per editorial group: the group itself as a checkbox row,
+// and under it where inside the group the content lands.
+@use 'mixins' as m;
+
 :host { display: block; }
 
-.placeholder { text-align: center; }
+// While the folder picker is open the screen fills the panel instead of growing with its content:
+// that is what gives the selector a definite height, and with it a scroll container of its own — so
+// its apply bar and this view's head stay put rather than scrolling out of reach.
+:host(.is-picking) { height: 100%; }
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.picker-head {
+  flex: 0 0 auto;
+  padding: var(--es-space-2) var(--es-space-4) var(--es-space-3);
+}
+
+// The room the head leaves over, as a definite height — the selector delegates its own height to
+// here (see collection-selector.component.scss), so without this it collapses to nothing.
+.picker es-collection-selector {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+// The way out of the picker. The topbar's back button leaves the whole step, so the view carries its
+// own — and it sits at the top, where a back button is looked for.
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--es-space-1);
+  margin-bottom: var(--es-space-2);
+  padding: 4px 6px 4px 0;
+  background: none;
+  border: none;
+  color: var(--es-blue);
+  font-size: 13px;
+  font-weight: 600;
+
+  &:hover { text-decoration: underline; }
+
+  svg { width: 16px; height: 16px; }
+}
+
+.picker-hint { margin: 0; }
+
+.groups {
+  @include m.list-reset;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--es-space-3);
+}
+
+// A card per group. Selected it carries the panel's blue: the tick is small, and which groups are
+// forwarded to has to be readable from the list as a whole.
+.group {
+  @include m.list-item;
+
+  margin-bottom: 0;
+  border-width: 2px;
+
+  &.is-selected {
+    border-color: var(--es-blue);
+    background: var(--es-hint-bg);
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--es-space-3);
+  padding: var(--es-space-3);
+  cursor: pointer;
+
+  input[type='checkbox'] {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--es-blue);
+    cursor: pointer;
+  }
+}
+
+// The group's own picture, in a fixed box so the names line up whatever shape the logos have.
+.logo {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 40px;
+  overflow: hidden;
+  background: var(--es-surface);
+  border: 1px solid var(--es-border);
+  border-radius: 6px;
+
+  img { max-width: 100%; max-height: 100%; object-fit: contain; }
+}
+
+// Stand-in for a group whose collection has no picture of its own.
+.logo-glyph { font-size: 22px; line-height: 1; color: var(--es-blue); }
+
+.name {
+  font-weight: 700;
+  font-size: 15px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+// Where inside the group the content lands, on its own line under the head — a hairline apart, since
+// it is a second choice rather than part of the first.
+.folder,
+.folder-none {
+  width: 100%;
+  margin: 0;
+  padding: var(--es-space-2) var(--es-space-3);
+  border-top: 1px solid var(--es-border);
+  font-size: 12px;
+}
+
+.folder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--es-space-2);
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  text-align: left;
+  color: var(--es-blue);
+  font-weight: 600;
+
+  &:hover { background: var(--es-surface); }
+
+  .chevron { flex: 0 0 auto; width: 14px; height: 14px; }
+}
+
+.folder-none { @include m.muted; }
+

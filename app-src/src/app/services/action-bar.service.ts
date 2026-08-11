@@ -175,9 +175,20 @@ export class ActionBarService {
 
       // "Einsortieren und weiterleiten": where the content is filed and handed on, before it is
       // described and written. Nothing is saved here — the way on leads into the Qualitätsprüfung,
-      // whose own way out writes the content with everything the flow collected. Only the way on:
-      // the way back is the topbar's back button, and between the two sub steps it is the tab bar.
-      case 'collections':
+      // whose own way out writes the content with everything the flow collected.
+      //
+      // Its sub steps are walked through like the Qualitätsprüfung's: from the forwarding the way on
+      // is the Persönliche Ablage where that applies, and only from the last of them does it leave
+      // the section. So both are offered rather than the second being reachable via the tab bar
+      // alone — a step the footer walks past reads as one that was not meant to be filled in.
+      //
+      // Only the way on: the way back is the topbar's back button, and between the sub steps it is
+      // the tab bar.
+      case 'collections': {
+        const next = this.navigation.nextTab();
+        if (next && !next.disabled) {
+          return [{ label: next.label, disabled: false, run: () => this.navigation.goNextTab() }];
+        }
         return [
           {
             label: 'Qualitätsprüfung',
@@ -185,6 +196,7 @@ export class ActionBarService {
             run: () => this.navigation.go('quality')
           }
         ];
+      }
 
       // Every other section owns its own primary action (selector insert, login form, the
       // "Inhaltsoptionen" choice, …).

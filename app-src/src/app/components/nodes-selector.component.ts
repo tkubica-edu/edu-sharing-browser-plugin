@@ -59,6 +59,15 @@ export class NodesSelectorComponent {
    * come back through `onNodesChoosen`.
    */
   readonly allowCollectionSelection = input(false);
+  /**
+   * The collections whose SUB collections may be picked, by id. With it the Sammlungen tab hands back
+   * a collection inside one of these instead of only opening it — which is what picking a collection
+   * folder needs (see EditorialForwardScreenComponent).
+   *
+   * `undefined` when the caller names none, which is the value the element sees when nobody sets the
+   * property at all: every other screen embeds the selector without it.
+   */
+  readonly parentCollections = input<readonly string[] | undefined>(undefined);
   /** Message shown when the bundle cannot be loaded. */
   readonly errorLabel = input('Auswahl konnte nicht geladen werden');
 

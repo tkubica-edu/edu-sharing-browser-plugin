@@ -106,14 +106,31 @@ The options:
   described: the flow runs *Inhalt erschließen* → Vorschau → **Einsortieren und weiterleiten** →
   *Qualitätsprüfung* → *Inhaltsübersicht*. Two sub steps, each offered only where it applies: *An
   Redaktionen weiterleiten* while the repository config enables the additional web component,
-  *Persönliche Ablage* for a session of the user's own. Both are placeholders for the components that
-  will fill them. Where neither applies the step falls away and the preview leads straight into the
+  *Persönliche Ablage* for a session of the user's own (still a placeholder for the component that
+  will fill it). Where neither applies the step falls away and the preview leads straight into the
   *Qualitätsprüfung*. Nothing is written here — **the content is created by the one save at the end
   of the Qualitätsprüfung**, which writes the quality criteria, whatever the steps recorded and the
   metadata the editor commits in one go (so *Speichern…* appears on the way into the
-  *Inhaltsübersicht*). The collection picker (`es-collection-selector`, `edu-sharing-nodes-selector`
-  in `collections` mode → `CollectionServiceUnwrapped.addToCollection`) is unused for the moment; it
-  is what the *Persönliche Ablage* screen is expected to build on.
+  *Inhaltsübersicht*). The footer walks the sub steps like the Qualitätsprüfung's: from the
+  forwarding it offers the *Persönliche Ablage* where that applies, and only from the last one does
+  it leave for the *Qualitätsprüfung*.
+  - *An Redaktionen weiterleiten* lists the editorial groups the repository config names in
+    **`browserExtensionEditorialGroups`** (`['ID1', 'ID2']`, read once per session by
+    `EditorialGroupsService` → `CollectionService.getCollection`). Ticking a group forwards the
+    content to it; where the group's collection has child collections
+    (`NodeService.getChildren`, folders only) one of them can be picked instead — the collection
+    picker (`es-collection-selector`, `edu-sharing-nodes-selector` in `collections` mode) opens for
+    that, and the content then goes into the picked folder *only*. The picker gets that one group's
+    collection as `parentCollections` — which is what makes a *sub* collection selectable rather than
+    merely open-able, and what keeps the choice inside the group it is recorded for — and it fills the
+    panel so its apply bar stays at the bottom edge (its own back button leads back to the list). A group without children says
+    „Kein Sammlungsordner erforderlich". The choice is held by the flow
+    (`CurationService.editorialTargets`), not written where it is made — the content has no node
+    yet — and the save behind the step carries it out: with the additional web component the
+    collection IDs travel in `/upload`'s `collection_id` (a list, however many were picked),
+    otherwise the node is created first and
+    `CollectionServiceUnwrapped.addToCollection` follows for each. Only collections the content is
+    not in yet, so re-saving does not file it twice.
 - **Neues OnlyOffice-Dokument** — mounts `edu-sharing-add-with-connector`, which opens the
   OnlyOffice create dialog; the new node is hydrated into the flow and opens in the preview.
 - **Inhalt suchen** — only on an insert host (URL matches `/src/tools/onlyoffice`): the same

@@ -22,6 +22,17 @@ const SOURCE_TEXT_KEY = '_source_text';
 /** How a screenshot for the preview is taken; the agent's own default for an embedded canvas. */
 const SCREENSHOT_METHOD = 'pageshot';
 
+/**
+ * Request key holding the collection IDs the created node is added to — the step of the endpoint's
+ * own pipeline that runs after the metadata was written (`_set_metadata` → **Collections** → …, see
+ * WIDGET-REFERENZ.md).
+ *
+ * Singular by the endpoint's naming, plural in what it takes: the value is the list of picked
+ * collections, one element or several (see {@link MetadataUploadService.fieldsOf} for why a single one
+ * still travels as a list).
+ */
+const COLLECTION_ID_KEY = 'collection_id';
+
 /** What the caller needs to know about an upload: the node it produced, or why there is none. */
 export interface UploadOutcome {
   ok: boolean;
@@ -59,11 +70,16 @@ export class MetadataUploadService {
    *   type, `_origins`, `_source_text`) that the endpoint expects alongside the values, and which
    *   an editor's committed values alone do not contain.
    * @param sourceUrl the page the content was curated from, used for the preview screenshot.
+   * @param collections the collections the created node is to be added to — the editorial groups the
+   *   forwarding step picked (see CurationService.editorialCollections). The endpoint files them
+   *   itself, which is the only way here: the node belongs to the agent's own privileges, so the
+   *   panel session may not add it to a collection afterwards.
    */
   async upload(
     values: MdsValues,
     payload: Record<string, unknown> | null,
     sourceUrl?: string,
+    collections: readonly string[] = [],
   ): Promise<UploadOutcome> {
     const body: Record<string, unknown> = {
       // The fields go at the TOP LEVEL, one key per property — `cclom:title`, `ccm:wwwurl`, the
@@ -87,6 +103,9 @@ export class MetadataUploadService {
       preview_url: sourceUrl || (values['ccm:wwwurl'] as string[] | undefined)?.[0],
       screenshot_method: SCREENSHOT_METHOD
     };
+    // Left out entirely where nothing was picked: the key is what the endpoint files the node under,
+    // and an empty list is not a statement the request needs to make.
+    if (collections.length) body[COLLECTION_ID_KEY] = [...collections];
     try {
       const response = await this.browserExtension.uploadMetadata(body, this.agentApi.baseUrl());
       if (!response.success) return { ok: false, error: response.error ?? 'Upload fehlgeschlagen.' };

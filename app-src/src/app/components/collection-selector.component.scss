@@ -1,11 +1,14 @@
-:host { display: block; }
+// Passes a height through rather than setting one: the selector's internal scroll container and its
+// apply bar need a definite height (see nodes-selector.component.scss), and only the caller knows
+// where that comes from — the forwarding step gives it the room its picker view has left over, so
+// the apply button sits at the bottom edge instead of below the fold.
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 
-// Sits inside a screen that scrolls as a page, so the height cannot come from a 100% chain: the
-// element gets a definite height of its own instead, which is what its internal scroll container
-// and footer bar need (see nodes-selector.component.scss). Bounded, so the hint card above it
-// stays reachable through the panel's own scroll.
 es-nodes-selector {
-  display: block;
-  height: 70vh;
-  min-height: 360px;
+  flex: 1 1 0;
+  min-height: 0;
 }

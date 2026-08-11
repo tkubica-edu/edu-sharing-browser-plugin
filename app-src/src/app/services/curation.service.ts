@@ -23,6 +23,19 @@ export interface Collection {
 }
 
 /**
+ * An editorial group the content is forwarded to — what "An Redaktionen weiterleiten" collects (see
+ * EditorialForwardScreenComponent).
+ *
+ * `folder` is a collection folder inside the group, where one was picked. It is then the *only* place
+ * the content is added: a folder is part of its group's collection, so adding it to both would file
+ * the same content twice — see {@link CurationService.editorialCollections}.
+ */
+export interface EditorialTarget {
+  group: Collection;
+  folder?: Collection;
+}
+
+/**
  * The content's picture: an image URL plus whether it is only the repository's *type* icon rather than
  * a rendered preview — see {@link CurationService.contentPreview}.
  */
@@ -313,6 +326,43 @@ export class CurationService {
   readonly assignError = signal<string | null>(null);
   readonly assignedCollections = signal<readonly Collection[]>([]);
 
+  /**
+   * The editorial groups the forwarding step picked, waiting for the save (see {@link EditorialTarget}).
+   *
+   * State of the flow rather than something written where it is chosen, for the same reason the
+   * quality criteria are ({@link recordedValues}): the step runs *before* the content has a node, and
+   * there is nothing to add to a collection until the save at the end of the Qualitätsprüfung created
+   * it. They are not node properties either — where a content is filed is a relation, not a field —
+   * so they travel beside the values rather than in them.
+   */
+  private readonly editorialTargetsState = signal<readonly EditorialTarget[]>([]);
+  readonly editorialTargets = this.editorialTargetsState.asReadonly();
+
+  /**
+   * Where the forwarding actually files the content: the picked folder per group, else the group's own
+   * collection — one collection per group, never both (see {@link EditorialTarget}).
+   */
+  readonly editorialCollections = computed<readonly Collection[]>(() =>
+    this.editorialTargetsState().map((target) => target.folder ?? target.group),
+  );
+
+  /**
+   * The forwarding's collections the content is not in yet. The save works off this rather than off
+   * {@link editorialCollections}, so a second save does not add the content to the same collection
+   * again — the flow's own steps are re-enterable, and only the first pass has anything to file.
+   */
+  private readonly pendingEditorialCollections = computed<readonly Collection[]>(() => {
+    const assigned = this.assignedCollections();
+    return this.editorialCollections().filter(
+      (collection) => !assigned.some((done) => done.id === collection.id),
+    );
+  });
+
+  /** Take over what the forwarding step picked — see {@link editorialTargets}. */
+  setEditorialTargets(targets: readonly EditorialTarget[]): void {
+    this.editorialTargetsState.set([...targets]);
+  }
+
   readonly running = this.metadataAgent.running;
 
   /** Set while a generated result still waits to be saved; see {@link hasUnsavedWork}. */
@@ -399,9 +449,16 @@ export class CurationService {
    * Whether {@link saveCollected} still has anything to do: a content without a node has to be
    * created, and one that already has a node is written again only for the values the flow collected
    * since. Without this a step that was merely passed through would update the node with nothing.
+   *
+   * A forwarding that has not been carried out counts as something to do as well, even though it is
+   * no *value*: the save is what files the content into the editorial groups (see {@link save}), so a
+   * step that only picked a group would otherwise be walked past without ever taking effect.
    */
   readonly hasCollectedValues = computed(
-    () => !this.activeNode() || Object.keys(this.recordedValues()).length > 0,
+    () =>
+      !this.activeNode() ||
+      Object.keys(this.recordedValues()).length > 0 ||
+      this.pendingEditorialCollections().length > 0,
   );
 
   /**
@@ -902,6 +959,10 @@ export class CurationService {
       await this.writePendingQuality(saved.nodeId);
       // Before the reload below, so the node comes back already carrying it.
       await this.writePendingPreview(saved.nodeId);
+      // The forwarding, now that there is a node to forward: a collection takes a node, so this
+      // could not happen at the step that picked the groups (see {@link editorialTargets}). A
+      // failure is reported (assignError) rather than thrown — the content is written either way.
+      await this.assignToCollections(this.pendingEditorialCollections());
       // Load the full hydrated node once: its properties re-seed the editor (so re-editing
       // uses the stored values) and the node itself feeds the preview.
       try {
@@ -931,16 +992,22 @@ export class CurationService {
    * the panel session's. So a second save cannot update what the first one wrote — it uploads
    * again and produces a NEW node, which then becomes the content the flow works on. The footer
    * says so ("Erneut speichern", see ActionBarService).
+   *
+   * The forwarding travels *with* the upload rather than being carried out afterwards, for the same
+   * reason: the node belongs to the agent, so the panel session (a guest) may not add it to a
+   * collection either — `/upload` files it itself (see MetadataUploadService).
    */
   private async saveThroughAgent(values: MdsValues): Promise<boolean> {
     this.saving.set(true);
     this.saveError.set(null);
     try {
       const lastRun = this.metadataAgent.lastRun();
+      const forwarded = this.pendingEditorialCollections();
       const outcome = await this.metadataUpload.upload(
         values,
         lastRun?.parsed?.raw ?? null,
         lastRun?.source?.url,
+        forwarded.map((collection) => collection.id),
       );
       if (!outcome.ok) {
         this.saveError.set(outcome.error ?? 'Upload fehlgeschlagen.');
@@ -957,6 +1024,9 @@ export class CurationService {
       if (outcome.node?.nodeId) {
         await this.applyUploadedNode(outcome.node, values);
         await this.writePendingQuality(outcome.node.nodeId);
+        // Written by the upload, so they are recorded as done here — after applyUploadedNode, which
+        // clears the list for a node that is not the one the previous save produced.
+        this.assignedCollections.update((list) => [...list, ...forwarded]);
       }
       return true;
     } catch (cause: unknown) {
@@ -1130,6 +1200,9 @@ export class CurationService {
     this.saveError.set(null);
     this.assignError.set(null);
     this.assignedCollections.set([]);
+    // Where a content was to be forwarded is a statement about that content; the next one starts
+    // without it rather than inheriting it.
+    this.editorialTargetsState.set([]);
     this.extractionUrl.set(null);
   }
 }
