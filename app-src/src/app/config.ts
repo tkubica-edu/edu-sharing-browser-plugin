@@ -61,7 +61,8 @@ export const APP_CONFIG = {
   metalookupApiKey: '',
   /**
    * ContentJudge, which judges a content against evaluation schemes by LLM (`POST /evaluate/`, see
-   * ContentJudgeService).
+   * ContentJudgeService). Its `GET /health/` is asked before every judgement, so a base that is wrong
+   * or unreachable is answered in seconds rather than after the judgement's own long timeout.
    */
   contentJudgeApiUrl: 'https://llm-contentjudge.staging.openeduhub.net',
   /**

@@ -11,9 +11,18 @@ import { errorMessage } from '../util/errors';
  */
 const JUDGE_TIMEOUT_MS = 300_000;
 
+/**
+ * How long to wait for the readiness answer. Short next to {@link JUDGE_TIMEOUT_MS}, and deliberately
+ * so: the endpoint reads a count out of memory, so a readiness answer that hangs *is* the answer.
+ */
+const HEALTH_TIMEOUT_MS = 10_000;
+
 /** The text bounds the API enforces (`EvaluationRequest.text`, min_length/max_length). */
 const TEXT_MIN_LENGTH = 10;
 const TEXT_MAX_LENGTH = 50_000;
+
+/** Log prefix, as everywhere else in the extension (`[edu-sharing][<station>]`). */
+const LOG = '[edu-sharing][contentjudge]';
 
 /**
  * What ContentJudge should judge, and how it gets at it — the API's three input sources
@@ -59,6 +68,20 @@ export interface ContentJudgeEvaluation {
 }
 
 /**
+ * What the service says about its own readiness (`GET /health/`).
+ *
+ * Optional throughout, like {@link ContentJudgeEvaluation}: what the API declares is not what a client
+ * may rely on having received.
+ */
+export interface ContentJudgeHealth {
+  /** `healthy`, `degraded` or `unhealthy` — the last two when the scheme engine did not come up. */
+  status?: string;
+  version?: string;
+  /** How many evaluation schemes the deployment has loaded, and can therefore be asked for. */
+  schemes_loaded?: number;
+}
+
+/**
  * The page's text as ContentJudge should judge it, or `null` when the page has too little to judge.
  *
  * `formattedText` first, because the API takes no context of its own: `EvaluationRequest` carries a
@@ -88,6 +111,8 @@ export function judgeableText(page: PageData | null): string | null {
  * redirect). Nothing is written anywhere; the sibling endpoint `/evaluate/suggest` would be the one
  * that does, and it is not used.
  *
+ * Every judgement is preceded by `GET /health/`, for the reason given at {@link ContentJudgeService.health}.
+ *
  * The request goes out from the panel document, like the metadata agent's and MetalookUp's: the
  * extension's `host_permissions` are what let this document reach a foreign origin.
  *
@@ -100,6 +125,12 @@ export class ContentJudgeService {
   readonly running = signal(false);
   /** The last answer; null until one arrived. */
   readonly lastEvaluation = signal<ContentJudgeEvaluation | null>(null);
+  /**
+   * What the service last said about its readiness; null until it said anything. The first thing worth
+   * looking at when a judgement failed — it separates "the deployment is not reachable" from "the
+   * deployment answered, and rejected this request".
+   */
+  readonly lastHealth = signal<ContentJudgeHealth | null>(null);
   /** Why the last judgement produced no answer; null when it did. */
   readonly error = signal<string | null>(null);
 
@@ -123,7 +154,8 @@ export class ContentJudgeService {
    *
    * Rejects when the service cannot be reached, answers with a status the request cannot be served
    * under, or sends something that is not a JSON object; {@link error} carries that for the view
-   * either way.
+   * either way. A service that is not there at all is found by {@link health} before the judgement
+   * goes out, so it is answered in seconds instead of after the judgement's own timeout.
    */
   async evaluate(
     input: ContentJudgeInput,
@@ -132,6 +164,7 @@ export class ContentJudgeService {
     this.running.set(true);
     this.error.set(null);
     try {
+      await this.checkReady();
       const evaluation = await this.postEvaluation(this.requestBody(input, schemes));
       this.lastEvaluation.set(evaluation);
       return evaluation;
@@ -141,6 +174,73 @@ export class ContentJudgeService {
     } finally {
       this.running.set(false);
     }
+  }
+
+  /**
+   * Whether the service is there and ready (`GET /health/`) — its status, its version and how many
+   * evaluation schemes it has loaded.
+   *
+   * Worth asking before a judgement because of what a judgement costs: it may be out for five minutes
+   * (see {@link JUDGE_TIMEOUT_MS}), so without this every misconfiguration — a wrong
+   * `contentJudgeApiUrl`, a missing `contentJudgeBasicAuth`, a deployment that is down — would surface
+   * as a five-minute wait, and where the user expects a verdict on the content rather than a technical
+   * fault. This answers in milliseconds and names the cause.
+   *
+   * Rejects for the same three reasons {@link evaluate} does — unreachable, a status the answer cannot
+   * be read under, no JSON object.
+   */
+  async health(): Promise<ContentJudgeHealth> {
+    const url = `${APP_CONFIG.contentJudgeApiUrl}/health/`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          Accept: 'application/json',
+          ...(APP_CONFIG.contentJudgeBasicAuth
+            ? { Authorization: `Basic ${btoa(APP_CONFIG.contentJudgeBasicAuth)}` }
+            : {}),
+        },
+        signal: controller.signal,
+      });
+    } catch (cause: unknown) {
+      // Naming the address: what fails here is usually the configured base, and the message is all the
+      // view gets to show.
+      throw new Error(`ContentJudge nicht erreichbar (${url}): ${errorMessage(cause)}`);
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!response.ok) {
+      // The whole body, for the reason the evaluation's own error path states: the answer to expect
+      // here is the guard's `401` page, which says *in* the body what is missing.
+      const detail = await response.text().catch(() => '');
+      throw new Error(`ContentJudge nicht bereit: ${response.status} - ${detail}`);
+    }
+    const health = (await response.json().catch(() => null)) as ContentJudgeHealth | null;
+    if (!health || typeof health !== 'object') {
+      throw new Error('health: invalid API response');
+    }
+    this.lastHealth.set(health);
+    return health;
+  }
+
+  /**
+   * The readiness check as a judgement's preflight: it stops one that has nowhere to go, and lets one
+   * through that merely might not fully succeed.
+   *
+   * A `degraded` deployment, or one with no schemes loaded, is logged and nothing more. It can still
+   * hold the schemes this request asks for, and where it does not, the answer is a `400 Unknown
+   * schemes: […]` naming them — which says more than a refusal decided here would.
+   */
+  private async checkReady(): Promise<void> {
+    const health = await this.health();
+    const loaded = health.schemes_loaded ?? 0;
+    if (health.status !== 'healthy' || !loaded) {
+      console.warn(`${LOG} health`, health.status, `— ${loaded} Schemata geladen`);
+      return;
+    }
+    console.log(`${LOG} health`, health.status, health.version, `— ${loaded} Schemata geladen`);
   }
 
   private async postEvaluation(body: Record<string, unknown>): Promise<ContentJudgeEvaluation> {
