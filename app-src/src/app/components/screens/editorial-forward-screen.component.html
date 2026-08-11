@@ -37,8 +37,14 @@
       </p>
     </section>
 
+    <!-- One wait for both requests: the groups' collections and the collection folders inside them are
+         loaded together, so the list appears complete rather than growing folder rows under the
+         user's hands (see EditorialGroupsService.load). -->
     @if (groups.loading()) {
-      <p class="es-muted">Die Redaktionen werden geladen …</p>
+      <div class="loading es-muted" role="status">
+        <es-spinner></es-spinner>
+        Die Redaktionen werden geladen …
+      </div>
     } @else if (groups.error(); as message) {
       <p class="es-error">Die Redaktionen konnten nicht geladen werden: {{ message }}</p>
     } @else if (groups.none()) {

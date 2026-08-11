@@ -12,6 +12,7 @@ import type { ContentJudgeEvaluation } from '../services/content-judge.service';
 import type { MetalookupEvaluation } from '../services/metalookup.service';
 import { JudgeStatus, QualityJudgeService } from '../services/quality-judge.service';
 import { CriterionJudgement, judgementsForCriteria } from '../util/quality-schemes';
+import { SpinnerComponent } from './spinner.component';
 
 /** Every property as `string[]` — the shape the repository and the MDS editor both expect. */
 export type CriteriaProperties = Record<string, string[]>;
@@ -95,7 +96,7 @@ function asList(value: unknown): string[] {
  */
 @Component({
   selector: 'es-quality-criteria',
-  imports: [IconDirective],
+  imports: [IconDirective, SpinnerComponent],
   templateUrl: './quality-criteria.component.html',
   styleUrl: './quality-criteria.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

@@ -4,6 +4,7 @@ import { IconDirective } from '../../directives/icon.directive';
 import { Collection, CurationService, EditorialTarget } from '../../services/curation.service';
 import { EditorialGroup, EditorialGroupsService } from '../../services/editorial-groups.service';
 import { CollectionSelectorComponent } from '../collection-selector.component';
+import { SpinnerComponent } from '../spinner.component';
 
 // "An Redaktionen weiterleiten", the first sub step of "Einsortieren und weiterleiten": where the
 // curated content is handed to one or more editorial teams. Offered only where the repository config
@@ -18,7 +19,7 @@ import { CollectionSelectorComponent } from '../collection-selector.component';
 // so this view works on a content that has no node yet (see CurationService.editorialTargets).
 @Component({
   selector: 'es-editorial-forward-screen',
-  imports: [CollectionSelectorComponent, IconDirective],
+  imports: [CollectionSelectorComponent, IconDirective, SpinnerComponent],
   templateUrl: './editorial-forward-screen.component.html',
   styleUrl: './editorial-forward-screen.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
