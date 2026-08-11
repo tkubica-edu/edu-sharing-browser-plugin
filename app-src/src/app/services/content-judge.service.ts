@@ -3,6 +3,7 @@ import { Injectable, signal } from '@angular/core';
 import { APP_CONFIG } from '../config';
 import { PageData } from './browser-extension.service';
 import { errorMessage } from '../util/errors';
+import { fetchJson } from '../util/json-api';
 
 /**
  * How long to wait for a judgement. Every scheme is its own LLM pass, and a `derived` scheme
@@ -40,45 +41,178 @@ export type ContentJudgeInput =
   | { source: 'nodeid'; nodeId: string }
   | { source: 'text'; text: string };
 
-/** One scheme's verdict on the content. */
-export interface ContentJudgeResult {
-  scheme_id: string;
-  /** The scheme's kind — `ordinal_rubric`, `binary_gate`, `nominal_categorical`, `derived`, … */
-  type?: string;
-  /** A number, a string, a boolean or a list of them, depending on {@link ContentJudgeResult.type}. */
-  value?: unknown;
-  /** The value in words; a list where the scheme classifies into several categories at once. */
-  label?: string | string[];
-  confidence?: number;
-  /** The judgement in prose, as the model justified it. Markdown, and long. */
-  reasoning?: string;
+/**
+ * The kinds of evaluation scheme, by the `type` a result reports (`ScaleType` in the API's schemas).
+ * Widened by `string`, because the set is the deployment's and not this client's: an unknown kind is a
+ * scheme this version has not heard of, which is nothing to break over.
+ */
+export type ContentJudgeScaleType =
+  | 'ordinal_rubric'
+  | 'checklist_additive'
+  | 'binary_gate'
+  | 'nominal_categorical'
+  | 'derived'
+  | (string & {});
+
+/**
+ * What a scheme answers with. Which of these it is follows from its kind: a rubric answers a number, a
+ * gate 0 or 1, a categorical one the name of a category — and a `derived` scheme that collects (its
+ * `method: collect`) answers with the *list* of what its parts found, which is why the lists are here.
+ */
+export type ContentJudgeValue =
+  | number
+  | string
+  | boolean
+  | readonly (number | string | boolean)[]
+  | null;
+
+/** One part check of a scheme, as the result carries it (`checks`). */
+export interface ContentJudgeCheck {
+  /** The rule's own id, or the key it sits under where it has none. */
+  id: string;
+  /** The rule in words. Empty where the scheme states none. */
+  title: string;
+  /** `WARN` only from a `checklist_additive` scheme, whose checks score rather than pass or fail. */
+  status: 'PASS' | 'FAIL' | 'WARN';
+  reasoning: string;
+  /** The check's normalised score, on the schemes that score their checks. */
+  score?: number;
 }
 
-/** ContentJudge's answer: one result per requested scheme, plus what produced them. */
-export interface ContentJudgeEvaluation {
-  results?: ContentJudgeResult[];
-  meta?: {
-    execution_time_ms?: number;
-    model_used?: string;
-    llm_provider?: string;
-    timestamp?: string;
-    text_length?: number;
-    source?: string;
-  };
+/** One scheme a `derived` scheme aggregated, as its result carries it (`dependencies`). */
+export interface ContentJudgeDependency {
+  scheme_id: string;
+  value: ContentJudgeValue;
+  label: string | string[] | null;
+  passed: boolean;
 }
 
 /**
- * What the service says about its own readiness (`GET /health/`).
+ * One scheme's verdict on the content.
  *
- * Optional throughout, like {@link ContentJudgeEvaluation}: what the API declares is not what a client
- * may rely on having received.
+ * The fields after `checks` are each written by one kind of scheme only — the shape follows `type`, and
+ * asking for the wrong one yields `undefined` rather than a lie.
  */
+export interface ContentJudgeResult {
+  scheme_id: string;
+  /** The scheme's kind, as its definition declares it; `unknown` for one the deployment cannot place. */
+  type: ContentJudgeScaleType;
+  /** The quality dimension the scheme belongs to (`neutrality`, `legal`, …); `unknown` where it has none. */
+  dimension: string;
+  value: ContentJudgeValue;
+  /** The value in words; a list where the scheme collects several categories at once. */
+  label: string | string[] | null;
+  /** The judgement in prose, as the model justified it. Markdown, and long. */
+  reasoning: string | null;
+  confidence: number | null;
+  /** The scheme's part checks; empty for the kinds that have none (a rubric, a categorical one). */
+  checks: ContentJudgeCheck[];
+  /**
+   * Why this scheme answered nothing. Present only where that happened — and where it begins with
+   * `LLM_ERROR`, the model call itself failed, which is a judgement missing rather than a content
+   * judged. {@link ContentJudgeMeta.llm_errors} counts those.
+   */
+  na_reason?: string;
+  /** The scale the value is on ("0-5"), from a `checklist_additive` scheme. */
+  scale_range?: string;
+  /** The rubric's levels, from an `ordinal_rubric` scheme. */
+  levels?: unknown[];
+  /** The categories to choose from, from a `nominal_categorical` scheme. */
+  categories?: unknown[];
+  /** The schemes aggregated, from a `derived` scheme. */
+  dependencies?: ContentJudgeDependency[];
+}
+
+/**
+ * One failed check worth naming, across all schemes — sorted by severity, and deduplicated by rule.
+ * `null` where there is nothing to report, and also for a request of nothing but `derived` schemes,
+ * whose results carry their parts already.
+ */
+export interface ContentJudgeFinding {
+  rule_id: string;
+  /** The area the rule belongs to — its gate, or the dimension of the scheme that holds it. */
+  category: string;
+  /** The scheme the rule came from, by id. */
+  scheme: string;
+  /** The rule in words. */
+  title: string;
+  severity: 'critical' | 'high' | 'medium' | 'low' | (string & {});
+  /** The paragraph the rule rests on, where it rests on one. */
+  legal_basis: string | null;
+}
+
+/**
+ * The answer in one line, shaped by what was asked: `compliance` for a request involving gates,
+ * `score` for a single scoring scheme, `mixed` for anything else — and for a single classifying scheme,
+ * the scheme's own kind. Which fields are set follows from that, so all but `type` are optional.
+ */
+export interface ContentJudgeSummary {
+  type: 'compliance' | 'score' | 'mixed' | ContentJudgeScaleType;
+  /** The compliance verdict: rejected on a critical violation, review on a serious one. */
+  status?: 'PASS' | 'FAIL' | 'REVIEW' | 'REJECTED';
+  /** The verdict in words, German — ready to show. */
+  label?: string | string[] | null;
+  /** A classifying scheme's answer: its label, or its value where it has no label. */
+  result?: ContentJudgeValue;
+  /** A scoring scheme's number. */
+  value?: ContentJudgeValue;
+  dimension?: string;
+  confidence?: number | null;
+  /** How many checks passed, already written out as `"7/9"`; `null` where nothing was checked. */
+  checks?: string | null;
+  schemes_count?: number;
+  /** How many findings there are, on a verdict of `REVIEW` or `REJECTED`. */
+  violations?: number;
+}
+
+/** What produced the answer. */
+export interface ContentJudgeMeta {
+  /** The schemes the request named — all of them, including any that answered nothing. */
+  schemes_evaluated: string[];
+  execution_time_ms: number;
+  model_used?: string;
+  llm_provider?: string;
+  /** When the evaluation started, ISO 8601. */
+  timestamp?: string;
+  text_length?: number;
+  source?: 'text' | 'url' | 'nodeid';
+  /**
+   * How many schemes failed in their model call rather than answering. Present only when at least one
+   * did — its absence is the normal case, and its presence means the answer is incomplete even though
+   * the request succeeded.
+   */
+  llm_errors?: number;
+  /** The node the content was read from, where it was read from one. */
+  node_id?: string;
+  /** The address the content was fetched from, where it was fetched. */
+  url?: string;
+  /** The metadata the repository holds on the content, for a judgement by node id. */
+  content_metadata?: Record<string, unknown>;
+}
+
+/**
+ * ContentJudge's answer — the flat, view-facing shape its engine builds (`_build_flat_response`).
+ *
+ * Typed after that builder and not after the API's declared `EvaluationResponse`: the endpoint is
+ * annotated `Dict[str, Any]` and returns the builder's dict, so the declared model is not what travels.
+ * It names a `gates_passed`, an `overall_score`, an `overall_label` and a `provenance` that no answer
+ * carries, and it omits `summary`, `findings` and `meta`, which every answer does carry.
+ */
+export interface ContentJudgeEvaluation {
+  summary: ContentJudgeSummary;
+  findings: ContentJudgeFinding[] | null;
+  /** One result per scheme that could be evaluated, in the order the request named them. */
+  results: ContentJudgeResult[];
+  meta: ContentJudgeMeta;
+}
+
+/** What the service says about its own readiness (`GET /health/`, `HealthResponse`). */
 export interface ContentJudgeHealth {
-  /** `healthy`, `degraded` or `unhealthy` — the last two when the scheme engine did not come up. */
-  status?: string;
-  version?: string;
+  /** `degraded` where the scheme engine did not come up; the endpoint reports no other failure itself. */
+  status: 'healthy' | 'degraded' | 'unhealthy' | (string & {});
+  version: string;
   /** How many evaluation schemes the deployment has loaded, and can therefore be asked for. */
-  schemes_loaded?: number;
+  schemes_loaded: number;
 }
 
 /**
@@ -190,37 +324,12 @@ export class ContentJudgeService {
    * be read under, no JSON object.
    */
   async health(): Promise<ContentJudgeHealth> {
-    const url = `${APP_CONFIG.contentJudgeApiUrl}/health/`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        headers: {
-          Accept: 'application/json',
-          ...(APP_CONFIG.contentJudgeBasicAuth
-            ? { Authorization: `Basic ${btoa(APP_CONFIG.contentJudgeBasicAuth)}` }
-            : {}),
-        },
-        signal: controller.signal,
-      });
-    } catch (cause: unknown) {
-      // Naming the address: what fails here is usually the configured base, and the message is all the
-      // view gets to show.
-      throw new Error(`ContentJudge nicht erreichbar (${url}): ${errorMessage(cause)}`);
-    } finally {
-      clearTimeout(timer);
-    }
-    if (!response.ok) {
-      // The whole body, for the reason the evaluation's own error path states: the answer to expect
-      // here is the guard's `401` page, which says *in* the body what is missing.
-      const detail = await response.text().catch(() => '');
-      throw new Error(`ContentJudge nicht bereit: ${response.status} - ${detail}`);
-    }
-    const health = (await response.json().catch(() => null)) as ContentJudgeHealth | null;
-    if (!health || typeof health !== 'object') {
-      throw new Error('health: invalid API response');
-    }
+    const health = await fetchJson<ContentJudgeHealth>({
+      service: 'ContentJudge',
+      url: `${APP_CONFIG.contentJudgeApiUrl}/health/`,
+      headers: this.authHeader(),
+      timeoutMs: HEALTH_TIMEOUT_MS,
+    });
     this.lastHealth.set(health);
     return health;
   }
@@ -236,43 +345,27 @@ export class ContentJudgeService {
   private async checkReady(): Promise<void> {
     const health = await this.health();
     const loaded = health.schemes_loaded ?? 0;
-    if (health.status !== 'healthy' || !loaded) {
-      console.warn(`${LOG} health`, health.status, `— ${loaded} Schemata geladen`);
-      return;
-    }
-    console.log(`${LOG} health`, health.status, health.version, `— ${loaded} Schemata geladen`);
+    const log = health.status === 'healthy' && loaded ? console.log : console.warn;
+    log(`${LOG} health`, health.status, health.version, `— ${loaded} Schemata geladen`);
   }
 
-  private async postEvaluation(body: Record<string, unknown>): Promise<ContentJudgeEvaluation> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), JUDGE_TIMEOUT_MS);
-    try {
-      const response = await fetch(`${APP_CONFIG.contentJudgeApiUrl}/evaluate/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          ...(APP_CONFIG.contentJudgeBasicAuth
-            ? { Authorization: `Basic ${btoa(APP_CONFIG.contentJudgeBasicAuth)}` }
-            : {}),
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        // The whole body, not a prefix of it: the two answers to expect here say what is wrong *in*
-        // it — the guard's `401` page, and `400 Unknown schemes: […]` naming the schemes the
-        // deployment does not have.
-        const detail = await response.text().catch(() => '');
-        throw new Error(`evaluation failed: ${response.status} - ${detail}`);
-      }
-      const evaluation = (await response.json().catch(() => null)) as ContentJudgeEvaluation | null;
-      if (!evaluation || typeof evaluation !== 'object') {
-        throw new Error('evaluation: invalid API response');
-      }
-      return evaluation;
-    } finally {
-      clearTimeout(timer);
-    }
+  /**
+   * The Basic auth the deployment's guard demands, where a credential is configured. Left off
+   * altogether otherwise: an absent header is what makes the demand visible, as the guard's `401`.
+   */
+  private authHeader(): Record<string, string> {
+    if (!APP_CONFIG.contentJudgeBasicAuth) return {};
+    return { Authorization: `Basic ${btoa(APP_CONFIG.contentJudgeBasicAuth)}` };
+  }
+
+  private postEvaluation(body: Record<string, unknown>): Promise<ContentJudgeEvaluation> {
+    return fetchJson<ContentJudgeEvaluation>({
+      service: 'ContentJudge',
+      url: `${APP_CONFIG.contentJudgeApiUrl}/evaluate/`,
+      method: 'POST',
+      headers: this.authHeader(),
+      body,
+      timeoutMs: JUDGE_TIMEOUT_MS,
+    });
   }
 }

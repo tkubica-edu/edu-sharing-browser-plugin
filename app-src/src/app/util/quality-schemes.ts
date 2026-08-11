@@ -185,8 +185,8 @@ function asNumber(value: unknown): number | null {
   return typeof number === 'number' && Number.isFinite(number) ? number : null;
 }
 
-/** A scheme's label; the ones that classify into several categories answer with a list. */
-function asLabel(label: string | string[] | undefined): string | null {
+/** A scheme's label; the ones that collect several categories at once answer with a list. */
+function asLabel(label: string | string[] | null | undefined): string | null {
   const labels = Array.isArray(label) ? label : [label];
   const first = labels.find((entry) => !!entry?.trim());
   return first?.trim() ?? null;

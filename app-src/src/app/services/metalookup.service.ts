@@ -3,6 +3,7 @@ import { HOME_REPOSITORY } from 'ngx-edu-sharing-api';
 
 import { APP_CONFIG } from '../config';
 import { errorMessage } from '../util/errors';
+import { fetchJson } from '../util/json-api';
 
 /** How long to wait for an evaluation before giving up on it. */
 const EVALUATE_TIMEOUT_MS = 120_000;
@@ -23,27 +24,40 @@ export interface MetalookupResource {
 }
 
 /**
- * One metadata property MetalookUp extracted, with how sure it is of the value. `value` is
- * deliberately `unknown`: the service types it as a free-form object, so its shape follows the
- * property rather than a schema of its own.
+ * One check's result: the property it bears on, the number it rated, and how sure it is
+ * (`MetadataUpdateRule` in the gateway).
+ *
+ * `value` and `confidence` are `double` there, so both really are numbers — but a check that could not
+ * run reports its excuse in `description` and a `value` that means nothing ("No files to extract"), so
+ * a number here is not yet an answer. That reading is `measurementOf`'s, in `util/quality-schemes.ts`.
  */
 export interface MetalookupRule {
+  /** The metadata property the check rates, by the id the metadata set gives it. */
   propertyId: string;
-  value: unknown;
+  value: number;
+  /** What the check found, in prose. Also how one check is told from another — see `MetalookupRule` in `config.ts`. */
   description: string;
+  /** 0 to 1, higher is more certain. */
   confidence: number;
 }
 
 /**
- * MetalookUp's answer. Every field is optional here although the API declares them required: an error
- * response is served under the same schema, and a body that lost a field must not turn into a parse
- * failure that hides the status behind it.
+ * MetalookUp's answer (`Response` in the gateway).
+ *
+ * `error` and `featureExtractions` are absent rather than null where they are empty — the DTO is
+ * serialised without its nulls (`@JsonInclude(NON_NULL)`). The other three are on every answer,
+ * including the ones that report a failure: `status` carries it a second time, in the body.
  */
 export interface MetalookupEvaluation {
-  timestamp?: string;
-  path?: string;
-  status?: number;
+  /** When the answer was made, ISO 8601. */
+  timestamp: string;
+  /** The path that produced it. */
+  path: string;
+  /** The HTTP status, repeated in the body. */
+  status: number;
+  /** What went wrong, on an answer that reports a failure. */
   error?: string;
+  /** One entry per check that ran. Absent where none did. */
   featureExtractions?: MetalookupRule[];
 }
 
@@ -51,6 +65,12 @@ export interface MetalookupEvaluation {
  * MetalookUp's evaluation of a content: what metadata can be extracted from the resource, and how
  * certain each value is. `POST /api/evaluation` — the endpoint that answers directly instead of
  * persisting anything to the suggestion service, so calling it has no effect beyond the answer.
+ *
+ * That endpoint is the deployment's and not the gateway sources': those declare `POST /api/extract`,
+ * which starts the extraction and answers `202` with an empty body, and `POST /api/poll` to ask after
+ * it. `/api/evaluation` answers on staging all the same — where the two disagree, the deployment is
+ * what this client is written against, and the DTOs below are the sources' (`Response`,
+ * `MetadataUpdateRule`), whose field names its answer matches.
  *
  * The request goes out from the panel document rather than through the background worker, like the
  * metadata agent's (see MetadataAgentService.postExtractField): the extension's `host_permissions`
@@ -107,33 +127,18 @@ export class MetalookupService {
     };
   }
 
-  private async postEvaluation(body: Record<string, string>): Promise<MetalookupEvaluation> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), EVALUATE_TIMEOUT_MS);
-    try {
-      const response = await fetch(`${APP_CONFIG.metalookupApiUrl}/api/evaluation`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          // Only where a key is configured: the header's mere presence is what an unauthenticated
-          // deployment would reject.
-          ...(APP_CONFIG.metalookupApiKey ? { 'X-API-KEY': APP_CONFIG.metalookupApiKey } : {}),
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        const detail = (await response.text().catch(() => '')).substring(0, 300);
-        throw new Error(`evaluation failed: ${response.status} - ${detail}`);
-      }
-      const evaluation = (await response.json().catch(() => null)) as MetalookupEvaluation | null;
-      if (!evaluation || typeof evaluation !== 'object') {
-        throw new Error('evaluation: invalid API response');
-      }
-      return evaluation;
-    } finally {
-      clearTimeout(timer);
-    }
+  private postEvaluation(body: Record<string, string>): Promise<MetalookupEvaluation> {
+    return fetchJson<MetalookupEvaluation>({
+      service: 'MetalookUp',
+      url: `${APP_CONFIG.metalookupApiUrl}/api/evaluation`,
+      method: 'POST',
+      // Only where a key is configured: the header's mere presence is what an unauthenticated
+      // deployment would reject.
+      headers: APP_CONFIG.metalookupApiKey
+        ? { 'X-API-KEY': APP_CONFIG.metalookupApiKey }
+        : {},
+      body,
+      timeoutMs: EVALUATE_TIMEOUT_MS,
+    });
   }
 }
