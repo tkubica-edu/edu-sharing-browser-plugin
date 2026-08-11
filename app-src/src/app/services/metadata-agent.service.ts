@@ -123,7 +123,11 @@ export class MetadataAgentService {
     }
   }
 
-  /** Split a flat metadata payload into envelope info + sorted display fields. */
+  /**
+   * Split a flat metadata payload into envelope info + sorted display fields. The agent's own field
+   * names are kept — this answer also feeds the WLO canvas, which is the agent's own form; renaming
+   * them for the edu-sharing form is that form's business (`mapAgentFields`).
+   */
   parse(raw: Record<string, unknown> | undefined): ParsedMetadata {
     const payload = raw ?? {};
     const fields = Object.entries(payload)

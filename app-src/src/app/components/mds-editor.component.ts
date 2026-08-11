@@ -7,6 +7,7 @@ import { DEFAULT, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 import { MdsValues, toMdsEditorValues } from '../util/mds-values';
 import { NodeSuggestions, aiSuggestionsFor } from '../util/mds-suggestions';
 import { EDITOR_MODE_FOR_DRAFT, forMdsEditor, isDraftNode } from '../util/mds-node';
+import { LICENSE_FIELDS, mapAgentFields } from '../util/agent-fields';
 import { MetadataEditor, MetadataSeed } from './metadata-editor';
 import { loadWebComponentBundle } from '../services/web-component-bundle.service';
 
@@ -137,7 +138,9 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
     // cm:name from it. This is the only field ever merged back in.
     const title = this.initialValues['cclom:title'];
     if (!values['cm:name']?.length && title?.length) values['cclom:title'] = title;
-    this.save.emit(values);
+    // Mapped on the way out too: what comes back is the rendered group's widget values, and the group
+    // has no widget for the licence flags at all — unmapped they would be dropped instead of written.
+    this.save.emit(toMdsEditorValues(mapAgentFields(values)));
   }
 
   /** Create the element, set every input as a property, THEN append (see the class comment). */
@@ -148,10 +151,13 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
     element.groupId = this.groupId();
     element.setId = this.setId();
     element.repository = this.repository();
+    // Under this form's field names first: the payload is the agent's, and only this form needs them
+    // renamed — the WLO canvas takes them as they come (see `mapAgentFields`).
+    const metadata = mapAgentFields(this.metadata());
     // Normalize the payload into MDS values (namespaced keys → string[]) — the shape the wrapper
     // expects `currentValues` in. Kept even in node mode: commit() reads the seeded title back out
     // of it, and the emitted values are only ever the rendered group's subset.
-    this.initialValues = toMdsEditorValues(this.metadata());
+    this.initialValues = toMdsEditorValues(metadata);
     // Seed latestValues so a save with no edits still sends everything.
     this.latestValues = this.initialValues;
 
@@ -160,21 +166,27 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
     // suggestion to its widget is set up in `initWithNodes`, so a form built on a values map never
     // sees them (`nodes` is what decides that, not `editorMode` — a draft's form is built on its
     // stand-in node too). Set before the element connects, like every other input.
-    const suggestions = node ? aiSuggestionsFor(this.metadata(), node.ref.id) : null;
-    if (suggestions) {
+    const suggestions = node ? aiSuggestionsFor(metadata, node.ref.id) : null;
+    // The licence is set rather than proposed: dropping it from the offer is what keeps it on the node,
+    // so its widget shows a licence chosen instead of one to accept first.
+    for (const field of LICENSE_FIELDS) delete suggestions?.suggestions[field];
+    const offered = Object.keys(suggestions?.suggestions ?? {});
+    if (suggestions && offered.length) {
       element.suggestions = [suggestions];
-      this.aiFields.set(Object.keys(suggestions.suggestions));
+      this.aiFields.set(offered);
     }
     if (node) {
       // Node mode. Both modes emit the FULL live values of the rendered group via
       // currentValuesChange (the instance maps every widget's value, not a diff against the node),
       // so commit() and the save path are the same either way.
       // A stand-in renders in the draft's mode: the form is the same, but the wrapper stops asking
-      // the repository about a node it does not have (see EDITOR_MODE_FOR_DRAFT).
+      // the repository about a node it does not have — at the price of the licence widget, which that
+      // mode does not render at all (see EDITOR_MODE_FOR_DRAFT).
       element.editorMode = isDraftNode(node) ? EDITOR_MODE_FOR_DRAFT : 'nodes';
       // Without the proposed properties: they arrive as suggestions instead (see aiFields), and a
-      // widget that already holds the value would neither offer nor mark it.
-      element.nodes = [forMdsEditor(this.withoutAiFields(node))];
+      // widget that already holds the value would neither offer nor mark it. Withheld AFTER the
+      // mapping, which reads the agent's fields to fill the form's own from them.
+      element.nodes = [this.withoutAiFields(forMdsEditor(node))];
       // The node is already in hand, and a stand-in is one the repository could not hand back at
       // all — re-fetching it would fail rather than improve anything.
       element.nodeRefetch = false;

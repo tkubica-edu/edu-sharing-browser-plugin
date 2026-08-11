@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { WorkflowStatus } from '../model/workflow';
 import { DRAFT_NODE_ID } from '../util/mds-node';
 import { MdsValues, firstString, toMdsEditorValues } from '../util/mds-values';
+import { withAgentLicense } from '../util/agent-fields';
 import { errorMessage } from '../util/errors';
 import { renderLink } from '../util/repository-links';
 import { AdditionalWebComponentService } from './additional-web-component.service';
@@ -937,6 +938,9 @@ export class CurationService {
     // editor's: it is the metadata's own authority, and it was seeded with the recorded values
     // anyway (see editorMetadata). A property it does not carry survives from where it was set.
     values = { ...this.recordedValues(), ...values };
+    // Before the branch, so it holds for both editors: the licence is written even where the open form
+    // had no widget to report it from (see {@link withAgentLicense}).
+    values = withAgentLicense(values, this.metadataAgent.lastRun()?.parsed?.raw ?? null);
     // With the additional web component every save goes through the agent's upload — not just the
     // first one. The nodes it writes belong to the agent's own privileges, so the session the panel
     // runs under (a guest) may neither read nor edit them: an update in place is not available for

@@ -6,6 +6,7 @@
 import type { Node } from 'ngx-edu-sharing-api';
 
 import { toMdsEditorValues } from './mds-values';
+import { LICENSE_ASPECTS, LICENSE_KEY, mapAgentFields } from './agent-fields';
 
 /** The native preview widget's element — see {@link previewSrcOf}. */
 const PREVIEW_WIDGET_TAG = 'es-mds-editor-widget-preview';
@@ -33,14 +34,17 @@ export function isDraftNode(node: Node | null | undefined): boolean {
  * but it is also the only mode in which `MdsEditorInstanceService.initWithNodes` fetches the node's
  * metadata suggestions (`GET /suggestions/v1/{repo}/{node}`, whenever the repository runs the
  * mongo-plugin). For a stand-in that request 500s and the bundle logs `Could not fetch suggestion
- * data`; nothing else in the editor is affected, so the mode is the only place to stop it.
+ * data`; the AI-suggestion button and the valuespace-suggestion input come with the mode too and do
+ * nothing for a content that does not exist yet. So the mode is the only place to stop all three.
  *
- * `form` is that mode minus the node-bound extras: widgets are still built from the node
- * (`initWithNodes` runs whenever `nodes` is set, whatever the mode), still editable, still validated,
- * and `currentValuesChange` still reports every widget's live value — it only drops the suggestion
- * fetch, the AI-suggestion button and the valuespace-suggestion input, none of which a content that
- * does not exist yet can use. Not for a real node: the license widget renders in `nodes`, `inline`
- * and `viewer` only.
+ * `form` is that mode minus those extras: widgets are still built from the node (`initWithNodes` runs
+ * whenever `nodes` is set, whatever the mode), still editable, still validated, and
+ * `currentValuesChange` still reports every widget's live value.
+ *
+ * The accepted cost is the licence: its widget renders in `nodes`, `inline` and `viewer` only, so a
+ * draft's form shows none, although the set asks for it unconditionally (`io` → `node_general`, no
+ * `condition`, no `hideIfEmpty`) and the stand-in carries the properties. It is written on save all the
+ * same (`withAgentLicense`) and shows once the content has a node, which renders in `nodes`.
  */
 export const EDITOR_MODE_FOR_DRAFT = 'form';
 
@@ -52,13 +56,20 @@ export const EDITOR_MODE_FOR_DRAFT = 'form';
  * payload (`CurationService.applyStoredEntry`). `aspects` and `access` are reduced over likewise.
  */
 export function forMdsEditor(node: Node): Node {
+  // Mapped here because this is what the form is built from: in node mode the editor reads its widget
+  // values off `nodes`, not off the metadata handed over besides them.
+  const properties = toMdsEditorValues(mapAgentFields(node.properties));
   const prepared = {
     ...node,
-    properties: toMdsEditorValues(node.properties),
-    aspects: node.aspects ?? [],
+    properties,
+    // A licence is its properties AND the aspects they belong to, which a stand-in brings none of.
+    aspects: properties[LICENSE_KEY]?.length
+      ? [...new Set([...(node.aspects ?? []), ...LICENSE_ASPECTS])]
+      : node.aspects ?? [],
     access: node.access ?? []
   };
-  // TEMPORARY — the node exactly as the wrapper receives it (`element.nodes`), for both editors.
+  // TEMPORARY — the node as prepared for the wrapper. The MDS editor withholds the agent's fields
+  // afterwards (see MdsEditorComponent), so `element.nodes` may carry less.
   console.log('[mds] node → editor', prepared);
   return prepared;
 }
