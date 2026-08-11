@@ -4,7 +4,8 @@
          appearing out of nowhere once the step becomes reachable. -->
     <button class="tab" role="tab" [class.is-active]="navigation.screen() === tab.id"
             [attr.aria-selected]="navigation.screen() === tab.id"
-            [disabled]="tab.disabled" [title]="tab.disabled ? tab.disabledHint ?? '' : tab.label"
+            [disabled]="tab.disabled || busy.busy()"
+            [title]="busy.hint() ?? (tab.disabled ? tab.disabledHint ?? '' : tab.label)"
             (click)="navigation.goTab(tab.id)">
       @if (icons.material(tab.id); as glyph) {
         <i class="t-icon" [esIcon]="glyph"></i>

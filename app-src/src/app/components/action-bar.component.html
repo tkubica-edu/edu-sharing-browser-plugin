@@ -3,7 +3,8 @@
     @for (action of actionBar.actions(); track action.label) {
       <button class="fbtn" [class.fbtn-primary]="action.kind !== 'secondary'"
               [class.fbtn-secondary]="action.kind === 'secondary'"
-              [disabled]="action.disabled" (click)="action.run()">
+              [disabled]="action.disabled || busy.busy()" [attr.title]="busy.hint()"
+              (click)="action.run()">
         <span>{{ action.label }}</span>
       </button>
     }

@@ -2,7 +2,10 @@
   <footer class="user-bar">
     <!-- The whole row is the control, not just the chevron: one target, and a 20px hit area at the
          panel's far edge is the hardest thing on screen to hit. -->
-    <button class="ub-row" (click)="toggle()" [attr.aria-expanded]="expanded()" [title]="hint()">
+    <!-- Disabled while a write is in flight: what this row folds out ends the session the save's
+         follow-up requests run under (see BusyService). -->
+    <button class="ub-row" (click)="toggle()" [attr.aria-expanded]="expanded()"
+            [disabled]="busy.busy()" [title]="busy.hint() ?? hint()">
       <i class="ub-avatar" esIcon="person"></i>
       <span class="ub-main">
         <span class="ub-title">{{ title() }}</span>

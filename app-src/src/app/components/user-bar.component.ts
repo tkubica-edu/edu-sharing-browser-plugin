@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { IconDirective } from '../directives/icon.directive';
 import { AuthorityNamePipe } from '../pipes/authority-name.pipe';
 import { AuthService } from '../services/auth.service';
+import { BusyService } from '../services/busy.service';
 import { NavigationService } from '../services/navigation.service';
 
 // The bottom bar naming who the panel is acting as, and where that session is changed: signing in,
@@ -21,6 +22,7 @@ import { NavigationService } from '../services/navigation.service';
 })
 export class UserBarComponent {
   private readonly auth = inject(AuthService);
+  protected readonly busy = inject(BusyService);
   private readonly navigation = inject(NavigationService);
   private readonly authorityName = inject(AuthorityNamePipe);
 

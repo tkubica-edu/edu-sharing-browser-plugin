@@ -6,7 +6,8 @@
        the close button instead of in the main menu. -->
   @for (section of navigation.topbarSections(); track section.id) {
     <button class="topbar-btn" [class.is-active]="navigation.section() === section.id"
-            [title]="section.label" [attr.aria-label]="section.label"
+            [disabled]="busy.busy()" [title]="busy.hint() ?? section.label"
+            [attr.aria-label]="section.label"
             (click)="navigation.go(section.id)">
       <span class="tb-icon" [innerHTML]="icons.icon(section.id)"></span>
       @if (section.id === 'settings' && auth.needsReload()) {
@@ -15,7 +16,10 @@
     </button>
   }
 
-  <button class="close" title="Schließen" aria-label="Schließen" (click)="close()">
+  <!-- Closing tears the panel down, and with it the requests the save is still making — so it waits
+       for the write like everything else does. -->
+  <button class="close" [disabled]="busy.busy()" [title]="busy.hint() ?? 'Schließen'"
+          aria-label="Schließen" (click)="close()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg>
   </button>
@@ -27,8 +31,9 @@
      itself and walks back through the steps the user came through (see NavigationService.back). -->
 <div class="step-header">
   @if (navigation.showBack()) {
-    <button class="back-btn" (click)="navigation.back()"
-            [title]="navigation.backLabel()" [attr.aria-label]="navigation.backLabel()">
+    <button class="back-btn" (click)="navigation.back()" [disabled]="busy.busy()"
+            [title]="busy.hint() ?? navigation.backLabel()"
+            [attr.aria-label]="navigation.backLabel()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
     </button>

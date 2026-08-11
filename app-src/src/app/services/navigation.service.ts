@@ -3,6 +3,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import {
   AppSection, Conditions, SECTIONS, ScreenId, SectionId, SectionTab, sectionText
 } from '../model/navigation';
+import { BusyService } from './busy.service';
 import { ConditionsService } from './conditions.service';
 import { CurationService } from './curation.service';
 
@@ -45,6 +46,8 @@ export class NavigationService {
   private readonly conditions = inject(ConditionsService);
   // To release a picked content once the steps it was picked for are left — see back() and openMenu().
   private readonly curation = inject(CurationService);
+  // A write in flight refuses every *user-driven* move; see BusyService and the guards below.
+  private readonly busy = inject(BusyService);
 
   readonly section = signal<SectionId>('menu');
 
@@ -158,8 +161,12 @@ export class NavigationService {
    * A *disabled* section is refused as firmly as an invisible one — the menu renders it as a
    * disabled row, and every other caller (a footer action, a screen offering a choice of sections)
    * must not be able to route around that.
+   *
+   * So is every move while a write is in flight (see {@link BusyService}): the controls that lead
+   * anywhere are disabled meanwhile, and this is the same answer for whatever reaches past them.
    */
   go(id: SectionId, options?: { tab?: ScreenId }): void {
+    if (this.busy.busy()) return;
     const conditions = this.conditions.snapshot();
     const section = this.sectionOf(id);
     if (!section?.visible(conditions) || !this.isEnabled(section, conditions)) return;
@@ -182,6 +189,7 @@ export class NavigationService {
    * is a step that must not be re-entered at all (see AppSection.oneWay).
    */
   back(): void {
+    if (this.busy.busy()) return;
     let trail = this.trail();
     while (trail.length) {
       const target = trail[trail.length - 1];
@@ -199,6 +207,7 @@ export class NavigationService {
 
   /** Select one of the open section's sub steps, if it can be opened right now. */
   goTab(id: ScreenId): void {
+    if (this.busy.busy()) return;
     if (this.tabs().some((tab) => tab.id === id && !tab.disabled)) this.requestedTab.set(id);
   }
 

@@ -9,6 +9,7 @@ import { errorMessage } from './util/errors';
 import { AdditionalWebComponentService } from './services/additional-web-component.service';
 import { AuthService } from './services/auth.service';
 import { BrowserExtensionService } from './services/browser-extension.service';
+import { BusyService } from './services/busy.service';
 import { ConditionsService } from './services/conditions.service';
 import { CurationService } from './services/curation.service';
 import { DebugService } from './services/debug.service';
@@ -74,6 +75,8 @@ const DISCARD_PROMPT =
 })
 export class AppComponent implements OnInit {
   protected readonly auth = inject(AuthService);
+  // Disables the shell's controls while a write is in flight — see BusyService.
+  protected readonly busy = inject(BusyService);
   protected readonly navigation = inject(NavigationService);
   protected readonly conditions = inject(ConditionsService);
   // Loaded on boot; the Verlauf's entries feed its menu entry and its screen.

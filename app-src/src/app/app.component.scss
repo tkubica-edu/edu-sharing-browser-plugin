@@ -36,8 +36,8 @@
   justify-content: center;
   cursor: pointer;
 }
-.close:hover,
-.topbar-btn:hover { background: rgba(0, 59, 124, 0.08); }
+.close:hover:not([disabled]),
+.topbar-btn:hover:not([disabled]) { background: rgba(0, 59, 124, 0.08); }
 
 .topbar-btn { position: relative; }
 // The open view's icon stays highlighted, since these two are reached from anywhere.
@@ -99,7 +99,16 @@
   flex: 0 0 auto;
 }
 .back-btn svg { width: 18px; height: 18px; }
-.back-btn:hover { background: #eef1f4; }
+.back-btn:hover:not([disabled]) { background: #eef1f4; }
+
+// The shell's controls while a write is in flight (see BusyService): still on screen, so the panel
+// keeps its shape, but visibly not to be used right now.
+.topbar-btn[disabled],
+.close[disabled],
+.back-btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .step-title { font-size: 16px; font-weight: 600; margin: 0; color: var(--es-text); }
 
 .content {

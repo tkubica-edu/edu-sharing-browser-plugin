@@ -38,6 +38,18 @@ starten* on the analyze screen, *Speichern* on the metadata screen, and the choi
 *Metadaten editieren* / *Sammlung zuordnen* on the preview. Screens that own their own action
 (the selectors, login, settings) get no footer.
 
+While a write is in flight the whole chrome is disabled — `BusyService.busy`
+(`CurationService.saving` ∨ `assigning`), read by the topbar icons, the close button, the back
+button, the tab bar, the session bar and every footer action, and enforced again in
+`NavigationService.go` / `back` / `goTab` so nothing routes around a disabled control. A save is more
+than the one request the button waits for: the node is created, then the confirmed quality, the
+picture and the forwarding are written onto it, so leaving mid-way (a logout takes the session those
+run under, closing tears the panel down) is what leaves a content half-written. It is deliberately
+*derived* from the services that write rather than a flag of its own, and deliberately **not** a
+condition of the navigation registry — a section that turns disabled is one the guard re-lands away
+from, which is the very thing this prevents. The editors are locked by
+`CurationService.metadataLocked` for the same span.
+
 The options:
 
 - **Login** — the shared `es-login` gate; shown while logged out and reused inline by the

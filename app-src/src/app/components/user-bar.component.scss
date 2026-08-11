@@ -24,7 +24,9 @@
   text-align: left;
   cursor: pointer;
 
-  &:hover { background: var(--es-hint-bg); }
+  &:hover:not([disabled]) { background: var(--es-hint-bg); }
+  // While a write is in flight the session must not be ended — see BusyService.
+  &[disabled] { opacity: 0.5; cursor: not-allowed; }
 }
 
 .ub-avatar {

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
 import { IconDirective } from '../directives/icon.directive';
+import { BusyService } from '../services/busy.service';
 import { NavigationService } from '../services/navigation.service';
 import { OptionIconService } from '../services/option-icon.service';
 
@@ -16,5 +17,6 @@ import { OptionIconService } from '../services/option-icon.service';
 })
 export class TabBarComponent {
   protected readonly navigation = inject(NavigationService);
+  protected readonly busy = inject(BusyService);
   protected readonly icons = inject(OptionIconService);
 }
