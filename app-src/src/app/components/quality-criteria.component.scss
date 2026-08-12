@@ -11,7 +11,13 @@
   --qc-error: var(--es-error, #a3271f);
   // Everything a machine put there is drawn in this one colour, so it is recognisable as such wherever
   // it turns up: a box it filled in, its judgements, and the wait for them.
-  --qc-ai: var(--es-ai, #6d28d9);
+  --qc-ai: var(--es-ai, #7362ec);
+  // A machine's objection: the alert that carries it, and the criteria it is about. Loud on purpose —
+  // it is the one thing in this view that asks for a decision instead of recording one.
+  --qc-alert: var(--es-danger, #c0392b);
+  // The alert's own ground. A fixed tint rather than one mixed from the colour above, so it stays
+  // legible under a theme that repaints only the foreground.
+  --qc-alert-surface: #fbe4e7;
 
   display: block;
   color: var(--qc-text);
@@ -63,9 +69,6 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 8px;
-
-  // The anchor of the reasoning popover — it hangs off the row it belongs to.
-  > li { position: relative; }
 }
 
 // The bulk row reads as one line of shortcuts under the lists, wrapping rather than squeezing.
@@ -137,115 +140,39 @@ input[type='checkbox'] {
   line-height: 1.35;
   color: var(--qc-text);
   overflow-wrap: anywhere;
+
+  // A criterion a machine answered, in the machine's colour like the box beside it: the whole row is
+  // its work, so the whole row says so.
+  &.is-ai { color: var(--qc-ai); }
+
+  // A criterion the checks objected to, in the colour of the objection — caption and finding together,
+  // since the finding is about the criterion and not a remark beside it.
+  &.is-violated { color: var(--qc-alert); }
 }
 
-// The machine's verdict, on its own line under the criterion: it belongs to the criterion but is not
-// the answer to it, so it reads as a footnote rather than as a second label. In the machine's colour
-// throughout, whichever way it went — it is its statement either way, and which way is what the glyph
-// in front of it says. (Colour alone would say nothing here anyway, since every verdict shares it.)
-.judged {
-  display: block;
-  margin-top: 2px;
-  font-size: 11px;
-  line-height: 1.3;
+// That a check objected, stated and nothing more: what it found is in the alert above, where it is
+// decided about. The glyph after it says whose finding it is.
+.violation {
+  white-space: normal;
+
+  // Put aside by a person: the finding stays on record, but it is a note about the criterion now and no
+  // longer a claim about it, so it steps back from the caption it hangs off.
+  &.is-dismissed { color: var(--qc-muted); }
+}
+
+// The star on a box a machine ticked rather than a person — the footnote under the lists says what it
+// means. In the machine's colour, like the box it belongs to.
+.auto-met {
   color: var(--qc-ai);
-
-  &::before { content: '◦ '; }
-  &.is-met::before { content: '✓ '; }
-  &.is-unmet::before { content: '✗ '; }
-}
-
-// The machine's mark, and the handle for its argument. Focusable, so the reasoning is reachable by
-// keyboard and by tap as well — hover alone would leave both out.
-.ai-hint {
-  position: relative;
-  cursor: help;
-
-  &:focus-visible { outline: 2px solid var(--qc-ai); outline-offset: 1px; }
+  font-weight: 700;
 }
 
 // The one glyph this component takes from the panel's icon font (see IconDirective). Sized and lifted
-// to sit on the line of the verdict rather than on top of it.
+// to sit on the line of the text rather than on top of it.
 .ai-glyph {
   font-size: 15px;
   line-height: 1;
   vertical-align: -3px;
-}
-
-// Why the machine judged that way, in its own words. Hidden until the mark is hovered or focused, and
-// wide enough to be read: it is several paragraphs of Markdown, so the line breaks it brought are kept
-// and the whole thing scrolls rather than growing over the sheet.
-//
-// Two things make that scrolling actually possible. It starts exactly at the mark's lower edge — any
-// gap between the two is neither, so the pointer on its way down would leave both and the popover
-// would close before it is reached. And it fades out on a delay instead of vanishing, which gives the
-// pointer the moment it needs to cross into it. Both are why this hides by `visibility` rather than by
-// `display`: only the former can be transitioned.
-.ai-reasoning {
-  visibility: hidden;
-  opacity: 0;
-  transition:
-    visibility 0s linear 0.3s,
-    opacity 0.12s linear 0.3s;
-  position: absolute;
-  z-index: 3;
-  top: 100%;
-  left: 0;
-  width: 280px;
-  max-width: 80vw;
-  max-height: 240px;
-  overflow-y: auto;
-  // The panel behind it stays put once the end of the text is reached.
-  overscroll-behavior: contain;
-  margin-top: 4px;
-  padding: 8px 10px;
-  border: 1px solid var(--qc-border);
-  border-left: 3px solid var(--qc-ai);
-  border-radius: 6px;
-  background: var(--qc-surface);
-  box-shadow: 0 6px 18px rgb(0 0 0 / 18%);
-  color: var(--qc-text);
-  font-size: 11px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  text-align: left;
-  cursor: text;
-
-  // The bridge across that 4px of margin: transparent, part of the popover, and therefore hovered.
-  &::before {
-    content: '';
-    position: absolute;
-    top: -5px;
-    left: 0;
-    right: 0;
-    height: 5px;
-  }
-}
-
-// Which scheme said it, above its own words.
-.ai-source {
-  display: block;
-  margin-bottom: 6px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--qc-border);
-  color: var(--qc-ai);
-  font-weight: 700;
-  white-space: normal;
-}
-
-.ai-hint:hover .ai-reasoning,
-.ai-hint:focus .ai-reasoning,
-.ai-hint:focus-within .ai-reasoning {
-  visibility: visible;
-  opacity: 1;
-  // Opening is immediate; only the closing waits (see the delays above).
-  transition-delay: 0s;
-}
-
-// The right-hand column would push its popover past the sheet, so there it opens the other way.
-.criteria-column:last-child .ai-reasoning {
-  left: auto;
-  right: 0;
 }
 
 .note {
@@ -267,60 +194,243 @@ input[type='checkbox'] {
   es-spinner { --es-spinner-size: 44px; }
 }
 
-// The wait, who was asked, and what the colour means: all three are about the machines, so all three
-// are in their colour.
-.checking,
-.ai-status,
-.ai-legend {
+// What the machines are doing or have found, in one block above the criteria. Its height is fixed
+// rather than following its content, so the criteria under it do not move while it goes from the wait
+// to the result — which happens with the user's eyes on the list, a minute in.
+//
+// In the machines' colour while it reports about them, and in the colour of an objection once it
+// carries one: the block then is the objection, not a note about it.
+.ai-check {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  min-height: 170px;
+  padding: 14px 12px;
+  border-radius: var(--es-radius, 8px);
+  background: rgba(115, 98, 236, 0.1);
+  color: var(--qc-ai);
+
+  &.has-violation {
+    background: var(--qc-alert-surface);
+    color: var(--qc-alert);
+  }
+}
+
+// The wait: the house spinner alone, in no box and no bigger than it has to be. Nothing is being
+// reported yet, so nothing takes the room the report will need.
+.ai-check-waiting {
+  display: flex;
+  justify-content: center;
+  padding: var(--es-space-1, 4px) 0;
+
+  es-spinner { --es-spinner-size: 30px; }
+}
+
+// The all-clear, centred in the room the alert would otherwise fill.
+.ai-check-state {
   display: flex;
   align-items: center;
-  gap: 8px;
   justify-content: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+// The alert folded away to one line, once every objection in it has been answered — and the way back
+// to it. In the machines' colour, since that is what it reports about; the room the alert took is given
+// back to the criteria.
+.ai-check-handled {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
   color: var(--qc-ai);
 }
 
-.ai-status {
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  font-size: 11px;
+// Reads as a link: it opens something up, it does not act on the content.
+.ai-check-toggle {
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+
+  &:focus-visible { outline: 2px solid currentcolor; outline-offset: 1px; }
 }
 
-// One judge's state. Marked by a glyph as well as by colour, since colour alone says nothing here.
-.ai-judge {
-  &::before { content: '◦ '; }
-  &.is-done::before { content: '✓ '; }
-
-  // A judge that did not answer is a malfunction rather than a verdict, so it is not in the machines'
-  // colour but in the one everything broken uses.
-  &.is-failed {
-    color: var(--qc-error);
-    &::before { content: '✗ '; }
-  }
+// What the objection is about, over the finding itself: which of them is on screen, that it is one,
+// and which criterion it concerns.
+.alert-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
 }
 
-// Drawn rather than an icon, like the checkbox tick: this component carries no icon font of its own.
-.spinner {
+// Folds the alert away again. Only rendered while every objection is answered (see the template), which
+// is also why it is a quiet glyph: by then the alert is a record, not a question.
+.alert-close {
   flex: 0 0 auto;
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--qc-border);
-  border-top-color: var(--qc-ai);
-  border-radius: 50%;
-  animation: qc-spin 0.8s linear infinite;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+
+  i { font-size: 18px; }
+
+  &:focus-visible { outline: 2px solid currentcolor; outline-offset: 2px; }
 }
 
-// Name prefixed: keyframes are global even in an emulated-encapsulation component.
-@keyframes qc-spin {
-  to {
-    transform: rotate(1turn);
+.alert-mark {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.alert-count {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.alert-glyph {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.alert-lead {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 500;
+}
+
+// The finding between the two arrows that lead through the rest of them, with enough room around it
+// that the text does not read as part of them.
+.alert-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-finding {
+  flex: 1 1 auto;
+  min-width: 0;
+
+  h4 {
+    margin: 0 0 2px;
+    font-size: 12px;
+    font-weight: 700;
+    color: inherit;
+    text-align: left;
   }
 }
 
-// Still a ring, just not turning — with the text beside it that reads as "busy" all the same.
-@media (prefers-reduced-motion: reduce) {
-  .spinner {
-    animation: none;
+// What the check said, in its own words — several paragraphs of Markdown at worst, so it scrolls
+// inside the block instead of pushing the criteria off the sheet. The line breaks it brought are kept.
+.alert-reason {
+  margin: 0;
+  max-height: 84px;
+  overflow-y: auto;
+  // The panel behind it stays put once the end of the text is reached.
+  overscroll-behavior: contain;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+// Drawn as a bare glyph: the arrows are part of the alert, not buttons sitting in it. Disabled while
+// there is only one finding, where there is nothing to page through.
+.alert-arrow {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+
+  i { font-size: 22px; }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
   }
+
+  &:focus-visible { outline: 2px solid currentcolor; outline-offset: 2px; }
+}
+
+// The two answers to the objection, at either end of the line: the one that lets the criterion pass
+// reads as a link, the one that keeps it back as the loud button it is.
+.alert-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.alert-dismiss,
+.alert-confirm {
+  border: 0;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+
+  &:focus-visible { outline: 2px solid var(--qc-alert); outline-offset: 2px; }
+}
+
+// Outlined rather than filled: the same shape and weight as the button beside it, and clearly the
+// quieter of the two answers. `box-shadow` draws the outline, so both buttons keep the same size — a
+// border would grow this one by its own width.
+.alert-dismiss {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: none;
+  color: var(--qc-text);
+  box-shadow: inset 0 0 0 2px currentcolor;
+
+  // Given: filled in, the same inversion the button beside it makes — the answer on record reads as
+  // pressed, for whoever pages back through the objections.
+  &.is-chosen {
+    background: var(--qc-text);
+    box-shadow: none;
+    color: var(--qc-surface);
+  }
+}
+
+.alert-confirm {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--qc-alert);
+  color: #fff;
+
+  // Given: turned inside out, so it reads as the answer already on record rather than as one still
+  // being offered.
+  &.is-chosen {
+    background: var(--qc-surface);
+    color: var(--qc-alert);
+    box-shadow: inset 0 0 0 2px var(--qc-alert);
+  }
+}
+
+// What the star behind a criterion means. Small and quiet: it explains a mark, it does not compete
+// with the criteria it stands under.
+.footnote {
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .note-error { color: var(--qc-error); }

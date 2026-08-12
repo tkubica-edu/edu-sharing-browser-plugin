@@ -1,5 +1,5 @@
 import {
-  ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal
+  ChangeDetectionStrategy, Component, computed, effect, inject, input, linkedSignal, output, signal
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -10,12 +10,38 @@ import { IconDirective } from '../directives/icon.directive';
 // Type-only: the answers are fetched by the service, this view only reads what came back.
 import type { ContentJudgeEvaluation } from '../services/content-judge.service';
 import type { MetalookupEvaluation } from '../services/metalookup.service';
-import { JudgeStatus, QualityJudgeService } from '../services/quality-judge.service';
+import { QualityJudgeService } from '../services/quality-judge.service';
 import { CriterionJudgement, judgementsForCriteria } from '../util/quality-schemes';
 import { SpinnerComponent } from './spinner.component';
 
 /** Every property as `string[]` — the shape the repository and the MDS editor both expect. */
 export type CriteriaProperties = Record<string, string[]>;
+
+/**
+ * What became of a machine's objection once a person looked at it: they saw the violation too
+ * (`confirmed`), or they did not (`dismissed`). Only the latter answers the criterion — a confirmed
+ * violation leaves its box exactly as empty as it was.
+ */
+export type ViolationDecision = 'confirmed' | 'dismissed';
+
+/** One criterion the checks objected to, as the alert above the lists shows it — one at a time. */
+interface CriterionViolation {
+  /** The criterion the objection is about, as the metadata set lists it. */
+  criterion: MdsValue;
+  /** Which of the two lists it belongs to — the answer is recorded differently in each. */
+  editorial: boolean;
+  /** What the checks found; more than one where several of them bear on this criterion. */
+  findings: readonly CriterionJudgement[];
+}
+
+/**
+ * How far the machines got with the content — the state the block above the lists shows. Two of them are
+ * not about the machines but about what is left to show: `handled`, where every objection has been
+ * answered and the block folds into one line, and `unavailable`, where no check got through at all and
+ * the block is not there. A service that is down is nothing to tell the user about — they can neither
+ * do anything about it nor read anything into it, and the criteria are theirs to answer either way.
+ */
+type CheckState = 'running' | 'violations' | 'handled' | 'unavailable' | 'done';
 
 /** Log prefix for what this view finds out about the content, as everywhere else in the extension. */
 const LOG_QUALITY = '[edu-sharing][quality]';
@@ -89,8 +115,9 @@ function asList(value: unknown): string[] {
  * the end of the flow, which is where a curated content gets its node in the first place.
  *
  * The content is also judged by machine, and this view is where that judgement lands: what the check
- * found in order is reported as an answer to that criterion, like a click on its box would be, and the
- * rest is shown beside it. The checking itself happens elsewhere and much earlier (QualityJudgeService,
+ * found in order is reported as an answer to that criterion, like a click on its box would be, and what
+ * it objected to is put in front of the user — one objection at a time, each to be dismissed or
+ * confirmed. The checking itself happens elsewhere and much earlier (QualityJudgeService,
  * started as soon as the content is erschlossen), so by the time this view opens the answer is usually
  * already there — and where it is not, the wait is the tail of it.
  */
@@ -144,11 +171,11 @@ export class QualityCriteriaComponent {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
 
-  /** Whether a check is still out — the spinner is gone once the slower of the two judges is back. */
-  protected readonly checking = this.qualityJudge.running;
+  /** Whether a check is still out — the wait is over once the slower of the two judges is back. */
+  private readonly checking = this.qualityJudge.running;
 
   /** What each judge did, so an empty result is not mistaken for "nothing found". */
-  protected readonly judgeStatuses = this.qualityJudge.statuses;
+  private readonly judgeStatuses = this.qualityJudge.statuses;
 
   /** Whether anything was asked at all; before that there is nothing to report. */
   protected readonly judgesAsked = this.qualityJudge.asked;
@@ -162,7 +189,7 @@ export class QualityCriteriaComponent {
    */
   private readonly aiAnswered = signal<readonly string[]>([]);
 
-  /** Whether anything on screen carries a machine's answer — for the legend that explains the colour. */
+  /** Whether anything on screen carries a machine's answer — for the footnote that explains the star. */
   protected readonly hasAiAnswers = computed(() => this.aiAnswered().length > 0);
 
   /** The answers already taken over, so the same state is not applied twice; see the constructor. */
@@ -171,26 +198,42 @@ export class QualityCriteriaComponent {
 
   /**
    * What the judges answered per criterion, keyed by criterion id — several answers where several
-   * checks bear on one criterion, empty until anything answered.
+   * checks bear on one criterion. Empty until every check is back, which is what makes the criteria
+   * show a whole result rather than a growing one (see the constructor).
    *
-   * Shown beside every criterion, whichever way each went; a criterion they *all* found in order is
-   * also ticked (see {@link tickJudged}). Kept as its own state rather than derived from the record,
-   * because the record only holds the answer — the score behind it and the wording are here.
+   * A criterion they *all* found in order is ticked (see {@link tickJudged}); one they objected to is
+   * marked as such and argued about in the alert above the lists. Kept as its own state rather than
+   * derived from the record, because the record only holds the answer — the finding behind it is here.
    */
   private readonly judgements = signal<Record<string, CriterionJudgement[]>>({});
+
+  /**
+   * What a person decided about each objection, keyed by criterion id — empty until they decided
+   * anything. Kept per criterion rather than per finding: two checks objecting to the same criterion
+   * are two arguments about one question, and the answer is to the question.
+   */
+  private readonly decisions = signal<Record<string, ViolationDecision>>({});
 
   constructor() {
     // The criteria belong to the set, so they are re-read whenever it (or the repository) changes.
     effect(() => void this.load(this.metadataSet(), this.repository()));
 
-    // Take the judgements over as soon as the criteria to map them onto are there. The two judges answer
-    // at their own pace and either can be the later one — the checks are usually done before this view
-    // opens, and a slow one lands while the criteria are already on screen. Each state of the answers is
-    // applied once, so the second judge arriving adds to what the first said instead of replacing it.
+    // Take the judgements over once every check is back and the criteria to map them onto are there.
+    //
+    // Not before: the two judges answer at their own pace, and a criterion the faster one found in
+    // order can still be objected to by the slower. Ticking it in the meantime would show an answer
+    // that is then taken back a moment later — with the box already ticked in the machine's colour, and
+    // the user's eyes on the list while it happens.
+    //
+    // All four signals are read before the first return, so the run that follows the last check coming
+    // in actually happens. Each state of the answers is then applied once (see takenJudgement), so a
+    // judge that answers late still adds to what the other one said.
     effect(() => {
+      const checking = this.checking();
       const criteria = this.criterionIds();
       const judgement = this.qualityJudge.evaluation();
       const measurement = this.qualityJudge.measured();
+      if (checking) return;
       if (!criteria.length || (!judgement && !measurement)) return;
       if (judgement === this.takenJudgement && measurement === this.takenMeasurement) return;
       this.takenJudgement = judgement;
@@ -225,6 +268,144 @@ export class QualityCriteriaComponent {
   protected readonly hasCriteria = computed(
     () => this.knockoutCriteria().length > 0 || this.editorialCriteria().length > 0
   );
+
+  /**
+   * Every criterion the checks objected to, both lists in the order they are shown — what the alert
+   * above them leads through.
+   *
+   * An objection is a finding of `met === false`: a check that answered nothing about a criterion
+   * (`null`) objects to nothing, and neither does one that found it in order.
+   */
+  protected readonly violations = computed<readonly CriterionViolation[]>(() => [
+    ...this.violationsIn(this.knockoutCriteria(), false),
+    ...this.violationsIn(this.editorialCriteria(), true)
+  ]);
+
+  /**
+   * How far the machines got, as the block above the lists reports it. The wait covers the metadata set
+   * as well: until the criteria are there, nothing can be said to have been found — and an all-clear
+   * that is taken back a moment later is worse than one that comes late.
+   *
+   * `unavailable` where not one judge got through — every one of them unreachable, or with nothing on
+   * this content it could check. There is no judgement then, not even an empty one, so nothing is
+   * claimed: neither that the content was checked nor that a service is broken.
+   *
+   * One judge answering is enough for `done`, whatever became of the other: what came back is a result,
+   * and the alert would carry it if it held an objection.
+   */
+  protected readonly checkState = computed<CheckState>(() => {
+    if (this.checking() || this.loading()) return 'running';
+    if (this.violations().length) return this.alertOpen() ? 'violations' : 'handled';
+    if (!this.judgeStatuses().some((status) => status.state === 'done')) return 'unavailable';
+    return 'done';
+  });
+
+  /** Whether every objection has been answered — nothing is asked of the user any more. */
+  protected readonly allDecided = computed(
+    () =>
+      this.violations().length > 0 &&
+      this.violations().every((violation) => !!this.decisionOf(violation.criterion.id))
+  );
+
+  /**
+   * Whether the objections are on screen. They are while any of them is unanswered, and once they are
+   * all answered only if the user asked for them back — the alert is a question, and an answered
+   * question should not keep the criteria pushed down the sheet.
+   */
+  private readonly alertOpen = computed(() => !this.allDecided() || this.reopened());
+
+  /** Whether the user asked the answered objections back on screen — see {@link alertOpen}. */
+  private readonly reopened = signal(false);
+
+  /** Put the answered objections back on screen, to look at them again or to answer differently. */
+  protected openAlert(): void {
+    this.reopened.set(true);
+  }
+
+  /** Fold them away again. Only ever offered while they are all answered (see the template). */
+  protected closeAlert(): void {
+    this.reopened.set(false);
+  }
+
+  /**
+   * Which objection the alert shows. Clamped to what is there, since the findings arrive while the view
+   * is open: an index into a list of two is nonsense the moment that list holds one.
+   */
+  protected readonly shown = linkedSignal<readonly CriterionViolation[], number>({
+    source: this.violations,
+    computation: (violations, previous) =>
+      Math.min(previous?.value ?? 0, Math.max(violations.length - 1, 0))
+  });
+
+  /** The objection on screen; null while there is none. */
+  protected readonly current = computed<CriterionViolation | null>(
+    () => this.violations()[this.shown()] ?? null
+  );
+
+  /** What a person decided about this criterion's objection; null while they decided nothing. */
+  protected decisionOf(criterion: string): ViolationDecision | null {
+    return this.decisions()[criterion] ?? null;
+  }
+
+  /**
+   * What the objection to this criterion is called in its row: the finding while it stands on the
+   * machine's word alone, and the person's own verdict once they have given it. `null` where nothing
+   * objected — which is most rows.
+   */
+  protected violationLabel(criterion: MdsValue): string | null {
+    if (!this.judgementsOf(criterion).some((judged) => judged.met === false)) return null;
+    switch (this.decisionOf(criterion.id)) {
+      case 'confirmed':
+        return 'Verstoß bestätigt';
+      case 'dismissed':
+        return 'Verstoß nicht bestätigt';
+      default:
+        return 'Verstoß entdeckt';
+    }
+  }
+
+  /**
+   * Whether the objection to this criterion is still one: nobody has answered it yet, or somebody
+   * confirmed it. That is what the row is drawn in the alarm colour for.
+   *
+   * A dismissed objection is not. The finding stays on record — a person disagreeing with a check does
+   * not unmake what it found — but the criterion is answered and in order, and a row that keeps
+   * shouting after that would send the user looking for a problem that has been dealt with.
+   */
+  protected isViolated(criterion: MdsValue): boolean {
+    return !!this.violationLabel(criterion) && this.decisionOf(criterion.id) !== 'dismissed';
+  }
+
+  /** Whether a person put this criterion's objection aside — see {@link isViolated}. */
+  protected isDismissed(criterion: MdsValue): boolean {
+    return this.decisionOf(criterion.id) === 'dismissed';
+  }
+
+  /** What a check found, in its own words — its reasoning, else the bare verdict it gave. */
+  protected findingText(finding: CriterionJudgement): string {
+    if (finding.reasoning) return finding.reasoning;
+    const value = finding.value === null ? '–' : String(Math.round(finding.value * 100) / 100);
+    return `${finding.scheme}: ${finding.label ?? value}`;
+  }
+
+  /** Show the objection before this one, wrapping around; nothing to do while there is only one. */
+  protected showPrevious(): void {
+    this.step(-1);
+  }
+
+  protected showNext(): void {
+    this.step(1);
+  }
+
+  /** "kein Verstoß erkennbar": the person looked and did not see it, so the criterion is met. */
+  protected dismissViolation(): void {
+    this.answerViolation(true, 'dismissed');
+  }
+
+  /** "Verstoß bestätigen": the person saw it too, so the criterion is not met and its box comes off. */
+  protected confirmViolation(): void {
+    this.answerViolation(false, 'confirmed');
+  }
 
   protected readonly allKnockoutMet = computed(
     () =>
@@ -279,7 +460,7 @@ export class QualityCriteriaComponent {
   }
 
   /** What the machines made of this criterion; empty while nothing judged it — see {@link judgements}. */
-  protected judgementsOf(criterion: MdsValue): readonly CriterionJudgement[] {
+  private judgementsOf(criterion: MdsValue): readonly CriterionJudgement[] {
     return this.judgements()[criterion.id] ?? [];
   }
 
@@ -289,48 +470,20 @@ export class QualityCriteriaComponent {
   }
 
   /**
-   * The verdict in one line: the scheme's own wording, and the number behind it. Cut to two decimals —
-   * the rubrics answer with a weighted average, and its third decimal says nothing.
+   * Record a knock-out criterion as met or as violated — one property each. Reports whether it was
+   * recorded: the vocabulary may hold no value for what the click means, and then nothing was answered.
    */
-  protected judgementText(judgement: CriterionJudgement): string {
-    const value = judgement.value === null ? '–' : String(Math.round(judgement.value * 100) / 100);
-    return judgement.label ? `${judgement.label} (${value})` : value;
-  }
-
-  /** What a judge's state is called where it is reported. */
-  protected judgeStateLabel(status: JudgeStatus): string {
-    switch (status.state) {
-      case 'running':
-        return 'läuft …';
-      case 'done':
-        return 'geprüft';
-      case 'skipped':
-        return 'übersprungen';
-      case 'failed':
-        return 'fehlgeschlagen';
-      default:
-        return 'nicht gestartet';
-    }
-  }
-
-  /** Who said it, by which check, and how sure — for the row's tooltip. */
-  protected judgementTitle(judgement: CriterionJudgement): string {
-    const confidence =
-      judgement.confidence === null ? '' : `, Konfidenz ${Math.round(judgement.confidence * 100)} %`;
-    return `${judgement.source}: ${judgement.scheme}${confidence}`;
-  }
-
-  /** Record a knock-out criterion as met or as violated — one property each. */
-  protected setCriterion(criterion: MdsValue, met: boolean): void {
+  protected setCriterion(criterion: MdsValue, met: boolean): boolean {
     const value = this.valueFor(criterion.id, met ? CRITERION_MET : CRITERION_VIOLATED);
     if (!value) {
       // The vocabulary does not offer the value this click means. Saying so beats recording
       // something else: the criterion decides whether the content may be published.
       this.error.set(`Für „${this.captionOf(criterion)}“ ist kein passender Wert hinterlegt.`);
-      return;
+      return false;
     }
     this.takeOver([criterion.id]);
     this.report({ [criterion.id]: [value] });
+    return true;
   }
 
   /** Record an editorial criterion by adding it to the property's values, or taking it out. */
@@ -370,6 +523,82 @@ export class QualityCriteriaComponent {
 
   /** What is wrong right now: this view's own complaint, else whatever the host reports. */
   protected readonly problemShown = computed(() => this.error() ?? this.problem());
+
+  /** The objections among these criteria — see {@link violations}. */
+  private violationsIn(
+    criteria: readonly MdsValue[],
+    editorial: boolean
+  ): readonly CriterionViolation[] {
+    return criteria
+      .map((criterion) => ({
+        criterion,
+        editorial,
+        findings: this.judgementsOf(criterion).filter((judged) => judged.met === false)
+      }))
+      .filter((violation) => violation.findings.length > 0);
+  }
+
+  /** Move through the objections, wrapping at either end. */
+  private step(by: number): void {
+    const count = this.violations().length;
+    if (count < 2) return;
+    this.shown.update((index) => (index + by + count) % count);
+  }
+
+  /**
+   * Answer the objection on screen, and move on to the next one nobody has answered yet — the alert is
+   * a queue of questions, and answering one is what asks the following one.
+   *
+   * Both answers are answers to the criterion, and each writes the value it means: the person did not
+   * see the violation, so the criterion is met; or they did, so it is violated. That is exactly what
+   * the vocabulary's "(Mensch)" values are for, and it is the same thing a click on the row's own box
+   * would record.
+   *
+   * The step forward happens either way, even where the value could not be recorded (see
+   * {@link setCriterion}) — the button has to do something visible. What is *not* recorded then is the
+   * decision: the objection stays in the queue, the row keeps reading as found, and the error says why.
+   */
+  private answerViolation(met: boolean, decision: ViolationDecision): void {
+    const violation = this.current();
+    if (!violation) return;
+    if (this.recordCriterion(violation, met)) {
+      this.decisions.update((decisions) => ({ ...decisions, [violation.criterion.id]: decision }));
+    }
+    this.advance();
+  }
+
+  /**
+   * Record the criterion behind an objection, in whichever of the two lists it stands. Reports whether
+   * it was recorded; the editorial ones always are — their property simply takes the change.
+   */
+  private recordCriterion(violation: CriterionViolation, met: boolean): boolean {
+    if (!violation.editorial) return this.setCriterion(violation.criterion, met);
+    this.setEditorialCriterion(violation.criterion, met);
+    return true;
+  }
+
+  /**
+   * Move on to the next objection nobody has answered yet, searching forwards from the one on screen
+   * and wrapping around — and where they are all answered, simply to the next one, so that an answer
+   * given always moves the alert on.
+   *
+   * That last case is the alert opened again to go over the decisions: on the way through it for the
+   * first time there is always an unanswered one left, and answering the final one folds the alert away
+   * (see {@link alertOpen}) rather than showing whatever this picked.
+   */
+  private advance(): void {
+    const violations = this.violations();
+    if (violations.length < 2) return;
+    const from = this.shown();
+    for (let step = 1; step <= violations.length; step++) {
+      const index = (from + step) % violations.length;
+      if (!this.decisionOf(violations[index].criterion.id)) {
+        this.shown.set(index);
+        return;
+      }
+    }
+    this.step(1);
+  }
 
   /**
    * Take both answers apart per criterion, so every box can say what the machines made of it — the same

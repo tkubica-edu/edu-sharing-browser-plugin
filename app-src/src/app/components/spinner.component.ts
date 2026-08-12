@@ -9,8 +9,9 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 // the polygon and its three fills, and the `es-spinner` component in `scripts/edu/chunk-*.js` for
 // the CSS): the hexagons are wider than the cells they sit in, which is what makes them overlap.
 //
-// Decorative by design — `aria-hidden`, because a spinner says nothing a caption next to it does
-// not say better, and every call site here has one.
+// Decorative by design — `aria-hidden`, because a spinner says nothing a caption next to it does not
+// say better. Where a call site shows none, the wait is announced by the element around it (a
+// `role="status"` carrying the label), so it is never only a picture.
 @Component({
   selector: 'es-spinner',
   templateUrl: './spinner.component.html',

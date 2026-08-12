@@ -14,8 +14,8 @@
   --es-success: #1e8e5a;
 
   // Everything a machine put there rather than a person — a value it filled in, a judgement it made.
-  // Dark enough for 11px text on white (contrast ≈ 5.9:1), since that is where it is mostly read.
-  --es-ai: #6d28d9;
+  // Contrast ≈ 4.5:1 on white, so it carries labels and bold notes; not the colour for fine print.
+  --es-ai: #7362ec;
 
   // Tinted hint-card background (used across intro/description cards)
   --es-hint-bg: #f0f4f9;

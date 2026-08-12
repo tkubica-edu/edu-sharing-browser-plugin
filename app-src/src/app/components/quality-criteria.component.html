@@ -1,31 +1,107 @@
 <section class="criteria-panel">
   <h2 class="panel-title">Fachliche Qualitätskriterien</h2>
 
-  <!-- While a check is out. `role="status"`, so it is announced rather than only drawn — the wait is a
-       minute long, and until it is over the criteria show what the content already answered. -->
-  @if (checking()) {
-    <p class="note checking" role="status">
-      <span class="spinner" aria-hidden="true"></span>
-      Der Inhalt wird geprüft …
-    </p>
-  }
+  <!-- What the machines made of the content, above the criteria: the wait for them, their all-clear, or
+       what they objected to — one shape per state rather than one box that changes, since what each of
+       them needs is a different amount of room. `role="status"` throughout, so every state is announced
+       as it arrives rather than only drawn: the wait is a minute long, and it ends while the user is
+       already reading the criteria.
 
-  <!-- Who was asked and what came of it. Named per judge, because they answer about different things:
-       an empty result from one of them is not the same as "nothing found" — see JudgeState. Why a judge
-       was skipped or how it failed is in its tooltip. -->
+       Two states show nothing at all: no check got through (`unavailable`, no case below), and the
+       objections are all answered (`handled`, one line).
+
+       Only the two judges are reported here. The criteria themselves are loaded separately and have
+       their own wait further down; this block is about the checking, not about the view. -->
   @if (judgesAsked()) {
-    <p class="note ai-status">
-      @for (status of judgeStatuses(); track status.judge) {
-        <span class="ai-judge" [class.is-done]="status.state === 'done'"
-              [class.is-failed]="status.state === 'failed'"
-              [attr.title]="status.detail">{{ status.judge }}: {{ judgeStateLabel(status) }}</span>
+    @switch (checkState()) {
+      @case ('running') {
+        <!-- The house spinner and nothing else. What is being waited for is deliberately not said: the
+             criteria below are readable and answerable throughout, so the wait is not the subject of
+             this screen — and a caption would claim the room the result is about to need. The spinner
+             itself is decoration (see SpinnerComponent), which is why the label sits out here. -->
+        <div class="ai-check-waiting" role="status" aria-label="Die KI-Prüfung läuft">
+          <es-spinner></es-spinner>
+        </div>
       }
-    </p>
-  }
+      @case ('handled') {
+        <!-- Every objection answered, so the alert has nothing left to ask and folds into one line. The
+             line is also the way back to it: the findings are still there to be looked at, and a
+             decision taken can be taken differently. -->
+        <p class="ai-check-handled" role="status">
+          <i class="ai-glyph" esIcon="smart_toy"></i>
+          KI-Prüfung abgeschlossen
+          <button type="button" class="ai-check-toggle" (click)="openAlert()">
+            {{ violations().length === 1 ? 'Verstoß anzeigen' : 'Verstöße anzeigen' }}
+          </button>
+        </p>
+      }
+      @case ('done') {
+        <div class="ai-check" role="status">
+          <p class="ai-check-state">
+            <i class="ai-glyph" esIcon="smart_toy"></i>
+            KI-Prüfung abgeschlossen
+          </p>
+        </div>
+      }
+      @case ('violations') {
+        <div class="ai-check has-violation" role="status" aria-live="polite">
+          @if (current(); as violation) {
+            <!-- One objection at a time, the arrows leading through the rest. The count says how many
+                 there are, since the alert looks the same for one as for five. -->
+            <div class="alert-head">
+              <span class="alert-mark">
+                <!-- `role="img"`, so the label really replaces the shorthand: "1/2" is read out as
+                     "one slash two", and a bare `aria-label` on a span is ignored. -->
+                <span class="alert-count" role="img" [attr.aria-label]="'Verstoß ' + (shown() + 1)
+                      + ' von ' + violations().length">{{ shown() + 1 }}/{{ violations().length }}</span>
+                <i class="alert-glyph" esIcon="error"></i>
+              </span>
+              <p class="alert-lead">
+                Die automatische Seitenprüfung hat einen möglichen Verstoß gegen
+                „{{ captionOf(violation.criterion) }}“ identifiziert. Bitte prüfe das Material.
+              </p>
+              <!-- Only offered once everything here is answered: while a question is open, folding it
+                   away would hide exactly what the content is being held back for. -->
+              @if (allDecided()) {
+                <button type="button" class="alert-close" (click)="closeAlert()"
+                        aria-label="Verstöße ausblenden"><i esIcon="close"></i></button>
+              }
+            </div>
 
-  @if (hasAiAnswers()) {
-    <!-- What the colour means, for as long as anything on screen is in it. -->
-    <p class="note ai-legend">Lila: von der KI geprüft und ausgefüllt.</p>
+            <div class="alert-body">
+              <button type="button" class="alert-arrow" (click)="showPrevious()"
+                      [disabled]="violations().length < 2"
+                      aria-label="Vorheriger Verstoß"><i esIcon="chevron_left"></i></button>
+              <div class="alert-finding">
+                <h4>Möglicher identifizierter Verstoß:</h4>
+                <!-- What the check said, in its own words. Several where several of them objected to
+                     this one criterion. -->
+                @for (finding of violation.findings; track finding.scheme) {
+                  <p class="alert-reason">„{{ findingText(finding) }}“</p>
+                }
+              </div>
+              <button type="button" class="alert-arrow" (click)="showNext()"
+                      [disabled]="violations().length < 2"
+                      aria-label="Nächster Verstoß"><i esIcon="chevron_right"></i></button>
+            </div>
+
+            <!-- The two answers to the objection. Each answers the criterion below as well — met, or
+                 violated — and each moves on to the next objection. Both stay marked as pressed once
+                 given: paging back through the objections has to show what was already answered. -->
+            <div class="alert-actions">
+              <button type="button" class="alert-dismiss"
+                      [class.is-chosen]="decisionOf(violation.criterion.id) === 'dismissed'"
+                      [attr.aria-pressed]="decisionOf(violation.criterion.id) === 'dismissed'"
+                      (click)="dismissViolation()">kein Verstoß erkennbar</button>
+              <button type="button" class="alert-confirm"
+                      [class.is-chosen]="decisionOf(violation.criterion.id) === 'confirmed'"
+                      [attr.aria-pressed]="decisionOf(violation.criterion.id) === 'confirmed'"
+                      (click)="confirmViolation()">Verstoß bestätigen</button>
+            </div>
+          }
+        </div>
+      }
+    }
   }
 
   <!-- The record is as necessary as the criteria: every box shows what the content answers, and a
@@ -53,28 +129,18 @@
                 <input type="checkbox" [checked]="isMet(criterion)"
                        [class.is-ai]="isAiAnswered(criterion)"
                        (change)="setCriterion(criterion, $any($event.target).checked)" />
-                <span class="label">
-                  {{ captionOf(criterion) }}
-                  <!-- What the machine made of this criterion, beside the box rather than in it — the
-                       box stays the human's answer (see QualityCriteriaComponent.judgements). -->
-                  @for (judged of judgementsOf(criterion); track judged.scheme) {
-                    <span class="judged" [class.is-met]="judged.met === true"
-                          [class.is-unmet]="judged.met === false"
-                          [attr.title]="judged.reasoning ? null : judgementTitle(judged)">
-                      <!-- The mark of the machine, and the way to its argument: hovering (or focusing,
-                           for a keyboard and for a tap) opens the reasoning it gave. Where there is
-                           one, which check judged is stated in there rather than as a native tooltip —
-                           two tooltips over one line would fight each other. `attr.title`, so that
-                           second tooltip is really absent then: a property binding would set the DOM
-                           property to null, which reflects as the *string* "null". -->
-                      @if (judged.reasoning; as reasoning) {
-                        <span class="ai-hint" tabindex="0" role="img"
-                              aria-label="Begründung der maschinellen Einschätzung"><i class="ai-glyph"
-                              esIcon="smart_toy"></i><span class="ai-reasoning"
-                              role="note"><span class="ai-source">{{ judgementTitle(judged) }}</span>{{ reasoning }}</span></span>
-                      }
-                      {{ judgementText(judged) }}
-                    </span>
+                <span class="label" [class.is-ai]="isAiAnswered(criterion)"
+                      [class.is-violated]="isViolated(criterion)">
+                  <!-- Caption and star written as one line, so the collapsed whitespace between them
+                       does not put a space in front of the star. -->
+                  {{ captionOf(criterion) }}@if (isAiAnswered(criterion)) {<span class="auto-met"
+                       role="note" aria-label="ohne maschinelle Auffälligkeiten">*</span>}
+                  <!-- What the machine objected to, beside the box rather than in it — the box stays
+                       the human's answer (see QualityCriteriaComponent.judgements). Its argument is not
+                       here: it is in the alert above, where the objection is decided about. -->
+                  @if (violationLabel(criterion); as found) {
+                    <span class="violation" [class.is-dismissed]="isDismissed(criterion)">–
+                      {{ found }} <i class="ai-glyph" esIcon="smart_toy"></i></span>
                   }
                 </span>
               </label>
@@ -92,26 +158,13 @@
                 <input type="checkbox" [checked]="isEditorialMet(criterion)"
                        [class.is-ai]="isAiAnswered(criterion)"
                        (change)="setEditorialCriterion(criterion, $any($event.target).checked)" />
-                <span class="label">
-                  {{ captionOf(criterion) }}
-                  @for (judged of judgementsOf(criterion); track judged.scheme) {
-                    <span class="judged" [class.is-met]="judged.met === true"
-                          [class.is-unmet]="judged.met === false"
-                          [attr.title]="judged.reasoning ? null : judgementTitle(judged)">
-                      <!-- The mark of the machine, and the way to its argument: hovering (or focusing,
-                           for a keyboard and for a tap) opens the reasoning it gave. Where there is
-                           one, which check judged is stated in there rather than as a native tooltip —
-                           two tooltips over one line would fight each other. `attr.title`, so that
-                           second tooltip is really absent then: a property binding would set the DOM
-                           property to null, which reflects as the *string* "null". -->
-                      @if (judged.reasoning; as reasoning) {
-                        <span class="ai-hint" tabindex="0" role="img"
-                              aria-label="Begründung der maschinellen Einschätzung"><i class="ai-glyph"
-                              esIcon="smart_toy"></i><span class="ai-reasoning"
-                              role="note"><span class="ai-source">{{ judgementTitle(judged) }}</span>{{ reasoning }}</span></span>
-                      }
-                      {{ judgementText(judged) }}
-                    </span>
+                <span class="label" [class.is-ai]="isAiAnswered(criterion)"
+                      [class.is-violated]="isViolated(criterion)">
+                  {{ captionOf(criterion) }}@if (isAiAnswered(criterion)) {<span class="auto-met"
+                       role="note" aria-label="ohne maschinelle Auffälligkeiten">*</span>}
+                  @if (violationLabel(criterion); as found) {
+                    <span class="violation" [class.is-dismissed]="isDismissed(criterion)">–
+                      {{ found }} <i class="ai-glyph" esIcon="smart_toy"></i></span>
                   }
                 </span>
               </label>
@@ -140,6 +193,15 @@
         <span class="label">alle auswählen</span>
       </label>
     </div>
+
+    <!-- What the star behind a criterion means, for as long as any is on screen: the box is ticked, but
+         on a machine's word — which is a check of the material, not a review of it. -->
+    @if (hasAiAnswers()) {
+      <p class="note footnote">
+        * bei unserer maschinellen Prüfung sind keine Auffälligkeiten gefunden worden. Eine zusätzliche
+        manuelle Prüfung durch ein:e Redakteur:in ist notwendig.
+      </p>
+    }
 
     @if (problemShown(); as message) {
       <p class="note note-error">{{ message }}</p>
