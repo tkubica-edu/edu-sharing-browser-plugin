@@ -28,8 +28,9 @@ const QR_SIZE = 200;
 // too late and the element fails with "no `node-id` given". So it is created imperatively with its
 // inputs set as properties before it is appended, exactly as in MdsEditorComponent.
 //
-// It resolves the link itself, which means it loads the node: a session that may not read it gets
-// nothing, so `failed` is surfaced rather than swallowed.
+// It resolves the link itself, which means it loads the node: a session that may not read it —
+// a guest on someone else's content — gets a 403 and no link at all. So `failed` is surfaced
+// rather than swallowed, as a sentence about the missing permission instead of the HTTP error.
 //
 // `mode` is left at its default 'permalink' — the node's own URL. The alternative creates a share
 // link with an unlimited expiry as a side effect, which sharing a *view* of the content must not do.
@@ -54,9 +55,18 @@ export class ShareScreenComponent implements OnDestroy {
   /** Which node the mounted element was built for; it reads its id only once. */
   private mountedNodeId: string | null = null;
 
+  /** 403 when the session may not read the node, 401 once it has expired. */
   private readonly onFailed = (event: Event): void => {
-    const detail = (event as CustomEvent).detail as { message?: string } | null;
-    this.error.set(detail?.message || 'Der Link zum Inhalt konnte nicht erzeugt werden.');
+    const detail = (event as CustomEvent).detail as { status?: number; message?: string } | null;
+    // The raw HttpErrorResponse text ("Http failure response for …: 403") tells the user nothing,
+    // so it stays in the console and never reaches the screen.
+    console.warn('[share] Der Link zum Inhalt konnte nicht erzeugt werden', detail);
+    const status = detail?.status;
+    this.error.set(
+      status === 401 || status === 403
+        ? 'Du hast nicht die nötigen Rechte, um diesen Inhalt zu teilen.'
+        : 'Der Link zum Inhalt konnte nicht erzeugt werden.'
+    );
   };
 
   private readonly onLinkReady = (): void => this.error.set(null);
