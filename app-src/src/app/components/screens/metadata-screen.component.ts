@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject
 
 import { MdsValues } from '../../util/mds-values';
 import { ActionBarService, SaveHandler } from '../../services/action-bar.service';
-import { AdditionalWebComponentService } from '../../services/additional-web-component.service';
+import { BrowserExtensionCustomWebComponentService } from '../../services/browser-extension-custom-web-component.service';
 import { ConditionsService } from '../../services/conditions.service';
 import { CurationService, DraftPreviewSource } from '../../services/curation.service';
 import { MetadataAgentService } from '../../services/metadata-agent.service';
@@ -18,7 +18,7 @@ import { WloCanvasComponent } from '../wlo-canvas.component';
 // last view of the first big step, so the content is written on the way out of it.
 //
 // Which editor is embedded depends on the repository config: the WLO canvas replaces the
-// edu-sharing MDS editor while the additional web component is enabled. Both implement
+// edu-sharing MDS editor while the browser extension custom web component is enabled. Both implement
 // MetadataEditor, so everything else on this screen is identical either way.
 @Component({
   selector: 'es-metadata-screen',
@@ -30,7 +30,7 @@ import { WloCanvasComponent } from '../wlo-canvas.component';
 export class MetadataScreenComponent implements OnInit, OnDestroy {
   protected readonly metadataAgent = inject(MetadataAgentService);
   protected readonly curation = inject(CurationService);
-  protected readonly additionalWebComponent = inject(AdditionalWebComponentService);
+  protected readonly browserExtensionCustomWebComponent = inject(BrowserExtensionCustomWebComponentService);
   private readonly actionBar = inject(ActionBarService);
   private readonly conditions = inject(ConditionsService);
   private readonly navigation = inject(NavigationService);

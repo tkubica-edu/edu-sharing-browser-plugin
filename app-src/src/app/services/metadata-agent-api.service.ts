@@ -6,8 +6,8 @@ import { APP_CONFIG, toAgentProxyUrl } from '../config';
  * Where the metadata agent is: the **default** repository's own
  * `…/rest/bapi/api/v1/proxy/metadata-agent-canvas`, for every call and whatever else is configured.
  *
- * Two earlier answers are deliberately not used here. `additionalWebComponent` decided it until
- * recently, which tied the agent's *address* to which editor the metadata screen embeds — a
+ * Two earlier answers are deliberately not used here. `browserExtensionCustomWebComponent` decided
+ * it until recently, which tied the agent's *address* to which editor the metadata screen embeds — a
  * different question. And the repository URL from *Einstellungen* is not asked either, although it
  * is what the rest of the panel talks to: pinning the agent keeps it reachable while that URL is
  * pointed somewhere without a B-API of its own (a local repository, say).

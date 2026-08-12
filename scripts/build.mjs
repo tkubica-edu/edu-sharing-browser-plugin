@@ -19,7 +19,7 @@ const SIDEBAR = path.join(ROOT, 'sidebar');
 // app loads it by (see WebComponentBundleService):
 //   scripts/edu → edu/  — edu-sharing bundle (edu-sharing-mds-editor-wrapper, …)
 //   scripts/wlo → wlo/  — WLO bundle (metadata-agent-canvas, …), loaded only when the repository
-//                         config enables the additional web component
+//                         config enables the browser extension custom web component
 const BUNDLE_DIRS = ['edu', 'wlo'];
 
 const TARGETS = ['chrome', 'firefox', 'safari'];

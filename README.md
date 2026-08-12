@@ -118,13 +118,13 @@ The options:
   on, *before* it is described: the flow runs *Inhalt erschließen* → Vorschau → **An Redaktionen
   weiterleiten** → **Persönliche Ablage** → *Qualitätsprüfung* → *Inhaltsübersicht*. Two steps of
   their own, each offered only where it applies: the forwarding while the repository config enables
-  the additional web component, the *Persönliche Ablage* for a session of the user's own (still a
-  placeholder for the component that will fill it). Where neither applies they fall away and the
-  preview leads straight into the *Qualitätsprüfung*. Nothing is written here — **the content is
-  created by the one save at the end of the Qualitätsprüfung**, which writes the quality criteria,
-  whatever the steps recorded and the metadata the editor commits in one go (so *Speichern…* appears
-  on the way into the *Inhaltsübersicht*). The footer's *Weiter* walks from each step to the next one
-  that applies.
+  the browser extension custom web component, the *Persönliche Ablage* for a session of the user's
+  own (still a placeholder for the component that will fill it). Where neither applies they fall
+  away and the preview leads straight into the *Qualitätsprüfung*. Nothing is written here — **the
+  content is created by the one save at the end of the Qualitätsprüfung**, which writes the quality
+  criteria, whatever the steps recorded and the metadata the editor commits in one go (so
+  *Speichern…* appears on the way into the *Inhaltsübersicht*). The footer's *Weiter* walks from each
+  step to the next one that applies.
   - *An Redaktionen weiterleiten* lists the editorial groups the repository config names in
     **`browserExtensionEditorialGroups`** (`['ID1', 'ID2']`, read once per session by
     `EditorialGroupsService` → `CollectionService.getCollection`). Ticking a group forwards the
@@ -216,8 +216,8 @@ cookie when the user is logged in; as guest they rely on public access.
 
 ## The optional WLO metadata editor
 
-`AdditionalWebComponentService` watches the repository config for the boolean variable
-**`additionalWebComponent`**. While it is enabled, `WloCanvasComponent` —
+`BrowserExtensionCustomWebComponentService` watches the repository config for the boolean variable
+**`browserExtensionCustomWebComponent`**. While it is enabled, `WloCanvasComponent` —
 `<metadata-agent-canvas>` from the packaged `wlo/` bundle — takes over two screens:
 
 - **Metadaten editieren** (`mode="edit"`) instead of the edu-sharing MDS editor,
@@ -288,9 +288,9 @@ points somewhere without a B-API of its own. Following the configured repository
 expression in that service. The two do have to agree, though: the proxy authorizes by repository
 session, so the pinned agent only answers while the panel's session is one *that* repository issued.
 
-This used to depend on `additionalWebComponent`, with every other repository served by the agent's
-public deployment. That flag answers which *editor* the metadata screen embeds, which is a different
-question from where the agent lives, so it no longer decides the address.
+This used to depend on `browserExtensionCustomWebComponent`, with every other repository served by
+the agent's public deployment. That flag answers which *editor* the metadata screen embeds, which is
+a different question from where the agent lives, so it no longer decides the address.
 
 The proxy **authorizes by repository session**, so every leg has to carry the session cookie
 explicitly (`credentials: 'include'`): a worker fetch and a cross-origin page fetch both send none by

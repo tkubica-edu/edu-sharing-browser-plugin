@@ -6,7 +6,7 @@ import { APP_CONFIG } from './config';
 import { SectionId } from './model/navigation';
 import { PLUGIN_SOURCE, PluginEnvelope } from './model/onlyoffice-events';
 import { errorMessage } from './util/errors';
-import { AdditionalWebComponentService } from './services/additional-web-component.service';
+import { BrowserExtensionCustomWebComponentService } from './services/browser-extension-custom-web-component.service';
 import { AuthService } from './services/auth.service';
 import { BrowserExtensionService } from './services/browser-extension.service';
 import { BusyService } from './services/busy.service';
@@ -84,7 +84,7 @@ export class AppComponent implements OnInit {
   protected readonly icons = inject(OptionIconService);
 
   private readonly browserExtension = inject(BrowserExtensionService);
-  private readonly additionalWebComponent = inject(AdditionalWebComponentService);
+  private readonly browserExtensionCustomWebComponent = inject(BrowserExtensionCustomWebComponentService);
   private readonly curation = inject(CurationService);
   private readonly onlyOfficeDocument = inject(OnlyOfficeDocumentService);
   private readonly pageRecognition = inject(PageRecognitionService);
@@ -145,8 +145,8 @@ export class AppComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
-    // Only activates when the repository config enables `additionalWebComponent`.
-    this.additionalWebComponent.initialize();
+    // Only activates when the repository config enables `browserExtensionCustomWebComponent`.
+    this.browserExtensionCustomWebComponent.initialize();
     // First of all: the debug flag decides `onlyOfficePresent`, which the section visibilities
     // and the document request below are gated on.
     await this.debug.load();

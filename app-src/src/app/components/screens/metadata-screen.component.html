@@ -14,7 +14,7 @@
     <p class="es-muted">
       @if (curation.metadataSaved()) {
         Die Metadaten sind gespeichert. Du kannst sie weiter bearbeiten und erneut speichern.
-        @if (additionalWebComponent.enabled()) {
+        @if (browserExtensionCustomWebComponent.enabled()) {
           „Erneut speichern" legt dabei einen <strong>neuen Inhalt</strong> an, der dann hier
           weitergeführt wird — der bereits gespeicherte bleibt unverändert bestehen.
         }
@@ -39,7 +39,7 @@
     <section class="es-card">
       <!-- The WLO canvas replaces the edu-sharing MDS editor while the repository config
            enables it; both implement the same MetadataEditor contract. -->
-      @if (additionalWebComponent.enabled()) {
+      @if (browserExtensionCustomWebComponent.enabled()) {
         <!-- Always the editing preset, also after a save: this screen is "Metadaten bearbeiten", and
              leaving and re-entering it (a sibling sub step, e.g. "Sammlungen hinzufügen") must not
              turn it into a read-only view. A save is only locked out while it is in flight. -->

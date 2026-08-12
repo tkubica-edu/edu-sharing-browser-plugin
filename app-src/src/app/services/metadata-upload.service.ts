@@ -39,7 +39,7 @@ export interface UploadOutcome {
   /**
    * The created node as the endpoint described it. This is the *only* description of it the app
    * gets: the agent writes the node with its own privileges, so the session the panel runs under
-   * (a guest, with the additional web component) may not be allowed to read it back.
+   * (a guest, with the browser extension custom web component) may not be allowed to read it back.
    */
   node?: UploadedNode;
   /** The endpoint recognised the content as already present. */
@@ -52,7 +52,7 @@ export interface UploadOutcome {
  * curated content into the repository: it creates the node, checks for duplicates and starts the
  * editorial workflow, none of which the plain node API does.
  *
- * Used instead of a direct node create while the additional web component is enabled (see
+ * Used instead of a direct node create while the browser extension custom web component is enabled (see
  * {@link CurationService.save}): there the WLO canvas is the editor, so its own upload is the
  * matching save. The request is proxied by the background worker to stay CORS-portable, exactly
  * like `/generate`.

@@ -79,9 +79,9 @@ const CONFIGS: Record<WloCanvasMode, CanvasConfig> = {
 };
 
 // The WLO metadata canvas: <metadata-agent-canvas> from the packaged wlo bundle, used as a REAL
-// custom element. While the repository config enables the additional web component it replaces
-// both the edu-sharing MDS editor (mode 'edit', on the metadata screen) and the preview element
-// (mode 'detail', on the preview screen).
+// custom element. While the repository config enables the browser extension custom web component
+// it replaces both the edu-sharing MDS editor (mode 'edit', on the metadata screen) and the preview
+// element (mode 'detail', on the preview screen).
 //
 // In 'edit' mode its own save and upload buttons stay hidden: as with MdsEditorComponent, the
 // footer owns "Speichern" and commit() hands over the current values, which arrive continuously

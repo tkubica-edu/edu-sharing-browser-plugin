@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 
-import { AdditionalWebComponentService } from '../../services/additional-web-component.service';
+import { BrowserExtensionCustomWebComponentService } from '../../services/browser-extension-custom-web-component.service';
 import { CurationService } from '../../services/curation.service';
 import { PreviewNodeComponent } from '../preview-node.component';
 import { WloCanvasComponent } from '../wlo-canvas.component';
@@ -8,10 +8,10 @@ import { WloCanvasComponent } from '../wlo-canvas.component';
 // "Vorschau", the first sub step of the Inhaltsübersicht: shows the active node. The footer's next
 // steps come from ActionBarService.
 //
-// Which preview is embedded depends on the repository config: while the additional web component is
-// enabled, the WLO canvas shows the properties read-only ('detail' mode) instead of the edu-sharing
-// preview element. That canvas renders the metadata fields only, so the content's title and its
-// preview image are supplied here — otherwise the preview never names what is being shown.
+// Which preview is embedded depends on the repository config: while the browser extension custom
+// web component is enabled, the WLO canvas shows the properties read-only ('detail' mode) instead of
+// the edu-sharing preview element. That canvas renders the metadata fields only, so the content's
+// title and its preview image are supplied here — otherwise the preview never names what is shown.
 @Component({
   selector: 'es-preview-screen',
   imports: [PreviewNodeComponent, WloCanvasComponent],
@@ -21,7 +21,7 @@ import { WloCanvasComponent } from '../wlo-canvas.component';
 })
 export class PreviewScreenComponent {
   protected readonly curation = inject(CurationService);
-  protected readonly additionalWebComponent = inject(AdditionalWebComponentService);
+  protected readonly browserExtensionCustomWebComponent = inject(BrowserExtensionCustomWebComponentService);
 
   /** The content's title — see CurationService.contentTitle, which the menu reads too. */
   protected readonly title = this.curation.contentTitle;

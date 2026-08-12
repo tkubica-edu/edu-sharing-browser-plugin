@@ -15,7 +15,7 @@
 
   <!-- The WLO canvas shows the saved properties read-only while the repository config enables it;
        otherwise the edu-sharing preview element renders the node itself. -->
-  @if (additionalWebComponent.enabled()) {
+  @if (browserExtensionCustomWebComponent.enabled()) {
     @if (curation.editorMetadata(); as metadata) {
       <section class="es-card">
         @if (previewImage()) {

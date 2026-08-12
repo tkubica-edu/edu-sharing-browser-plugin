@@ -77,8 +77,9 @@ export interface Conditions {
   /** The recognition has not answered yet what this page's content is (PageRecognitionService).
    *  Only once this is false does "no content" mean there is none. */
   recognizingContent: boolean;
-  /** The repository config enabled the additional web component — see AdditionalWebComponentService. */
-  additionalWebComponent: boolean;
+  /** The repository config enabled the browser extension custom web component — see
+   *  BrowserExtensionCustomWebComponentService. */
+  browserExtensionCustomWebComponent: boolean;
   /** The Qualitätsprüfung's knock-out criteria are answered, so the quality may be confirmed
    *  (QualityCriteriaComponent reports it, CurationService holds it). */
   qualityCriteriaMet: boolean;
@@ -335,10 +336,11 @@ export const SECTIONS: readonly AppSection[] = [
     // save that writes it comes at the end of the Qualitätsprüfung behind this — so a freshly curated
     // content reaches this step before it has a node at all.
     //
-    // The additional web component is what the forwarding exists for: the groups are the editorial
-    // teams a submitted content is judged by, and where nothing is submitted there is nobody to
-    // forward to. Without it the step falls away and the flow goes on to the filing behind it.
-    visible: requiresLogin((c) => c.hasEditableMetadata && c.additionalWebComponent),
+    // The browser extension custom web component is what the forwarding exists for: the groups are
+    // the editorial teams a submitted content is judged by, and where nothing is submitted there is
+    // nobody to forward to. Without it the step falls away and the flow goes on to the filing behind
+    // it.
+    visible: requiresLogin((c) => c.hasEditableMetadata && c.browserExtensionCustomWebComponent),
     tabs: [{ id: 'editorial-forward', label: 'An Redaktionen weiterleiten' }]
   },
   {
@@ -347,7 +349,7 @@ export const SECTIONS: readonly AppSection[] = [
     description: 'Die Sammlung wählen, in die der Inhalt bei dieser Redaktion einsortiert wird',
     // A step of the forwarding rather than one of the flow: it is entered from a group's row and
     // returns to it, so it applies exactly where the forwarding does.
-    visible: requiresLogin((c) => c.hasEditableMetadata && c.additionalWebComponent),
+    visible: requiresLogin((c) => c.hasEditableMetadata && c.browserExtensionCustomWebComponent),
     tabs: [{ id: 'select-collection', label: 'Sammlung auswählen' }]
   },
   {
@@ -355,8 +357,8 @@ export const SECTIONS: readonly AppSection[] = [
     label: 'Persönliche Ablage',
     description: 'Den Inhalt in der eigenen Ablage einsortieren',
     // A session of the user's own, not `loggedIn`: a private filing place is one a *person* has —
-    // the guest session the additional web component brings has none. Like the forwarding it works
-    // on editable metadata rather than on a node; see there.
+    // the guest session the browser extension custom web component brings has none. Like the
+    // forwarding it works on editable metadata rather than on a node; see there.
     visible: requiresLogin((c) => c.hasEditableMetadata && c.hasSession),
     tabs: [{ id: 'personal-storage', label: 'Persönliche Ablage' }]
   },
@@ -373,12 +375,12 @@ export const SECTIONS: readonly AppSection[] = [
     // The last step before the Inhaltsübersicht, and therefore the one that writes the content:
     // everything the flow collected is saved on the way out of the Metadaten view.
     //
-    // The quality view belongs to the additional web component, like the forwarding step does: the
-    // criteria are what an editorial team judges a submitted content by, and where nothing is
-    // submitted there is nobody they are answered for. Without it the step is the Metadaten view
-    // alone — which is why the section itself needs no condition of its own.
+    // The quality view belongs to the browser extension custom web component, like the forwarding
+    // step does: the criteria are what an editorial team judges a submitted content by, and where
+    // nothing is submitted there is nobody they are answered for. Without it the step is the
+    // Metadaten view alone — which is why the section itself needs no condition of its own.
     tabs: [
-      { id: 'quality-check', label: 'Qualität', visible: (c) => c.additionalWebComponent },
+      { id: 'quality-check', label: 'Qualität', visible: (c) => c.browserExtensionCustomWebComponent },
       {
         id: 'metadata',
         label: 'Metadaten',
@@ -386,7 +388,7 @@ export const SECTIONS: readonly AppSection[] = [
         // whether the content may be published at all, so they are answered before it is described.
         // Visible and disabled meanwhile — the tab is the step that is still to come, not one that
         // appears out of nowhere once the boxes are ticked (see SectionTab.enabled).
-        enabled: (c) => !c.additionalWebComponent || c.qualityCriteriaMet,
+        enabled: (c) => !c.browserExtensionCustomWebComponent || c.qualityCriteriaMet,
         disabledHint: 'Zuerst die Kriterien für die Such-Veröffentlichung erfüllen.'
       }
     ]

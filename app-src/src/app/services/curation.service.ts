@@ -8,7 +8,7 @@ import { MdsValues, firstString, toMdsEditorValues } from '../util/mds-values';
 import { withAgentLicense } from '../util/agent-fields';
 import { errorMessage } from '../util/errors';
 import { renderLink } from '../util/repository-links';
-import { AdditionalWebComponentService } from './additional-web-component.service';
+import { BrowserExtensionCustomWebComponentService } from './browser-extension-custom-web-component.service';
 import { AuthService } from './auth.service';
 import { UploadedNode } from './browser-extension.service';
 import { HistoryEntry, HistoryService } from './history.service';
@@ -335,7 +335,7 @@ export class CurationService {
   private readonly auth = inject(AuthService);
   private readonly metadataAgent = inject(MetadataAgentService);
   private readonly metadataUpload = inject(MetadataUploadService);
-  private readonly additionalWebComponent = inject(AdditionalWebComponentService);
+  private readonly browserExtensionCustomWebComponent = inject(BrowserExtensionCustomWebComponentService);
   private readonly repositoryNodes = inject(RepositoryNodeService);
   private readonly qualityJudge = inject(QualityJudgeService);
   private readonly history = inject(HistoryService);
@@ -998,8 +998,8 @@ export class CurationService {
    * Save the metadata: create the node the first time, otherwise update it in place. Returns
    * true on success so the caller can offer the next step.
    *
-   * A freshly curated content takes a different route while the additional web component is
-   * enabled — see {@link saveThroughAgent}.
+   * A freshly curated content takes a different route while the browser extension custom web
+   * component is enabled — see {@link saveThroughAgent}.
    *
    * `payload` is the open editor's own view of what it committed (MetadataEditor.payload), where it
    * has one. It is not what gets written — `values` is — but what the content's metadata is re-read
@@ -1015,11 +1015,12 @@ export class CurationService {
     // Before the branch, so it holds for both editors: the licence is written even where the open form
     // had no widget to report it from (see {@link withAgentLicense}).
     values = withAgentLicense(values, this.metadataAgent.lastRun()?.parsed?.raw ?? null);
-    // With the additional web component every save goes through the agent's upload — not just the
-    // first one. The nodes it writes belong to the agent's own privileges, so the session the panel
-    // runs under (a guest) may neither read nor edit them: an update in place is not available for
-    // them, and a second save can only be another upload. See {@link saveThroughAgent}.
-    if (this.additionalWebComponent.enabled()) return this.saveThroughAgent(values, payload);
+    // With the browser extension custom web component every save goes through the agent's upload —
+    // not just the first one. The nodes it writes belong to the agent's own privileges, so the
+    // session the panel runs under (a guest) may neither read nor edit them: an update in place is
+    // not available for them, and a second save can only be another upload. See
+    // {@link saveThroughAgent}.
+    if (this.browserExtensionCustomWebComponent.enabled()) return this.saveThroughAgent(values, payload);
     this.saving.set(true);
     this.saveError.set(null);
     try {
@@ -1062,9 +1063,9 @@ export class CurationService {
 
   /**
    * Save through the metadata agent's own upload instead of writing the node ourselves. That is the
-   * save belonging to the WLO canvas, which is the editor while the additional web component is
-   * enabled: the agent creates the node, checks for duplicates and starts the editorial workflow —
-   * a plain node create does none of that.
+   * save belonging to the WLO canvas, which is the editor while the browser extension custom web
+   * component is enabled: the agent creates the node, checks for duplicates and starts the editorial
+   * workflow — a plain node create does none of that.
    *
    * `/upload` only ever CREATES: it takes no node id, and the nodes it writes are the agent's, not
    * the panel session's. So a second save cannot update what the first one wrote — it uploads

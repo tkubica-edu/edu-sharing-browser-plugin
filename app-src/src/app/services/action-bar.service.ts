@@ -1,7 +1,7 @@
 import { Injectable, Signal, computed, inject, signal } from '@angular/core';
 
 import { SectionId } from '../model/navigation';
-import { AdditionalWebComponentService } from './additional-web-component.service';
+import { BrowserExtensionCustomWebComponentService } from './browser-extension-custom-web-component.service';
 import { CurationService } from './curation.service';
 import { NavigationService } from './navigation.service';
 
@@ -52,7 +52,7 @@ export interface FooterAction {
 export class ActionBarService {
   private readonly curation = inject(CurationService);
   private readonly navigation = inject(NavigationService);
-  private readonly additionalWebComponent = inject(AdditionalWebComponentService);
+  private readonly browserExtensionCustomWebComponent = inject(BrowserExtensionCustomWebComponentService);
 
   // The metadata screen registers its save handler (→ mdsEditor.commit()) while mounted, so the
   // footer can drive a save without referencing the editor.
@@ -261,17 +261,18 @@ export class ActionBarService {
    * mounted, or the section carries no Metadaten view — what the other steps recorded is written on
    * its own (CurationService.saveCollected).
    *
-   * A content that has nothing left to write simply goes on — see CurationService.hasCollectedValues
-   * and, for the additional web component, `written` below.
+   * A content that has nothing left to write simply goes on — see
+   * CurationService.hasCollectedValues and, for the browser extension custom web component,
+   * `written` below.
    */
   private finishAction(): FooterAction {
     const handler = this.navigation.screen() === 'metadata' ? this.saveHandler() : null;
-    // Saving through the additional web component goes through the agent's `/upload`, which only
-    // ever CREATES — there is no endpoint that writes back to a node it made, and the panel session
-    // (a guest) may not edit it either (see WIDGET-REFERENZ.md, "Bestandsinhalte via Node-ID"). So
-    // once it has written one, writing again would produce a SECOND node for the same content; the
-    // way on then only goes on.
-    const written = this.additionalWebComponent.enabled() && this.curation.metadataSaved();
+    // Saving through the browser extension custom web component goes through the agent's `/upload`,
+    // which only ever CREATES — there is no endpoint that writes back to a node it made, and the
+    // panel session (a guest) may not edit it either (see WIDGET-REFERENZ.md, "Bestandsinhalte via
+    // Node-ID"). So once it has written one, writing again would produce a SECOND node for the same
+    // content; the way on then only goes on.
+    const written = this.browserExtensionCustomWebComponent.enabled() && this.curation.metadataSaved();
     const ready = handler ? handler.canSave() : this.curation.hasCollectedValues();
     const saves = ready && !this.curation.metadataLocked() && !written;
     return {

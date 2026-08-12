@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 
 import { Conditions } from '../model/navigation';
-import { AdditionalWebComponentService } from './additional-web-component.service';
+import { BrowserExtensionCustomWebComponentService } from './browser-extension-custom-web-component.service';
 import { AuthService } from './auth.service';
 import { CurationService } from './curation.service';
 import { DebugService } from './debug.service';
@@ -43,7 +43,7 @@ export class ConditionsService {
   private readonly auth = inject(AuthService);
   private readonly curation = inject(CurationService);
   private readonly debug = inject(DebugService);
-  private readonly webComponent = inject(AdditionalWebComponentService);
+  private readonly webComponent = inject(BrowserExtensionCustomWebComponentService);
 
   /** The active browser tab's URL (set by the shell on boot). */
   readonly activeUrl = signal<string | null>(null);
@@ -78,8 +78,8 @@ export class ConditionsService {
     );
   });
 
-  // Not the raw session flag but `authorized`: with the additional web component enabled no login
-  // is required, so every option stays reachable and the login gate never appears.
+  // Not the raw session flag but `authorized`: with the browser extension custom web component
+  // enabled no login is required, so every option stays reachable and the login gate never appears.
   readonly loggedIn = this.auth.authorized;
 
   // The raw session flag, for the question `authorized` cannot answer: is there a login to *make*?
@@ -102,7 +102,7 @@ export class ConditionsService {
 
   // The repository config's own switch, which decides more than which editor is embedded: it is
   // also what makes the editorial forwarding a step of the flow (see the `collections` section).
-  readonly additionalWebComponent = this.webComponent.enabled;
+  readonly browserExtensionCustomWebComponent = this.webComponent.enabled;
 
   // What the Qualität view reports of its criteria — the gate the Metadaten sub step sits behind.
   readonly qualityCriteriaMet = this.curation.qualityCriteriaMet;
@@ -119,7 +119,7 @@ export class ConditionsService {
     hasCuratedDraft: this.hasCuratedDraft(),
     editMode: this.editMode(),
     recognizingContent: this.recognizingContent(),
-    additionalWebComponent: this.additionalWebComponent(),
+    browserExtensionCustomWebComponent: this.browserExtensionCustomWebComponent(),
     qualityCriteriaMet: this.qualityCriteriaMet()
   }));
 }

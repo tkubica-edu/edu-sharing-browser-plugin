@@ -16,7 +16,7 @@ import { MetadataAgentApiService } from './metadata-agent-api.service';
  *   `edu-sharing-preview-sidebar`, `edu-sharing-nodes-selector`,
  *   `edu-sharing-add-with-connector`).
  * - `wlo` — the additional WLO bundle (`metadata-agent-canvas`), enabled by repository
- *   config (see AdditionalWebComponentService).
+ *   config (see BrowserExtensionCustomWebComponentService).
  */
 export type WebComponentBundle = 'edu' | 'wlo';
 

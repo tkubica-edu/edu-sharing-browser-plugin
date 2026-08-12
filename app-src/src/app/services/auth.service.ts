@@ -4,7 +4,7 @@ import { AuthenticationService, LoginInfo, User, UserService } from 'ngx-edu-sha
 
 import { APP_CONFIG, toApiRootUrl } from '../config';
 import { BOOT_ROOT_URL } from '../app.config';
-import { AdditionalWebComponentService } from './additional-web-component.service';
+import { BrowserExtensionCustomWebComponentService } from './browser-extension-custom-web-component.service';
 import { BrowserExtensionService } from './browser-extension.service';
 
 /** How long to wait for the session check on startup. */
@@ -19,7 +19,7 @@ export class AuthService {
   private readonly userApi = inject(UserService);
   private readonly browserExtension = inject(BrowserExtensionService);
   private readonly bootRootUrl = inject(BOOT_ROOT_URL);
-  private readonly additionalWebComponent = inject(AdditionalWebComponentService);
+  private readonly browserExtensionCustomWebComponent = inject(BrowserExtensionCustomWebComponentService);
 
   /** The repository base URL (`…/edu-sharing`) the user configured. */
   readonly repositoryUrl = signal(this.bootRootUrl.replace(/\/rest$/, ''));
@@ -47,14 +47,14 @@ export class AuthService {
    * work* (option visibility, the landing view, the screens' gates, the API-backed actions) uses
    * this instead.
    */
-  readonly authorized = computed(() => this.loggedIn() || this.additionalWebComponent.enabled());
+  readonly authorized = computed(() => this.loggedIn() || this.browserExtensionCustomWebComponent.enabled());
 
   /**
-   * Whether a login applies at all. False with the additional web component enabled: it replaces
-   * the login necessity entirely, so not even the logged-out state is reported — nothing about a
-   * login is shown at all.
+   * Whether a login applies at all. False with the browser extension custom web component enabled:
+   * it replaces the login necessity entirely, so not even the logged-out state is reported — nothing
+   * about a login is shown at all.
    */
-  readonly loginRequired = computed(() => !this.additionalWebComponent.enabled());
+  readonly loginRequired = computed(() => !this.browserExtensionCustomWebComponent.enabled());
 
   /** Load the persisted repository URL (or default), then revalidate any session. */
   async init(): Promise<void> {

@@ -1,8 +1,9 @@
 // What the WLO bundle changes about the panel's own look: the shape of the footer buttons.
 //
-// Active only while the repository config enables `additionalWebComponent`, which is what puts the
-// class on the document element (see AdditionalWebComponentService). Without the flag the `wlo/`
-// bundle is never loaded at all and the panel keeps the shape from `_tokens.scss`.
+// Active only while the repository config enables `browserExtensionCustomWebComponent`, which is
+// what puts the class on the document element (see BrowserExtensionCustomWebComponentService).
+// Without the flag the `wlo/` bundle is never loaded at all and the panel keeps the shape from
+// `_tokens.scss`.
 //
 // Its colours are deliberately NOT adopted: the bundle's Material 3 palette (surface #fcf8fd,
 // on-surface #1b1b1f) tints the whole panel violet-grey, which reads as washed out next to the

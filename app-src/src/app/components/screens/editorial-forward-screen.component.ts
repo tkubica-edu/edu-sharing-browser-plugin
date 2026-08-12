@@ -7,8 +7,8 @@ import { NavigationService } from '../../services/navigation.service';
 import { SpinnerComponent } from '../spinner.component';
 
 // "An Redaktionen weiterleiten": where the curated content is handed to one or more editorial teams.
-// Offered only where the repository config enables the additional web component (see the section in
-// the navigation registry).
+// Offered only where the repository config enables the browser extension custom web component (see
+// the section in the navigation registry).
 //
 // The groups on offer are the collections the config names (EditorialGroupsService). Ticking one
 // forwards the content to it; where a group has collections inside it, one of them is picked in the
