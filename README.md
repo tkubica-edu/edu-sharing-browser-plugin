@@ -411,6 +411,14 @@ resets per session.
   handed as a URL of its own: the preview widget `fetch`es the picked node's inline
   `preview.data` (a data URL) to turn it into a file, and the panel does the same with the
   object URL of a picture picked in the widget (`CurationService`).
+- **Reading the clipboard** takes two grants, both for one option of the preview widget: it
+  offers *Aus der Zwischenablage einfügen* only while it can see an image on the clipboard,
+  which it answers with `navigator.permissions.query({name: 'clipboard-read'})` plus a
+  `clipboard.read()`. The extension declares `clipboardRead` (Chrome answers that query with
+  `denied` without it), and the panel's iframe is opened with `allow="clipboard-read;
+  clipboard-write"` (the permissions policy defaults to the top-level document, so the frame
+  is refused otherwise — see `content/panel-host.js`). Pasting itself needs neither: the
+  widget listens for the `paste` event as well, which is why Cmd+V worked all along.
 - The repository URL cannot be changed at runtime without reloading the sidebar —
   the library freezes `rootUrl` at bootstrap and does not export its config classes.
 - **MDS editor rendering needs verification in a real browser.** Two things must hold:

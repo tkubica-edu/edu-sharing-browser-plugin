@@ -116,7 +116,10 @@
     const iframe = document.createElement('iframe');
     iframe.src = api.runtime.getURL('sidebar/index.html');
     iframe.setAttribute('title', 'edu-sharing');
-    iframe.setAttribute('allow', 'clipboard-write');
+    // Clipboard access is delegated to the panel: the permissions policy for both directions
+    // defaults to the top-level document alone, so a cross-origin frame is refused without this —
+    // including the read the preview widget answers its "aus der Zwischenablage einfügen" with.
+    iframe.setAttribute('allow', 'clipboard-read; clipboard-write');
     Object.assign(iframe.style, {
       width: '100%',
       height: '100%',
