@@ -59,18 +59,60 @@ export class MenuComponent {
   );
 
   /**
-   * Where the card leads. Normally into the section it stands for; while it carries an unsaved draft
-   * back into that draft's own step — its picture and title are all there is of the content, and that
-   * step is where they are worked on. Inhaltsoptionen could do nothing with it: everything it offers
-   * acts on a node, which is exactly what a draft does not have yet.
+   * The *Inhalt erschließen* entry as the menu renders it, for the state below: whether that step can
+   * be entered is what decides whether the card may offer it — the registry's answer, not a second
+   * reading of the conditions (it is disabled on Edu-Sharing's own pages, among others).
+   */
+  private readonly curationEntry = computed(() =>
+    this.navigation.menuSections().find((section) => section.id === 'curation'),
+  );
+
+  /**
+   * The open page is a content the repository does not hold yet: nothing was recognised, the
+   * recognition has answered, and erschließen can be started here.
+   *
+   * Then the card is not the report of an absence but the offer to curate the page — a page that is
+   * not in the repository is a *new* content, and the one thing to do with it is the step the card
+   * then leads to. Where that step is not available the card stays the report, since there would be
+   * nothing to offer.
+   */
+  protected newContent(section: SectionView): boolean {
+    const curation = this.curationEntry();
+    return (
+      !this.contentTitle() && !this.unsaved() && !section.loading && !!curation && !curation.disabled
+    );
+  }
+
+  /**
+   * Where the card leads. Normally into the section it stands for; for a page that is not in the
+   * repository into the erschließen step it offers; and while it carries an unsaved draft back into
+   * that draft's own step — its picture and title are all there is of the content, and that step is
+   * where they are worked on. Inhaltsoptionen could do nothing with it: everything it offers acts on
+   * a node, which is exactly what a draft does not have yet.
    */
   protected cardTarget(section: SectionView): SectionId {
+    if (this.newContent(section)) return 'curation';
     return this.draftStep() ?? section.id;
   }
 
   /** …and the card is enterable then, even though its own section is not (it wants a node). */
   protected cardDisabled(section: SectionView): boolean {
-    return this.draftStep() ? false : section.disabled;
+    return this.draftStep() || this.newContent(section) ? false : section.disabled;
+  }
+
+  /** What the card is called where the content cannot name it: the state it reports. */
+  protected cardTitle(section: SectionView): string {
+    return this.newContent(section) ? 'Neuer Inhalt erkannt' : section.label;
+  }
+
+  /** The step the card offers, for the one state in which it is an offer — see {@link newContent}. */
+  protected cardAction(section: SectionView): string {
+    return this.newContent(section) ? 'Inhalt jetzt erschließen' : '';
+  }
+
+  /** The sign for adding a content, in place of the kind of content there is none of yet. */
+  protected cardIcon(section: SectionView): string {
+    return this.newContent(section) ? 'add_circle' : '';
   }
 
   /**

@@ -1,12 +1,16 @@
 <div class="menu">
   <!-- The panel's centre as its own group: a heading, and a card showing the content — its picture and
        title, or what the recognition reports instead (see AppSection.focal). The card is the shared
-       one; pressing it opens the Inhaltsoptionen, which show it again as "Gewählter Inhalt". -->
+       one; pressing it opens the Inhaltsoptionen, which show it again as "Gewählter Inhalt".
+       For a page the repository does not hold it is the offer to curate that page instead, and leads
+       there — see newContent. -->
   @for (section of focalSections(); track section.id) {
     <es-content-card heading="Geöffneter Inhalt"
-                     [fallbackTitle]="section.label"
+                     [fallbackTitle]="cardTitle(section)"
                      [note]="cardNote(section)"
                      [description]="entryDescription(section)"
+                     [action]="cardAction(section)"
+                     [icon]="cardIcon(section)"
                      [loading]="section.loading"
                      [interactive]="true"
                      [disabled]="cardDisabled(section)"

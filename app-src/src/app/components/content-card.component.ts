@@ -49,6 +49,19 @@ export class ContentCardComponent {
   /** The card's own state (e.g. "Bestehender Inhalt"), set in the panel's blue. */
   readonly note = input<string | null>(null);
 
+  /**
+   * What pressing the card does, named as the step it leads to ("Inhalt jetzt erschließen") — for a
+   * card that is an offer rather than a statement about a content. Shown in place of {@link note} and
+   * {@link description}: those describe what is there, and this card's subject is what is not yet.
+   */
+  readonly action = input('');
+
+  /**
+   * The tile's glyph, where the content's own kind is not what the card is about — the offer to
+   * curate the open page carries the sign for adding one. Empty means {@link typeIcon}.
+   */
+  readonly icon = input('');
+
   /** The line under the title where there is no {@link note}. */
   readonly description = input('');
 

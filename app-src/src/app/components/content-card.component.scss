@@ -86,6 +86,27 @@
   color: var(--es-blue);
 }
 
+// The step the card leads to, written out as the link it stands for: the card itself is the button,
+// so this is what says where pressing it goes.
+.fc-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  align-self: flex-start;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--es-blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+
+  svg {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 auto;
+  }
+}
+
 // Sits in the tile, at the size of the icon it stands in for.
 .fc-spinner {
   width: 26px;
