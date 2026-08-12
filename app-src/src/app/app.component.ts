@@ -3,12 +3,12 @@ import {
 } from '@angular/core';
 
 import { APP_CONFIG } from './config';
-import { SectionId } from './model/navigation';
 import { PLUGIN_SOURCE, PluginEnvelope } from './model/onlyoffice-events';
 import { errorMessage } from './util/errors';
 import { BrowserExtensionCustomWebComponentService } from './services/browser-extension-custom-web-component.service';
 import { AuthService } from './services/auth.service';
 import { BrowserExtensionService } from './services/browser-extension.service';
+import { ContentFlowService } from './services/content-flow.service';
 import { BusyService } from './services/busy.service';
 import { ConditionsService } from './services/conditions.service';
 import { CurationService } from './services/curation.service';
@@ -87,6 +87,7 @@ export class AppComponent implements OnInit {
   protected readonly icons = inject(OptionIconService);
 
   private readonly browserExtension = inject(BrowserExtensionService);
+  private readonly contentFlow = inject(ContentFlowService);
   private readonly browserExtensionCustomWebComponent = inject(BrowserExtensionCustomWebComponentService);
   private readonly curation = inject(CurationService);
   private readonly onlyOfficeDocument = inject(OnlyOfficeDocumentService);
@@ -204,11 +205,15 @@ export class AppComponent implements OnInit {
 
   /**
    * Open a saved node from the history (requested by the history screen). A picked node is handled
-   * exactly like a detected one: the *Inhaltsoptionen* screen offers the two ways on.
+   * exactly like a detected one: the *Inhaltsoptionen* screen offers the two ways on — and the tab
+   * follows the pick to that content's own page, see ContentFlowService.showContentOptions.
    */
   protected async openFromHistory(entry: HistoryEntry): Promise<void> {
     if (!this.confirmDiscardUnsaved()) return;
-    await this.openNode(() => this.curation.openFromHistory(entry), 'content-options');
+    await this.openNode(
+      () => this.curation.openFromHistory(entry),
+      () => this.contentFlow.showContentOptions(),
+    );
   }
 
   protected hideBrokenLogo(event: Event): void {
@@ -293,13 +298,13 @@ export class AppComponent implements OnInit {
    * Load a node into the flow; surface a failure to the user. Callers confirm discarding unsaved
    * work first (see {@link confirmDiscardUnsaved}).
    *
-   * Without a `target` the app re-lands on the main menu, where the loaded node shows up as the
+   * Without an `enter` the app re-lands on the main menu, where the loaded node shows up as the
    * *Inhalt erkannt* menu entry — a node that merely arrived never navigates for the user.
    */
-  private async openNode(load: () => Promise<void>, target?: SectionId): Promise<void> {
+  private async openNode(load: () => Promise<void>, enter?: () => Promise<void>): Promise<void> {
     try {
       await load();
-      if (target) this.navigation.go(target);
+      if (enter) await enter();
       else this.navigation.land();
     } catch (cause: unknown) {
       alert('Der Node konnte nicht geladen werden: ' + errorMessage(cause));

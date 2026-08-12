@@ -2,8 +2,8 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 
 import { errorMessage } from '../../util/errors';
 import { AuthService } from '../../services/auth.service';
+import { ContentFlowService } from '../../services/content-flow.service';
 import { CurationService } from '../../services/curation.service';
-import { NavigationService } from '../../services/navigation.service';
 import { LoginComponent } from '../login.component';
 import { NodesSelectorComponent, NodesSelectorOption } from '../nodes-selector.component';
 
@@ -24,7 +24,7 @@ import { NodesSelectorComponent, NodesSelectorOption } from '../nodes-selector.c
 export class OwnContentScreenComponent {
   protected readonly auth = inject(AuthService);
   private readonly curation = inject(CurationService);
-  private readonly navigation = inject(NavigationService);
+  private readonly contentFlow = inject(ContentFlowService);
 
   protected readonly error = signal<string | null>(null);
   protected readonly loading = signal(false);
@@ -64,14 +64,18 @@ export class OwnContentScreenComponent {
     }
   };
 
-  /** Load the picked node into the flow and hand over to the *Inhaltsoptionen* screen. */
+  /**
+   * Load the picked node into the flow and hand over to the *Inhaltsoptionen* screen — which takes
+   * the tab to that content's own page in the repository, see
+   * {@link ContentFlowService.showContentOptions}.
+   */
   private async open(nodeId: string | undefined): Promise<void> {
     if (!nodeId) return;
     this.error.set(null);
     this.loading.set(true);
     try {
       await this.curation.openNode(nodeId);
-      this.navigation.go('content-options');
+      await this.contentFlow.showContentOptions();
     } catch (cause: unknown) {
       this.error.set('Der Inhalt konnte nicht geladen werden: ' + errorMessage(cause));
     } finally {

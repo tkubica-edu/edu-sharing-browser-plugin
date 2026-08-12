@@ -31,6 +31,11 @@ export interface NavStep {
   tab: ScreenId | null;
 }
 
+/** A step together with the steps behind it — a whole navigation state, as a resume carries it. */
+export interface NavState extends NavStep {
+  trail: readonly NavStep[];
+}
+
 /** How many steps back are kept. Deep enough for any flow, bounded so nothing accumulates. */
 const TRAIL_LIMIT = 20;
 
@@ -241,6 +246,25 @@ export class NavigationService {
     this.trail.set([]);
     if (!this.conditions.snapshot().loggedIn) return this.open('login', null);
     this.openMenu();
+  }
+
+  /**
+   * The state a {@link go} to `id` would leave behind, without performing it: the step plus the way
+   * to it. Null when the section could not be entered at all, exactly as `go` refuses it.
+   *
+   * For a step that belongs on another page (see ContentFlowService): it is carried across in the
+   * stored state instead of being opened here, so the panel about to be torn down stays on the screen
+   * the user is looking at rather than rendering the next one for the instant before the load.
+   */
+  stateFor(id: SectionId, options?: { tab?: ScreenId }): NavState | null {
+    const conditions = this.conditions.snapshot();
+    const section = this.sectionOf(id);
+    if (!section?.visible(conditions) || !this.isEnabled(section, conditions)) return null;
+    const behind =
+      id === this.section()
+        ? this.trail()
+        : [...this.trail(), { section: this.section(), tab: this.screen() }];
+    return { section: id, tab: options?.tab ?? null, trail: behind.slice(-TRAIL_LIMIT) };
   }
 
   /**

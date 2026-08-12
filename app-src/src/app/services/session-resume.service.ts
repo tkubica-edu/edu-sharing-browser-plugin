@@ -5,7 +5,7 @@ import { ScreenId, SectionId } from '../model/navigation';
 import { BrowserExtensionService } from './browser-extension.service';
 import { ConditionsService } from './conditions.service';
 import { CurationService, NodeSource } from './curation.service';
-import { NavStep, NavigationService } from './navigation.service';
+import { NavState, NavStep, NavigationService } from './navigation.service';
 
 /** What is carried across a page change. Ids only — everything else is re-derived on the new page. */
 interface ResumeState {
@@ -79,14 +79,22 @@ export class SessionResumeService {
    * node survives that navigation — see {@link restore}, which otherwise drops a node that only
    * described the page being left.
    *
+   * `state` is where the panel should come back, for a step that belongs on the page being opened:
+   * it is stored instead of the step the panel is on, so entering it never has to happen here — see
+   * NavigationService.stateFor.
+   *
    * This is the app's LAST write: tracking is switched off first, because the navigation that
    * brought us here was itself a state change, so the effect above is already scheduled and would
    * otherwise land *after* this one — with the page being left as the state's page, which is exactly
    * what this call is correcting. Whoever cancels the navigation calls {@link track} again.
    */
-  async save(targetUrl?: string): Promise<void> {
+  async save(targetUrl?: string, state?: NavState): Promise<void> {
     this.tracking.set(false);
-    await this.write({ ...this.snapshot(), url: targetUrl ?? this.conditions.activeUrl() });
+    await this.write({
+      ...this.snapshot(),
+      url: targetUrl ?? this.conditions.activeUrl(),
+      ...(state ? { section: state.section, tab: state.tab, trail: [...state.trail] } : {})
+    });
   }
 
   /** Where the user is. Reads every signal the state is made of, so the effect tracks them all. */

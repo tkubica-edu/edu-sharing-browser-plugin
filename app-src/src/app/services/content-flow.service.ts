@@ -3,7 +3,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { BrowserExtensionService } from './browser-extension.service';
 import { ConditionsService } from './conditions.service';
 import { CurationService } from './curation.service';
-import { NavigationService } from './navigation.service';
+import { NavState, NavigationService } from './navigation.service';
 import { NodeConnectorService } from './node-connector.service';
 import { OnlyOfficeDocumentService } from './onlyoffice-document.service';
 import { SessionResumeService } from './session-resume.service';
@@ -15,6 +15,10 @@ import { SessionResumeService } from './session-resume.service';
  * it means accompanying that editor (Bearbeitungsmodus) — everything else has nothing to edit
  * outside the panel and goes straight to the Qualitätsprüfung. The check needs the repository's
  * connector list, so it is asynchronous; {@link deciding} lets the caller show that.
+ *
+ * It is also where the tab is taken along: two of the steps belong on a page of their own — the
+ * editing on the editor's, the Inhaltsoptionen on the content's — and the panel is restored on it
+ * (see {@link openPage}).
  */
 @Injectable({ providedIn: 'root' })
 export class ContentFlowService {
@@ -64,6 +68,41 @@ export class ContentFlowService {
   }
 
   /**
+   * "Inhaltsoptionen" for a content the user picked themselves (Meine Inhalte, Verlauf), on that
+   * content's own page in the repository (`…/components/render/<id>`).
+   *
+   * Picking a content is choosing what to work on, so the tab follows: the page then shows the very
+   * node the panel's steps act on, and everything the repository knows about it is one click away
+   * instead of behind the panel. The panel comes back on this step, working on the same node — it
+   * cannot survive the load, so it is restored (see {@link openPage}).
+   *
+   * The step is *not* entered before that load: it belongs to the page being opened, so it is carried
+   * across in the stored state (NavigationService.stateFor) and the panel stays on the screen the user
+   * picked from until the page is there. Entering it here would show the Inhaltsoptionen for the
+   * moment before the load replaces them, which reads as the panel arriving and then reloading.
+   *
+   * Where no load follows — the content's page is already open, or the tab could not be taken there —
+   * the step is entered right away instead.
+   */
+  async showContentOptions(): Promise<void> {
+    const target = this.curation.activeNode()?.link;
+    const ahead = target && target !== this.conditions.activeUrl()
+      ? this.navigation.stateFor('content-options')
+      : null;
+    if (!target || !ahead) {
+      this.navigation.go('content-options');
+      return;
+    }
+    try {
+      await this.openPage(target, ahead);
+    } catch (cause: unknown) {
+      // The page stayed, so the step has to be entered here after all — nothing will restore it.
+      this.navigation.go('content-options');
+      throw cause;
+    }
+  }
+
+  /**
    * "Qualitätsprüfung": the quality and metadata step, straight from a node — nothing to decide.
    * On the Qualität tab: that is what the step is entered for, and the metadata are worked on off
    * the back of it.
@@ -101,22 +140,32 @@ export class ContentFlowService {
    * Take the current tab to where the content is edited: the connector's URL, or the node's page in
    * the repository (`…/components/render/<id>`) when there is none — *unless the editing is already
    * on screen*, see {@link alreadyOpen}.
-   *
-   * The panel cannot survive that load — it is an iframe in the page — so it is *restored* instead:
-   * the state is written to storage first, the background worker reopens the panel on the new page,
-   * and the app picks the state back up on boot. Same tab, not a new one: editing in a window the
-   * panel cannot reach would leave the two apart.
    */
   private async openNodePage(connectorUrl?: string): Promise<void> {
     const node = this.curation.activeNode();
     if (!node) return;
     const target = connectorUrl || node.link;
     if (this.alreadyOpen(node.nodeId, target)) return;
+    await this.openPage(target);
+  }
+
+  /**
+   * Take the current tab to `target` and have the panel come back there — on the step it is on, or on
+   * `state` where the step belongs to the page being opened. A tab that already stands on that page is
+   * left alone: there is nothing to navigate to.
+   *
+   * The panel cannot survive the load — it is an iframe in the page — so it is *restored* instead:
+   * the state is written to storage first, the background worker reopens the panel on the new page,
+   * and the app picks the state back up on boot. Same tab, not a new one: a content opened in a
+   * window the panel cannot reach would leave the two apart.
+   */
+  private async openPage(target: string, state?: NavState): Promise<void> {
+    if (this.conditions.activeUrl() === target) return;
     // Save BEFORE navigating: the load tears this app down without further notice. The page we are
     // about to open goes into the state as the page it belongs to, so the panel comes back working
     // on it — this navigation is the flow continuing, not the page changing under it (see
     // SessionResumeService.nodeStillApplies).
-    await this.sessionResume.save(target);
+    await this.sessionResume.save(target, state);
     try {
       await this.browserExtension.navigateTab(target);
     } catch (cause: unknown) {

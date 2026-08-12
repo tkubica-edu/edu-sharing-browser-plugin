@@ -24,6 +24,17 @@ content **releases a content the user picked** — going back into *Eigene Inhal
 page (`CurationService.releaseChosenContent`). The trail is carried across a page change with the
 rest of the session state (`SessionResumeService`).
 
+**Picking a content takes the tab with it**: a node chosen in *Meine Inhalte* or im *Verlauf* opens
+its own page in the repository (`…/components/render/<id>`) and the panel comes back there on
+*Inhaltsoptionen*, working on that same node (`ContentFlowService.showContentOptions`). The page then
+shows the content the panel's steps act on. The panel cannot survive the load — it is an iframe in
+the page — so the state is written to storage first and restored on boot, exactly as for the
+*Bearbeitungsmodus*, which takes the tab to the connector the same way. The step is **not entered
+before the load**: it is carried across in that stored state (`NavigationService.stateFor`) and the
+panel stays on the screen the content was picked from, so the Inhaltsoptionen are not shown for the
+moment before the page replaces them. A tab already standing on that page is left alone — then there
+is no load, and the step is entered right away.
+
 On an **OnlyOffice page the edited document is the active node from the start**: the sidebar asks
 the page-side plugin once on boot for its identity (`REQUEST_DOCUMENT_INFO` → `DOCUMENT_INFO`, see
 `content/CLAUDE.md`), loads that node and adopts it (`CurationService.adoptDetectedNode`). So
