@@ -2,22 +2,10 @@ import { Injectable, inject } from '@angular/core';
 
 import { APP_CONFIG } from '../config';
 import { MdsValues } from '../util/mds-values';
+import { SOURCE_TEXT_KEY, toEnvelope, toPayloadFields } from '../util/agent-payload';
 import { BrowserExtensionService, UploadedNode } from './browser-extension.service';
 import { MetadataAgentApiService } from './metadata-agent-api.service';
 import { errorMessage } from './../util/errors';
-
-/**
- * The envelope keys the agent's payload carries alongside the field values — which set the values
- * are read against. They travel at the top level of the request, next to the fields themselves.
- */
-const ENVELOPE_KEYS = ['contextName', 'schemaVersion', 'metadataset', 'metadataset_uri'] as const;
-
-/**
- * The agent's own record of where its result came from. Not properties of the content, so they are
- * not sent as fields: the page's raw text travels as `extended_text` (which is what
- * `write_extended_data` writes), and `_origins` describes the run rather than the content.
- */
-const SOURCE_TEXT_KEY = '_source_text';
 
 /** How a screenshot for the preview is taken; the agent's own default for an embedded canvas. */
 const SCREENSHOT_METHOD = 'pageshot';
@@ -82,14 +70,14 @@ export class MetadataUploadService {
     collections: readonly string[] = [],
   ): Promise<UploadOutcome> {
     const body: Record<string, unknown> = {
-      // The fields go at the TOP LEVEL, one key per property — `cclom:title`, `ccm:wwwurl`, the
-      // quality criteria, all of it. What the endpoint takes under `metadata` it writes into the
-      // node's extended data instead, which is the wrong place for a property the metadata set
-      // defines: it would be stored beside the node's own fields rather than as them.
+      // The payload in the shape the canvas states it in (`getMetadataForExport`): the envelope at the
+      // top level, and the properties — `cclom:title`, `ccm:wwwurl`, the quality criteria — one level
+      // in under `metadata`. That is where the endpoint reads them, so this is not the panel's own
+      // arrangement to make.
       //
-      // Before the flags below, so a field that happened to be named like one cannot displace it.
-      ...this.envelopeOf(payload),
-      ...this.fieldsOf(values),
+      // Before the flags below, so a payload key that happened to be named like one cannot displace it.
+      ...toEnvelope(payload),
+      metadata: toPayloadFields(values),
       repository: APP_CONFIG.uploadRepository,
       // Never here: the question is answered BEFORE anything is curated — the panel looks the open
       // page up as soon as it is opened and adopts the content the repository already holds for it
@@ -120,34 +108,6 @@ export class MetadataUploadService {
     } catch (cause: unknown) {
       return { ok: false, error: errorMessage(cause) };
     }
-  }
-
-  /**
-   * The field values as request keys, each as the list the property is.
-   *
-   * Deliberately NOT unwrapped to a bare value when there happens to be one of it: how many values a
-   * property holds right now says nothing about how many it *takes*. `ccm:oeh_buffet_criteria` is a
-   * list of criteria, and sending the single one that is ticked as a bare string makes it a
-   * different property than the one with two ticked. The endpoint documents its fields with plain
-   * values (`"cclom:title": "…"`), and a one-element list is that same value said in the shape the
-   * repository stores it in.
-   *
-   * An empty one is left out altogether — it says nothing, and sending it would clear a field the
-   * editor never touched.
-   */
-  private fieldsOf(values: MdsValues): Record<string, unknown> {
-    return Object.fromEntries(Object.entries(values).filter(([, value]) => value?.length));
-  }
-
-  /** The envelope fields of an agent payload, skipping the ones it did not deliver. */
-  private envelopeOf(payload: Record<string, unknown> | null): Record<string, unknown> {
-    const source = payload ?? {};
-    return Object.fromEntries(
-      ENVELOPE_KEYS.filter((key) => source[key] !== undefined && source[key] !== null).map((key) => [
-        key,
-        source[key]
-      ]),
-    );
   }
 
   private describe(result: {
