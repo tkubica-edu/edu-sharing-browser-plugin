@@ -11,6 +11,7 @@
 /** A leaf screen: exactly one component is rendered for it. */
 export type ScreenId =
   | 'login'
+  | 'ai-assistant'
   | 'settings'
   | 'add-content'
   | 'new-document'
@@ -35,6 +36,7 @@ export type ScreenId =
 export type SectionId =
   | 'menu'
   | 'login'
+  | 'ai-assistant'
   | 'settings'
   | 'add-content'
   | 'new-document'
@@ -181,6 +183,20 @@ export const SECTIONS: readonly AppSection[] = [
     // from the user bar; the landing logic uses `loggedIn`, so a guest is never sent here.
     visible: (c) => !c.hasSession,
     tabs: [{ id: 'login', label: 'Anmelden' }]
+  },
+  {
+    id: 'ai-assistant',
+    label: 'Boerdi - KI-Assistent',
+    description: 'Eine Frage an den KI-Assistenten stellen',
+    // The assistant belongs to the WLO bundle, on the same condition its canvas does: where the
+    // browser extension custom web component is off there is no assistant to offer.
+    //
+    // Reached from the offer above the session bar rather than from the menu, the way "Anmelden" is
+    // — both are about the panel itself rather than about the open content (AiAssistantBarComponent).
+    visible: requiresLogin((c) => c.browserExtensionCustomWebComponent),
+    // Nothing but text so far, so the bottom edge stays the session bar's — see AppSection.plain.
+    plain: true,
+    tabs: [{ id: 'ai-assistant', label: 'Frage stellen' }]
   },
 
   // ---- Main menu ----------------------------------------------------------

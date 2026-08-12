@@ -1,0 +1,22 @@
+@if (visible()) {
+  <aside class="ai-bar">
+    <!-- The whole row is the control, not just the label at its end: one target, the same way the
+         session bar under it is one. -->
+    <!-- Disabled while a write is in flight: leaving for the assistant would take the screen the
+         save is reporting back to with it (see BusyService). -->
+    <button class="ai-row" [disabled]="busy.busy()" [title]="busy.hint() ?? hint()"
+            (click)="ask()">
+      <!-- The mascot is its own circle, so the row gives it no disc to sit on. Decorative: the row
+           says who is being asked in the text beside it. -->
+      <img class="ai-avatar" src="../icons/boerdi.svg" alt=""
+           (error)="hideBrokenAvatar($event)" />
+      <span class="ai-name">{{ name }}</span>
+      <span class="ai-cta">
+        Frage stellen
+        <svg class="ai-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M5 12h13" /><path d="M12 5l7 7-7 7" /></svg>
+      </span>
+    </button>
+  </aside>
+}

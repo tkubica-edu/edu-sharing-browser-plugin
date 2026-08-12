@@ -50,6 +50,7 @@
   } @else {
     @switch (navigation.screen()) {
       @case ('login') { <es-login></es-login> }
+      @case ('ai-assistant') { <es-ai-assistant-screen></es-ai-assistant-screen> }
       @case ('add-content') { <es-add-content-screen></es-add-content-screen> }
       @case ('new-document') { <es-new-document-screen></es-new-document-screen> }
       @case ('add-material') { <es-add-material-screen></es-add-material-screen> }
@@ -74,6 +75,9 @@
 </main>
 
 <es-action-bar></es-action-bar>
+
+<!-- Above the session bar, and only in the WLO context: who there is to ask (AiAssistantBarComponent). -->
+<es-ai-assistant-bar></es-ai-assistant-bar>
 
 <!-- The session's bar at the bottom edge; it decides itself when it applies (UserBarComponent). -->
 <es-user-bar></es-user-bar>

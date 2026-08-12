@@ -21,6 +21,7 @@ import { PageRecognitionService } from './services/page-recognition.service';
 import { SessionResumeService } from './services/session-resume.service';
 
 import { ActionBarComponent } from './components/action-bar.component';
+import { AiAssistantBarComponent } from './components/ai-assistant-bar.component';
 import { HistoryComponent } from './components/history.component';
 import { LoginComponent } from './components/login.component';
 import { MenuComponent } from './components/menu.component';
@@ -41,6 +42,7 @@ import { MetadataScreenComponent } from './components/screens/metadata-screen.co
 import { NewDocumentScreenComponent } from './components/screens/new-document-screen.component';
 import { OwnContentScreenComponent } from './components/screens/own-content-screen.component';
 import { PreviewScreenComponent } from './components/screens/preview-screen.component';
+import { AiAssistantScreenComponent } from './components/screens/ai-assistant-screen.component';
 import { QualityCheckScreenComponent } from './components/screens/quality-check-screen.component';
 import { ShareScreenComponent } from './components/screens/share-screen.component';
 import { UsagesScreenComponent } from './components/screens/usages-screen.component';
@@ -54,8 +56,9 @@ const DISCARD_PROMPT =
 @Component({
   selector: 'es-root',
   imports: [
-    ActionBarComponent, TabBarComponent, UserBarComponent, MenuComponent,
-    LoginComponent, HistoryComponent, SettingsComponent, SearchComponent, AddContentScreenComponent,
+    ActionBarComponent, TabBarComponent, UserBarComponent, AiAssistantBarComponent, MenuComponent,
+    LoginComponent, AiAssistantScreenComponent, HistoryComponent, SettingsComponent,
+    SearchComponent, AddContentScreenComponent,
     ContentOptionsScreenComponent, CurationScreenComponent, CurationPreviewScreenComponent,
     FindContentScreenComponent,
     NewDocumentScreenComponent, AddMaterialScreenComponent, OwnContentScreenComponent,

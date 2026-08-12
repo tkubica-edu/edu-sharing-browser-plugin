@@ -1,0 +1,57 @@
+:host { display: block; flex: 0 0 auto; }
+
+// Carries the brand colour rather than the surface the bars around it use: the offer is the one
+// thing down here that is not a statement about the panel's own state, and it is meant to be seen.
+.ai-bar {
+  background: var(--es-blue);
+  border-top: 1px solid var(--es-border);
+}
+
+.ai-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  // Shallower than the session bar's row: the offer sits above it, and two rows of equal weight at
+  // the bottom edge would read as one block.
+  padding: 10px 18px;
+  background: none;
+  border: none;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover:not([disabled]) { background: var(--es-blue-600); }
+  &[disabled] { opacity: 0.5; cursor: not-allowed; }
+}
+
+// The mascot draws its own disc, so it gets a box and nothing else — the size the session bar's
+// avatar has below it, so the two line up down the panel's edge.
+.ai-avatar {
+  flex: 0 0 auto;
+  display: block;
+  width: 32px;
+  height: 32px;
+}
+
+// Any name fits: cut off rather than pushing the call to action out of the bar.
+.ai-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ai-cta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ai-arrow { width: 18px; height: 18px; }
