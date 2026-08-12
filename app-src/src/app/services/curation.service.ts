@@ -6,6 +6,7 @@ import { WorkflowStatus } from '../model/workflow';
 import { DRAFT_NODE_ID } from '../util/mds-node';
 import { MdsValues, firstString, toMdsEditorValues } from '../util/mds-values';
 import { withAgentLicense } from '../util/agent-fields';
+import { toExtendedFields } from '../util/agent-payload';
 import { errorMessage } from '../util/errors';
 import { renderLink } from '../util/repository-links';
 import { BrowserExtensionCustomWebComponentService } from './browser-extension-custom-web-component.service';
@@ -557,6 +558,18 @@ export class CurationService {
    */
   readonly metadataLocked = computed(() => this.saving());
 
+  /**
+   * Whether the save goes through the metadata agent's upload rather than writing the node itself —
+   * the route of a session that is not the user's own (see {@link saveThroughAgent}).
+   *
+   * It decides more than which request is sent: the upload only ever CREATES, so along that route a
+   * written content cannot be saved again without producing a second node (which is what the footer
+   * reads, see ActionBarService).
+   */
+  readonly savesThroughAgent = computed(
+    () => this.browserExtensionCustomWebComponent.enabled() && !this.auth.loggedIn(),
+  );
+
   /** A metadata-agent result or an active node exists. */
   readonly hasEditableMetadata = computed(
     () => this.metadataAgent.lastRun()?.ok === true || this.activeNode() !== null,
@@ -1065,8 +1078,8 @@ export class CurationService {
    * Save the metadata: create the node the first time, otherwise update it in place. Returns
    * true on success so the caller can offer the next step.
    *
-   * A freshly curated content takes a different route while the browser extension custom web
-   * component is enabled — see {@link saveThroughAgent}.
+   * A content curated in a session that is not the user's own takes a different route — see
+   * {@link saveThroughAgent}.
    *
    * `payload` is the open editor's own view of what it committed (MetadataEditor.payload), where it
    * has one. It is not what gets written — `values` is — but what the content's metadata is re-read
@@ -1082,12 +1095,14 @@ export class CurationService {
     // Before the branch, so it holds for both editors: the licence is written even where the open form
     // had no widget to report it from (see {@link withAgentLicense}).
     values = withAgentLicense(values, this.metadataAgent.lastRun()?.parsed?.raw ?? null);
-    // With the browser extension custom web component every save goes through the agent's upload —
-    // not just the first one. The nodes it writes belong to the agent's own privileges, so the
-    // session the panel runs under (a guest) may neither read nor edit them: an update in place is
-    // not available for them, and a second save can only be another upload. See
-    // {@link saveThroughAgent}.
-    if (this.browserExtensionCustomWebComponent.enabled()) return this.saveThroughAgent(values, payload);
+    // Only a session that is not the user's own goes through the agent's upload: it writes with the
+    // agent's privileges, which is the one way a guest session gets a content into the repository at
+    // all (see {@link saveThroughAgent}). A signed-in user writes the node themselves — as their own,
+    // in the folder they picked for it, and re-editable afterwards — even with the browser extension
+    // custom web component enabled. What the agent's upload does besides creating the node is done
+    // here in turn: the extended fields ({@link writeExtendedData}), the quality workflow
+    // ({@link writePendingQuality}) and the collections ({@link assignToCollections}).
+    if (this.savesThroughAgent()) return this.saveThroughAgent(values, payload);
     this.saving.set(true);
     this.saveError.set(null);
     try {
@@ -1103,6 +1118,8 @@ export class CurationService {
       this.saved.set(true);
       // Written now, so the node's own properties are what the steps read back from here on.
       this.recordedValues.set({});
+      // After the metadata and before the workflow, the order the agent's own pipeline writes them in.
+      await this.writeExtendedData(saved.nodeId, values, payload);
       await this.writePendingQuality(saved.nodeId);
       // Before the reload below, so the node comes back already carrying it.
       await this.writePendingPreview(saved.nodeId);
@@ -1130,10 +1147,15 @@ export class CurationService {
   }
 
   /**
-   * Save through the metadata agent's own upload instead of writing the node ourselves. That is the
-   * save belonging to the WLO canvas, which is the editor while the browser extension custom web
-   * component is enabled: the agent creates the node, checks for duplicates and starts the editorial
-   * workflow — a plain node create does none of that.
+   * Save through the metadata agent's own upload instead of writing the node ourselves — the save of
+   * a session that is not the user's own: the guest session the browser extension custom web
+   * component brings may not create a node in the repository at all, and the agent's upload writes
+   * with the agent's own privileges. It creates the node, files it and starts the workflow in one
+   * request.
+   *
+   * A signed-in user does not come here even with that web component enabled: they write the node
+   * themselves (see {@link save}), which is the only route that can put the content where they picked
+   * and let them edit it afterwards.
    *
    * `/upload` only ever CREATES: it takes no node id, and the nodes it writes are the agent's, not
    * the panel session's. So a second save cannot update what the first one wrote — it uploads
@@ -1325,6 +1347,39 @@ export class CurationService {
     this.nodeSource.set(source);
     this.previewNode.set(node);
     this.nodeMetadata.set({ ...(node.properties ?? {}) });
+  }
+
+  /**
+   * Write the WLO extended fields onto the saved node: the content type, the whole payload as JSON
+   * and the raw text the metadata was read from (see `toExtendedFields`).
+   *
+   * WLO only — they are fields of the additional web component's world, and a repository without it
+   * neither defines them nor has a payload to fill them from. The metadata set does not define them
+   * either, which is why they are a write of their own; see
+   * RepositoryNodeService.writeExtendedData.
+   *
+   * `payload` is the editor's own view of what it committed, the agent's last result standing in for
+   * it — the same fallback the metadata is re-read along.
+   *
+   * A field that does not get through is reported and no more: it describes the content, it is not
+   * the content, and the node the save wrote stands either way.
+   */
+  private async writeExtendedData(
+    nodeId: string,
+    values: MdsValues,
+    payload: Record<string, unknown> | null,
+  ): Promise<void> {
+    if (!this.browserExtensionCustomWebComponent.enabled()) return;
+    const source = payload ?? this.metadataAgent.lastRun()?.parsed?.raw ?? null;
+    try {
+      const failed = await this.repositoryNodes.writeExtendedData(
+        nodeId,
+        toExtendedFields(values, source),
+      );
+      if (failed.length) console.warn('extended fields not written', failed);
+    } catch (cause: unknown) {
+      console.warn('extended fields not written', errorMessage(cause));
+    }
   }
 
   /** Hand a confirmation given before the save on to the node the save produced. */

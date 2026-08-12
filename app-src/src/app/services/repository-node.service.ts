@@ -65,19 +65,64 @@ export class RepositoryNodeService {
   /**
    * Create a child (`ccm:io`) with the given MDS properties in `parent` — the folder picked for the
    * content, or the user's inbox where there is none.
+   *
+   * `obeyMds` is stated rather than left to the server's default: the properties come from a form the
+   * metadata set defines, and the set is what decides which of them a node may carry. The fields it
+   * does not define are dropped here on purpose — the ones that still belong on the node are written
+   * afterwards, by the one call that does not obey it (see {@link writeExtendedData}).
    */
   async create(values: MdsValues, parent: string = INBOX): Promise<NodeSummary> {
-    const node = await firstValueFrom(
-      this.nodes.createChild({
+    const entry = await firstValueFrom(
+      this.nodesUnwrapped.createChild({
         repository: HOME_REPOSITORY,
         node: parent,
         type: 'ccm:io',
         renameIfExists: true,
         versionComment: 'MAIN_FILE_UPLOAD',
+        obeyMds: true,
         body: this.toCreateBody(values)
       })
     );
-    return { nodeId: node.ref.id, name: node.name };
+    return { nodeId: entry.node.ref.id, name: entry.node.name };
+  }
+
+  /**
+   * Write the WLO extended fields onto a node (see `toExtendedFields`) — a call of its own, because
+   * the metadata set does not define them: a write that obeys the set drops them silently, so this
+   * one does not obey it and says what it is for in its version comment.
+   *
+   * Answers which fields did not get through, so the caller can report an incomplete write without
+   * losing the content over it. A bulk write that fails is retried field by field: the repository
+   * refuses the whole request over a single property it will not take, and the other fields are
+   * worth having (the raw text is the largest of them by far and the likeliest to be refused).
+   */
+  async writeExtendedData(nodeId: string, fields: MdsValues): Promise<string[]> {
+    const names = Object.keys(fields);
+    if (!names.length) return [];
+    try {
+      await this.writeUnchecked(nodeId, fields);
+      return [];
+    } catch {
+      const failed: string[] = [];
+      for (const name of names) {
+        try {
+          await this.writeUnchecked(nodeId, { [name]: fields[name] });
+        } catch {
+          failed.push(name);
+        }
+      }
+      return failed;
+    }
+  }
+
+  /** One metadata write that does not obey the metadata set — see {@link writeExtendedData}. */
+  private writeUnchecked(nodeId: string, fields: MdsValues): Promise<Node> {
+    return firstValueFrom(
+      this.nodes.editNodeMetadata(nodeId, fields, {
+        versionComment: 'EXTENDED_DATA',
+        obeyMds: false
+      })
+    );
   }
 
   /**

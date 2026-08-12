@@ -130,7 +130,12 @@ The options:
   weiterleiten** → **Persönliche Ablage** → *Qualitätsprüfung* → *Inhaltsübersicht*. Two steps of
   their own, each offered only where it applies: the forwarding while the repository config enables
   the browser extension custom web component, the *Persönliche Ablage* for a session of the user's
-  own (still a placeholder for the component that will fill it). Where neither applies they fall
+  own. That step offers both of the user's own filing places: the folder, through the repository's
+  own Ablageort control (`edu-sharing-location-picker`, wrapped as `es-storage-location-picker`,
+  seeded with the user's `defaultInboxFolder` setting and otherwise with `-inbox-`), and — optionally
+  — a collection, through the same `es-collection-selector` the forwarding uses. The collection has
+  no confirmation of its own; the footer's *Weiter* takes the ticked one over as it leads on. Where
+  neither applies they fall
   away and the preview leads straight into the *Qualitätsprüfung*. Nothing is written here — **the
   content is created by the one save at the end of the Qualitätsprüfung**, which writes the quality
   criteria, whatever the steps recorded and the metadata the editor commits in one go (so
@@ -144,11 +149,12 @@ The options:
     leads into the **Sammlung auswählen** step for that, and the content then goes into the picked
     collection *only*. A group without children says „Keine Sammlungsauswahl erforderlich". The
     choice is held by the flow (`CurationService.editorialTargets`), not written where it is made —
-    the content has no node yet — and the save behind the step carries it out: with the additional
-    web component the collection IDs travel in `/upload`'s `collection_id` (a list, however many were
-    picked), otherwise the node is created first and
-    `CollectionServiceUnwrapped.addToCollection` follows for each. Only collections the content is
-    not in yet, so re-saving does not file it twice.
+    the content has no node yet — and the save behind the step carries it out, together with the
+    collections the *Persönliche Ablage* picked (`CurationService.filedCollections`, each collection
+    once however many steps reached it): the node is created first and
+    `CollectionServiceUnwrapped.addToCollection` follows for each, and only along the agent-upload
+    route (see below) do the IDs travel in `/upload`'s `collection_id` instead. Only collections the
+    content is not in yet, so re-saving does not file it twice.
   - **Sammlung auswählen** is a step of its own, entered from a group's row and returning to it. It
     names the group it belongs to (`EditorialGroupsService.picking`) and what is recorded for it so
     far, and shows the collection picker (`es-collection-selector`, `edu-sharing-nodes-selector` in
@@ -258,6 +264,26 @@ view on the options menu.
 Nothing else changes: *Inhalt erschließen* still runs the metadata agent through the background
 worker, its result is loaded into the editor, and saving still creates or updates the repository
 node and records it in the Verlauf.
+
+### Which route the save takes
+
+The session decides, not the flag (`CurationService.savesThroughAgent`):
+
+- **A signed-in user writes the node themselves**, with the web component enabled as without it
+  (`RepositoryNodeService.create`, `obeyMds=true`, in the folder the *Persönliche Ablage* picked and
+  `-inbox-` otherwise). What the agent's `/upload` pipeline would do besides creating the node is
+  then done in turn: the WLO **extended fields** in a write of their own —
+  `POST …/nodes/-home-/{id}/metadata?versionComment=EXTENDED_DATA&obeyMds=false` with
+  `ccm:oeh_extendedType`, `ccm:oeh_lrt`, `ccm:oeh_extendedData` (the whole payload as JSON, in the
+  canvas' export shape) and `ccm:oeh_extendedText` (the raw text), because the metadata set defines
+  none of them and a write that obeys it drops them silently; a bulk write the repository refuses is
+  retried field by field (`RepositoryNodeService.writeExtendedData`) — then the quality workflow
+  status, then the collections. Every further save updates that node in place.
+- **A guest session** (the web component's own, brought by the embedding host) may not create a node
+  at all, so it saves through the agent's `POST /upload`, which writes with the agent's privileges and
+  creates, files and starts the workflow in one request. That endpoint only ever CREATES, so the
+  footer offers no second save along this route, and a folder picked for the user's own storage cannot
+  be honoured — `/upload` always creates in the inbox the agent is configured with.
 
 Both editors implement the same `MetadataEditor` contract (`ready` + `commit()`), so the footer
 owns "Speichern" either way and the metadata screen only picks which one to render. In
