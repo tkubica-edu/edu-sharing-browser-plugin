@@ -407,6 +407,10 @@ resets per session.
   `CollectionService` wrapper is read-only.
 - **Broad permissions** (`host_permissions: https://*/*`, `connect-src https:`) are
   required because the repository URL is user-editable; expect stricter store review.
+  `connect-src` also allows `data:` and `blob:`, because the bundle reads a picture it was
+  handed as a URL of its own: the preview widget `fetch`es the picked node's inline
+  `preview.data` (a data URL) to turn it into a file, and the panel does the same with the
+  object URL of a picture picked in the widget (`CurationService`).
 - The repository URL cannot be changed at runtime without reloading the sidebar —
   the library freezes `rootUrl` at bootstrap and does not export its config classes.
 - **MDS editor rendering needs verification in a real browser.** Two things must hold:
