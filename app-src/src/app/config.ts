@@ -20,15 +20,13 @@ export interface CriterionScheme {
 /** One of MetalookUp's checks, and the criterion it answers — see `APP_CONFIG.qualityMetalookupRules`. */
 export interface MetalookupRule {
   /**
-   * How the check is recognised in the answer: a distinctive part of the `description` it reports.
+   * How the check is recognised in the answer: the key it reports its result under
+   * (`featureExtractions[].propertyId`), which each of MetalookUp's sidecars carries as a deployment
+   * variable of its own (`PROPERTY_ID` / `DYNACONF_PROPERTY_ID`).
    *
-   * Its `propertyId` would be the obvious key and cannot be used: MetalookUp's sidecars each carry it
-   * as a deployment variable (`DYNACONF_PROPERTY_ID` in every sidecar's `score.yml`, and in
-   * `k8s/manifests.yml`), and staging has nearly all of them set to the same copy-pasted
-   * `ccm:oeh_text_reading_time`. Until those are set per service, the description is the only thing that
-   * tells one check from another. It is a constant in each sidecar's source, not free text.
+   * A key this list does not name is not read at all — see `measurementOf` in `util/quality-schemes.ts`.
    */
-  readonly match: string;
+  readonly propertyId: string;
   /** What the check is called where its result is shown; MetalookUp reports no name of its own. */
   readonly label: string;
   /** The criterion it answers, by the id the metadata set gives it. */
@@ -125,59 +123,23 @@ export const APP_CONFIG = {
    * Which of MetalookUp's checks answers which quality criterion — the counterpart of
    * `qualityCriterionSchemes` for the other judge (see `judgementsForCriteria`).
    *
-   * MetalookUp measures the resource rather than reading it, so it answers where an LLM cannot: it is
-   * the only judge for Barrierearmut (an AXE audit of the rendered page) and for Urheberrecht (the
-   * licence stated in the content) — for both of those ContentJudge has no scheme at all.
+   * The list is what is read of the answer: an extraction under a key it does not name is discarded,
+   * however much the answer carries. So one entry, for the one check whose key the deployment states
+   * distinctly — the AXE audit of the rendered page under `ccm:accessibilitySummary`. It is also the
+   * criterion an LLM cannot answer at all: ContentJudge has no scheme for Barrierearmut, so
+   * MetalookUp is its only judge.
    *
    * Several checks may answer the same criterion; each is then shown and counted on its own, and the
    * criterion is only met while none of them fails. A check the answer does not carry is simply absent,
    * and one that reports no value ("No files to extract") does not count either way.
-   *
-   * Left out on purpose, for want of a criterion they would honestly answer: the JavaScript check, the
-   * blacklist for paywalls and pop-ups, the file extraction and the malicious-extension check.
    */
   qualityMetalookupRules: [
     {
-      match: 'Accessibility audit',
+      propertyId: 'ccm:accessibilitySummary',
       label: 'Barrierefreiheit (AXE)',
       criterion: 'accessible',
       met: 'atLeast',
       threshold: 0.9
-    },
-    {
-      match: 'GDPR safety standards',
-      label: 'DSGVO-Indikatoren',
-      criterion: 'ccm:oeh_quality_data_privacy',
-      met: 'atLeast',
-      threshold: 1
-    },
-    {
-      match: 'Indicators for insufficient security',
-      label: 'Sicherheits-Header',
-      criterion: 'ccm:oeh_quality_data_privacy',
-      met: 'atLeast',
-      threshold: 1
-    },
-    {
-      match: 'iframe embedding',
-      label: 'iframe-Absicherung',
-      criterion: 'ccm:oeh_quality_data_privacy',
-      met: 'atLeast',
-      threshold: 1
-    },
-    {
-      match: 'potentially malicious links',
-      label: 'Verdächtige Links',
-      criterion: 'ccm:oeh_quality_data_privacy',
-      met: 'atLeast',
-      threshold: 1
-    },
-    {
-      match: 'content for license information',
-      label: 'Lizenzangabe',
-      criterion: 'ccm:oeh_quality_copyright_law',
-      met: 'atLeast',
-      threshold: 0.5
     }
   ] as readonly MetalookupRule[],
   defaultRepositoryUrl: 'https://repository.staging.openeduhub.net/edu-sharing',

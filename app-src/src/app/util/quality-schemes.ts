@@ -127,16 +127,19 @@ function rulesFor(criterion: string): readonly MetalookupRule[] {
  * What MetalookUp's answer holds for one of its checks; `null` when the check is not in there, or when
  * it reports no value — "No files to extract" is not an answer to anything.
  *
+ * The check is found by the key it reports under, so an extraction no rule names is read by nobody:
+ * the answer carries every check the deployment ran, and only the configured keys are taken from it
+ * (see `APP_CONFIG.qualityMetalookupRules`).
+ *
  * Its whole description travels on as the reasoning: it is where the check says what it found, and for
- * several of them that is the only useful part (a list of missing security headers, the licence it
- * recognised, the number of accessibility violations).
+ * the AXE audit that is the only useful part — the number of accessibility violations behind the score.
  */
 function measurementOf(
   rule: MetalookupRule,
   measurement: MetalookupEvaluation | null
 ): CriterionJudgement | null {
-  const found = (measurement?.featureExtractions ?? []).find((extraction) =>
-    (extraction.description ?? '').includes(rule.match)
+  const found = (measurement?.featureExtractions ?? []).find(
+    (extraction) => extraction.propertyId === rule.propertyId
   );
   const value = asNumber(found?.value);
   if (!found || value === null) return null;

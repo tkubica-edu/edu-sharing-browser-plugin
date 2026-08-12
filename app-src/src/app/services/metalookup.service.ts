@@ -32,10 +32,13 @@ export interface MetalookupResource {
  * a number here is not yet an answer. That reading is `measurementOf`'s, in `util/quality-schemes.ts`.
  */
 export interface MetalookupRule {
-  /** The metadata property the check rates, by the id the metadata set gives it. */
+  /**
+   * The metadata property the check rates, by the id the metadata set gives it. Also how one check is
+   * told from another, and which of them are read at all — see `MetalookupRule` in `config.ts`.
+   */
   propertyId: string;
   value: number;
-  /** What the check found, in prose. Also how one check is told from another — see `MetalookupRule` in `config.ts`. */
+  /** What the check found, in prose. */
   description: string;
   /** 0 to 1, higher is more certain. */
   confidence: number;
