@@ -1,7 +1,9 @@
 import { Injectable, inject, signal } from '@angular/core';
 
 import { BrowserExtensionService, PageSource } from './browser-extension.service';
+import { DevModeService } from './dev-mode.service';
 import { MetadataAgentApiService } from './metadata-agent-api.service';
+import { EXTRACT_FIELD_ANSWER } from '../util/dev-fixtures';
 import { errorMessage } from '../util/errors';
 
 /** Reserved (non-metadata) top-level keys in the metadata-agent response. */
@@ -74,6 +76,7 @@ interface ExtractFieldAnswer {
 export class MetadataAgentService {
   private readonly browserExtension = inject(BrowserExtensionService);
   private readonly agentApi = inject(MetadataAgentApiService);
+  private readonly devMode = inject(DevModeService);
 
   private readonly lastRunState = signal<AnalyzeOutcome | null>(null);
 
@@ -177,6 +180,9 @@ export class MetadataAgentService {
    * (and its prompt) is resolved from that schema.
    */
   private async postExtractField(text: string, fieldId: string): Promise<ExtractFieldAnswer> {
+    if (this.devMode.enabled()) {
+      return this.devMode.answer(`Agent POST /extract-field (${fieldId})`, EXTRACT_FIELD_ANSWER);
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), EXTRACT_TIMEOUT_MS);
     try {

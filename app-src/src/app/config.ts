@@ -167,7 +167,13 @@ export const APP_CONFIG = {
     pendingPreview: 'eduSharingPendingPreview',
     resumeState: 'eduSharingResumeState',
     debugMode: 'eduSharingDebugMode',
-    debugDocumentNodeId: 'eduSharingDebugDocumentNodeId'
+    debugDocumentNodeId: 'eduSharingDebugDocumentNodeId',
+    /**
+     * The dev mode's switch (see DevModeService). Also read by the background worker, which fakes the
+     * metadata agent's answers under the same flag — the literal there has to stay in step with this
+     * one (`DEV_MODE_STORAGE_KEY` in background/background.js).
+     */
+    devMode: 'eduSharingDevMode'
   },
   maxHistory: 200
 };

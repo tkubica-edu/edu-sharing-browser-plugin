@@ -22,6 +22,22 @@
   </div>
 </section>
 
+<!-- Entwicklung: ersetzt die Antworten der KI-Dienste durch Fixtures. -->
+<section class="es-card">
+  <label class="check">
+    <input type="checkbox" [ngModel]="devMode.enabled()" (ngModelChange)="setDevMode($event)" />
+    <span>Dev-Modus: KI-Antworten faken</span>
+  </label>
+
+  <p class="desc">
+    Fragt die langsamen Dienste nicht, sondern antwortet sofort aus hartcodierten Beispielen: der
+    Metadaten-Agent liefert über <code>/health</code> und <code>/generate</code> eine fertige
+    Erschließung und über <code>/extract-field</code> Schlagwörter, ContentJudge meldet sich bereit
+    und beantwortet <code>/evaluate</code> mit <code>422</code>. Zum Testen gegen die echten Dienste
+    ausschalten.
+  </p>
+</section>
+
 <!-- Entwicklung: ersetzt das OnlyOffice-Plugin durch simulierte Events. -->
 <section class="es-card">
   <label class="check">

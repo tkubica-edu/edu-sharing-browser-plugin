@@ -1,7 +1,9 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 
 import { APP_CONFIG } from '../config';
 import { PageData } from './browser-extension.service';
+import { DevModeService } from './dev-mode.service';
+import { CONTENT_JUDGE_HEALTH, contentJudgeEvaluateRejection } from '../util/dev-fixtures';
 import { errorMessage } from '../util/errors';
 import { fetchJson } from '../util/json-api';
 
@@ -255,6 +257,8 @@ export function judgeableText(page: PageData | null): string | null {
  */
 @Injectable({ providedIn: 'root' })
 export class ContentJudgeService {
+  private readonly devMode = inject(DevModeService);
+
   /** True while a judgement is in flight. */
   readonly running = signal(false);
   /** The last answer; null until one arrived. */
@@ -324,12 +328,14 @@ export class ContentJudgeService {
    * be read under, no JSON object.
    */
   async health(): Promise<ContentJudgeHealth> {
-    const health = await fetchJson<ContentJudgeHealth>({
-      service: 'ContentJudge',
-      url: `${APP_CONFIG.contentJudgeApiUrl}/health/`,
-      headers: this.authHeader(),
-      timeoutMs: HEALTH_TIMEOUT_MS,
-    });
+    const health = this.devMode.enabled()
+      ? await this.devMode.answer('ContentJudge GET /health/', CONTENT_JUDGE_HEALTH)
+      : await fetchJson<ContentJudgeHealth>({
+          service: 'ContentJudge',
+          url: `${APP_CONFIG.contentJudgeApiUrl}/health/`,
+          headers: this.authHeader(),
+          timeoutMs: HEALTH_TIMEOUT_MS,
+        });
     this.lastHealth.set(health);
     return health;
   }
@@ -359,6 +365,9 @@ export class ContentJudgeService {
   }
 
   private postEvaluation(body: Record<string, unknown>): Promise<ContentJudgeEvaluation> {
+    if (this.devMode.enabled()) {
+      return this.devMode.fail('ContentJudge POST /evaluate/', contentJudgeEvaluateRejection());
+    }
     return fetchJson<ContentJudgeEvaluation>({
       service: 'ContentJudge',
       url: `${APP_CONFIG.contentJudgeApiUrl}/evaluate/`,

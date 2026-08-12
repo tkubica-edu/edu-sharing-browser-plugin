@@ -13,6 +13,7 @@ import { BusyService } from './services/busy.service';
 import { ConditionsService } from './services/conditions.service';
 import { CurationService } from './services/curation.service';
 import { DebugService } from './services/debug.service';
+import { DevModeService } from './services/dev-mode.service';
 import { HistoryEntry, HistoryService } from './services/history.service';
 import { NavigationService } from './services/navigation.service';
 import { OnlyOfficeDocumentService } from './services/onlyoffice-document.service';
@@ -93,6 +94,7 @@ export class AppComponent implements OnInit {
   private readonly onlyOfficeDocument = inject(OnlyOfficeDocumentService);
   private readonly pageRecognition = inject(PageRecognitionService);
   private readonly debug = inject(DebugService);
+  private readonly devMode = inject(DevModeService);
   private readonly sessionResume = inject(SessionResumeService);
 
   /** A node received while logged out — opened once the user logs in. */
@@ -154,6 +156,9 @@ export class AppComponent implements OnInit {
     // First of all: the debug flag decides `onlyOfficePresent`, which the section visibilities
     // and the document request below are gated on.
     await this.debug.load();
+    // Before anything can ask one of the faked services — a resumed session may start an
+    // Erschließung of its own further down this boot.
+    await this.devMode.load();
     await this.auth.init();
     await this.history.load();
     const tab = await this.browserExtension.getActiveTab().catch(() => null);

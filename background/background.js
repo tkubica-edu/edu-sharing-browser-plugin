@@ -3,7 +3,7 @@
 // POST /upload (from the worker to stay CORS-portable). Auth is handled in the sidebar app,
 // not here.
 
-/* global EDU_SHARING_CONFIG */
+/* global EDU_SHARING_CONFIG, EDU_SHARING_DEV_FIXTURES */
 
 /**
  * Fallback metadata agent, for a call that arrives without one. The agent is a repository's own
@@ -15,6 +15,48 @@ const API_URL = (typeof EDU_SHARING_CONFIG !== 'undefined' && EDU_SHARING_CONFIG
   || 'https://repository.staging.openeduhub.net/edu-sharing/rest/bapi/api/v1/proxy/metadata-agent-canvas';
 const DEFAULT_TIMEOUT_MS = (typeof EDU_SHARING_CONFIG !== 'undefined' && EDU_SHARING_CONFIG.network?.defaultTimeoutMs) || 20000;
 const GENERATE_TIMEOUT_MS = (typeof EDU_SHARING_CONFIG !== 'undefined' && EDU_SHARING_CONFIG.network?.generateTimeoutMs) || 60000;
+
+// DEV MODE
+
+/**
+ * Where the dev mode's switch is stored, and what it is when nothing is stored: on. The same key the
+ * sidebar's DevModeService reads and writes (`APP_CONFIG.storageKeys.devMode`) — the flag is one
+ * setting for both, so the switch in the settings covers this worker as well.
+ */
+const DEV_MODE_STORAGE_KEY = 'eduSharingDevMode';
+const DEV_MODE_DEFAULT = true;
+
+/**
+ * Delay before a faked answer arrives, so a caller sees the same asynchronous behaviour — spinner,
+ * in-flight guard — as with the real agent. Small, since saving the wait is the point.
+ */
+const DEV_LATENCY_MS = 300;
+
+/**
+ * Whether the metadata agent's answers are faked instead of asked for (see EDU_SHARING_DEV_FIXTURES).
+ *
+ * Read per call rather than cached: the worker outlives the sidebar and is not restarted when the
+ * switch is flipped, so a cached value would keep faking after the mode was turned off.
+ */
+async function devModeEnabled() {
+  try {
+    const items = await browser.storage.local.get({ [DEV_MODE_STORAGE_KEY]: DEV_MODE_DEFAULT });
+    return items[DEV_MODE_STORAGE_KEY] !== false;
+  } catch {
+    return DEV_MODE_DEFAULT;
+  }
+}
+
+/**
+ * A fixture as an answer: a deep copy, delivered after {@link DEV_LATENCY_MS}. Copied because the
+ * fixtures live for the worker's whole lifetime while a caller may write into what it got —
+ * without this, one run's edit would be the next run's starting point.
+ */
+async function fakeAnswer(label, fixture) {
+  await new Promise((resolve) => setTimeout(resolve, DEV_LATENCY_MS));
+  console.log(`🧪 dev mode: ${label} faked`);
+  return structuredClone(fixture);
+}
 
 // FETCH HELPERS
 
@@ -354,6 +396,7 @@ function buildGenerateBody(pageData, language) {
  * and it carries the session like the call it guards.
  */
 async function callHealth(apiUrl) {
+  if (await devModeEnabled()) return fakeAnswer('GET /health', EDU_SHARING_DEV_FIXTURES.agentHealth);
   const url = `${apiUrl}/health`;
   let response;
   try {
@@ -373,6 +416,9 @@ async function callHealth(apiUrl) {
 async function callGenerate(body, apiUrl) {
   // First health, then generate: no point sending an extraction to a base that is not answering.
   await callHealth(apiUrl);
+  if (await devModeEnabled()) {
+    return fakeAnswer('POST /generate', EDU_SHARING_DEV_FIXTURES.agentGenerate);
+  }
   const response = await fetchWithTimeout(
     `${apiUrl}/generate`,
     agentRequest({
