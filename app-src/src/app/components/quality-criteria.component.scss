@@ -211,7 +211,15 @@ input[type='checkbox'] {
   background: rgba(115, 98, 236, 0.1);
   color: var(--qc-ai);
 
+  // The alert keeps one height across every objection, however long its caption and its finding are:
+  // the two answers have to stay under the pointer while the user pages through them, and a block that
+  // resizes with each one would move them out from under it.
+  //
+  // A hard height, because that is what makes a long finding give way — it shrinks into what the rest
+  // leaves over and scrolls there (see .alert-body). Tall enough that even a four-line caption over
+  // answers wrapped onto two lines still fits, which is the narrowest a panel gets.
   &.has-violation {
+    height: 226px;
     background: var(--qc-alert-surface);
     color: var(--qc-alert);
   }
@@ -318,17 +326,27 @@ input[type='checkbox'] {
 
 // The finding between the two arrows that lead through the rest of them, with enough room around it
 // that the text does not read as part of them.
+//
+// As tall as what it says, and no taller — but the first thing to give way when the block runs out of
+// room, which is what keeps the answers under it in one place from objection to objection. `stretch`,
+// so that giving way reaches the scrolling text inside it rather than stopping here.
 .alert-body {
   display: flex;
-  align-items: center;
+  flex: 0 1 auto;
+  align-items: stretch;
   gap: 8px;
+  min-height: 0;
 }
 
 .alert-finding {
+  display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
 
   h4 {
+    flex: 0 0 auto;
     margin: 0 0 2px;
     font-size: 12px;
     font-weight: 700;
@@ -337,17 +355,24 @@ input[type='checkbox'] {
   }
 }
 
-// What the check said, in its own words — several paragraphs of Markdown at worst, so it scrolls
-// inside the block instead of pushing the criteria off the sheet. The line breaks it brought are kept.
-.alert-reason {
-  margin: 0;
-  max-height: 84px;
+// What the checks said, in the room the block has left over — several paragraphs of Markdown at worst,
+// so it scrolls there instead of pushing everything else around.
+.alert-reasons {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   // The panel behind it stays put once the end of the text is reached.
   overscroll-behavior: contain;
+}
+
+// One check's words. The line breaks it brought are kept.
+.alert-reason {
+  margin: 0;
   font-size: 12px;
   line-height: 1.4;
   white-space: pre-wrap;
+
+  + .alert-reason { margin-top: 6px; }
 }
 
 // Drawn as a bare glyph: the arrows are part of the alert, not buttons sitting in it. Disabled while
@@ -372,14 +397,15 @@ input[type='checkbox'] {
   &:focus-visible { outline: 2px solid currentcolor; outline-offset: 2px; }
 }
 
-// The two answers to the objection, at either end of the line: the one that lets the criterion pass
-// reads as a link, the one that keeps it back as the loud button it is.
+// The two answers to the objection, at either end of the line and at the foot of the block — `auto`,
+// so whatever room the finding did not need collects above them instead of moving them up.
 .alert-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px 12px;
+  margin-top: auto;
 }
 
 .alert-dismiss,

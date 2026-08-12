@@ -74,11 +74,14 @@
                       aria-label="Vorheriger Verstoß"><i esIcon="chevron_left"></i></button>
               <div class="alert-finding">
                 <h4>Möglicher identifizierter Verstoß:</h4>
-                <!-- What the check said, in its own words. Several where several of them objected to
-                     this one criterion. -->
-                @for (finding of violation.findings; track finding.scheme) {
-                  <p class="alert-reason">„{{ findingText(finding) }}“</p>
-                }
+                <!-- What the check said, in its own words, in the room the block has left over — one
+                     scrolling area for all of it, since several checks can object to the one
+                     criterion and they are all its argument. -->
+                <div class="alert-reasons">
+                  @for (finding of violation.findings; track finding.scheme) {
+                    <p class="alert-reason">„{{ findingText(finding) }}“</p>
+                  }
+                </div>
               </div>
               <button type="button" class="alert-arrow" (click)="showNext()"
                       [disabled]="violations().length < 2"
