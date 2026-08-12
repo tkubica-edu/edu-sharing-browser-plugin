@@ -20,3 +20,14 @@
   display: block;
   width: 100%;
 }
+
+// What a picture's transparent parts show through to. The layer behind the picture is a blurred copy
+// of it on a box the bundle paints black, so a picture with an alpha channel reads as black — while
+// the repository shows the very same file on white once it is saved. White here too, so the two
+// agree; an opaque picture is unaffected, its own blurred copy covers the box either way.
+//
+// `!important` rather than a longer selector: the bundle's rule has the same specificity, and which
+// of the two stylesheets loads last is not ours to decide.
+:host ::ng-deep .card-image-backdrop {
+  background-color: var(--es-surface) !important;
+}
