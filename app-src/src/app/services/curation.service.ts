@@ -144,7 +144,8 @@ function toPartialNode(
  * So each value goes back into the shape the payload states for that property, and everything the
  * payload carries besides the values stays. A property the payload does not know keeps its list
  * shape: it comes from a step outside the editor (the quality criteria, the preview widget's name),
- * and those are lists.
+ * and those are lists — {@link withCanvasScalars} is what unwraps the ones a canvas insists on
+ * reading as a scalar.
  */
 function toSavedMetadata(
   payload: Record<string, unknown> | null,
@@ -179,21 +180,22 @@ const CANVAS_SCALAR_FIELDS: readonly string[] = [
 ];
 
 /**
- * A node's stored properties as an editor is seeded from them: as the repository holds them, except
- * for the fields a canvas can only read as a scalar — see {@link CANVAS_SCALAR_FIELDS}.
+ * Metadata as an editor is seeded from it: as it arrived, except for the fields a canvas can only
+ * read as a scalar — see {@link CANVAS_SCALAR_FIELDS}.
  *
- * The same restatement {@link toSavedMetadata} makes, for the case that has no payload to take the
- * shapes from: a content the panel merely found (the document the host page has open, the node a
- * repository page shows, an entry reopened from the Verlauf) never came through the metadata agent,
- * so its properties are all the flow has — and a node states every one of them as a `string[]`.
+ * Applied to everything the flow's picture of the metadata is assembled from ({@link
+ * CurationService.editorMetadata}), because a list reaches those fields from every direction: a
+ * node's stored properties state every property as a `string[]`, and so do the values a step outside
+ * the editor contributes — the preview widget answers the content's title among them, which is
+ * exactly one of these fields.
  */
-function toNodeMetadata(properties: unknown): Record<string, unknown> {
-  const values = { ...((properties ?? {}) as Record<string, unknown>) };
+function withCanvasScalars(values: Record<string, unknown>): Record<string, unknown> {
+  const seeded = { ...values };
   for (const field of CANVAS_SCALAR_FIELDS) {
-    const value = values[field];
-    if (Array.isArray(value)) values[field] = value[0] ?? '';
+    const value = seeded[field];
+    if (Array.isArray(value)) seeded[field] = value[0] ?? '';
   }
-  return values;
+  return seeded;
 }
 
 /** Name of a draft whose metadata carries no title yet. Never written anywhere. */
@@ -595,13 +597,18 @@ export class CurationService {
    *
    * Carries `_origins` for the whole set, so an editor that marks the generated fields marks the
    * agent's and only the agent's — see {@link fieldOrigins}.
+   *
+   * Stated in the shapes an editor can read, which is this one place for all of them: whatever a
+   * single step contributes, what the editor is seeded with has to render — see
+   * {@link withCanvasScalars}.
    */
   readonly editorMetadata = computed<Record<string, unknown> | null>(() => {
     const payload = this.metadataAgent.lastRun()?.parsed?.raw ?? null;
     const base = this.activeNode() ? this.nodeMetadata() ?? payload : payload;
     const recorded = this.recordedValues();
-    const values = Object.keys(recorded).length ? { ...(base ?? {}), ...recorded } : base;
-    if (!values) return null;
+    const merged = Object.keys(recorded).length ? { ...(base ?? {}), ...recorded } : base;
+    if (!merged) return null;
+    const values = withCanvasScalars(merged);
     return { ...values, _origins: fieldOrigins(values, payload?.['_origins'], recorded) };
   });
 
@@ -1051,7 +1058,7 @@ export class CurationService {
     const node = await this.loadNode(nodeId);
     if (!node || this.activeNode()?.nodeId !== nodeId) return;
     this.previewNode.set(node);
-    this.nodeMetadata.set(toNodeMetadata(node.properties));
+    this.nodeMetadata.set({ ...(node.properties ?? {}) });
   }
 
   /**
@@ -1108,7 +1115,7 @@ export class CurationService {
       try {
         const node = await this.repositoryNodes.get(saved.nodeId);
         this.previewNode.set(node);
-        this.nodeMetadata.set(toNodeMetadata(node.properties));
+        this.nodeMetadata.set({ ...(node.properties ?? {}) });
       } catch {
         /* keep editor/preview as-is if the reload fails */
       }
@@ -1317,7 +1324,7 @@ export class CurationService {
     this.setActiveNode(nodeId, name);
     this.nodeSource.set(source);
     this.previewNode.set(node);
-    this.nodeMetadata.set(toNodeMetadata(node.properties));
+    this.nodeMetadata.set({ ...(node.properties ?? {}) });
   }
 
   /** Hand a confirmation given before the save on to the node the save produced. */
