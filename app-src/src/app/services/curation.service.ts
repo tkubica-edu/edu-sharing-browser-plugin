@@ -152,6 +152,44 @@ function toSavedMetadata(
   return saved;
 }
 
+/**
+ * The fields the WLO canvas renders from a SCALAR value. Its field input keeps a single-valued
+ * field's text in an `inputValue` of its own and derives it from the field's value — an array it
+ * derives as the empty string, so such a field renders blank however filled it is, showing its
+ * placeholder ("Titel der Ressource"). Multi-valued fields are unaffected: their chips are rendered
+ * off the value itself, which is a list there.
+ *
+ * These are the single-valued fields of the metadata agent's `core.json` (everything for which
+ * neither `system.multiple` nor `datatype: 'array'` holds). Core is the whole list because it is the
+ * only schema a node's properties resolve: a content type is read from `metadataset`, which the
+ * properties do not carry, so no content-type schema is loaded beside it.
+ */
+const CANVAS_SCALAR_FIELDS: readonly string[] = [
+  'cclom:title',
+  'cclom:general_description',
+  'ccm:wwwurl',
+  'preview:url',
+  'cclom:general_language'
+];
+
+/**
+ * A node's stored properties as an editor is seeded from them: as the repository holds them, except
+ * for the fields a canvas can only read as a scalar — see {@link CANVAS_SCALAR_FIELDS}.
+ *
+ * The same restatement {@link toSavedMetadata} makes, for the case that has no payload to take the
+ * shapes from: a content the panel merely found (the document the host page has open, the node a
+ * repository page shows, an entry reopened from the Verlauf) never came through the metadata agent,
+ * so its properties are all the flow has — and a node states every one of them as a `string[]`.
+ */
+function toNodeMetadata(properties: unknown): Record<string, unknown> {
+  const values = { ...((properties ?? {}) as Record<string, unknown>) };
+  for (const field of CANVAS_SCALAR_FIELDS) {
+    const value = values[field];
+    if (Array.isArray(value)) values[field] = value[0] ?? '';
+  }
+  return values;
+}
+
 /** Name of a draft whose metadata carries no title yet. Never written anywhere. */
 const DRAFT_NAME = 'Neuer Inhalt';
 
@@ -953,7 +991,7 @@ export class CurationService {
     const node = await this.loadNode(nodeId);
     if (!node || this.activeNode()?.nodeId !== nodeId) return;
     this.previewNode.set(node);
-    this.nodeMetadata.set(node.properties as MdsValues);
+    this.nodeMetadata.set(toNodeMetadata(node.properties));
   }
 
   /**
@@ -1008,7 +1046,7 @@ export class CurationService {
       try {
         const node = await this.repositoryNodes.get(saved.nodeId);
         this.previewNode.set(node);
-        this.nodeMetadata.set(node.properties as MdsValues);
+        this.nodeMetadata.set(toNodeMetadata(node.properties));
       } catch {
         /* keep editor/preview as-is if the reload fails */
       }
@@ -1206,7 +1244,7 @@ export class CurationService {
     this.setActiveNode(nodeId, name);
     this.nodeSource.set(source);
     this.previewNode.set(node);
-    this.nodeMetadata.set(node.properties as MdsValues);
+    this.nodeMetadata.set(toNodeMetadata(node.properties));
   }
 
   /** Hand a confirmation given before the save on to the node the save produced. */
