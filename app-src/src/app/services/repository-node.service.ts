@@ -1,11 +1,20 @@
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { HOME_REPOSITORY, Node, NodeService, NodeServiceUnwrapped } from 'ngx-edu-sharing-api';
+import {
+  HOME_REPOSITORY, Node, NodeService, NodeServiceUnwrapped, SessionStorageService
+} from 'ngx-edu-sharing-api';
 
 import { MdsValues, toMdsValues } from '../util/mds-values';
 
-/** The parent every curated node is created in. */
+/** The parent a curated node is created in where none was picked for it. */
 const INBOX = '-inbox-';
+
+/**
+ * Where the user's own storage setting keeps the folder they filed content in last — the key the
+ * repository's own Ablageort control writes when its "als Standard verwenden" box is ticked, so both
+ * read and write the same setting.
+ */
+const DEFAULT_FOLDER_KEY = 'defaultInboxFolder';
 
 /** Fallback name when the metadata carries no title. */
 const FALLBACK_NAME = 'Neue Ressource';
@@ -23,13 +32,45 @@ export class RepositoryNodeService {
   // The generated NodeV1Service (exported as NodeServiceUnwrapped) — the NodeService wrapper does
   // not cover the preview upload.
   private readonly nodesUnwrapped = inject(NodeServiceUnwrapped);
+  // The user's own settings, as the repository's own app keeps them (their profile preferences, with
+  // the browser's storage standing in where there is no login).
+  private readonly storage = inject(SessionStorageService);
 
-  /** Create a child (`ccm:io`) in the user's inbox with the given MDS properties. */
-  async createInInbox(values: MdsValues): Promise<NodeSummary> {
+  /**
+   * The folder a curated content is filed in unless the user picks another one: the one they set as
+   * their default, else their inbox — the same answer the repository's own Ablageort control gives
+   * (NodeHelperService.getDefaultInboxFolder).
+   *
+   * The node itself rather than its id, because that is what the control shows: it renders the folder
+   * as a breadcrumb, which it resolves from the node.
+   *
+   * A default that cannot be loaded falls back to the inbox: the setting names a folder that may
+   * since have been deleted or become unreadable, and a filing place the user cannot see is worse
+   * than the one every content starts in.
+   */
+  async defaultParent(): Promise<Node> {
+    let preferred = INBOX;
+    try {
+      preferred = (await this.storage.get<string>(DEFAULT_FOLDER_KEY, INBOX)) || INBOX;
+    } catch {
+      /* no setting readable — the inbox stands */
+    }
+    try {
+      return await this.get(preferred);
+    } catch {
+      return this.get(INBOX);
+    }
+  }
+
+  /**
+   * Create a child (`ccm:io`) with the given MDS properties in `parent` — the folder picked for the
+   * content, or the user's inbox where there is none.
+   */
+  async create(values: MdsValues, parent: string = INBOX): Promise<NodeSummary> {
     const node = await firstValueFrom(
       this.nodes.createChild({
         repository: HOME_REPOSITORY,
-        node: INBOX,
+        node: parent,
         type: 'ccm:io',
         renameIfExists: true,
         versionComment: 'MAIN_FILE_UPLOAD',

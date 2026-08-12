@@ -70,8 +70,8 @@ export class MetadataUploadService {
    *   type, `_origins`, `_source_text`) that the endpoint expects alongside the values, and which
    *   an editor's committed values alone do not contain.
    * @param sourceUrl the page the content was curated from, used for the preview screenshot.
-   * @param collections the collections the created node is to be added to — the editorial groups the
-   *   forwarding step picked (see CurationService.editorialCollections). The endpoint files them
+   * @param collections the collections the created node is to be added to — what the flow's filing
+   *   steps picked (see CurationService.filedCollections). The endpoint files them
    *   itself, which is the only way here: the node belongs to the agent's own privileges, so the
    *   panel session may not add it to a collection afterwards.
    */

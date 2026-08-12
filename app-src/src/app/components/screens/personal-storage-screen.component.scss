@@ -1,5 +1,35 @@
-// "Persönliche Ablage" — a placeholder until the filing component is supplied; it will bring its own
-// styling, so this only marks the slot it goes into.
-:host { display: block; }
+// "Persönliche Ablage" — the hint, the folder the content is filed in, and under it the selector the
+// collection is picked in.
 
-.placeholder { text-align: center; }
+// Fills the panel exactly: that is what gives the selector a definite height, and with it a scroll
+// container of its own — so the hint and the folder stay put rather than scrolling out of reach.
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.hint {
+  flex: 0 0 auto;
+  margin: var(--es-space-4) var(--es-space-4) var(--es-space-3);
+}
+
+// The padding the picker's band is pulled out of, so it spans the panel from edge to edge (see
+// storage-location-picker.component.scss).
+.location {
+  flex: 0 0 auto;
+  padding: 0 var(--es-space-4);
+  margin-bottom: var(--es-space-2);
+}
+
+// The room the parts above leave over, as a definite height — the selector delegates its own height
+// to here (see collection-selector.component.scss), so without this it collapses to nothing.
+es-collection-selector {
+  flex: 1 1 0;
+  min-height: 0;
+  margin: 0 var(--es-space-4) var(--es-space-4);
+  border: 1px solid var(--es-border);
+  border-radius: var(--es-radius);
+  background: var(--es-surface);
+  overflow: hidden;
+}

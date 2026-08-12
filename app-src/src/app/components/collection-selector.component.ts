@@ -19,8 +19,8 @@ const APPLY_BUTTON = '.tab-action-bar button[mat-flat-button]:not(.back-btn)';
 // (see {@link CollectionSelectorComponent.externalApply}).
 //
 // Embedded by the "Sammlung auswählen" step to pick a collection inside an editorial group
-// (SelectCollectionScreenComponent); the "Persönliche Ablage" sub step is expected to build on it
-// too, together with CurationService.assignToCollections.
+// (SelectCollectionScreenComponent), and by the "Persönliche Ablage" sub step to pick one of the
+// user's own (PersonalStorageScreenComponent).
 @Component({
   selector: 'es-collection-selector',
   imports: [NodesSelectorComponent],

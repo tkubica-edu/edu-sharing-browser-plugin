@@ -191,11 +191,24 @@ export class ActionBarService {
           }
         ];
 
-      case 'personal-storage':
+      // The filing's collection is optional and has no confirmation of its own, so the way on is
+      // also what takes it over: a collection ticked in the embedded selector is applied here (the
+      // screen registers the handler for it, see {@link ApplyHandler}) and then the step leads on.
+      // Nothing ticked is a step passed as it stands — the content is filed in the folder alone.
+      case 'personal-storage': {
+        const handler = this.applyHandler();
         return [
           this.backAction(),
-          { label: 'Weiter', disabled: false, run: () => this.navigation.go('quality') }
+          {
+            label: 'Weiter',
+            disabled: false,
+            run: () => {
+              if (handler?.canApply()) handler.apply();
+              this.navigation.go('quality');
+            }
+          }
         ];
+      }
 
       // "Sammlung auswählen": the confirmation belongs to the embedded selector, which the screen
       // registers here while it is mounted (see {@link ApplyHandler}) — so this step's controls are

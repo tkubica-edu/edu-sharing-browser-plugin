@@ -1,17 +1,27 @@
-<div class="es-screen-body">
-  <section class="es-hint-card">
-    <p class="es-muted">
-      Wähle, wo
-      @if (curation.contentTitle(); as title) {
-        <strong>{{ title }}</strong>
-      } @else {
-        dieser Inhalt
-      }
-      in deiner persönlichen Ablage abgelegt werden soll.
-    </p>
-  </section>
+<section class="es-hint-card hint">
+  <p class="es-muted">
+    Wähle, wo
+    @if (curation.contentTitle(); as title) {
+      <strong>{{ title }}</strong>
+    } @else {
+      dieser Inhalt
+    }
+    in deiner persönlichen Ablage abgelegt werden soll — in einem Ordner, in einer Sammlung oder in
+    beidem.
+  </p>
+</section>
 
-  <section class="es-card placeholder">
-    <p class="es-muted">Die Auswahl der persönlichen Ablage wird hier eingebunden.</p>
-  </section>
+<!-- The folder: the repository's own Ablageort control, which opens its file chooser to change it. -->
+<div class="location">
+  <es-storage-location-picker
+    [parent]="curation.storageParent()"
+    (parentChange)="chooseLocation($event)"
+  ></es-storage-location-picker>
 </div>
+
+<!-- The collection, optional: the footer's "Weiter" takes the ticked one over as it leads on, so the
+     selector shows no confirmation of its own (externalApply). -->
+<es-collection-selector
+  [externalApply]="true"
+  (choose)="chooseCollections($event)"
+></es-collection-selector>

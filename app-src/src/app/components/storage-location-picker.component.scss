@@ -1,0 +1,15 @@
+// The repository's "Ablageort" control. It brings its own look (a caption above a band that holds
+// the breadcrumb and the button that changes the folder), so this only fits it into the panel.
+:host { display: block; }
+
+.es-error { margin: 0; }
+
+// The element pulls its band out of the horizontal padding it is told about, so that the band spans
+// the full width of the surface it sits on. Naming the panel's own padding is what keeps it inside
+// that surface — with the element's default of 25px it would overhang.
+//
+// No `display` here: the element lays itself out as a flex column through its own host rule, and a
+// rule from this component outranks it (see nodes-selector.component.scss).
+edu-sharing-location-picker {
+  --addMaterialHPadding: var(--es-space-4);
+}

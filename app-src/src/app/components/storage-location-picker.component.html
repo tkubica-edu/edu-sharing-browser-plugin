@@ -1,0 +1,15 @@
+@if (bundle.error()) {
+  <p class="es-error">{{ errorLabel() }}: {{ bundle.error() }}</p>
+}
+
+<!--
+  The @if is required, not cosmetic (see the component comment): inside a conditional block the
+  element's DOM node is created detached, bound, and only then inserted.
+-->
+@if (bundle.ready()) {
+  <edu-sharing-location-picker
+    [parent]="parent()"
+    [allowSaveAsDefault]="allowSaveAsDefault()"
+    (parentChange)="onParentChange($event)"
+  ></edu-sharing-location-picker>
+}
