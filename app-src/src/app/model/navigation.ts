@@ -258,11 +258,18 @@ export const SECTIONS: readonly AppSection[] = [
     // - any page whose content was already detected: the repository holds it (PageRecognitionService
     //   found it by URL) or the host has it open, and *that* content is what the panel offers to work
     //   on under "Inhalt erkannt". Curating again would produce a second node for the same page.
-    enabled: (c) => !c.onEduSharing && !c.hasDetectedNode,
+    //
+    // And not while the recognition is still running: whether this page is the second kind is exactly
+    // what it is answering (it matches the URL against the nodes that already carry it), so starting
+    // the Erschließung before that answer is in is what would produce the duplicate node the second
+    // rule exists to prevent.
+    enabled: (c) => !c.onEduSharing && !c.hasDetectedNode && !c.recognizingContent,
     disabledHint: (c) =>
       c.onEduSharing
         ? 'Edu-Sharing-Seiten werden nicht erschlossen — sie zeigen, was das Repository schon hat.'
-        : 'Dieser Inhalt ist bereits erschlossen — er wird unter „Inhalt erkannt“ angeboten.',
+        : c.recognizingContent
+          ? 'Es wird noch geprüft, ob das Repository diese Seite schon als Inhalt hat.'
+          : 'Dieser Inhalt ist bereits erschlossen — er wird unter „Inhalt erkannt“ angeboten.',
     // Opening the screen starts the Erschließung (see CurationScreenComponent), so stepping back
     // into it would run it again and carry the user straight forward — see AppSection.oneWay.
     oneWay: true,
