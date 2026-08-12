@@ -77,6 +77,11 @@
 }
 
 // Workflow-step header (below the status bar): back-to-menu button + current step title.
+//
+// The back button is the tallest thing in it, and the menu renders none — so the title carries the
+// same height (see .step-title) and the bar stays one height across every section.
+$step-control: 28px;
+
 .step-header {
   display: flex;
   align-items: center;
@@ -90,7 +95,7 @@
   background: none;
   border: none;
   color: var(--es-text);
-  width: 28px; height: 28px;
+  width: $step-control; height: $step-control;
   margin-left: -6px;
   border-radius: 6px;
   display: inline-flex;
@@ -109,7 +114,16 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
-.step-title { font-size: 16px; font-weight: 600; margin: 0; color: var(--es-text); }
+// As tall as the bar's button, whether one is beside it or not — see the note on .step-header.
+.step-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--es-text);
+  min-height: $step-control;
+  display: flex;
+  align-items: center;
+}
 
 .content {
   flex: 1 1 auto;
