@@ -27,15 +27,27 @@
   display: none;
 }
 
-// The canvas reserves 80px below its fields (`.layout-plugin .fields-section`) for the action bar it
-// floats over them in its own app. Embedded here it has none — saving is the panel's footer — so the
-// gap is empty screen at the end of a form the user scrolls to the bottom of.
+// The canvas' own inset around its fields (`.layout-plugin .fields-section`: `4px 8px 80px`), replaced
+// on two counts:
 //
-// `:host` is in the selector for its weight alone: the rule it overrides carries two of the canvas'
-// own encapsulation attributes, and the canvas injects its styles when it mounts, hence after ours —
-// so an equally specific selector would lose on order.
+// - the 80px at the bottom reserve room for the action bar it floats over the fields in its own app.
+//   Embedded here it has none — saving is the panel's footer — so the gap is empty screen at the end
+//   of a form the user scrolls to the bottom of.
+// - the 8px at the sides come on top of the card's own padding, which would set these fields in a
+//   little further than everything else on the screen — the preview widget's form above it in
+//   particular, which is the same kind of form in the same kind of card.
+//
+// Each field group repeats that inset around its own fields (`.group-fields`), so it goes there too —
+// otherwise the groups' contents sit in further than the group headings above them.
+//
+// `!important` on both: the canvas' rules have the same specificity as anything we can write from
+// here, and which of the two stylesheets loads last is not ours to decide.
 :host .canvas-wrap ::ng-deep .layout-plugin .fields-section {
-  padding-bottom: 8px;
+  padding: 4px 0 8px !important;
+}
+
+:host .canvas-wrap ::ng-deep .field-group .group-fields {
+  padding: 0 !important;
 }
 
 metadata-agent-canvas {
