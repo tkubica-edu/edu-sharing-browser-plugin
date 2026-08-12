@@ -186,6 +186,134 @@ async function extractPageDataFromTab(tabId) {
   }
 }
 
+// PAGE SCREENSHOT
+//
+// The picture for a page that names none of its own: what the tab is showing. Taken in the worker
+// because `captureVisibleTab` lives nowhere else — neither the content script nor the panel can
+// reach it.
+
+/** Encoding of the captured picture. A preview, so a small JPEG rather than a lossless PNG. */
+const SCREENSHOT_TYPE = 'image/jpeg';
+const SCREENSHOT_QUALITY = 0.7;
+
+/** Widest the picture is kept, in pixels — a HiDPI display captures at a multiple of the CSS width. */
+const SCREENSHOT_MAX_WIDTH = 1200;
+
+/** Element id of the injected panel, as content/panel-host.js builds it. */
+const PANEL_ELEMENT_ID = 'edusharing-panel-root';
+
+/**
+ * How much of the tab's viewport the page itself occupies, as a fraction of its width.
+ *
+ * The panel is docked INTO the page rather than beside it, so a capture of the viewport shows this
+ * extension next to the content unless that share is cut away. A fraction rather than a pixel count:
+ * the captured image is in device pixels, and their ratio to the CSS pixels measured here depends on
+ * the display and on the page zoom.
+ *
+ * `null` when the page cannot be measured — then nothing is captured at all, since a picture that
+ * might have the panel in it is worse than none.
+ */
+async function pageWidthFraction(tabId) {
+  try {
+    const [measured] = await browser.scripting.executeScript({
+      target: { tabId },
+      func: (panelId) => {
+        const viewport = window.innerWidth || 0;
+        const panel = document.getElementById(panelId);
+        const taken = panel ? panel.getBoundingClientRect().width : 0;
+        return viewport > 0 ? Math.max(0, (viewport - taken) / viewport) : 0;
+      },
+      args: [PANEL_ELEMENT_ID]
+    });
+    const fraction = measured?.result;
+    return typeof fraction === 'number' && fraction > 0 ? fraction : null;
+  } catch (error) {
+    console.warn('⚠️ Measuring the page for a screenshot failed:', error?.message || error);
+    return null;
+  }
+}
+
+/** A blob as a data URL — the shape a picture travels to the panel in. */
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+    reader.onerror = () => reject(reader.error ?? new Error('READ_FAILED'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * A base64 data URL as a blob, decoded by hand rather than by `fetch`.
+ *
+ * `fetch` would be the short way and is the wrong one here: this worker runs under the extension's
+ * own content security policy, whose `connect-src` names http and https — a request for a `data:`
+ * URL is refused by it, which is what `captureVisibleTab` hands back.
+ */
+function dataUrlToBlob(dataUrl) {
+  const match = /^data:([^;,]+);base64,(.*)$/s.exec(dataUrl ?? '');
+  if (!match) throw new Error('NOT_A_DATA_URL');
+  const binary = atob(match[2]);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: match[1] });
+}
+
+/** Cut a captured viewport down to the page's share of it and scale it to preview size. */
+async function cropToPage(captured, fraction) {
+  const bitmap = await createImageBitmap(dataUrlToBlob(captured));
+  try {
+    const width = Math.max(1, Math.round(bitmap.width * fraction));
+    const scale = Math.min(1, SCREENSHOT_MAX_WIDTH / width);
+    const canvas = new OffscreenCanvas(
+      Math.max(1, Math.round(width * scale)),
+      Math.max(1, Math.round(bitmap.height * scale))
+    );
+    const context = canvas.getContext('2d');
+    context.drawImage(bitmap, 0, 0, width, bitmap.height, 0, 0, canvas.width, canvas.height);
+    const blob = await canvas.convertToBlob({ type: SCREENSHOT_TYPE, quality: SCREENSHOT_QUALITY });
+    return await blobToDataUrl(blob);
+  } finally {
+    bitmap.close();
+  }
+}
+
+/**
+ * The visible part of a tab as a picture, with the panel's share of the viewport cut away.
+ *
+ * Only the *visible* part: `captureVisibleTab` photographs the viewport, so this is the page as the
+ * user has it in front of them, not the whole document. Deliberately not scrolled to the top first —
+ * the page belongs to the user, and a capture must not move it under them.
+ *
+ * A bonus, never a reason for the analysis to fail: every failure answers `null` and the content
+ * simply keeps having no picture.
+ */
+async function captureVisiblePage(tab) {
+  try {
+    const fraction = await pageWidthFraction(tab.id);
+    if (fraction === null) return null;
+    const captured = await browser.tabs.captureVisibleTab(tab.windowId, {
+      format: 'jpeg',
+      quality: 80
+    });
+    const picture = await cropToPage(captured, fraction);
+    console.log('📸 page screenshot:', Math.round((picture?.length ?? 0) / 1024), 'kB',
+      '(page share of the viewport:', Math.round(fraction * 100) + '%)');
+    return picture;
+  } catch (error) {
+    console.warn('⚠️ Screenshot of the page failed:', error?.message || error);
+    return null;
+  }
+}
+
+/** Whether an agent result already names a picture for the content it describes. */
+function hasPreviewImage(result) {
+  const named = Array.isArray(result?.preview_image_url)
+    ? result.preview_image_url[0]
+    : result?.preview_image_url;
+  return typeof named === 'string' && named.trim().length > 0;
+}
+
 // /generate PROXY
 
 // Build the /generate request body: prefer text mode, fall back to URL mode.
@@ -352,10 +480,18 @@ browser.runtime.onMessage.addListener((message, sender) => {
           const pageData = await extractPageDataFromTab(tab.id);
           const body = buildGenerateBody(pageData, message.language);
           const result = await callGenerate(body, agentBaseOf(message));
+          // Only for a page that names no picture of its own: what a page states about itself
+          // describes it better than a photograph of how it happens to be rendered right now.
+          const screenshot = hasPreviewImage(result) ? null : await captureVisiblePage(tab);
           return {
             success: true,
             result,
-            source: { url: pageData?.url || tab.url, title: pageData?.title || tab.title, favIconUrl: tab.favIconUrl }
+            source: {
+              url: pageData?.url || tab.url,
+              title: pageData?.title || tab.title,
+              favIconUrl: tab.favIconUrl,
+              screenshot: screenshot ?? undefined
+            }
           };
         }
 

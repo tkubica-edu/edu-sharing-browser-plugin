@@ -574,7 +574,11 @@ export class CurationService {
    * 3. The image the metadata agent found (`preview_image_url`, the page's `og:image`), which is what
    *    a curated content has instead. Read from the editor's metadata *and* from the agent's result,
    *    since {@link editorMetadata} swaps in the node's stored properties on the first save.
-   * 4. The node's type icon (`preview.isIcon`) — true of the kind of material, but not of this one,
+   * 4. The screenshot the run took of the page, for a page that named no picture at all (see
+   *    `PageSource.screenshot`). It shows this content and nothing else, so it outranks the icon —
+   *    but it is a photograph of a rendering rather than a picture the page chose, so everything the
+   *    page or the repository states about itself comes first.
+   * 5. The node's type icon (`preview.isIcon`) — true of the kind of material, but not of this one,
    *    so a real image comes first.
    */
   readonly contentPreview = computed<ContentPreview | null>(() => {
@@ -586,6 +590,8 @@ export class CurationService {
       previewImageOf(this.editorMetadata()) ??
       previewImageOf(this.metadataAgent.lastRun()?.parsed?.raw);
     if (found) return { url: found, isIcon: false };
+    const captured = this.metadataAgent.lastRun()?.source?.screenshot;
+    if (captured) return { url: captured, isIcon: false };
     return preview?.url ? { url: preview.url, isIcon: true } : null;
   });
 

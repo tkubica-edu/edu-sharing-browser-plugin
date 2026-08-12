@@ -6,6 +6,12 @@ export interface PageSource {
   url: string;
   title: string;
   favIconUrl?: string;
+  /**
+   * The tab as it looked when the analysis ran, as a data URL — the panel's own share of the viewport
+   * already cut away (see background.js, `captureVisiblePage`). Present only for a page that names no
+   * picture of its own, which is the one case the content would otherwise have none at all.
+   */
+  screenshot?: string;
 }
 
 /**
