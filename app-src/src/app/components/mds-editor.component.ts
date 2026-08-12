@@ -1,14 +1,17 @@
 import {
   afterRenderEffect, ChangeDetectionStrategy, Component, computed, CUSTOM_ELEMENTS_SCHEMA,
-  ElementRef, OnDestroy, input, output, signal, viewChild
+  ElementRef, OnDestroy, inject, input, output, signal, viewChild
 } from '@angular/core';
-import { DEFAULT, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
+import { HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 
 import { MdsValues, toMdsEditorValues } from '../util/mds-values';
 import { NodeSuggestions, aiSuggestionsFor } from '../util/mds-suggestions';
 import { EDITOR_MODE_FOR_DRAFT, forMdsEditor, isDraftNode } from '../util/mds-node';
 import { LICENSE_FIELDS, mapAgentFields } from '../util/agent-fields';
 import { MetadataEditor, MetadataSeed } from './metadata-editor';
+import {
+  BrowserExtensionCustomWebComponentService
+} from '../services/browser-extension-custom-web-component.service';
 import { loadWebComponentBundle } from '../services/web-component-bundle.service';
 
 const EDITOR_TAG = 'edu-sharing-mds-editor-wrapper';
@@ -70,13 +73,19 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
   readonly groupId = input('io');
   /** Repository/app id the set lives in. */
   readonly repository = input(HOME_REPOSITORY);
-  /** MDS set id; `-default-` resolves to the repository's default set. */
-  readonly setId = input(DEFAULT);
+  /**
+   * MDS set id; `-default-` resolves to the repository's default set. `null` takes the set the panel
+   * itself is on (see BrowserExtensionCustomWebComponentService.metadataSet), which is what every
+   * caller so far wants.
+   */
+  readonly setId = input<string | null>(null);
 
   /** Emits the current edited values when the footer triggers a save. */
   readonly save = output<MdsValues>();
 
   private readonly host = viewChild.required<ElementRef<HTMLElement>>('host');
+
+  private readonly webComponent = inject(BrowserExtensionCustomWebComponentService);
 
   protected readonly bundle = loadWebComponentBundle('edu', EDITOR_TAG);
 
@@ -149,7 +158,7 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
     const element = document.createElement(EDITOR_TAG) as MdsEditorElement;
     element.embedded = true;
     element.groupId = this.groupId();
-    element.setId = this.setId();
+    element.setId = this.setId() ?? this.webComponent.metadataSet();
     element.repository = this.repository();
     // Under this form's field names first: the payload is the agent's, and only this form needs them
     // renamed — the WLO canvas takes them as they come (see `mapAgentFields`).

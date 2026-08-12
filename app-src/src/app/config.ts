@@ -186,14 +186,19 @@ export const APP_CONFIG = {
   // name, so this is its key, not a URL (see MetadataUploadService).
   uploadRepository: 'staging',
   /**
-   * The metadata set the quality criteria are defined in (QualityCriteriaComponent).
+   * The WLO metadata set.
    *
-   * Named rather than taken from the repository's default set, because the two are not the same
-   * thing here: staging's default is "Contentbuffet", which knows neither `virtual:unmetLegalCriteria`
-   * nor `ccm:oeh_buffet_criteria` — the criteria belong to the WLO set. A repository whose default
-   * set does define them can be pointed at `-default-` instead.
+   * The panel's forms are built from it wherever the panel is a WLO one, and from the repository's own
+   * default set everywhere else — which of the two applies is not this constant's to say, see
+   * `BrowserExtensionCustomWebComponentService.metadataSet`. The quality criteria are the exception:
+   * they are WLO criteria (`virtual:unmetLegalCriteria`, `ccm:oeh_buffet_criteria`) and no other set
+   * defines them, so their view reads this one directly.
+   *
+   * Named rather than resolved from the repository, because a repository's default is not its WLO set:
+   * staging's default is "Contentbuffet", which knows neither those criteria nor the fields the panel
+   * curates.
    */
-  qualityMetadataSet: 'mds_oeh',
+  metadataSet: 'mds_oeh',
   storageKeys: {
     repositoryUrl: 'eduSharingRepoUrl',
     history: 'eduSharingHistory',

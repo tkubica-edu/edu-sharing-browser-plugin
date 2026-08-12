@@ -42,8 +42,12 @@ export class QualityCheckScreenComponent implements OnInit {
    */
   protected readonly properties = this.curation.editorMetadata;
 
-  /** The criteria are not in every repository's default set — see APP_CONFIG.qualityMetadataSet. */
-  protected readonly metadataSet = APP_CONFIG.qualityMetadataSet;
+  /**
+   * The WLO set, not the one the panel resolves for its forms: the criteria are defined nowhere else,
+   * and this step only exists where the panel is a WLO one anyway (see the `quality-check` entry in
+   * navigation.ts) — so there is no case in which the repository's default set would do.
+   */
+  protected readonly metadataSet = APP_CONFIG.metadataSet;
 
   protected record(values: CriteriaProperties): void {
     this.curation.recordValues(values);

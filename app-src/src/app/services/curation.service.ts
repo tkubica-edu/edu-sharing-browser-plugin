@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { CollectionServiceUnwrapped, DEFAULT, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
+import { CollectionServiceUnwrapped, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 import { firstValueFrom } from 'rxjs';
 
 import { WorkflowStatus } from '../model/workflow';
@@ -109,9 +109,15 @@ function fieldOrigins(
  * and `type` say, so the usages element and the preview treat it like any other such node.
  *
  * `metadataset` is stated for the same reason as on the draft: an MDS editor initialised with a node
- * resolves its set from the *node*, so a stand-in without one would resolve none at all.
+ * resolves its set from the *node*, so a stand-in without one would resolve none at all. Which set it
+ * is, is the panel's (see {@link toDraftNode}).
  */
-function toPartialNode(nodeId: string, uploaded: UploadedNode, values: MdsValues): Node {
+function toPartialNode(
+  nodeId: string,
+  uploaded: UploadedNode,
+  values: MdsValues,
+  metadataSet: string,
+): Node {
   return {
     ref: { id: nodeId, repo: HOME_REPOSITORY },
     name: uploaded.title ?? nodeId,
@@ -119,7 +125,7 @@ function toPartialNode(nodeId: string, uploaded: UploadedNode, values: MdsValues
     description: uploaded.description ?? undefined,
     type: 'ccm:io',
     mediatype: 'link',
-    metadataset: DEFAULT,
+    metadataset: metadataSet,
     properties: values,
     access: []
   } as unknown as Node;
@@ -292,18 +298,24 @@ function withTitleProperties(values: MdsValues, title: string | null): MdsValues
  * node-less editor, so a draft without it would resolve no metadata set) and `access`
  * (see {@link DRAFT_ACCESS}).
  *
- * The set is always the repository default, never the `metadataset` of the agent's payload: that
- * names the agent's own extraction template (`learning_material.json`), not a set the repository
- * knows — asking for it 404s and the step stays blank.
+ * The set is the one the panel itself is on (`BrowserExtensionCustomWebComponentService.metadataSet`),
+ * never the `metadataset` of the agent's payload: that names the agent's own extraction template
+ * (`learning_material.json`), not a set the repository knows — asking for it 404s and the step stays
+ * blank.
  */
-function toDraftNode(values: MdsValues, title: string | null, previewSrc: string | null): Node {
+function toDraftNode(
+  values: MdsValues,
+  title: string | null,
+  previewSrc: string | null,
+  metadataSet: string,
+): Node {
   let node = {
     ref: { id: DRAFT_NODE_ID, repo: HOME_REPOSITORY },
     name: title ?? DRAFT_NAME,
     title: title ?? undefined,
     type: 'ccm:io',
     mediatype: 'link',
-    metadataset: DEFAULT,
+    metadataset: metadataSet,
     aspects: [],
     access: DRAFT_ACCESS,
     properties: withTitleProperties(values, title),
@@ -611,6 +623,7 @@ export class CurationService {
       toMdsEditorValues(this.editorMetadata()),
       this.contentTitle(),
       this.currentPreviewSrc(),
+      this.browserExtensionCustomWebComponent.metadataSet(),
     );
   }
 
@@ -1166,7 +1179,9 @@ export class CurationService {
     // payload rather than as the bare value map, so an editor seeded back from it renders them.
     this.nodeMetadata.set(toSavedMetadata(payload, values));
     // A node states its properties the way the repository holds them — every one of them a list.
-    this.previewNode.set(toPartialNode(nodeId, uploaded, values));
+    this.previewNode.set(
+      toPartialNode(nodeId, uploaded, values, this.browserExtensionCustomWebComponent.metadataSet()),
+    );
     // The user curated and saved this one, so it belongs to the flow they started.
     this.nodeSource.set('chosen');
     await this.recordSaved({ nodeId, name: uploaded.title ?? nodeId });
@@ -1184,7 +1199,12 @@ export class CurationService {
     this.nodeSource.set('chosen');
     this.nodeMetadata.set(values);
     this.previewNode.set(
-      toPartialNode(entry.nodeId, { nodeId: entry.nodeId, title: entry.title }, values),
+      toPartialNode(
+        entry.nodeId,
+        { nodeId: entry.nodeId, title: entry.title },
+        values,
+        this.browserExtensionCustomWebComponent.metadataSet(),
+      ),
     );
   }
 

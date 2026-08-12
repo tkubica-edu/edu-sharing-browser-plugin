@@ -1,11 +1,14 @@
 import {
   afterRenderEffect, ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, ElementRef,
-  OnDestroy, effect, input, output, signal, viewChild
+  OnDestroy, effect, inject, input, output, signal, viewChild
 } from '@angular/core';
-import { DEFAULT, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
+import { HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 
 import { MdsValues } from '../util/mds-values';
 import { forMdsEditor, previewSrcOf } from '../util/mds-node';
+import {
+  BrowserExtensionCustomWebComponentService
+} from '../services/browser-extension-custom-web-component.service';
 import { loadWebComponentBundle } from '../services/web-component-bundle.service';
 
 const EDITOR_TAG = 'edu-sharing-mds-editor-wrapper';
@@ -75,10 +78,11 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
   readonly groupId = input(PREVIEW_GROUP);
 
   /**
-   * MDS set id; `-default-` resolves to the repository's default set. Applies to a node-less editor
-   * only — with a node the wrapper takes the set from the node's own `metadataset`.
+   * MDS set id; `-default-` resolves to the repository's default set, `null` to the set the panel
+   * itself is on (see BrowserExtensionCustomWebComponentService.metadataSet). Applies to a node-less
+   * editor only — with a node the wrapper takes the set from the node's own `metadataset`.
    */
-  readonly setId = input(DEFAULT);
+  readonly setId = input<string | null>(null);
 
   /** How the group's widgets are rendered — see {@link PreviewEditorMode}. */
   readonly editorMode = input<PreviewEditorMode>('form');
@@ -99,6 +103,8 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
   readonly valuesChange = output<MdsValues>();
 
   private readonly host = viewChild.required<ElementRef<HTMLElement>>('host');
+
+  private readonly webComponent = inject(BrowserExtensionCustomWebComponentService);
 
   protected readonly bundle = loadWebComponentBundle('edu', EDITOR_TAG);
 
@@ -148,7 +154,7 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
     element.embedded = true;
     element.editorMode = this.editorMode();
     element.groupId = this.groupId();
-    element.setId = this.setId();
+    element.setId = this.setId() ?? this.webComponent.metadataSet();
     element.repository = HOME_REPOSITORY;
     // The node is already hydrated, so the wrapper must not fetch it again — and a stand-in node is
     // one the repository could not hand back at all.
