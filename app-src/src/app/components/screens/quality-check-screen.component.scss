@@ -1,2 +1,11 @@
-// The criteria component brings its own layout and padding — the screen is only its place.
+// "Qualität" — the criteria sit on a white sheet over the panel's tinted body, like the content of
+// every other screen.
 :host { display: block; }
+
+// The card carries the padding around the criteria; the component's own would come on top of it, so
+// it is taken away for as long as it is in here (see --qc-padding).
+.criteria-card {
+  padding: 12px 14px;
+
+  es-quality-criteria { --qc-padding: 0; }
+}

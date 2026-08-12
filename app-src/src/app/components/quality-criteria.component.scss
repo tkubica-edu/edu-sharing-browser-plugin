@@ -17,11 +17,13 @@
   color: var(--qc-text);
 }
 
+// The room around the criteria is its own where nothing else provides one, and can be taken away
+// from outside (`--qc-padding`) where the surrounding sheet already draws it.
 .criteria-panel {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding: 16px 12px 20px;
+  padding: var(--qc-padding, 16px 12px 20px);
 }
 
 // Centred headings, as the criteria are a sheet of their own rather than a section of the screen.

@@ -1,6 +1,10 @@
-<es-quality-criteria [properties]="properties()"
-                     [metadataSet]="metadataSet"
-                     [confirmed]="curation.qualityConfirmed()"
-                     [problem]="curation.qualityError()"
-                     (propertiesChange)="record($event)"
-                     (knockoutSatisfiedChange)="reportCriteria($event)"></es-quality-criteria>
+<div class="es-screen-body">
+  <section class="es-card criteria-card">
+    <es-quality-criteria [properties]="properties()"
+                         [metadataSet]="metadataSet"
+                         [confirmed]="curation.qualityConfirmed()"
+                         [problem]="curation.qualityError()"
+                         (propertiesChange)="record($event)"
+                         (knockoutSatisfiedChange)="reportCriteria($event)"></es-quality-criteria>
+  </section>
+</div>
