@@ -86,9 +86,13 @@
             </div>
 
             <!-- The two answers to the objection. Each answers the criterion below as well — met, or
-                 violated — and each moves on to the next objection. Both stay marked as pressed once
-                 given: paging back through the objections has to show what was already answered. -->
-            <div class="alert-actions">
+                 violated — and each moves on to the next objection.
+
+                 The answer given stays visible on them, because paging back through the objections has
+                 to show what was already decided: it is the filled one with the halo around it, and
+                 the other one has stepped back beside it. `aria-pressed` says the same to a screen
+                 reader, which is where colour reaches nobody. -->
+            <div class="alert-actions" [class.is-answered]="!!decisionOf(violation.criterion.id)">
               <button type="button" class="alert-dismiss"
                       [class.is-chosen]="decisionOf(violation.criterion.id) === 'dismissed'"
                       [attr.aria-pressed]="decisionOf(violation.criterion.id) === 'dismissed'"
