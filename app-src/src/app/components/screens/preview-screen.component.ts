@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 
 import { BrowserExtensionCustomWebComponentService } from '../../services/browser-extension-custom-web-component.service';
 import { CurationService } from '../../services/curation.service';
+import { DetailsLinkComponent } from '../details-link.component';
 import { PreviewNodeComponent } from '../preview-node.component';
 import { WloCanvasComponent } from '../wlo-canvas.component';
 
@@ -14,7 +15,7 @@ import { WloCanvasComponent } from '../wlo-canvas.component';
 // title and its preview image are supplied here — otherwise the preview never names what is shown.
 @Component({
   selector: 'es-preview-screen',
-  imports: [PreviewNodeComponent, WloCanvasComponent],
+  imports: [DetailsLinkComponent, PreviewNodeComponent, WloCanvasComponent],
   templateUrl: './preview-screen.component.html',
   styleUrl: './preview-screen.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

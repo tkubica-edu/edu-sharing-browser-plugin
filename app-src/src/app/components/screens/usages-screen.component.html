@@ -1,8 +1,12 @@
 <div class="es-screen-body">
   <section class="es-hint-card">
-    @if (curation.activeNode(); as node) {
-      <p class="es-muted">Aufrufe und Verwendungen von <strong>{{ node.name ?? node.nodeId }}</strong>.</p>
-      <a class="upload-link" [href]="node.link" target="_blank" rel="noopener noreferrer">Node öffnen</a>
+    @if (curation.activeNode()) {
+      <!-- The same head as the Vorschau tab of this section: what the content is called, and the way
+           to everything else about it. Which numbers follow is the tab's business, not this card's. -->
+      @if (title(); as contentTitle) {
+        <h2 class="es-content-title">{{ contentTitle }}</h2>
+      }
+      <es-details-link></es-details-link>
     } @else {
       <p class="es-muted">Noch kein Node vorhanden.</p>
     }

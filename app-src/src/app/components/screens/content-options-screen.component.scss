@@ -10,19 +10,6 @@ es-content-card {
   background: var(--es-surface);
 }
 
-// The link under the title, to the content's page in the repository.
-.details-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  align-self: flex-start;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--es-blue);
-
-  svg { width: 13px; height: 13px; }
-}
-
 // The main menu's row look: these ways on are menu options one level down, not form buttons.
 .option-list {
   @include m.menu-rows;

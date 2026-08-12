@@ -12,10 +12,10 @@
   // Everything a machine put there is drawn in this one colour, so it is recognisable as such wherever
   // it turns up: a box it filled in, its judgements, and the wait for them.
   --qc-ai: var(--es-ai, #7362ec);
-  // A machine's objection: the alert that carries it, and the criteria it is about. Loud on purpose —
-  // it is the one thing in this view that asks for a decision instead of recording one.
+  // A machine's objection: the finding itself, the criteria it is about, and the answers to it. Loud
+  // on purpose — it is the one thing in this view that asks for a decision instead of recording one.
   --qc-alert: var(--es-danger, #c0392b);
-  // The alert's own ground. A fixed tint rather than one mixed from the colour above, so it stays
+  // The finding's own ground. A fixed tint rather than one mixed from the colour above, so it stays
   // legible under a theme that repaints only the foreground.
   --qc-alert-surface: #fbe4e7;
 
@@ -32,7 +32,7 @@
   padding: var(--qc-padding, 16px 12px 20px);
 }
 
-// Centred headings, as the criteria are a sheet of their own rather than a section of the screen.
+// Centred, as the criteria are a sheet of their own rather than a section of the screen.
 .panel-title {
   margin: 0;
   text-align: center;
@@ -41,9 +41,11 @@
   color: var(--qc-accent);
 }
 
+// A column's heading sits on the same left edge as the boxes under it, so it reads as their label
+// rather than as a title of the room they happen to stand in.
 h3 {
   margin: 0 0 10px;
-  text-align: center;
+  text-align: left;
   font-size: 14px;
   font-weight: 700;
   color: var(--qc-accent);
@@ -198,8 +200,8 @@ input[type='checkbox'] {
 // rather than following its content, so the criteria under it do not move while it goes from the wait
 // to the result — which happens with the user's eyes on the list, a minute in.
 //
-// In the machines' colour while it reports about them, and in the colour of an objection once it
-// carries one: the block then is the objection, not a note about it.
+// In the machines' colour throughout, whatever it carries: the block is the report of a check, and the
+// objection inside it is what wears the colour of an objection.
 .ai-check {
   display: flex;
   flex-direction: column;
@@ -218,11 +220,7 @@ input[type='checkbox'] {
   // A hard height, because that is what makes a long finding give way — it shrinks into what the rest
   // leaves over and scrolls there (see .alert-body). Tall enough that even a four-line caption over
   // answers wrapped onto two lines still fits, which is the narrowest a panel gets.
-  &.has-violation {
-    height: 226px;
-    background: var(--qc-alert-surface);
-    color: var(--qc-alert);
-  }
+  &.has-violation { height: 240px; }
 }
 
 // The wait: the house spinner alone, in no box and no bigger than it has to be. Nothing is being
@@ -299,12 +297,15 @@ input[type='checkbox'] {
   &:focus-visible { outline: 2px solid currentcolor; outline-offset: 2px; }
 }
 
+// Which objection is on screen and that it is one. In the text colour like the sentence beside it:
+// the head says what is being asked, the box below it is what is red.
 .alert-mark {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  color: var(--qc-text);
 }
 
 .alert-count {
@@ -317,11 +318,14 @@ input[type='checkbox'] {
   line-height: 1;
 }
 
+// What the user is asked to do about the finding — ordinary text, since it is an instruction and not
+// the objection itself.
 .alert-lead {
   margin: 0;
   font-size: 13px;
   line-height: 1.35;
   font-weight: 500;
+  color: var(--qc-text);
 }
 
 // The finding between the two arrows that lead through the rest of them, with enough room around it
@@ -338,12 +342,18 @@ input[type='checkbox'] {
   min-height: 0;
 }
 
+// The objection itself, and the only part of the block that is drawn as one: a box of its own, in the
+// colour of an objection. What surrounds it reports about the check — this is what the check found.
 .alert-finding {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  padding: 8px 10px;
+  border-radius: var(--es-radius, 8px);
+  background: var(--qc-alert-surface);
+  color: var(--qc-alert);
 
   h4 {
     flex: 0 0 auto;

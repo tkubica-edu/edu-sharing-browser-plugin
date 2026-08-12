@@ -2,15 +2,7 @@
   <!-- The same card the main menu shows, under the name this screen gives it: there it is the way in,
        here it says which content the options below act on. -->
   <es-content-card heading="Gewählter Inhalt">
-    @if (curation.activeNode(); as node) {
-      <a class="details-link" [href]="node.link" target="_blank" rel="noopener">
-        Alle Details anzeigen
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M7 17L17 7" /><path d="M9 7h8v8" />
-        </svg>
-      </a>
-    }
+    <es-details-link></es-details-link>
   </es-content-card>
 
   <!-- The same rows as the main menu: these are a choice of next step, not form buttons. -->

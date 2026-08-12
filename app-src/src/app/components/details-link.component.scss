@@ -1,0 +1,17 @@
+// Set as fine print under a title: the title names the content, this only says where the rest of it
+// is. `align-self` keeps the host at the link's width inside the flex columns it is projected into.
+:host {
+  display: inline-flex;
+  align-self: flex-start;
+}
+
+.details-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--es-blue);
+
+  svg { width: 13px; height: 13px; }
+}

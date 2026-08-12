@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, computed, i
 
 import { CurationService } from '../../services/curation.service';
 import { loadWebComponentBundle } from '../../services/web-component-bundle.service';
+import { DetailsLinkComponent } from '../details-link.component';
 
 /** The element is only rendered once its tag is defined, so bindings hit an upgraded element. */
 const USAGES_TAG = 'edu-sharing-usages';
@@ -15,6 +16,7 @@ const USAGES_TAG = 'edu-sharing-usages';
 // node that is (re)loaded after every save, and passes it as a single-element array.
 @Component({
   selector: 'es-usages-screen',
+  imports: [DetailsLinkComponent],
   templateUrl: './usages-screen.component.html',
   styleUrl: './usages-screen.component.scss',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -22,6 +24,9 @@ const USAGES_TAG = 'edu-sharing-usages';
 })
 export class UsagesScreenComponent {
   protected readonly curation = inject(CurationService);
+
+  /** The content's title — see CurationService.contentTitle, which the Vorschau tab reads too. */
+  protected readonly title = this.curation.contentTitle;
 
   protected readonly bundle = loadWebComponentBundle('edu', USAGES_TAG);
 

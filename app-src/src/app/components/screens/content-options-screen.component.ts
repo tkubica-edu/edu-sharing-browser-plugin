@@ -8,11 +8,13 @@ import { NavigationService } from '../../services/navigation.service';
 import { NodeConnectorService } from '../../services/node-connector.service';
 import { IconId, OptionIconService } from '../../services/option-icon.service';
 import { ContentCardComponent } from '../content-card.component';
+import { DetailsLinkComponent } from '../details-link.component';
 
 /**
  * One way on from a known content. `section` is the step it leads to — its condition, and the icon
- * it is picked by unless `icon` names another: two of the options lead into the same section (its
- * Vorschau and its Freigabe), and a row is told apart by its icon before it is read.
+ * it is picked by unless `icon` names another: several options lead into the same section (the
+ * Inhaltsübersicht's Vorschau, Nutzung and Inhalt teilen), and a row is told apart by its icon
+ * before it is read.
  */
 interface ContentOption {
   section: SectionId;
@@ -32,7 +34,7 @@ interface ContentOption {
 // (see NodeConnectorService) — so the row appears once that answer is in.
 @Component({
   selector: 'es-content-options-screen',
-  imports: [ContentCardComponent],
+  imports: [ContentCardComponent, DetailsLinkComponent],
   templateUrl: './content-options-screen.component.html',
   styleUrl: './content-options-screen.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -72,10 +74,10 @@ export class ContentOptionsScreenComponent {
    * The ways on that apply right now, in the order they are offered: looking at the content first,
    * then working on it, then passing it on.
    *
-   * Two of them are a *tab* of a section rather than the section itself — the Vorschau and the
-   * Freigabe of the Inhaltsübersicht. They are offered separately because they are separate errands:
-   * looking at a content and handing it out are not the same visit, and neither should have to be
-   * found behind the other's tab bar.
+   * Three of them are a *tab* of a section rather than the section itself — the Vorschau, the
+   * Nutzung and the Inhalt teilen of the Inhaltsübersicht. They are offered separately because they
+   * are separate errands: looking at a content, seeing where it is used and handing it out are not
+   * the same visit, and none of them should have to be found behind another's tab bar.
    *
    * Editing is offered for a content that opens in a connector — the repository's connector list
    * decides, so the row waits for that answer. What the row then does is not decided here:
@@ -90,9 +92,16 @@ export class ContentOptionsScreenComponent {
     const options: ContentOption[] = [
       {
         section: 'overview',
-        label: 'Inhaltsübersicht',
-        description: 'Vorschau und Nutzung des Inhalts ansehen',
+        label: 'Vorschau',
+        description: 'Den Inhalt ansehen',
         run: () => this.flow.showOverview()
+      },
+      {
+        section: 'overview',
+        icon: 'usages',
+        label: 'Nutzung',
+        description: 'Aufrufe und Verwendungen des Inhalts ansehen',
+        run: () => this.flow.showUsages()
       },
       // The working steps in the order the flow walks them: where the content goes is settled
       // before it is described, and the Qualitätsprüfung is what ends with the save.
@@ -126,7 +135,7 @@ export class ContentOptionsScreenComponent {
     options.push({
       section: 'overview',
       icon: 'share',
-      label: 'Freigabe',
+      label: 'Inhalt teilen',
       description: 'Den Inhalt für andere freigeben',
       run: () => this.flow.showShare()
     });

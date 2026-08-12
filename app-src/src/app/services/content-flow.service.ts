@@ -87,6 +87,11 @@ export class ContentFlowService {
     this.navigation.go('overview', { tab: 'preview' });
   }
 
+  /** "Nutzung": the usage tab of the Inhaltsübersicht, offered as a step of its own. */
+  showUsages(): void {
+    this.navigation.go('overview', { tab: 'usages' });
+  }
+
   /** "Freigabe": the sharing tab of the Inhaltsübersicht, offered as a step of its own. */
   showShare(): void {
     this.navigation.go('overview', { tab: 'share' });

@@ -63,3 +63,7 @@ button {
 
 // Section heading used inside cards
 .es-card h2, .es-hint-card h2 { font-size: 14px; margin: 0 0 var(--es-space-2); }
+
+// The content's own name at the head of a screen about it — matched on the tag as well, so it keeps
+// its size inside the cards above rather than being read as one of their section headings.
+h2.es-content-title { @include m.content-title; }

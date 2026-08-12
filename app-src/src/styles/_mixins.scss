@@ -24,6 +24,17 @@
   background: var(--es-hint-bg);
 }
 
+// The content's own name at the head of a screen that is about it. Set only a little above the body
+// text: it names what is shown below, it is not the screen's headline — and a title the repository
+// generated can be long, so it wraps rather than pushing the card wide.
+@mixin content-title {
+  margin: 0 0 var(--es-space-2);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
 @mixin card-head {
   display: flex;
   align-items: center;
