@@ -16,7 +16,8 @@
  * Rewriting the URL to the repository fixes both at the root: the window opens on the repository's
  * own route, so the bundle's later navigation happens on the right origin and the session cookie
  * applies. That is what {@link installBundleWindowRedirect} does, and it is the default for every
- * such URL.
+ * such URL. A route that picks a node to hand back is opened with guest access on top — see
+ * {@link repositoryQuery}.
  *
  * A caller can take one of those windows over instead ({@link captureBundleEditorWindow}), for the
  * case where the panel cannot follow where the window would go.
@@ -24,6 +25,26 @@
 
 /** Path the bundle's own routes start with (its `UIConstants.ROUTER_PREFIX`). */
 const ROUTER_PREFIX = 'components/';
+
+/** Query param the bundle marks a window it wants the picked node sent back through. */
+const REURL_PARAM = 'reurl';
+
+/** Query param that lets a repository route be used under a guest session. */
+const ALLOW_GUEST_PARAM = 'allowGuest';
+
+/**
+ * The query string a repository route is opened with, asking for guest access where a node is picked
+ * to be handed back (`reurl`).
+ *
+ * The panel's session may be a guest one (see BrowserExtensionCustomWebComponentService), and the
+ * repository's search refuses such a session unless the flag is set — the window would show the login
+ * instead of the search, so the picking it exists for could never happen.
+ */
+function repositoryQuery(params: URLSearchParams): string {
+  if (params.has(REURL_PARAM)) params.set(ALLOW_GUEST_PARAM, 'true');
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
 
 /**
  * Where a window the bundle wants to open should really point. Returns null for a URL that already
@@ -52,7 +73,8 @@ export function repositoryWindowUrl(rawUrl: string, repositoryUrl: string): stri
   // best target: the bundle navigates the tab on from there anyway.
   const start = resolved.pathname.indexOf(ROUTER_PREFIX);
   if (start < 0) return `${base}/`;
-  return `${base}/${resolved.pathname.slice(start)}${resolved.search}${resolved.hash}`;
+  const query = repositoryQuery(resolved.searchParams);
+  return `${base}/${resolved.pathname.slice(start)}${query}${resolved.hash}`;
 }
 
 /**
