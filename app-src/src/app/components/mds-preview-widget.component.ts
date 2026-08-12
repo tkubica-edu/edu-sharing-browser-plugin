@@ -4,11 +4,13 @@ import {
 } from '@angular/core';
 import { HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 
-import { MdsValues } from '../util/mds-values';
+import { MdsValues, firstString } from '../util/mds-values';
 import { forMdsEditor, previewSrcOf } from '../util/mds-node';
 import {
   BrowserExtensionCustomWebComponentService
 } from '../services/browser-extension-custom-web-component.service';
+import { MdsSuggestion, NodeSuggestions, aiFieldsOf, aiSuggestionsFor } from '../util/mds-suggestions';
+import { LICENSE_FIELDS, mapAgentFields } from '../util/agent-fields';
 import { loadWebComponentBundle } from '../services/web-component-bundle.service';
 
 const EDITOR_TAG = 'edu-sharing-mds-editor-wrapper';
@@ -37,6 +39,12 @@ export type PreviewEditorMode = 'inline' | 'nodes' | 'form';
  */
 const PREVIEW_GROUP = 'browser_extension_preview';
 
+/** The node's file name — the one field of {@link PREVIEW_GROUP} besides the picture. */
+const NAME_FIELD = 'cm:name';
+
+/** The content's title, which {@link NAME_FIELD} is derived from — see `withDerivedName`. */
+const TITLE_FIELD = 'cclom:title';
+
 /** The wrapper element, typed for the inputs we set. */
 interface MdsEditorElement extends HTMLElement {
   embedded?: boolean;
@@ -46,6 +54,7 @@ interface MdsEditorElement extends HTMLElement {
   repository?: string;
   nodes?: Node[];
   nodeRefetch?: boolean;
+  suggestions?: NodeSuggestions[];
 }
 
 /**
@@ -62,6 +71,11 @@ interface MdsEditorElement extends HTMLElement {
  * writes the picture to the node itself; everything else is reported through {@link valuesChange} and
  * is the caller's to commit — embedded mode hides the wrapper's own save. The picture is read back by
  * {@link MdsPreviewWidgetComponent.currentPreviewSrc}, since it travels through no output at all.
+ *
+ * What the metadata agent filled is handed to the group as its own KI-Vorschläge, so this form shows
+ * which of its fields a machine proposed — see {@link metadata}. It matters here in particular
+ * because the title and the file name are *this* group's to render: the editor below hides its own
+ * widgets for them (see mds-editor.component.scss), so without this nothing would mark them.
  */
 @Component({
   selector: 'es-mds-preview-widget',
@@ -86,6 +100,16 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
 
   /** How the group's widgets are rendered — see {@link PreviewEditorMode}. */
   readonly editorMode = input<PreviewEditorMode>('form');
+
+  /**
+   * The metadata payload the node's values came from, for its `_origins` alone: the fields it
+   * attributes to the metadata agent are handed to the group as KI-Vorschläge, so this form marks
+   * them the way the editor below it does (see {@link aiFields}). `null` marks nothing.
+   *
+   * Needed as well as {@link node} because a node says nothing about where its properties came from
+   * — that is what the payload carries (CurationService.editorMetadata).
+   */
+  readonly metadata = input<Record<string, unknown> | null>(null);
 
   /**
    * Locks the group: the picture and its fields stay visible but can no longer be changed. For the
@@ -113,6 +137,15 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
 
   private element: MdsEditorElement | null = null;
 
+  /**
+   * The properties handed over as suggestions instead of as values — read once, at mount.
+   *
+   * A plain field rather than a signal on purpose: the effect below withholds them too, and tracking
+   * them there would rebuild the form whenever the payload changed (which is what {@link node} is
+   * already careful not to do).
+   */
+  private aiFields: readonly string[] = [];
+
   private readonly onValuesChange = (event: Event): void => {
     this.valuesChange.emit((event as CustomEvent).detail as MdsValues);
   };
@@ -136,9 +169,13 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
     // A node often arrives twice — as announced, then hydrated — and the form is built from the
     // properties only the hydrated one has. So `nodes` is kept in sync rather than only seeded; the
     // wrapper re-initialises itself when the property changes again.
+    //
+    // Withheld here as well: the later node carries the proposed properties again, and handing them
+    // over as values would fill the widgets that were supposed to take them on as suggestions —
+    // undoing the marking the mount just set up.
     effect(() => {
       const node = this.node();
-      if (this.element) this.element.nodes = [forMdsEditor(node)];
+      if (this.element) this.element.nodes = [this.withoutAiFields(forMdsEditor(node))];
     });
   }
 
@@ -150,20 +187,86 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
 
   private mount(): void {
     if (this.element) return;
+    const node = this.node();
     const element = document.createElement(EDITOR_TAG) as MdsEditorElement;
     element.embedded = true;
     element.editorMode = this.editorMode();
     element.groupId = this.groupId();
     element.setId = this.setId() ?? this.webComponent.metadataSet();
     element.repository = HOME_REPOSITORY;
+    // The agent's fields as the group's own suggestions, which is what colours them — the same
+    // arrangement MdsEditorComponent makes, and for the same reason it is made before the element
+    // connects. Under this form's field names first, since the payload is the agent's.
+    //
+    // The licence is left out: it is set rather than proposed, so its widget shows a licence chosen
+    // instead of one still to be accepted.
+    const payload = mapAgentFields(this.metadata());
+    const proposed = aiSuggestionsFor(payload, node.ref.id);
+    for (const field of LICENSE_FIELDS) delete proposed?.suggestions[field];
+    const suggestions = this.withDerivedName(proposed, node, payload);
+    const offered = Object.keys(suggestions?.suggestions ?? {});
+    if (suggestions && offered.length) {
+      element.suggestions = [suggestions];
+      this.aiFields = offered;
+    }
     // The node is already hydrated, so the wrapper must not fetch it again — and a stand-in node is
     // one the repository could not hand back at all.
-    element.nodes = [forMdsEditor(this.node())];
+    element.nodes = [this.withoutAiFields(forMdsEditor(node))];
     element.nodeRefetch = false;
     element.style.cssText = 'display:block;width:100%';
     element.addEventListener('currentValuesChange', this.onValuesChange);
     this.host().nativeElement.appendChild(element);
     this.element = element;
     this.ready.set(true);
+  }
+
+  /**
+   * The file name as a proposal of the agent's, which no payload can state itself.
+   *
+   * `cm:name` is the one field of {@link PREVIEW_GROUP} the metadata ever carries a value for, and
+   * generated metadata never carries it: the agent produces no file name, so the name is *derived*
+   * from its title (CurationService's `withTitleProperties`, RepositoryNodeService.toCreateBody).
+   * It is therefore the machine's exactly when that title is — which is what this says, since
+   * `_origins` only ever names fields the payload has.
+   *
+   * Proposed with the name the node ALREADY holds, never with the title: the two need not be equal
+   * (a node written by the agent's own upload carries a name of its own), and saying where a name
+   * came from must not change what it is.
+   */
+  private withDerivedName(
+    suggestions: NodeSuggestions | null,
+    node: Node,
+    payload: Record<string, unknown> | null,
+  ): NodeSuggestions | null {
+    if (!aiFieldsOf(payload).includes(TITLE_FIELD)) return suggestions;
+    const name = firstString(node.properties?.[NAME_FIELD]);
+    if (!name) return suggestions;
+    const derived: MdsSuggestion = {
+      id: `es-ai-${NAME_FIELD}-0`,
+      propertyId: NAME_FIELD,
+      value: name,
+      status: 'PENDING',
+      type: 'AI'
+    };
+    return {
+      nodeId: node.ref.id,
+      suggestions: { ...(suggestions?.suggestions ?? {}), [NAME_FIELD]: [derived] }
+    };
+  }
+
+  /**
+   * The node without the properties offered as suggestions — what the form is built on.
+   *
+   * Withholding them is what makes the marking happen at all: a widget takes a suggestion on only
+   * while its own value is empty, and colours only what it took on. So a proposed value reaches this
+   * form through one door or the other, never both — see MdsEditorComponent.withoutAiFields, which
+   * says what that means for a proposal the user leaves standing.
+   */
+  private withoutAiFields(node: Node): Node {
+    if (!this.aiFields.length) return node;
+    const properties = Object.fromEntries(
+      Object.entries(node.properties ?? {}).filter(([key]) => !this.aiFields.includes(key)),
+    );
+    return { ...node, properties };
   }
 }

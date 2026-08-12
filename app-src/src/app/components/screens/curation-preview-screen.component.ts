@@ -43,6 +43,13 @@ export class CurationPreviewScreenComponent implements OnInit, OnDestroy {
    */
   protected readonly draftNode = this.curation.draftNode();
 
+  /**
+   * The payload the stand-in was built from, for its `_origins` — the picture and the title are the
+   * agent's findings here, so this step is where saying so matters most. Read at the same moment as
+   * the node, so the two agree about the content they describe.
+   */
+  protected readonly draftMetadata = this.curation.editorMetadata();
+
   /** The step always works on the stand-in, so it always renders in its mode. */
   protected readonly editorMode: PreviewEditorMode = EDITOR_MODE_FOR_DRAFT;
 

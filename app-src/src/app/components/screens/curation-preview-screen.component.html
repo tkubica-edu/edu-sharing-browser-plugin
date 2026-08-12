@@ -4,7 +4,7 @@
        be asked about (see EDITOR_MODE_FOR_DRAFT). -->
   @if (draftNode; as node) {
     <section class="es-card preview-card">
-      <es-mds-preview-widget [node]="node" [editorMode]="editorMode"
+      <es-mds-preview-widget [node]="node" [metadata]="draftMetadata" [editorMode]="editorMode"
                              (valuesChange)="onValuesChange($event)"></es-mds-preview-widget>
     </section>
   } @else {

@@ -30,7 +30,8 @@
        mds-editor.component.scss). -->
   @if (editorNode; as node) {
     <section class="es-card preview-widget-card">
-      <es-mds-preview-widget [node]="node" [locked]="curation.metadataLocked()"
+      <es-mds-preview-widget [node]="node" [metadata]="editorMetadata"
+                             [locked]="curation.metadataLocked()"
                              (valuesChange)="onPreviewValuesChange($event)"></es-mds-preview-widget>
     </section>
   }

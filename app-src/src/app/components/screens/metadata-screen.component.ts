@@ -62,6 +62,13 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
   protected readonly editorNode = this.curation.editorNode();
 
   /**
+   * The payload `editorNode` was built from, for the preview widget's `_origins` — which of the
+   * fields it renders the metadata agent filled. Read at the same moment as the node, so the two
+   * agree about the content they describe.
+   */
+  protected readonly editorMetadata = this.curation.editorMetadata();
+
+  /**
    * What the preview widget last reported: the values of the group it renders, the content's file name
    * among them. Kept here rather than handed to the curation, because it is not a *finding* but the
    * answer to a question the form below asks as well — see {@link previewOverrides}.
