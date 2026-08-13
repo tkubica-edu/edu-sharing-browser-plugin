@@ -178,6 +178,22 @@ function toWrittenNode(
 }
 
 /**
+ * The node written along the agent's route with the picture *this* session can show, which the one it
+ * reports is not: the address it names is the repository's rendered preview of a node that belongs to
+ * the agent, and fetching it under the panel's session (a guest) renders the repository's "Keine
+ * ausreichenden Rechte" placeholder instead of the picture — every element that shows the content,
+ * the metadata step's preview widget among them.
+ *
+ * `src` is the picture the panel itself holds for the content (the one the save just sent, else
+ * {@link CurationService.contentPreview}), stated in the shape a widget builds an image source from —
+ * see {@link toDraftPreview}. Where there is none the preview is dropped rather than left standing:
+ * an empty picture says nothing, the placeholder says the content is not the user's to see.
+ */
+function withReadablePreview(node: Node, src: string | null): Node {
+  return { ...node, preview: toDraftPreview(src) } as unknown as Node;
+}
+
+/**
  * The metadata of a content that has just been written, as an editor is seeded from it: the payload
  * the save started from, with the values that were committed laid over it.
  *
@@ -317,6 +333,20 @@ function toDraftPreview(src: string | null): Record<string, unknown> | undefined
   return inline
     ? { mimetype: inline[1], data: inline[2], isIcon: false, width: 0, height: 0 }
     : { url: previewSource(src), isIcon: false, width: 0, height: 0 };
+}
+
+/**
+ * The picture a node's `preview` states, as an image source: its address, or the picture itself where
+ * it is stated inline (`mimetype` + base64 `data`) — the shape {@link toDraftPreview} builds for one
+ * that exists only in this browser, so a node carrying such a preview shows its picture wherever a
+ * fetched one would.
+ *
+ * Null for a preview that states no picture of this content: none at all, or a mere type icon.
+ */
+function previewSrcOfNode(preview: Node['preview'] | undefined): string | null {
+  if (!preview || preview.isIcon) return null;
+  if (preview.data && preview.mimetype) return `data:${preview.mimetype};base64,${preview.data}`;
+  return preview.url || null;
 }
 
 /**
@@ -727,7 +757,8 @@ export class CurationService {
    * 1. A picture the user picked in a step's preview widget, once that step handed it over. It
    *    outranks the rest because it is a decision rather than a finding — and because it is what the
    *    save will write, so every view of the content has to agree with it beforehand.
-   * 2. The node's rendered preview — the repository's own picture of a content it holds.
+   * 2. The picture the node states — the repository's rendered preview of a content it holds, or the
+   *    one carried inline on a node the panel assembled itself (see {@link previewSrcOfNode}).
    * 3. The image the metadata agent found (`preview_image_url`, the page's `og:image`), which is what
    *    a curated content has instead. Read from the editor's metadata *and* from the agent's result,
    *    since {@link editorMetadata} swaps in the node's stored properties on the first save.
@@ -742,7 +773,8 @@ export class CurationService {
     const picked = this.pendingPreview();
     if (picked) return { url: picked, isIcon: false };
     const preview = this.previewNode()?.preview;
-    if (preview?.url && !preview.isIcon) return { url: preview.url, isIcon: false };
+    const stated = previewSrcOfNode(preview);
+    if (stated) return { url: stated, isIcon: false };
     const found =
       previewImageOf(this.editorMetadata()) ??
       previewImageOf(this.metadataAgent.lastRun()?.parsed?.raw);
@@ -1373,7 +1405,7 @@ export class CurationService {
     // own rather than in the answer's verdict, which is why it is only reported here.
     if (outcome.previewError) console.warn('preview not set', outcome.previewError);
     if (outcome.node?.nodeId) {
-      await this.applySavedNode(outcome.node, outcome.nodeFull, values, source);
+      await this.applySavedNode(outcome.node, outcome.nodeFull, values, source, picture);
       // Filed by the endpoint, so they are recorded as done here — after applySavedNode, which
       // clears the list for a node that is not the one the previous save produced.
       this.assignedCollections.update((list) => [...list, ...filed]);
@@ -1394,12 +1426,17 @@ export class CurationService {
    * `payload` is the editor's own view of the committed values (else the agent result they came
    * from): the values alone are not enough to seed an editor back from, so the node's metadata is
    * assembled out of both — see {@link toSavedMetadata}.
+   *
+   * `picture` is the one the save sent along, for the same reason the metadata is taken from the
+   * request rather than from the node: the preview the answer names is not readable under this
+   * session — see {@link withReadablePreview}.
    */
   private async applySavedNode(
     saved: SavedNode,
     full: Record<string, unknown> | null | undefined,
     values: MdsValues,
     payload: Record<string, unknown> | null,
+    picture: string | null,
   ): Promise<void> {
     const nodeId = saved.nodeId!;
     // A write that produced a different node than the flow was working on (it created one because
@@ -1419,13 +1456,20 @@ export class CurationService {
     // keeps showing exactly what was saved. As a payload rather than as the bare value map, so an
     // editor seeded back from it renders them.
     this.nodeMetadata.set(toSavedMetadata(payload, values));
+    // Read before the node is swapped in, since the picture the panel holds for the content is partly
+    // read off the node it currently has (see contentPreview) — a save that sent none keeps showing
+    // what the flow has been showing all along.
+    const shown = picture ?? this.currentPreviewSrc();
     this.previewNode.set(
-      toWrittenNode(
-        nodeId,
-        saved,
-        full,
-        values,
-        this.browserExtensionCustomWebComponent.metadataSet(),
+      withReadablePreview(
+        toWrittenNode(
+          nodeId,
+          saved,
+          full,
+          values,
+          this.browserExtensionCustomWebComponent.metadataSet(),
+        ),
+        shown,
       ),
     );
     // The user curated and saved this one, so it belongs to the flow they started.
