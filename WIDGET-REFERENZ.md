@@ -194,17 +194,19 @@ Gleiche `instance-id` → geteilter State. Events feuern nur von der **ersten re
 |---|---|---|
 | **Lesen** (Metadaten + Volltext aus Node) | ✅ `input-mode="nodeId"`, Node-ID **manuell ins Feld tippen** | ✅ `POST /generate` mit `input_source: "node_id"` |
 | **Ändern** (im Canvas editieren) | ✅ | ✅ (`existing_metadata`) |
-| **Zurückspeichern in denselben Node** | ❌ | ❌ |
+| **Zurückspeichern in denselben Node** | ❌ | ✅ `POST /nodes` mit `node_id` |
 
 **Details:**
 
 - **Lesen:** `startNodeIdExtraction()` ruft `POST /generate` mit `input_source: "node_id"`, `node_id`, `include_core: true`, `enable_geocoding: true`, `normalize: true` und — falls schon Felder gefüllt sind — `existing_metadata`. Serverseitig holt `InputSourceService` `…/node/v1/nodes/-home-/{id}/metadata` + `…/textContent`. `input_source: "node_url"` nimmt zusätzlich die `ccm:wwwurl` als Crawler-Fallback, wenn kein Volltext hinterlegt ist.
 - **Kein `node-id`-Attribut.** Die Input-Liste des Custom Elements enthält `text`, `url`, `inputMode` — aber **kein** `nodeId`. `GET /widget/info` dokumentiert `node-id` und `source-url`; beide existieren als Element-Attribute nicht. Node-ID ist derzeit nur über das UI-Eingabefeld setzbar.
-- **Speichern:** `POST /upload` legt **immer einen neuen Node** im konfigurierten Inbox-Ordner an (`_create_node` → `_ensure_aspects` → `_set_metadata` → Collections → Extended Data → Workflow). Es gibt keinen Endpunkt, der einen vorhandenen Node aktualisiert.
+- **Speichern:** `POST /upload` legt **immer einen neuen Node** im konfigurierten Inbox-Ordner an (`_create_node` → `_ensure_aspects` → `_set_metadata` → Collections → Extended Data → Workflow).
+- **Speichern und Aktualisieren:** `POST /nodes` fährt dieselbe Pipeline, entscheidet aber über `node_id`, ob angelegt oder überschrieben wird — fehlende Felder bleiben dabei unverändert. Optionen: `collection_id` (Liste), `write_extended_data` + `extended_text`, `start_review_workflow` (`200_tocheck`, Empfänger `GROUP_ORG_WLO-Uploadmanager`), `start_quality_workflow` (`140_ELEMENT_LEGALLY_APPROVED`) und `preview`; die Antwort enthält immer den vollständigen Node als `node_full`.
+- **Vorschaubild:** `preview` steht als einzelnes Feld auf oberster Ebene, neben `node_id`, und gilt beim Anlegen wie beim Update. Der Wert ist entweder eine Adresse (`http(s)://…`, die der Dienst lädt) oder das Bild selbst — Data-URL im Format von `preview_image_url` aus `/generate`, nacktes Base64 geht auch; unterschieden wird am Präfix. Dahinter steht ein `POST …/nodes/-home-/{id}/preview` gegen edu-sharing, es wird also echtes Vorschaubild und kein Metadatenfeld (PNG, JPEG, GIF, WebP, SVG bis 10 MB). Ohne das Feld bleibt ein vorhandenes Vorschaubild unangetastet. Ein Bild, das nicht geladen oder dekodiert werden kann, macht den Schreibvorgang **nicht** ungültig: `success` bleibt `true`, der Grund steht in `preview.error` (und zusätzlich in `error`) — wer das Bild braucht, muss `preview.success` auswerten. Ein Update ist nur **innerhalb von zwei Stunden nach dem Anlegen** möglich, danach antwortet der Endpunkt 403 (unbekannter Node: 404). Kein Dublettencheck und kein Screenshot/Vorschaubild — das gibt es nur bei `/upload`. Diese Extension speichert ausschließlich über diesen Endpunkt (`NodeWriteService`).
 - **Duplikatlogik:** `check_duplicates: true` sucht per `ccm:wwwurl`. Bei Treffer bricht der Upload ab (`duplicate: true` + vorhandene `nodeId`). Der Widget-Dialog bietet dann „trotzdem hochladen" — das erzeugt einen **zweiten Node**, kein Update.
 - **Gegenprüfen:** `POST /upload/verify/{node_id}` — ohne Body reines Auslesen, mit Body SOLL/IST-Diff je Feld (`match`, `mismatch`, `missing_in_repo`, `extra_in_repo`, `not_written`).
 
-**Wenn echtes In-place-Update gebraucht wird:** Round-trip selbst bauen — `POST /generate` (`input_source: node_id`) → bearbeiten → `PUT …/node/v1/nodes/-home-/{id}/metadata?versionComment=…&obeyMds=false` direkt gegen edu-sharing. Die Logik dafür liegt in `RepositoryService._set_metadata()`, ist aber nicht über einen Endpunkt erreichbar. Ein `target_node_id`-Parameter an `/upload` wäre der kleinste Eingriff.
+**Außerhalb des Zwei-Stunden-Fensters** bleibt nur der Round-trip von Hand: `POST /generate` (`input_source: node_id`) → bearbeiten → `PUT …/node/v1/nodes/-home-/{id}/metadata?versionComment=…&obeyMds=false` direkt gegen edu-sharing — mit einer Session, die den Node bearbeiten darf.
 
 ---
 

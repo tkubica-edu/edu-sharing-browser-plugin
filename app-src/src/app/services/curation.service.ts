@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { CollectionServiceUnwrapped, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 import { firstValueFrom } from 'rxjs';
 
-import { WorkflowStatus } from '../model/workflow';
+import { REVIEW_RECEIVER, WorkflowStatus } from '../model/workflow';
 import { DRAFT_NODE_ID } from '../util/mds-node';
 import { MdsValues, firstString, toMdsEditorValues } from '../util/mds-values';
 import { withAgentLicense } from '../util/agent-fields';
@@ -11,10 +11,10 @@ import { errorMessage } from '../util/errors';
 import { renderLink } from '../util/repository-links';
 import { BrowserExtensionCustomWebComponentService } from './browser-extension-custom-web-component.service';
 import { AuthService } from './auth.service';
-import { UploadedNode } from './browser-extension.service';
+import { SavedNode } from './browser-extension.service';
 import { HistoryEntry, HistoryService } from './history.service';
 import { MetadataAgentService } from './metadata-agent.service';
-import { MetadataUploadService } from './metadata-upload.service';
+import { NodeWriteService } from './node-write.service';
 import { NodeSummary, RepositoryNodeService } from './repository-node.service';
 import { QualityJudgeService } from './quality-judge.service';
 
@@ -100,9 +100,29 @@ function fieldOrigins(
 }
 
 /**
+ * What a save does beyond writing the values onto the node — the steps of the endpoint's own
+ * pipeline the flow asks for at the step it has reached (see {@link CurationService.save}).
+ *
+ * Both routes state the same three, so a step of the flow means the same thing whether the agent
+ * writes the node or the panel does.
+ */
+export interface SaveSteps {
+  /**
+   * The write that DESCRIBES the content — the Metadaten step, the one that carries the whole of the
+   * metadata. Two things hang off it: the WLO extended fields, which state that same payload on the
+   * node (see `toExtendedFields`), and the licence the form may have had no widget to report
+   * (see `withAgentLicense`). Every other step writes only what it itself decided.
+   */
+  metadata?: boolean;
+  /** Confirm the content's quality: {@link WorkflowStatus.ELEMENT_LEGALLY_APPROVED}. */
+  quality?: boolean;
+  /** Hand the content over to the editorial queue: {@link WorkflowStatus.TO_CHECK}. */
+  review?: boolean;
+}
+
+/**
  * Assemble a stand-in {@link Node} for a content the repository was never asked about — the one the
- * metadata agent's `/upload` created and described itself (see
- * {@link CurationService.applyUploadedNode}).
+ * metadata agent's `/nodes` wrote and described itself (see {@link CurationService.applySavedNode}).
  *
  * A real `Node` has ~30 fields; the elements fed from it read a handful (`ref.id`, `name`, `title`,
  * `mediatype`, `properties`), so only those are filled and the cast declares the rest absent. It is
@@ -115,7 +135,7 @@ function fieldOrigins(
  */
 function toPartialNode(
   nodeId: string,
-  uploaded: UploadedNode,
+  uploaded: SavedNode,
   values: MdsValues,
   metadataSet: string,
 ): Node {
@@ -130,6 +150,31 @@ function toPartialNode(
     properties: values,
     access: []
   } as unknown as Node;
+}
+
+/**
+ * The node a `/nodes` write produced, as the flow's own node: the whole one the endpoint answers
+ * with (`node_full`, the same shape a node load returns), which is what the steps behind the save
+ * work on — the folder it lives in, the preview the repository derived for it, its aspects and
+ * access are all only in there.
+ *
+ * The stand-in assembled from the summary is the fallback for an answer that carries no node at all
+ * — see {@link toPartialNode}. Its `metadataset` is likewise only kept where the node names one: an
+ * editor resolves its set from the node, and the panel's own set is the answer for a node that
+ * names none (see {@link toDraftNode}).
+ */
+function toWrittenNode(
+  nodeId: string,
+  saved: SavedNode,
+  full: Record<string, unknown> | null | undefined,
+  values: MdsValues,
+  metadataSet: string,
+): Node {
+  if (!full || typeof full !== 'object' || !full['ref']) {
+    return toPartialNode(nodeId, saved, values, metadataSet);
+  }
+  const node = full as unknown as Node;
+  return { ...node, metadataset: node.metadataset || metadataSet };
 }
 
 /**
@@ -349,7 +394,7 @@ export interface ActiveNode {
 export class CurationService {
   private readonly auth = inject(AuthService);
   private readonly metadataAgent = inject(MetadataAgentService);
-  private readonly metadataUpload = inject(MetadataUploadService);
+  private readonly nodeWrite = inject(NodeWriteService);
   private readonly browserExtensionCustomWebComponent = inject(BrowserExtensionCustomWebComponentService);
   private readonly repositoryNodes = inject(RepositoryNodeService);
   private readonly qualityJudge = inject(QualityJudgeService);
@@ -406,6 +451,13 @@ export class CurationService {
 
   readonly saving = signal(false);
   readonly saveError = signal<string | null>(null);
+
+  /**
+   * Why a workflow step a save asked for did not happen; null while none failed. Kept apart from
+   * {@link saveError}: the metadata is written either way, so a handover that did not get through
+   * is a report about the content's *state*, not a failed save.
+   */
+  readonly workflowError = signal<string | null>(null);
 
   readonly assigning = signal(false);
   readonly assignError = signal<string | null>(null);
@@ -509,8 +561,8 @@ export class CurationService {
 
   /**
    * The quality was confirmed in the Qualitätsprüfung. Kept as state of the flow rather than read
-   * back from the node: the confirmation is usually given before there is a node at all, and it is
-   * the same statement either way — see {@link confirmQuality}.
+   * back from the node: the node's workflow history is not what the *step* asks about, and the
+   * confirmation is the same statement whichever route wrote it — see {@link confirmQuality}.
    */
   private readonly quality = signal(false);
   readonly qualityConfirmed = this.quality.asReadonly();
@@ -530,9 +582,6 @@ export class CurationService {
   private readonly criteriaSatisfied = signal(false);
   readonly qualityCriteriaMet = this.criteriaSatisfied.asReadonly();
 
-  /** Set while a confirmation waits for the node the save will create. */
-  private qualityPending = false;
-
   /** Reads the preview step's picture while that step is open; see {@link registerDraftPreviewSource}. */
   private draftPreviewSource: DraftPreviewSource | null = null;
 
@@ -546,9 +595,10 @@ export class CurationService {
   private readonly saved = signal(false);
 
   /**
-   * The metadata has been written at least once. Only the *wording* of the save step depends on it
-   * ("erneut speichern") — editing stays open: the save created (or found) the active node, so every
-   * further save updates that node in place (see {@link save}).
+   * The content has been written at least once — which, since the flow saves it as soon as its
+   * picture and title are confirmed, is true from the preview step on. Only the *wording* of the
+   * save step depends on it ("erneut speichern"): editing stays open either way, as every further
+   * save updates that same node in place (see {@link save}).
    */
   readonly metadataSaved = this.saved.asReadonly();
 
@@ -559,20 +609,26 @@ export class CurationService {
   readonly metadataLocked = computed(() => this.saving());
 
   /**
-   * Whether the save goes through the metadata agent's upload rather than writing the node itself —
-   * the route of a session that is not the user's own (see {@link saveThroughAgent}).
+   * Whether the save goes through the metadata agent's `/nodes` rather than writing the node itself
+   * — the route of a session that is not the user's own (see {@link writeThroughAgent}).
    *
-   * It decides more than which request is sent: the upload only ever CREATES, so along that route a
-   * written content cannot be saved again without producing a second node (which is what the footer
-   * reads, see ActionBarService).
+   * Which request is sent is all it decides: both routes create the content once and update it from
+   * there on, so the flow's steps are the same either way.
    */
   readonly savesThroughAgent = computed(
     () => this.browserExtensionCustomWebComponent.enabled() && !this.auth.loggedIn(),
   );
 
+  /**
+   * A content this session read off a page: a metadata-agent run that succeeded. It stays true once
+   * that content has been written to a node — the run is what the content *is*, not what is still
+   * outstanding about it (see {@link hasUnsavedWork} for that question).
+   */
+  readonly hasCuratedResult = computed(() => this.metadataAgent.lastRun()?.ok === true);
+
   /** A metadata-agent result or an active node exists. */
   readonly hasEditableMetadata = computed(
-    () => this.metadataAgent.lastRun()?.ok === true || this.activeNode() !== null,
+    () => this.hasCuratedResult() || this.activeNode() !== null,
   );
 
   /**
@@ -584,19 +640,37 @@ export class CurationService {
   readonly hasUnsavedWork = this.resultPending.asReadonly();
 
   /**
+   * The folder the content is to be moved into: the one the user's own filing step picked, where the
+   * node is not in it already. `null` when there is nothing to move.
+   *
+   * A move rather than a parent, because the content is created at the *preview* step — before that
+   * filing step is reached — so where it lives can no longer be decided by the create (see
+   * {@link moveToStorageParent}). Only along the route that writes the node itself: the agent's own
+   * inbox is where the other one puts it, and a guest may not move it out of there.
+   */
+  private readonly pendingStorageParent = computed<string | null>(() => {
+    if (this.savesThroughAgent()) return null;
+    const target = this.storageParentState()?.ref.id;
+    const current = this.previewNode()?.parent?.id;
+    return target && current && target !== current ? target : null;
+  });
+
+  /**
    * Whether {@link saveCollected} still has anything to do: a content without a node has to be
-   * created, and one that already has a node is written again only for the values the flow collected
+   * created, and one that already has a node is written again only for what the flow collected
    * since. Without this a step that was merely passed through would update the node with nothing.
    *
    * A filing that has not been carried out counts as something to do as well, even though it is no
-   * *value*: the save is what files the content into its collections (see {@link save}), so a step
-   * that only picked one would otherwise be walked past without ever taking effect.
+   * *value*: the save is what files the content into its collections and into the folder picked for
+   * it (see {@link save}), so a step that only picked one would otherwise be walked past without
+   * ever taking effect.
    */
   readonly hasCollectedValues = computed(
     () =>
       !this.activeNode() ||
       Object.keys(this.recordedValues()).length > 0 ||
-      this.pendingCollections().length > 0,
+      this.pendingCollections().length > 0 ||
+      this.pendingStorageParent() !== null,
   );
 
   /**
@@ -617,7 +691,17 @@ export class CurationService {
    */
   readonly editorMetadata = computed<Record<string, unknown> | null>(() => {
     const payload = this.metadataAgent.lastRun()?.parsed?.raw ?? null;
-    const base = this.activeNode() ? this.nodeMetadata() ?? payload : payload;
+    // A curated content is the run's findings with what the node already holds laid over them — NOT
+    // the node's properties alone. The flow saves the content as soon as its picture and title are
+    // confirmed, and what it writes at that point is exactly those two: everything the run found is
+    // still a proposal the user has not seen, and reading the metadata off the node would throw it
+    // away before the step that shows it (see {@link createContent}).
+    //
+    // For a content that was not curated here the node is all there is, and it stands alone.
+    const stored = this.nodeMetadata();
+    const base = this.hasCuratedResult()
+      ? { ...(payload ?? {}), ...(stored ?? {}) }
+      : stored ?? payload;
     const recorded = this.recordedValues();
     const merged = Object.keys(recorded).length ? { ...(base ?? {}), ...recorded } : base;
     if (!merged) return null;
@@ -738,11 +822,37 @@ export class CurationService {
   }
 
   /**
-   * Write what the flow collected outside the metadata editor ({@link recordValues}) — the save at
-   * the end of the first big step for a content whose editor is not there to commit.
+   * Write the content as the preview step confirmed it — the FIRST save of the flow, and the one
+   * that creates the node: from here on every step edits that node rather than collecting for a
+   * save at the end.
+   *
+   * **The picture and the title, and nothing else.** They are what this step confirmed, and each of
+   * the steps behind it adds what *it* decided: the collections, the criteria, and finally the whole
+   * of the generated metadata at the Metadaten step. The agent's findings are deliberately not
+   * written here — until the user has seen them, they are a proposal.
+   *
+   * The title is the one the preview step's editor reported ({@link applyDraftValues}, which the
+   * caller runs first). The picture is content rather than a property, so it travels its own way: it
+   * is uploaded onto the node this creates ({@link writePendingPreview}), and along the agent's route
+   * it is the `preview_image_url` its payload already carries.
    */
-  saveCollected(): Promise<boolean> {
-    return this.save({});
+  createContent(): Promise<boolean> {
+    const title = this.contentTitle();
+    return this.save(title ? { 'cclom:title': [title] } : {});
+  }
+
+  /**
+   * Write what the flow collected outside the metadata editor ({@link recordValues}) — the way on
+   * out of a step that has no editor to commit: the collections it picked, the folder it chose, the
+   * criteria it recorded.
+   *
+   * A step that collected nothing is passed without a request: the content is already written, and
+   * an update with nothing in it would only add a version to it.
+   */
+  saveCollected(steps: SaveSteps = {}): Promise<boolean> {
+    return this.hasCollectedValues() || steps.quality || steps.review
+      ? this.save({}, null, steps)
+      : Promise.resolve(true);
   }
 
   /** Take over what the Qualität view reports of its criteria — see {@link qualityCriteriaMet}. */
@@ -751,23 +861,23 @@ export class CurationService {
   }
 
   /**
-   * Confirm the content's quality: a workflow status on its node
-   * ({@link WorkflowStatus.ELEMENT_LEGALLY_APPROVED}).
+   * Confirm the content's quality: the criteria the view recorded are written onto the node and the
+   * quality workflow is started with them ({@link WorkflowStatus.ELEMENT_LEGALLY_APPROVED}).
    *
-   * A status is written to a node, and at the step this is given there usually is none yet — so a
-   * content that has one is confirmed on the spot, and a content that has not is confirmed by the
-   * save that creates it (see {@link writePendingQuality}). Either way the confirmation itself holds
-   * from the moment it is given: it is a statement about the content, not about the node.
+   * One save, not two: the criteria are the *reason* for the confirmation, so a node that carries
+   * the status without them would state a judgement nothing supports. Both routes take them
+   * together — `start_quality_workflow` runs after the metadata was written (see
+   * {@link NodeWriteService}), and so does the status the panel writes itself.
+   *
+   * The confirmation holds only where it was actually recorded: a write that did not get through
+   * leaves the statement unmade and says why ({@link qualityError}), which is what the view shows.
    */
   async confirmQuality(): Promise<void> {
-    this.quality.set(true);
     this.qualityError.set(null);
-    const nodeId = this.activeNode()?.nodeId;
-    if (!nodeId) {
-      this.qualityPending = true;
-      return;
-    }
-    await this.writeQualityStatus(nodeId);
+    const written = await this.save({}, null, { quality: true });
+    const problem = written ? this.workflowError() : this.saveError();
+    this.quality.set(!problem);
+    if (problem) this.qualityError.set('Die Qualität konnte nicht bestätigt werden: ' + problem);
   }
 
   /**
@@ -873,6 +983,22 @@ export class CurationService {
     } catch {
       /* the node keeps the preview the repository derived for it */
     }
+  }
+
+  /**
+   * The picture to send along the agent's route, as its `/nodes` takes it: an address it fetches, or
+   * the picture itself as a data URL (see {@link NodeWriteSteps.preview}). `null` when there is none
+   * to send — the node then keeps whatever preview it has.
+   *
+   * The same two sources {@link writePendingPreview} writes on the other route, and in the same
+   * order: a picture picked in the editor that is open right now wins over the one the preview step
+   * carried over. An object URL is read out first — it names a picture inside this browser, which is
+   * nowhere a service can fetch from.
+   */
+  private async previewToSend(): Promise<string | null> {
+    const src = this.pickedPreviewSrc() ?? this.pendingPreview();
+    if (!src?.startsWith('blob:')) return src;
+    return await toDataUrl(src);
   }
 
   /** Clear the whole flow for a fresh analysis. */
@@ -1075,69 +1201,55 @@ export class CurationService {
   }
 
   /**
-   * Save the metadata: create the node the first time, otherwise update it in place. Returns
-   * true on success so the caller can offer the next step.
+   * Save the content: create the node the first time, otherwise update it in place. Returns true on
+   * success so the caller can offer the next step.
+   *
+   * The flow writes early and often — the content is created as soon as its picture and title are
+   * confirmed ({@link createContent}), and every step after that edits the node it made. So this is
+   * not one save at the end of a flow but the one write every step goes through, and `steps` is what
+   * the step being left asks for beyond the values (see {@link SaveSteps}).
+   *
+   * Whatever the step, the same three things travel with it, because each of them is something a
+   * step decided that has nowhere else to be carried out: the collections picked so far
+   * ({@link filedCollections}), the folder picked for the content ({@link pendingStorageParent}) and
+   * the picture the preview step handed over ({@link writePendingPreview}).
    *
    * A content curated in a session that is not the user's own takes a different route — see
-   * {@link saveThroughAgent}.
+   * {@link writeThroughAgent}.
    *
    * `payload` is the open editor's own view of what it committed (MetadataEditor.payload), where it
    * has one. It is not what gets written — `values` is — but what the content's metadata is re-read
    * from afterwards along that route, which reloads no node; see {@link toSavedMetadata}. Without one
    * the agent's result stands in, which is what the editor started from.
    */
-  async save(values: MdsValues, payload: Record<string, unknown> | null = null): Promise<boolean> {
+  async save(
+    values: MdsValues,
+    payload: Record<string, unknown> | null = null,
+    steps: SaveSteps = {},
+  ): Promise<boolean> {
     if (!this.auth.authorized()) return false;
     // What other steps recorded goes underneath, so a property the editor carries too is the
     // editor's: it is the metadata's own authority, and it was seeded with the recorded values
     // anyway (see editorMetadata). A property it does not carry survives from where it was set.
     values = { ...this.recordedValues(), ...values };
-    // Before the branch, so it holds for both editors: the licence is written even where the open form
-    // had no widget to report it from (see {@link withAgentLicense}).
-    values = withAgentLicense(values, this.metadataAgent.lastRun()?.parsed?.raw ?? null);
-    // Only a session that is not the user's own goes through the agent's upload: it writes with the
-    // agent's privileges, which is the one way a guest session gets a content into the repository at
-    // all (see {@link saveThroughAgent}). A signed-in user writes the node themselves — as their own,
-    // in the folder they picked for it, and re-editable afterwards — even with the browser extension
-    // custom web component enabled. What the agent's upload does besides creating the node is done
-    // here in turn: the extended fields ({@link writeExtendedData}), the quality workflow
-    // ({@link writePendingQuality}) and the collections ({@link assignToCollections}).
-    if (this.savesThroughAgent()) return this.saveThroughAgent(values, payload);
+    // Only on the write that describes the content, and before the branch so it holds for both
+    // editors: the licence is written even where the open form had no widget to report it from (see
+    // {@link withAgentLicense}). A step that writes what it decided is not one that states a licence.
+    if (steps.metadata) {
+      values = withAgentLicense(values, this.metadataAgent.lastRun()?.parsed?.raw ?? null);
+    }
     this.saving.set(true);
     this.saveError.set(null);
+    this.workflowError.set(null);
     try {
-      const existing = this.activeNode();
-      // Pass the current name so an update never renames the node (generated metadata carries no
-      // `cm:name`). An unknown name is passed on as such — update() then sends none at all.
-      const saved = existing
-        ? await this.repositoryNodes.update(existing.nodeId, values, existing.name ?? undefined)
-        // In the folder the user's own filing step picked, where it picked one; else in the inbox.
-        : await this.repositoryNodes.create(values, this.storageParent()?.ref.id);
-      this.setActiveNode(saved.nodeId, saved.name);
-      this.resultPending.set(false);
-      this.saved.set(true);
-      // Written now, so the node's own properties are what the steps read back from here on.
-      this.recordedValues.set({});
-      // After the metadata and before the workflow, the order the agent's own pipeline writes them in.
-      await this.writeExtendedData(saved.nodeId, values, payload);
-      await this.writePendingQuality(saved.nodeId);
-      // Before the reload below, so the node comes back already carrying it.
-      await this.writePendingPreview(saved.nodeId);
-      // The filing, now that there is a node to file: a collection takes a node, so this could not
-      // happen at the steps that picked them (see {@link filedCollections}). A failure is reported
-      // (assignError) rather than thrown — the content is written either way.
-      await this.assignToCollections(this.pendingCollections());
-      // Load the full hydrated node once: its properties re-seed the editor (so re-editing
-      // uses the stored values) and the node itself feeds the preview.
-      try {
-        const node = await this.repositoryNodes.get(saved.nodeId);
-        this.previewNode.set(node);
-        this.nodeMetadata.set({ ...(node.properties ?? {}) });
-      } catch {
-        /* keep editor/preview as-is if the reload fails */
-      }
-      await this.recordSaved(saved);
-      return true;
+      // Only a session that is not the user's own goes through the agent: it writes with the agent's
+      // privileges, which is the one way a guest session gets a content into the repository at all
+      // (see {@link writeThroughAgent}). A signed-in user writes the node themselves — as their own,
+      // in the folder they picked for it — even with the browser extension custom web component
+      // enabled.
+      return this.savesThroughAgent()
+        ? await this.writeThroughAgent(values, payload, steps)
+        : await this.writeToRepository(values, payload, steps);
     } catch (cause: unknown) {
       this.saveError.set(errorMessage(cause));
       return false;
@@ -1147,119 +1259,178 @@ export class CurationService {
   }
 
   /**
-   * Save through the metadata agent's own upload instead of writing the node ourselves — the save of
-   * a session that is not the user's own: the guest session the browser extension custom web
-   * component brings may not create a node in the repository at all, and the agent's upload writes
-   * with the agent's own privileges. It creates the node, files it and starts the workflow in one
-   * request.
+   * Write the node ourselves, through the repository's own API — the route of a signed-in user.
    *
-   * A signed-in user does not come here even with that web component enabled: they write the node
-   * themselves (see {@link save}), which is the only route that can put the content where they picked
-   * and let them edit it afterwards.
-   *
-   * `/upload` only ever CREATES: it takes no node id, and the nodes it writes are the agent's, not
-   * the panel session's. So a second save cannot update what the first one wrote — it uploads
-   * again and produces a NEW node, which then becomes the content the flow works on. The footer
-   * says so ("Erneut speichern", see ActionBarService).
-   *
-   * The filing travels *with* the upload rather than being carried out afterwards, for the same
-   * reason: the node belongs to the agent, so the panel session (a guest) may not add it to a
-   * collection either — `/upload` files it itself (see MetadataUploadService).
-   *
-   * A folder picked for the user's own storage ({@link storageParent}) cannot be honoured along this
-   * route: `/upload` always creates in the inbox the agent is configured with and takes no parent
-   * (see WIDGET-REFERENZ.md). Only the collections picked there travel with it.
+   * What the agent's endpoint does in one request is done here in turn, in the same order: the
+   * metadata, the folder ({@link moveToStorageParent}), the extended fields
+   * ({@link writeExtendedData}), the workflow steps ({@link writeWorkflowSteps}) and the collections
+   * ({@link assignToCollections}).
    */
-  private async saveThroughAgent(
+  private async writeToRepository(
     values: MdsValues,
     payload: Record<string, unknown> | null,
+    steps: SaveSteps,
   ): Promise<boolean> {
-    this.saving.set(true);
-    this.saveError.set(null);
+    const existing = this.activeNode();
+    // Pass the current name so an update never renames the node (generated metadata carries no
+    // `cm:name`). An unknown name is passed on as such — update() then sends none at all.
+    const saved = existing
+      ? await this.repositoryNodes.update(existing.nodeId, values, existing.name ?? undefined)
+      // In the folder the user's own filing step picked, where it already picked one; else in the
+      // inbox, and the move behind that step puts it where it belongs.
+      : await this.repositoryNodes.create(values, this.storageParent()?.ref.id);
+    this.setActiveNode(saved.nodeId, saved.name);
+    // The user curated and saved this one, so it belongs to the flow they started rather than to the
+    // page they happen to be on — which is what keeps it across a page change (SessionResumeService).
+    this.nodeSource.set('chosen');
+    this.resultPending.set(false);
+    this.saved.set(true);
+    // Written now, so the node's own properties are what the steps read back from here on.
+    this.recordedValues.set({});
+    if (steps.metadata) await this.writeExtendedData(saved.nodeId, values, payload);
+    await this.writeWorkflowSteps(saved.nodeId, steps);
+    // Before the reload below, so the node comes back already carrying it.
+    await this.writePendingPreview(saved.nodeId);
+    // The filing, now that there is a node to file: a collection takes a node, so this could not
+    // happen at the steps that picked them (see {@link filedCollections}). A failure is reported
+    // (assignError) rather than thrown — the content is written either way.
+    await this.assignToCollections(this.pendingCollections());
+    // After the collections, although the agent's pipeline puts the folder first: both report on
+    // {@link assignError} — where the content ended up — and the assignment clears that as it starts,
+    // so a move that failed would otherwise have its report wiped by the filing behind it.
+    await this.moveToStorageParent(saved.nodeId);
+    // Load the full hydrated node once: its properties re-seed the editor (so re-editing
+    // uses the stored values) and the node itself feeds the preview.
     try {
-      const lastRun = this.metadataAgent.lastRun();
-      const filed = this.pendingCollections();
-      const outcome = await this.metadataUpload.upload(
-        values,
-        lastRun?.parsed?.raw ?? null,
-        lastRun?.source?.url,
-        filed.map((collection) => collection.id),
-      );
-      if (!outcome.ok) {
-        this.saveError.set(outcome.error ?? 'Upload fehlgeschlagen.');
-        return false;
-      }
-      this.resultPending.set(false);
-      this.saved.set(true);
-      // Uploaded with the rest of the values, so they are the node's metadata from here on.
-      this.recordedValues.set({});
-      // The preview step's picture is dropped rather than written here: the agent creates the node
-      // with its own privileges, so the panel session (a guest) may not upload a preview to it. What
-      // the page itself offers the agent already has — `preview_image_url` travelled in the payload.
-      this.pendingPreview.set(null);
-      if (outcome.node?.nodeId) {
-        await this.applyUploadedNode(
-          outcome.node,
-          values,
-          payload ?? lastRun?.parsed?.raw ?? null,
-        );
-        await this.writePendingQuality(outcome.node.nodeId);
-        // Written by the upload, so they are recorded as done here — after applyUploadedNode, which
-        // clears the list for a node that is not the one the previous save produced.
-        this.assignedCollections.update((list) => [...list, ...filed]);
-      }
-      return true;
-    } catch (cause: unknown) {
-      this.saveError.set(errorMessage(cause));
-      return false;
-    } finally {
-      this.saving.set(false);
+      const node = await this.repositoryNodes.get(saved.nodeId);
+      this.previewNode.set(node);
+      this.nodeMetadata.set({ ...(node.properties ?? {}) });
+    } catch {
+      /* keep editor/preview as-is if the reload fails */
     }
+    await this.recordSaved(saved);
+    return true;
   }
 
   /**
-   * Take the uploaded content over into the flow **from the endpoint's own answer**, without
-   * loading the node.
+   * Write through the metadata agent's `POST /nodes` instead of writing the node ourselves — the
+   * save of a session that is not the user's own: the guest session the browser extension custom web
+   * component brings may not create a node in the repository at all, and the agent writes with its
+   * own privileges. It creates or updates the node, files it, writes the extended fields and runs
+   * the workflow steps in one request.
    *
-   * The node is deliberately not fetched back: the agent creates it with its own privileges, so the
-   * session the panel runs under (a guest — which is the normal case with the additional web
-   * component) is not allowed to read it. `/upload` already reports everything the following steps
-   * need, so its `node` is treated as the node: its id identifies it, its `repositoryUrl` is the
-   * link out, and the values just committed *are* its metadata — they are what was written.
+   * A signed-in user does not come here even with that web component enabled: they write the node
+   * themselves (see {@link writeToRepository}), which is the only route that can put the content
+   * where they picked it.
    *
-   * `payload` is the editor's own view of those values (else the agent result they came from): the
-   * values alone are not enough to seed an editor back from, so the node's metadata is assembled out
-   * of both — see {@link toSavedMetadata}.
+   * The node id is what makes it an update: the first save sends none and the endpoint creates the
+   * content, every later one names the node it made. The repository holds that open for two hours
+   * after the node was created — a later write is refused (403) and the editorial interface takes
+   * over from there, which is reported as any other refusal is.
+   *
+   * The filing travels *with* the request rather than being carried out afterwards: the node belongs
+   * to the agent, so the panel session (a guest) may not add it to a collection either — the
+   * endpoint files it itself (see {@link NodeWriteService}).
+   *
+   * The picture travels with it too, as the body's `preview` — an address the endpoint fetches or
+   * the picture itself as a data URL. It has to go that way here: a preview is uploaded to a node
+   * rather than written as a property, and this node is the agent's, so the endpoint does it.
+   *
+   * One thing cannot be honoured along this route, because the node is not the panel session's to
+   * touch: the folder picked for the user's own storage ({@link storageParent}) — the endpoint
+   * always creates in the inbox the agent is configured with.
    */
-  private async applyUploadedNode(
-    uploaded: UploadedNode,
+  private async writeThroughAgent(
+    values: MdsValues,
+    payload: Record<string, unknown> | null,
+    steps: SaveSteps,
+  ): Promise<boolean> {
+    const source = payload ?? this.metadataAgent.lastRun()?.parsed?.raw ?? null;
+    const filed = this.pendingCollections();
+    const picture = await this.previewToSend();
+    const outcome = await this.nodeWrite.write(values, source, this.activeNode()?.nodeId ?? null, {
+      preview: picture ?? undefined,
+      collections: filed.map((collection) => collection.id),
+      quality: steps.quality,
+      review: steps.review,
+      extended: steps.metadata
+    });
+    if (!outcome.ok) {
+      this.saveError.set(outcome.error ?? 'Speichern fehlgeschlagen.');
+      return false;
+    }
+    this.workflowError.set(outcome.workflowError ?? null);
+    // The filing travelled with the request, so its outcome is read from the same answer — the
+    // route's counterpart of what assignToCollections reports on the other one.
+    this.assignError.set(outcome.collectionError ?? null);
+    this.resultPending.set(false);
+    this.saved.set(true);
+    // Written with the rest of the values, so they are the node's metadata from here on.
+    this.recordedValues.set({});
+    // Sent with the request, so it is off the flow's hands — a second save must not carry it again.
+    if (picture) this.pendingPreview.set(null);
+    // A picture the endpoint could not load or decode leaves the content written; it says so on its
+    // own rather than in the answer's verdict, which is why it is only reported here.
+    if (outcome.previewError) console.warn('preview not set', outcome.previewError);
+    if (outcome.node?.nodeId) {
+      await this.applySavedNode(outcome.node, outcome.nodeFull, values, source);
+      // Filed by the endpoint, so they are recorded as done here — after applySavedNode, which
+      // clears the list for a node that is not the one the previous save produced.
+      this.assignedCollections.update((list) => [...list, ...filed]);
+    }
+    return true;
+  }
+
+  /**
+   * Take the written content over into the flow **from the endpoint's own answer**, without loading
+   * the node.
+   *
+   * The node is deliberately not fetched back: the agent writes it with its own privileges, so the
+   * session the panel runs under (a guest — which is the normal case with the additional web
+   * component) is not allowed to read it. `/nodes` already reports everything the following steps
+   * need, so what it answers is treated as the node: its id identifies it, its `repositoryUrl` is
+   * the link out, and the node it read back stands for the node itself (see {@link toWrittenNode}).
+   *
+   * `payload` is the editor's own view of the committed values (else the agent result they came
+   * from): the values alone are not enough to seed an editor back from, so the node's metadata is
+   * assembled out of both — see {@link toSavedMetadata}.
+   */
+  private async applySavedNode(
+    saved: SavedNode,
+    full: Record<string, unknown> | null | undefined,
     values: MdsValues,
     payload: Record<string, unknown> | null,
   ): Promise<void> {
-    const nodeId = uploaded.nodeId!;
-    // A re-upload produces a DIFFERENT node (see saveThroughAgent), and what the previous one was
-    // assigned to says nothing about this one — so the assignments start over with it.
+    const nodeId = saved.nodeId!;
+    // A write that produced a different node than the flow was working on (it created one because
+    // the previous one could no longer be edited) carries none of its predecessor's assignments —
+    // so they start over with it.
     if (this.activeNode() && this.activeNode()!.nodeId !== nodeId) {
       this.assignedCollections.set([]);
       this.assignError.set(null);
     }
     this.activeNode.set({
       nodeId,
-      // The agent's title, never the id — see {@link ActiveNode}.
-      name: uploaded.title ?? null,
-      link: uploaded.repositoryUrl ?? renderLink(this.auth.repositoryUrl(), nodeId)
+      // The name the repository holds, else the agent's title — never the id, see {@link ActiveNode}.
+      name: firstString((full as { name?: string } | null)?.name) ?? saved.title ?? null,
+      link: saved.repositoryUrl ?? renderLink(this.auth.repositoryUrl(), nodeId)
     });
-    // The committed values, since there are no stored properties to read: the editor keeps showing
-    // exactly what was saved, and the preview and the usages element get a node to work on. As a
-    // payload rather than as the bare value map, so an editor seeded back from it renders them.
+    // The committed values, since there are no stored properties this session may read: the editor
+    // keeps showing exactly what was saved. As a payload rather than as the bare value map, so an
+    // editor seeded back from it renders them.
     this.nodeMetadata.set(toSavedMetadata(payload, values));
-    // A node states its properties the way the repository holds them — every one of them a list.
     this.previewNode.set(
-      toPartialNode(nodeId, uploaded, values, this.browserExtensionCustomWebComponent.metadataSet()),
+      toWrittenNode(
+        nodeId,
+        saved,
+        full,
+        values,
+        this.browserExtensionCustomWebComponent.metadataSet(),
+      ),
     );
     // The user curated and saved this one, so it belongs to the flow they started.
     this.nodeSource.set('chosen');
-    await this.recordSaved({ nodeId, name: uploaded.title ?? nodeId });
+    await this.recordSaved({ nodeId, name: this.activeNode()?.name ?? nodeId });
   }
 
   /**
@@ -1382,28 +1553,54 @@ export class CurationService {
     }
   }
 
-  /** Hand a confirmation given before the save on to the node the save produced. */
-  private async writePendingQuality(nodeId: string): Promise<void> {
-    if (!this.qualityPending) return;
-    this.qualityPending = false;
-    await this.writeQualityStatus(nodeId);
+  /**
+   * Put the node in the folder the user's own filing step picked. A move rather than a parent for
+   * the create, because that step comes *after* the content was created — see
+   * {@link pendingStorageParent}, which is also what says whether there is anything to move.
+   *
+   * A failure is reported rather than thrown: the content is written, only not where it was to be
+   * filed — and losing the save over its place would be the worse outcome.
+   */
+  private async moveToStorageParent(nodeId: string): Promise<void> {
+    const parent = this.pendingStorageParent();
+    if (!parent) return;
+    try {
+      await this.repositoryNodes.moveTo(nodeId, parent);
+    } catch (cause: unknown) {
+      this.assignError.set('Der Inhalt konnte nicht abgelegt werden: ' + errorMessage(cause));
+    }
   }
 
   /**
-   * Record the confirmed quality on the node. A failure is reported rather than thrown: it comes
-   * after the metadata was written, and losing that save over the status would be the worse outcome
-   * — the content is saved, only its confirmation did not get through.
+   * Run the workflow steps the save asked for, each its own entry in the node's history — the
+   * counterpart of the agent endpoint's two switches, in the order it runs them: the handover to the
+   * editorial queue first, the release second.
+   *
+   * A failure is reported ({@link workflowError}) rather than thrown: it comes after the metadata was
+   * written, and losing that save over a status would be the worse outcome — the content is saved,
+   * only the step behind it did not get through. The step that asked for it says what that means
+   * (see {@link confirmQuality}).
    */
-  private async writeQualityStatus(nodeId: string): Promise<void> {
-    try {
-      await this.repositoryNodes.addWorkflowStatus(
-        nodeId,
-        WorkflowStatus.ELEMENT_LEGALLY_APPROVED
-      );
-    } catch (cause: unknown) {
-      this.quality.set(false);
-      this.qualityError.set('Die Qualität konnte nicht bestätigt werden: ' + errorMessage(cause));
+  private async writeWorkflowSteps(nodeId: string, steps: SaveSteps): Promise<void> {
+    const wanted: string[] = [];
+    if (steps.review) wanted.push(WorkflowStatus.TO_CHECK);
+    if (steps.quality) wanted.push(WorkflowStatus.ELEMENT_LEGALLY_APPROVED);
+    for (const status of wanted) {
+      try {
+        await this.repositoryNodes.addWorkflowStatus(nodeId, status, '', this.receiverFor(status));
+      } catch (cause: unknown) {
+        this.workflowError.set(`${status}: ${errorMessage(cause)}`);
+        return;
+      }
     }
+  }
+
+  /** Who a workflow status is addressed to; nobody outside the WLO context — see REVIEW_RECEIVER. */
+  private receiverFor(status: string): readonly string[] {
+    return status === WorkflowStatus.TO_CHECK &&
+      this.browserExtensionCustomWebComponent.enabled()
+      ? REVIEW_RECEIVER
+      : [];
   }
 
   private setActiveNode(nodeId: string, name: string | null): void {
@@ -1416,7 +1613,7 @@ export class CurationService {
     this.recordedValues.set({});
     this.quality.set(false);
     this.qualityError.set(null);
-    this.qualityPending = false;
+    this.workflowError.set(null);
     // A judgement is about one content; the next one starts without it rather than inheriting it.
     this.qualityJudge.reset();
     // The criteria belong to the content that is going: the next one's view reports its own.

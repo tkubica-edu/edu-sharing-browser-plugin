@@ -28,6 +28,8 @@ export type ScreenId =
   | 'editorial-forward'
   | 'personal-storage'
   | 'select-collection'
+  | 'flow-choice'
+  | 'ai-quality'
   | 'preview'
   | 'usages'
   | 'share';
@@ -52,6 +54,8 @@ export type SectionId =
   | 'editorial-forward'
   | 'personal-storage'
   | 'select-collection'
+  | 'flow-choice'
+  | 'ai-quality'
   | 'overview';
 
 /** A snapshot of the world a section's (or tab's) visibility is decided against. */
@@ -74,6 +78,10 @@ export interface Conditions {
   /** A fresh /generate result that has not been written to a node yet — a content still being
    *  curated. Narrower than {@link hasEditableMetadata}, which a saved node satisfies too. */
   hasCuratedDraft: boolean;
+  /** A content this session read off a page: a metadata agent run that succeeded. Wider than
+   *  {@link hasCuratedDraft} — it still holds once the content has been written to a node, which is
+   *  what keeps the Erschließung's own steps returnable after that first save. */
+  hasCuratedContent: boolean;
   /** The metadata editor is currently open. */
   editMode: boolean;
   /** The recognition has not answered yet what this page's content is (PageRecognitionService).
@@ -302,11 +310,13 @@ export const SECTIONS: readonly AppSection[] = [
     // asks for the picture and the title, and the user never left "Inhalt erschließen" for that.
     label: 'Inhalt erschließen',
     description: 'Vorschaubild und Titel des erschlossenen Inhalts prüfen',
-    // The second step of "Inhalt erschließen", reached the moment its run succeeded: a curated
-    // result that has no node yet is exactly the state this step is about (see
-    // CurationPreviewScreenComponent). Once the content is saved it falls away — the picture and the
-    // title are then the node's own, and the Qualitätsprüfung is where they are edited.
-    visible: requiresLogin((c) => c.hasCuratedDraft),
+    // The second step of "Inhalt erschließen", reached the moment its run succeeded — and the step
+    // that WRITES the content: confirming the picture and the title creates the node, and everything
+    // after it edits that node (see ActionBarService).
+    //
+    // So the condition is the curated content and not the unsaved draft: the step stays returnable
+    // once the content has a node, and it then works on that node rather than on the stand-in.
+    visible: requiresLogin((c) => c.hasCuratedContent),
     tabs: [{ id: 'curation-preview', label: 'Vorschau' }]
   },
   {
@@ -384,6 +394,26 @@ export const SECTIONS: readonly AppSection[] = [
     // forwarding it works on editable metadata rather than on a node; see there.
     visible: requiresLogin((c) => c.hasEditableMetadata && c.hasSession),
     tabs: [{ id: 'personal-storage', label: 'Persönliche Ablage' }]
+  },
+  {
+    id: 'flow-choice',
+    label: 'Prüfprozess auswählen',
+    description: 'Wählen, wie der Inhalt geprüft wird',
+    // The junction the filing steps lead into: where the content goes is settled, and what is left to
+    // decide is how it is checked (see FlowChoiceScreenComponent). Every route through the flow
+    // passes it, so it applies wherever the steps around it do — for a content there is something to
+    // check about, saved or not.
+    visible: requiresLogin((c) => c.hasEditableMetadata),
+    tabs: [{ id: 'flow-choice', label: 'Prüfprozess' }]
+  },
+  {
+    id: 'ai-quality',
+    label: 'Individuelle Qualitätsprüfung mit KI',
+    description: 'Den Inhalt von der KI gegen die Anforderungen der Sammlung prüfen lassen',
+    // One of the two processes the choice above leads into; the other is the Qualitätsprüfung below,
+    // which is the guided walk through criteria and metadata.
+    visible: requiresLogin((c) => c.hasEditableMetadata),
+    tabs: [{ id: 'ai-quality', label: 'KI-Analyse' }]
   },
   {
     id: 'quality',

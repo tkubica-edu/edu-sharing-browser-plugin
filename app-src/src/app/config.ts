@@ -144,9 +144,6 @@ export const APP_CONFIG = {
   ] as readonly MetalookupRule[],
   defaultRepositoryUrl: 'https://repository.staging.openeduhub.net/edu-sharing',
  //defaultRepositoryUrl: 'http://repository.127.0.0.1.nip.io:8100/edu-sharing',
-  // Which repository the metadata agent writes to on POST /upload — the agent knows its targets by
-  // name, so this is its key, not a URL (see MetadataUploadService).
-  uploadRepository: 'staging',
   /**
    * The WLO metadata set.
    *

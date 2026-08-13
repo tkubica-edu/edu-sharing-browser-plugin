@@ -13,11 +13,8 @@
 
     <p class="es-muted">
       @if (curation.metadataSaved()) {
-        Die Metadaten sind gespeichert. Du kannst sie weiter bearbeiten und erneut speichern.
-        @if (browserExtensionCustomWebComponent.enabled()) {
-          „Erneut speichern" legt dabei einen <strong>neuen Inhalt</strong> an, der dann hier
-          weitergeführt wird — der bereits gespeicherte bleibt unverändert bestehen.
-        }
+        Der Inhalt ist gespeichert. Du kannst die Metadaten weiter bearbeiten und erneut speichern —
+        sie werden dabei am selben Inhalt aktualisiert.
       } @else {
         Bitte prüfe die Angaben und korrigiere oder ergänze sie bei Bedarf.
       }
@@ -58,6 +55,14 @@
 
   @if (curation.saveError(); as error) {
     <section class="es-card"><p class="es-error">Speichern fehlgeschlagen: {{ error }}</p></section>
+  }
+
+  <!-- The content is written even when the handover behind it was not, so this is a report of its
+       own rather than a failed save (CurationService.workflowError). -->
+  @if (curation.workflowError(); as error) {
+    <section class="es-card">
+      <p class="es-error">Der Inhalt konnte nicht zur Prüfung übergeben werden: {{ error }}</p>
+    </section>
   }
 
 </div>

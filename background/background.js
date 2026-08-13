@@ -1,6 +1,6 @@
 // Background worker: toggles the injected sidebar panel, extracts the active tab's
 // content, and proxies the metadata agent's POST /generate (preceded by GET /health) and
-// POST /upload (from the worker to stay CORS-portable). Auth is handled in the sidebar app,
+// POST /nodes (from the worker to stay CORS-portable). Auth is handled in the sidebar app,
 // not here.
 
 /* global EDU_SHARING_CONFIG, EDU_SHARING_DEV_FIXTURES */
@@ -450,14 +450,15 @@ async function callGenerate(body, apiUrl) {
   return result;
 }
 
-// /upload PROXY
+// /nodes PROXY
 
-// POST an assembled upload body to the metadata agent, which writes the content into the
-// repository itself (duplicate check + workflow). Proxied through the worker for the same reason
+// POST a node body to the metadata agent, which writes the content into the repository itself: it
+// creates the node when the body names none and updates the one it names otherwise, and runs the
+// collections and workflow steps the body asks for. Proxied through the worker for the same reason
 // as /generate: the endpoint is cross-origin for the sidebar document.
-async function callUpload(body, apiUrl) {
+async function callSaveNode(body, apiUrl) {
   const response = await fetchWithTimeout(
-    `${apiUrl}/upload`,
+    `${apiUrl}/nodes`,
     agentRequest({
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -465,11 +466,17 @@ async function callUpload(body, apiUrl) {
     }),
     GENERATE_TIMEOUT_MS
   );
-  // A rejected upload answers with a JSON body too (`success: false`), so the payload is read
-  // either way and only a bodyless failure becomes an error.
+  // A refused write answers with a JSON body too — `success: false`, or FastAPI's `detail` for a
+  // node this endpoint will not touch (403 outside its edit window, 404 for an unknown one). So the
+  // payload is read either way and only a bodyless failure becomes an error.
   const result = await safeJson(response);
   if (!result || typeof result !== 'object') {
-    throw new Error(`upload failed: ${response.status}`);
+    throw new Error(`nodes failed: ${response.status}`);
+  }
+  // FastAPI states a refusal as `{ detail }` and says nothing about success — read as the failure
+  // it is, so the caller does not have to know this endpoint's two answer shapes.
+  if (!response.ok && result.success === undefined) {
+    return { success: false, error: String(result.detail ?? `HTTP ${response.status}`) };
   }
   return result;
 }
@@ -483,7 +490,7 @@ const ALLOWED_ACTIONS = new Set([
   'tabs.extractPageData',
   'tabs.navigate',
   'analyze.run',
-  'metadata.upload'
+  'metadata.saveNode'
 ]);
 
 browser.runtime.onMessage.addListener((message, sender) => {
@@ -554,10 +561,10 @@ browser.runtime.onMessage.addListener((message, sender) => {
           };
         }
 
-        // POST an upload body assembled by the sidebar to /upload — the metadata agent's own way
-        // of writing the curated content into the repository.
-        case 'metadata.upload': {
-          const result = await callUpload(message.body ?? {}, agentBaseOf(message));
+        // POST a node body assembled by the sidebar to /nodes — the metadata agent's own way of
+        // writing the curated content into the repository, for creating it and for every update.
+        case 'metadata.saveNode': {
+          const result = await callSaveNode(message.body ?? {}, agentBaseOf(message));
           return { success: true, result };
         }
 

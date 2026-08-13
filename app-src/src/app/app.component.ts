@@ -37,6 +37,8 @@ import { CurationPreviewScreenComponent } from './components/screens/curation-pr
 import { CurationScreenComponent } from './components/screens/curation-screen.component';
 import { FindContentScreenComponent } from './components/screens/find-content-screen.component';
 import { EditorialForwardScreenComponent } from './components/screens/editorial-forward-screen.component';
+import { FlowChoiceScreenComponent } from './components/screens/flow-choice-screen.component';
+import { AiQualityScreenComponent } from './components/screens/ai-quality-screen.component';
 import { PersonalStorageScreenComponent } from './components/screens/personal-storage-screen.component';
 import { SelectCollectionScreenComponent } from './components/screens/select-collection-screen.component';
 import { MetadataScreenComponent } from './components/screens/metadata-screen.component';
@@ -65,6 +67,7 @@ const DISCARD_PROMPT =
     NewDocumentScreenComponent, AddMaterialScreenComponent, OwnContentScreenComponent,
     QualityCheckScreenComponent, MetadataScreenComponent, PreviewScreenComponent,
     EditorialForwardScreenComponent, PersonalStorageScreenComponent, SelectCollectionScreenComponent,
+    FlowChoiceScreenComponent, AiQualityScreenComponent,
     UsagesScreenComponent, ShareScreenComponent
   ],
   templateUrl: './app.component.html',

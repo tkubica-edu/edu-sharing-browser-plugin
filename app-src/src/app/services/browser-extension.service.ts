@@ -40,27 +40,36 @@ export interface AnalyzeResponse {
 }
 
 /**
- * Reply of the background worker's `metadata.upload` message. `success` is the *transport*: the
- * endpoint's own verdict is in `result`, which is what a caller has to check (a rejected upload —
- * e.g. a detected duplicate — is a successful request).
+ * Reply of the background worker's `metadata.saveNode` message. `success` is the *transport*: the
+ * endpoint's own verdict is in `result`, which is what a caller has to check (a refused write — a
+ * node outside the endpoint's edit window, say — is a successful request).
  */
-export interface UploadResponse {
+export interface SaveNodeResponse {
   success: boolean;
   result?: {
     success?: boolean;
     error?: string | null;
-    duplicate?: boolean | null;
-    node?: UploadedNode;
+    /** Whether this call created the node, as opposed to updating the one it named. */
+    node_created?: boolean | null;
+    node?: SavedNode;
+    /** The whole edu-sharing node, as the repository states it — see {@link SaveNodeResponse}. */
+    node_full?: Record<string, unknown> | null;
+    /** One entry per requested workflow step, in the order they ran. */
+    workflow?: readonly { status?: string; success?: boolean; error?: string | null }[] | null;
+    /** One entry per collection the node was to be referenced in. */
+    collections?: readonly { collectionId?: string; success?: boolean; error?: string | null }[] | null;
+    /** Whether the picture the body named became the node's preview — see `NodeWriteSteps.preview`. */
+    preview?: { success?: boolean; error?: string | null } | null;
   };
   error?: string;
 }
 
 /**
- * The node the metadata agent created, as `/upload` reports it. Deliberately the whole thing: it is
- * everything the app knows about the new node — a guest may not read it back from the repository —
- * so the flow is seeded from this instead of from a node load (see CurationService).
+ * The node the metadata agent wrote, as `/nodes` reports it. Deliberately the whole thing: along
+ * that route it is everything the app knows about the node — a guest may not read it back from the
+ * repository — so the flow is seeded from this instead of from a node load (see CurationService).
  */
-export interface UploadedNode {
+export interface SavedNode {
   nodeId?: string;
   title?: string | null;
   description?: string | null;
@@ -121,18 +130,20 @@ export class BrowserExtensionService {
   }
 
   /**
-   * Ask the background worker to POST an upload body to the metadata agent's `/upload`, which
-   * writes the curated content into the repository itself. The reply carries the endpoint's own
-   * answer verbatim (see {@link UploadResponse}). `apiUrl` as in {@link analyzeActiveTab}.
+   * Ask the background worker to POST a node body to the metadata agent's `/nodes`, which writes
+   * the curated content into the repository itself — creating the node, or updating the one the
+   * body names. The reply carries the endpoint's own answer verbatim (see
+   * {@link SaveNodeResponse}). `apiUrl` as in {@link analyzeActiveTab}.
    */
-  async uploadMetadata(body: Record<string, unknown>, apiUrl?: string): Promise<UploadResponse> {
+  async saveNode(body: Record<string, unknown>, apiUrl?: string): Promise<SaveNodeResponse> {
     const response = (await browser.runtime.sendMessage({
-      action: 'metadata.upload',
+      action: 'metadata.saveNode',
       body,
       apiUrl,
-    })) as UploadResponse | null;
+    })) as SaveNodeResponse | null;
     return response ?? { success: false, error: 'NO_RESPONSE' };
   }
+
 
   /**
    * The id of the tab this panel sits in, as the background worker sees it (`sender.tab`). Null

@@ -167,14 +167,38 @@ export class RepositoryNodeService {
    * Record a workflow status on the node — an entry in its workflow history, which is how the
    * repository tracks the editorial ladder (see WorkflowStatus). It is a history, not a property:
    * writing one adds a step, it does not overwrite the step before it.
+   *
+   * `receiver` are the authorities the step is addressed to, by name. Only the handover states have
+   * one — they name the queue the content lands in; a state that merely records an outcome is
+   * written on the acting user and passes none.
    */
-  async addWorkflowStatus(nodeId: string, status: string, comment = ''): Promise<void> {
+  async addWorkflowStatus(
+    nodeId: string,
+    status: string,
+    comment = '',
+    receiver: readonly string[] = [],
+  ): Promise<void> {
     await firstValueFrom(
       this.nodesUnwrapped.addWorkflowHistory({
         repository: HOME_REPOSITORY,
         node: nodeId,
         // `editor` and `time` are filled in by the repository.
-        body: { status, comment }
+        body: { status, comment, receiver: receiver.map((authorityName) => ({ authorityName })) }
+      })
+    );
+  }
+
+  /**
+   * Move the node into another folder — what the user's own filing step decides, *after* the content
+   * was created: the node exists from the preview step on, so where it is filed can no longer be the
+   * parent it is created in (see {@link CurationService.moveToStorageParent}).
+   */
+  async moveTo(nodeId: string, parent: string): Promise<void> {
+    await firstValueFrom(
+      this.nodesUnwrapped.createChildByMoving({
+        repository: HOME_REPOSITORY,
+        node: parent,
+        source: nodeId
       })
     );
   }

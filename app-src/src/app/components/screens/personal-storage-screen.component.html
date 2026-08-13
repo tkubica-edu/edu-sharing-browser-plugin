@@ -25,3 +25,13 @@
   [externalApply]="true"
   (choose)="chooseCollections($event)"
 ></es-collection-selector>
+
+<!-- The filing is carried out by the write the way on makes; a refusal is reported back here, which
+     is where it can be answered by picking differently. -->
+@if (curation.assignError(); as message) {
+  <p class="es-error">Der Inhalt konnte nicht abgelegt werden: {{ message }}</p>
+}
+
+@if (curation.saveError(); as error) {
+  <p class="es-error">Speichern fehlgeschlagen: {{ error }}</p>
+}

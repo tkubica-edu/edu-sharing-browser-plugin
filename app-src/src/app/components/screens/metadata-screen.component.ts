@@ -83,10 +83,18 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
    */
   private settleSave: ((saved: boolean) => void) | null = null;
 
+  /**
+   * Whether the write in flight is the one that *ends* this step — the footer's way on — rather than
+   * a save the editor's own control asked for. Only the former hands the content over for review:
+   * that is what leaving the last view of the flow means, and a save made to keep working is not it.
+   */
+  private finishing = false;
+
   /** Stable object, so register/clear pair up by identity. */
   private readonly saveHandler: SaveHandler = {
     save: () =>
       new Promise<boolean>((resolve) => {
+        this.finishing = true;
         this.settleSave = resolve;
         this.editor()?.commit();
       }),
@@ -113,6 +121,7 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
     // the footer action awaiting it ends instead of hanging on a screen that is gone.
     this.settleSave?.(false);
     this.settleSave = null;
+    this.finishing = false;
     this.conditions.editMode.set(false);
     this.actionBar.clearSaveHandler(this.saveHandler);
     this.curation.clearDraftPreviewSource(this.previewSource);
@@ -141,13 +150,20 @@ export class MetadataScreenComponent implements OnInit, OnDestroy {
    * Write the metadata and stay put. Where the flow goes next is the footer's business, not this
    * screen's — the editor also reaches here through a save control of the canvas's own
    * (WloCanvasComponent.onMetadataSubmit), and that one saves without meaning to leave.
+   *
+   * This is the step that describes the content, so the whole of the metadata is written again
+   * along with the WLO extended fields — and, where the write is the one that ends the step, the
+   * content is handed over to the editorial queue with it (see {@link finishing}).
    */
   protected async save(values: MdsValues): Promise<void> {
+    const finishing = this.finishing;
+    this.finishing = false;
     // The editor's own payload travels with the values: it is what the content's metadata is read
     // back from once it is written (see CurationService.save).
     const saved = await this.curation.save(
       { ...values, ...this.previewOverrides() },
       this.editor()?.payload?.() ?? null,
+      { metadata: true, review: finishing },
     );
     const settle = this.settleSave;
     this.settleSave = null;

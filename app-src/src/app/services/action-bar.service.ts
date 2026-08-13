@@ -95,20 +95,25 @@ export class ActionBarService {
           }
         ];
 
-      // The preview step of the Erschließung: nothing is written here, so what it offers is the two
-      // ways through it. The adjusted picture and title travel with it (applyDraftValues).
+      // The preview step of the Erschließung, and the step that WRITES the content: confirming the
+      // picture and the title is the point at which enough is known to save it, so the node is
+      // created here and every step behind this one edits it (see CurationService.createContent).
+      //
+      // Only on the back of a write that held: a step entered after a failed save would work on a
+      // content that is not there, and the failure is reported on this screen.
       case 'curation-preview':
         return [
           this.backAction(),
           {
-            label: 'Weiter',
-            disabled: false,
+            label: this.curation.saving() ? 'Speichern…' : 'Weiter',
+            disabled: this.curation.saving(),
             run: async () => {
-              // Awaited: the handover reads a picked picture out of the widget, and the next step's
-              // editor is built from the node that picture goes on.
+              // Awaited: the handover reads a picked picture out of the widget, and it is that
+              // picture the save writes onto the node it creates.
               await this.curation.applyDraftValues();
+              if (!(await this.curation.createContent())) return;
               // Where the content goes is asked before it is described, so the filing steps come
-              // first — and where none of them applies, the Qualitätsprüfung behind them does.
+              // first — and where none of them applies, the choice of process behind them does.
               this.navigation.go(this.nextSection('editorial-forward', 'personal-storage'));
             }
           }
@@ -148,9 +153,11 @@ export class ActionBarService {
           return [
             this.backAction(),
             {
-              label: 'Weiter',
-              disabled: !this.curation.qualityCriteriaMet(),
+              label: this.curation.saving() ? 'Speichern…' : 'Weiter',
+              disabled: !this.curation.qualityCriteriaMet() || this.curation.saving(),
               run: async () => {
+                // The confirmation is a write: the criteria go onto the content and the quality
+                // workflow is started with them (CurationService.confirmQuality).
                 await this.curation.confirmQuality();
                 // Only on the back of a confirmation that held: one the repository refused is
                 // reported in the view (CurationService.qualityError), which is here.
@@ -176,37 +183,64 @@ export class ActionBarService {
       }
 
       // "An Redaktionen weiterleiten" and "Persönliche Ablage": where the content is filed and handed
-      // on, before it is described and written. Nothing is saved here — the way on leads through the
-      // other of the two (where it applies) into the Qualitätsprüfung, whose own way out writes the
-      // content with everything the flow collected.
+      // on. The content exists by now, so the way on out of each of them writes what that step
+      // picked — the collections it is referenced in, the folder it is moved to (see
+      // CurationService.saveCollected) — and only then leads on: to the other of the two where it
+      // applies, and to the choice of process behind them otherwise.
       case 'editorial-forward':
         return [
           this.backAction(),
           {
-            label: 'Weiter',
-            disabled: false,
-            run: () => this.navigation.go(this.nextSection('personal-storage'))
+            label: this.curation.saving() ? 'Speichern…' : 'Weiter',
+            disabled: this.curation.saving(),
+            run: async () => {
+              if (!(await this.curation.saveCollected())) return;
+              this.navigation.go(this.nextSection('personal-storage'));
+            }
           }
         ];
 
       // The filing's collection is optional and has no confirmation of its own, so the way on is
       // also what takes it over: a collection ticked in the embedded selector is applied here (the
-      // screen registers the handler for it, see {@link ApplyHandler}) and then the step leads on.
-      // Nothing ticked is a step passed as it stands — the content is filed in the folder alone.
+      // screen registers the handler for it, see {@link ApplyHandler}) and then the step writes and
+      // leads on. Nothing ticked is a step passed as it stands — the content is filed in the folder
+      // alone.
       case 'personal-storage': {
         const handler = this.applyHandler();
         return [
           this.backAction(),
           {
-            label: 'Weiter',
-            disabled: false,
-            run: () => {
+            label: this.curation.saving() ? 'Speichern…' : 'Weiter',
+            disabled: this.curation.saving(),
+            run: async () => {
               if (handler?.canApply()) handler.apply();
-              this.navigation.go('quality');
+              if (!(await this.curation.saveCollected())) return;
+              this.navigation.go('flow-choice');
             }
           }
         ];
       }
+
+      // "Prüfprozess auswählen": the two processes are the ways on, and each is offered by the card
+      // that describes it (FlowChoiceScreenComponent). The footer's own way on repeats whichever one
+      // is selected — the screen registers it as its apply handler, the same arrangement "Sammlung
+      // auswählen" makes for its selector.
+      case 'flow-choice': {
+        const handler = this.applyHandler();
+        return [
+          this.backAction(),
+          {
+            label: 'Weiter',
+            disabled: !handler?.canApply(),
+            run: () => handler?.apply()
+          }
+        ];
+      }
+
+      // "Individuelle Qualitätsprüfung mit KI": nothing to work through yet, so the way back is all
+      // this step offers (see AiQualityScreenComponent).
+      case 'ai-quality':
+        return [this.backAction()];
 
       // "Sammlung auswählen": the confirmation belongs to the embedded selector, which the screen
       // registers here while it is mounted (see {@link ApplyHandler}) — so this step's controls are
@@ -252,45 +286,41 @@ export class ActionBarService {
   }
 
   /**
-   * The first of the given steps that applies right now, falling back to the Qualitätsprüfung — the
+   * The first of the given steps that applies right now, falling back to the choice of process — the
    * step every filing leads into. Both filings are optional, and a step that has nothing to offer is
    * walked past rather than shown empty (see the registry).
    */
   private nextSection(...candidates: readonly SectionId[]): SectionId {
-    return candidates.find((id) => this.navigation.isVisible(id)) ?? 'quality';
+    return candidates.find((id) => this.navigation.isVisible(id)) ?? 'flow-choice';
   }
 
   /**
-   * The way out of the Qualitätsprüfung and into the Inhaltsübersicht — the one action that writes.
+   * The way out of the Qualitätsprüfung and into the Inhaltsübersicht — the last write of the flow.
    *
-   * The content is created here and nowhere earlier: everything the flow collected (the quality
-   * criteria, where the content was filed, and the metadata the editor commits now) belongs to one
-   * content, so it is written once, at the end. The next step is entered only once that succeeded —
-   * going on after a failed save would leave the content behind unwritten.
+   * The content exists from the preview step on, so what is written here is the metadata the editor
+   * commits now, the WLO extended fields, and the handover to the editorial queue that ends the
+   * flow's part in it (see MetadataScreenComponent.save). The next step is entered only once that
+   * succeeded — going on after a failed save would leave the content behind as it was.
    *
    * The editor is on screen here, so it commits and its values are written. Without one — it has not
    * mounted, or the section carries no Metadaten view — what the other steps recorded is written on
    * its own (CurationService.saveCollected).
    *
-   * A content that has nothing left to write simply goes on — see
-   * CurationService.hasCollectedValues and, for the browser extension custom web component,
-   * `written` below.
+   * Unlike the other steps this one always has something to write: the handover is what leaving the
+   * view means, however little was changed in it.
    */
   private finishAction(): FooterAction {
     const handler = this.navigation.screen() === 'metadata' ? this.saveHandler() : null;
-    // A save that goes through the agent's `/upload` only ever CREATES — there is no endpoint that
-    // writes back to a node it made, and the guest session it is used for may not edit it either (see
-    // WIDGET-REFERENZ.md, "Bestandsinhalte via Node-ID"). So once it has written one, writing again
-    // would produce a SECOND node for the same content; the way on then only goes on. A user writing
-    // the node themselves is not bound by that: their next save updates it in place.
-    const written = this.curation.savesThroughAgent() && this.curation.metadataSaved();
-    const ready = handler ? handler.canSave() : this.curation.hasCollectedValues();
-    const saves = ready && !this.curation.metadataLocked() && !written;
+    const saves = (handler ? handler.canSave() : true) && !this.curation.metadataLocked();
     return {
       label: this.curation.saving() ? 'Speichern…' : 'Weiter',
       disabled: this.curation.saving() || (!saves && !this.curation.activeNode()),
       run: async () => {
-        const save = handler ? () => handler.save() : () => this.curation.saveCollected();
+        // Without an editor to commit, the step's own write still happens: the extended fields and
+        // the handover are what leaving this view means, whether or not a form reported values.
+        const save = handler
+          ? () => handler.save()
+          : () => this.curation.saveCollected({ metadata: true, review: true });
         if (saves && !(await save())) return;
         this.navigation.go('overview');
       }

@@ -126,8 +126,9 @@ The options:
   *selection*, so the hydrated node goes in as a single-element array; the element fetches the
   numbers itself through the repository session. Shown for an active node, like the preview.
 - **An Redaktionen weiterleiten** / **Persönliche Ablage** — where the content is filed and handed
-  on, *before* it is described: the flow runs *Inhalt erschließen* → Vorschau → **An Redaktionen
-  weiterleiten** → **Persönliche Ablage** → *Qualitätsprüfung* → *Inhaltsübersicht*. Two steps of
+  on: the flow runs *Inhalt erschließen* → Vorschau → **An Redaktionen weiterleiten** →
+  **Persönliche Ablage** → *Prüfprozess auswählen* → *Qualitätsprüfung* → *Inhaltsübersicht*. Two
+  steps of
   their own, each offered only where it applies: the forwarding while the repository config enables
   the browser extension custom web component, the *Persönliche Ablage* for a session of the user's
   own. That step offers both of the user's own filing places: the folder, through the repository's
@@ -135,12 +136,23 @@ The options:
   seeded with the user's `defaultInboxFolder` setting and otherwise with `-inbox-`), and — optionally
   — a collection, through the same `es-collection-selector` the forwarding uses. The collection has
   no confirmation of its own; the footer's *Weiter* takes the ticked one over as it leads on. Where
-  neither applies they fall
-  away and the preview leads straight into the *Qualitätsprüfung*. Nothing is written here — **the
-  content is created by the one save at the end of the Qualitätsprüfung**, which writes the quality
-  criteria, whatever the steps recorded and the metadata the editor commits in one go (so
-  *Speichern…* appears on the way into the *Inhaltsübersicht*). The footer's *Weiter* walks from each
-  step to the next one that applies.
+  neither applies they fall away and the preview leads straight into the choice of process.
+
+  **The content is written early and edited from there on** (`CurationService.save`): the *Vorschau*
+  step creates the node with the picture and the title it confirmed and nothing else, and every step
+  behind it adds what *it* decided — the collections it picked, the criteria it recorded with the
+  quality workflow, and finally the whole of the generated metadata with the extended fields and the
+  handover for review. So each step's *Weiter* is a write (*Speichern…* on the button), it leads on
+  only once that write held, and a step that decided nothing is passed without a request
+  (`CurationService.saveCollected`). The footer's *Weiter* walks from each step to the next one that
+  applies.
+- **Prüfprozess auswählen** — the junction between the filing and the checking, entered from
+  whichever filing step was the last to apply. Two cards, each with the button that starts its
+  process: *Geführte Qualitätsprüfung*, which is the *Qualitätsprüfung* as it stands (criteria, then
+  metadata), and *Individuelle Qualitätsprüfung mit KI*, the analysis against the chosen
+  collection's requirements — its screen is still to be built. Clicking a
+  card marks it and the footer's *Weiter* starts the marked one, so the two ways on say the same
+  thing (`FlowChoiceScreenComponent`, which registers the choice as the footer's `ApplyHandler`).
   - *An Redaktionen weiterleiten* lists the editorial groups the repository config names in
     **`browserExtensionEditorialGroups`** (`['ID1', 'ID2']`, read once per session by
     `EditorialGroupsService` → `CollectionService.getCollection`). Ticking a group forwards the
@@ -148,13 +160,12 @@ The options:
     (`NodeService.getChildren`, folders only) one of them can be picked instead — the group's row
     leads into the **Sammlung auswählen** step for that, and the content then goes into the picked
     collection *only*. A group without children says „Keine Sammlungsauswahl erforderlich". The
-    choice is held by the flow (`CurationService.editorialTargets`), not written where it is made —
-    the content has no node yet — and the save behind the step carries it out, together with the
-    collections the *Persönliche Ablage* picked (`CurationService.filedCollections`, each collection
-    once however many steps reached it): the node is created first and
-    `CollectionServiceUnwrapped.addToCollection` follows for each, and only along the agent-upload
-    route (see below) do the IDs travel in `/upload`'s `collection_id` instead. Only collections the
-    content is not in yet, so re-saving does not file it twice.
+    choice is held by the flow (`CurationService.editorialTargets`) and carried out by the write the
+    step's *Weiter* makes, together with the collections the *Persönliche Ablage* picked
+    (`CurationService.filedCollections`, each collection once however many steps reached it):
+    `CollectionServiceUnwrapped.addToCollection` per collection, and along the agent route (see
+    below) the IDs travel in `/nodes`' `collection_id` instead. Only collections the content is not
+    in yet, so a later write does not file it twice.
   - **Sammlung auswählen** is a step of its own, entered from a group's row and returning to it. It
     names the group it belongs to (`EditorialGroupsService.picking`) and what is recorded for it so
     far, and shows the collection picker (`es-collection-selector`, `edu-sharing-nodes-selector` in
@@ -270,20 +281,34 @@ node and records it in the Verlauf.
 The session decides, not the flag (`CurationService.savesThroughAgent`):
 
 - **A signed-in user writes the node themselves**, with the web component enabled as without it
-  (`RepositoryNodeService.create`, `obeyMds=true`, in the folder the *Persönliche Ablage* picked and
-  `-inbox-` otherwise). What the agent's `/upload` pipeline would do besides creating the node is
-  then done in turn: the WLO **extended fields** in a write of their own —
+  (`RepositoryNodeService.create`, `obeyMds=true`, in `-inbox-`). What the agent's `/nodes` pipeline
+  would do besides writing the metadata is then done in turn, in the same order: the **folder** the
+  *Persönliche Ablage* picked (`…/nodes/-home-/{parent}/children/_move`, a move because the content
+  already exists by then — see below), the WLO **extended fields** in a write of their own —
   `POST …/nodes/-home-/{id}/metadata?versionComment=EXTENDED_DATA&obeyMds=false` with
   `ccm:oeh_extendedType`, `ccm:oeh_lrt`, `ccm:oeh_extendedData` (the whole payload as JSON, in the
   canvas' export shape) and `ccm:oeh_extendedText` (the raw text), because the metadata set defines
   none of them and a write that obeys it drops them silently; a bulk write the repository refuses is
-  retried field by field (`RepositoryNodeService.writeExtendedData`) — then the quality workflow
-  status, then the collections. Every further save updates that node in place.
-- **A guest session** (the web component's own, brought by the embedding host) may not create a node
-  at all, so it saves through the agent's `POST /upload`, which writes with the agent's privileges and
-  creates, files and starts the workflow in one request. That endpoint only ever CREATES, so the
-  footer offers no second save along this route, and a folder picked for the user's own storage cannot
-  be honoured — `/upload` always creates in the inbox the agent is configured with.
+  retried field by field (`RepositoryNodeService.writeExtendedData`) — then the **workflow steps**
+  (`200_tocheck`, addressed to `GROUP_ORG_WLO-Uploadmanager` in a WLO panel, then
+  `140_ELEMENT_LEGALLY_APPROVED`, each its own history entry), then the **collections**.
+- **A guest session** (the web component's own, brought by the embedding host) may not write a node
+  at all, so it saves through the agent's `POST /nodes`, which writes with the agent's privileges and
+  does all of the above in one request (`node_id`, `collection_id`, `write_extended_data`,
+  `start_quality_workflow`, `start_review_workflow`, `preview`; `NodeWriteService`). One thing cannot
+  be honoured along that route, because the node is the agent's rather than the panel session's: a
+  folder picked for the user's own storage — it always creates in the inbox the agent is configured
+  with. The repository also only lets that endpoint edit a node **within two hours of its creation**;
+  after that it answers 403 and the editorial interface takes over.
+
+The **picture** is a preview rather than a property, so neither route writes it with the metadata: it
+is uploaded to the node (`POST …/nodes/-home-/{id}/preview`). Writing the node itself, the panel does
+that upload (`RepositoryNodeService.setPreview`, a multipart `image`); along the agent's route the
+endpoint does it, and the picture travels as the body's `preview` — the address it should fetch, or
+the picture itself as a data URL for one the user picked in the widget
+(`CurationService.previewToSend`). Either way it goes with the *Vorschau* step's save, and is not
+sent again afterwards: the node then has a preview of its own. A picture that cannot be loaded or
+decoded leaves the content written, and the endpoint says so in `preview.error` alone.
 
 Both editors implement the same `MetadataEditor` contract (`ready` + `commit()`), so the footer
 owns "Speichern" either way and the metadata screen only picks which one to render. In
@@ -315,7 +340,7 @@ before the scripts run — mirroring `window.__env.EDU_SHARING_API_URL` for the 
   `GET {repo}/edu-sharing/rest/authentication/v1/validateSession` with Basic auth.
 
 ### The metadata agent's address
-Every agent call — `/health`, `/generate`, `/upload`, `/extract-field` — goes to a repository's own
+Every agent call — `/health`, `/generate`, `/nodes`, `/extract-field` — goes to a repository's own
 B-API proxy, `{repo}/rest/bapi/api/v1/proxy/metadata-agent-canvas` (`MetadataAgentApiService`).
 
 Which repository is **pinned to the default one** for the moment
@@ -337,7 +362,7 @@ precedes every `/generate` rather than as a failed extraction a minute later.
 ### Network legs & CORS
 | Leg | Where it runs | Why |
 |-----|---------------|-----|
-| `POST /generate`, `POST /upload` (Metadata-Agent) | background service worker | background fetch is gated by `host_permissions`, not CORS/page-CSP — portable everywhere (`analyze.run`: extract the tab, generate everything) |
+| `POST /generate`, `POST /nodes` (Metadata-Agent) | background service worker | background fetch is gated by `host_permissions`, not CORS/page-CSP — portable everywhere (`analyze.run`: extract the tab, generate everything) |
 | `POST /extract-field` (Metadata-Agent) | sidebar document (`MetadataAgentService`) | same context the WLO canvas calls `/generate` from, so the request is visible in the panel's own DevTools and there is no worker build that can fall out of sync with the app. Relies on `host_permissions` for the cross-origin call, like the repository login |
 | Page content extraction | `scripting.executeScript` (background) | no cross-origin fetch |
 | Repository login | Angular `HttpClient` (library) | the library owns the call; relies on `host_permissions` bypassing CORS on Chrome/Edge/Firefox |

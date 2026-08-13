@@ -96,9 +96,13 @@ export class ConditionsService {
   // save (the node is created on save, so the metadata option must open on a result too).
   readonly hasEditableMetadata = this.curation.hasEditableMetadata;
 
-  // A curation that has not been saved yet — the state the preview step of "Inhalt erschließen"
-  // belongs to. Narrower than the above: a saved node has editable metadata but nothing pending.
+  // A curation that has not been saved yet. Narrower than the above: a saved node has editable
+  // metadata but nothing pending.
   readonly hasCuratedDraft = this.curation.hasUnsavedWork;
+
+  // A content read off a page in this session, saved or not — what the preview step of "Inhalt
+  // erschließen" works on, which it keeps doing after that step has written it.
+  readonly hasCuratedContent = this.curation.hasCuratedResult;
 
   // The repository config's own switch, which decides more than which editor is embedded: it is
   // also what makes the editorial forwarding a step of the flow (see the `collections` section).
@@ -117,6 +121,7 @@ export class ConditionsService {
     hasDetectedNode: this.hasDetectedNode(),
     hasEditableMetadata: this.hasEditableMetadata(),
     hasCuratedDraft: this.hasCuratedDraft(),
+    hasCuratedContent: this.hasCuratedContent(),
     editMode: this.editMode(),
     recognizingContent: this.recognizingContent(),
     browserExtensionCustomWebComponent: this.browserExtensionCustomWebComponent(),
