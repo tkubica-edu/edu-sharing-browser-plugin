@@ -196,3 +196,15 @@ const AGENT_PROXY_PATH = '/rest/bapi/api/v1/proxy/metadata-agent-canvas';
 export function toAgentProxyUrl(repositoryBase: string): string {
   return toApiRootUrl(repositoryBase).replace(/\/rest$/, '') + AGENT_PROXY_PATH;
 }
+
+/**
+ * Where the metadata agent is — the base every one of its endpoints is appended to (`/health`,
+ * `/generate`, `/upload`, `/extract-field`), for the panel as much as for the background worker it
+ * hands the address to (see MetadataAgentApiService).
+ *
+ * The default repository's own proxy, which authorizes by repository session. The commented line is
+ * an agent running locally on its own deployment, which authorizes nothing: swap the two to develop
+ * against it, and note that a session of *this* repository is then no longer what makes it answer.
+ */
+export const METADATA_AGENT_API_URL = toAgentProxyUrl(APP_CONFIG.defaultRepositoryUrl);
+// export const METADATA_AGENT_API_URL = 'http://localhost:8010';
