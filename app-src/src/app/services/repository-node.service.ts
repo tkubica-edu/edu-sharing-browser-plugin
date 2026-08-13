@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import {
-  HOME_REPOSITORY, Node, NodeService, NodeServiceUnwrapped, SessionStorageService
+  HOME_REPOSITORY, Node, NodeService, NodeServiceUnwrapped, UserService
 } from 'ngx-edu-sharing-api';
 
 import { MdsValues, toMdsValues } from '../util/mds-values';
@@ -10,14 +10,25 @@ import { MdsValues, toMdsValues } from '../util/mds-values';
 const INBOX = '-inbox-';
 
 /**
- * Where the user's own storage setting keeps the folder they filed content in last — the key the
- * repository's own Ablageort control writes when its "als Standard verwenden" box is ticked, so both
- * read and write the same setting.
+ * The setting that names the folder the user files content in by default — what the repository's own
+ * Ablageort control writes when its „als Standard verwenden" box is ticked, so both read and write
+ * the same one.
+ *
+ * It lives in two places, and which one applies is decided by the session rather than by the caller
+ * (that is how the library's own SessionStorageService keeps it): in the **user's profile
+ * preferences** where there is a profile to keep it in, and in the **browser** — plain key, the value
+ * JSON-encoded — for a session that has none, the guest one the browser extension custom web
+ * component brings. See {@link RepositoryNodeService.storedDefaultFolder}.
  */
 const DEFAULT_FOLDER_KEY = 'defaultInboxFolder';
 
 /** Fallback name when the metadata carries no title. */
 const FALLBACK_NAME = 'Neue Ressource';
+
+/** A stored setting read as a node id: a non-blank string, else null. */
+function folderId(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null;
+}
 
 /** Identity of a created or updated node. */
 export interface NodeSummary {
@@ -32,9 +43,9 @@ export class RepositoryNodeService {
   // The generated NodeV1Service (exported as NodeServiceUnwrapped) — the NodeService wrapper does
   // not cover the preview upload.
   private readonly nodesUnwrapped = inject(NodeServiceUnwrapped);
-  // The user's own settings, as the repository's own app keeps them (their profile preferences, with
-  // the browser's storage standing in where there is no login).
-  private readonly storage = inject(SessionStorageService);
+  // The user's profile preferences, where their default filing folder is kept — read through the
+  // plain API rather than through SessionStorageService, see {@link storedDefaultFolder}.
+  private readonly users = inject(UserService);
 
   /**
    * The folder a curated content is filed in unless the user picks another one: the one they set as
@@ -49,16 +60,49 @@ export class RepositoryNodeService {
    * than the one every content starts in.
    */
   async defaultParent(): Promise<Node> {
-    let preferred = INBOX;
-    try {
-      preferred = (await this.storage.get<string>(DEFAULT_FOLDER_KEY, INBOX)) || INBOX;
-    } catch {
-      /* no setting readable — the inbox stands */
-    }
+    const preferred = (await this.storedDefaultFolder()) || INBOX;
     try {
       return await this.get(preferred);
     } catch {
       return this.get(INBOX);
+    }
+  }
+
+  /**
+   * The folder the user set as their default ({@link DEFAULT_FOLDER_KEY}); null when they set none.
+   *
+   * **Read on every ask, and not through `SessionStorageService`.** That service is what *writes* the
+   * setting — the Ablageort control calls it when the box is ticked — but it serves the profile
+   * preferences from a copy it holds for as long as the app lives, re-reading them only when the
+   * login changes. And the control does not run in this app: it is an element of the edu bundle,
+   * which brings its own copy of the library and therefore its own cache. So the write lands in the
+   * bundle's copy, this app's copy never hears of it, and the panel goes on offering the folder that
+   * was the default when it started.
+   *
+   * Both places the setting can live are consulted, the profile first: a session without a profile to
+   * keep preferences in has the browser's copy and nothing else, and one that has a profile has that
+   * as its answer — the browser's copy then only stands in where the profile names no folder at all.
+   */
+  private async storedDefaultFolder(): Promise<string | null> {
+    let preferences: Record<string, unknown> | null = null;
+    try {
+      preferences = (await firstValueFrom(this.users.getUserPreferences())) as Record<
+        string,
+        unknown
+      > | null;
+    } catch {
+      /* no profile to read them from — the browser's copy below is what such a session has */
+    }
+    return folderId(preferences?.[DEFAULT_FOLDER_KEY]) ?? this.locallyStoredDefaultFolder();
+  }
+
+  /** The setting as the library leaves it in the browser for a session without a profile. */
+  private locallyStoredDefaultFolder(): string | null {
+    try {
+      return folderId(JSON.parse(localStorage.getItem(DEFAULT_FOLDER_KEY) ?? 'null'));
+    } catch {
+      /* not JSON — nothing this app wrote, so nothing it reads */
+      return null;
     }
   }
 
