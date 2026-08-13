@@ -4,10 +4,10 @@ import { APP_CONFIG } from '../config';
 import { BrowserExtensionService } from './browser-extension.service';
 
 /**
- * On unless it was switched off — the mode is what development runs in, so nothing has to be turned
- * on first to get there.
+ * Off unless it was switched on: what the panel does by default is ask the real services, so an
+ * install nobody configured never shows a faked answer as if it were one.
  */
-const DEFAULT_ENABLED = true;
+const DEFAULT_ENABLED = false;
 
 /**
  * Delay before a faked answer arrives, so a caller sees the same asynchronous behaviour — spinner,
@@ -25,8 +25,8 @@ const LOG = '[edu-sharing][devmode]';
  *
  * What it saves is time per run: an Erschließung is a minute of LLM work, a set of master gates
  * several — paid again on every reload of the panel, and for a flow whose next steps have nothing to
- * do with either service. The switch is in the settings, so a run that does need a real answer only
- * costs turning it off.
+ * do with either service. The switch is in the settings and off by default, so the saving is there
+ * for the asking while a normal run always gets the real answers.
  *
  * Distinct from {@link DebugService}, which stands in for the host-side OnlyOffice plugin: that one
  * fakes what the *browser* cannot deliver here, this one what a *service* takes too long to.

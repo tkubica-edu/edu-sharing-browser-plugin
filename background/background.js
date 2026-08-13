@@ -19,12 +19,12 @@ const GENERATE_TIMEOUT_MS = (typeof EDU_SHARING_CONFIG !== 'undefined' && EDU_SH
 // DEV MODE
 
 /**
- * Where the dev mode's switch is stored, and what it is when nothing is stored: on. The same key the
+ * Where the dev mode's switch is stored, and what it is when nothing is stored: off. The same key the
  * sidebar's DevModeService reads and writes (`APP_CONFIG.storageKeys.devMode`) — the flag is one
  * setting for both, so the switch in the settings covers this worker as well.
  */
 const DEV_MODE_STORAGE_KEY = 'eduSharingDevMode';
-const DEV_MODE_DEFAULT = true;
+const DEV_MODE_DEFAULT = false;
 
 /**
  * Delay before a faked answer arrives, so a caller sees the same asynchronous behaviour — spinner,
@@ -41,7 +41,7 @@ const DEV_LATENCY_MS = 300;
 async function devModeEnabled() {
   try {
     const items = await browser.storage.local.get({ [DEV_MODE_STORAGE_KEY]: DEV_MODE_DEFAULT });
-    return items[DEV_MODE_STORAGE_KEY] !== false;
+    return items[DEV_MODE_STORAGE_KEY] === true;
   } catch {
     return DEV_MODE_DEFAULT;
   }
