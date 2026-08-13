@@ -122,9 +122,16 @@ export class QualityJudgeService {
     const schemes = configuredSchemes();
     console.log(`${LOG_QUALITY} schemes`, schemes);
     await Promise.allSettled([
-      this.runMetalookup(resource),
-      this.runContentJudge(resource, schemes.schemes)
+      this.runMetalookup(resource)
+      // ContentJudge is switched off: one judgement costs far more than the criteria it answers are
+      // worth. Put the call back once that is fixed — everything it feeds is still in place.
+      // this.runContentJudge(resource, schemes.schemes)
     ]);
+    this.contentJudgeStatus.set({
+      judge: 'ContentJudge',
+      state: 'skipped',
+      detail: 'Die LLM-Bewertung ist derzeit abgeschaltet.'
+    });
   }
 
   /**
