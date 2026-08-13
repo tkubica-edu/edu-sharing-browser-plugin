@@ -56,7 +56,10 @@ export class UserBarComponent {
    * itself ends on, and what is shown while the person record is still on its way (or did not come).
    */
   protected readonly subtitle = computed(() => {
-    if (this.guest()) return 'Kein Login erforderlich';
+    // For a guest it names what the login is *for* rather than that none is required: the sections a
+    // guest session cannot serve are listed and disabled (see GUEST_HINT), and this row is where the
+    // way out of that is — folding it out offers "Anmelden".
+    if (this.guest()) return 'Anmelden schaltet weitere Funktionen frei';
     const user = this.auth.currentUser();
     const name = user ? this.authorityName.transform(user) : null;
     return (name === 'invalid' ? null : name) || this.auth.username() || '–';
@@ -66,7 +69,7 @@ export class UserBarComponent {
   protected readonly hint = computed(() => {
     if (this.expanded()) return 'Schließen';
     return this.guest()
-      ? 'Ohne Anmeldung unterwegs — hier anmelden'
+      ? 'Als Gast unterwegs — hier anmelden, um alle Funktionen zu nutzen'
       : `Angemeldet als ${this.subtitle()}`;
   });
 

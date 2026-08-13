@@ -175,6 +175,16 @@ export interface AppSection {
   oneWay?: boolean;
 }
 
+/**
+ * Why a section is off for a guest, said the same way wherever that is the reason.
+ *
+ * A guest session is the panel working without a login (the repository allows it, see
+ * `AuthService.authorized`) — it belongs to no person, so everything that acts *as* one has nothing
+ * to act on: a storage to write into, a list of one's own contents. Those sections stay listed and
+ * disabled, so the menu keeps saying what the panel can do and this says what it takes.
+ */
+const GUEST_HINT = 'Nur mit eigener Anmeldung — als Gast steht diese Funktion nicht zur Verfügung.';
+
 /** Everything except login and settings requires a valid login. */
 const requiresLogin =
   (extra: (conditions: Conditions) => boolean = () => true) =>
@@ -249,6 +259,10 @@ export const SECTIONS: readonly AppSection[] = [
     description: 'Inhalt erstellen oder hochladen',
     visible: requiresLogin(),
     menu: true,
+    // Both ways of adding something write into the user's own storage, which a guest has none of —
+    // see GUEST_HINT.
+    enabled: (c) => c.hasSession,
+    disabledHint: GUEST_HINT,
     // Two rows to pick from — the ways of adding something. The forms are behind them.
     plain: true,
     tabs: [{ id: 'add-content', label: 'Hinzufügen' }]
@@ -290,6 +304,10 @@ export const SECTIONS: readonly AppSection[] = [
     description: 'Eigene Inhalte und Status aufrufen',
     visible: requiresLogin(),
     menu: true,
+    // "Eigene" is what a guest session has nothing of: it belongs to no person, so there is no such
+    // list to show — see GUEST_HINT.
+    enabled: (c) => c.hasSession,
+    disabledHint: GUEST_HINT,
     tabs: [{ id: 'own-content', label: 'Auswählen' }]
   },
   {
