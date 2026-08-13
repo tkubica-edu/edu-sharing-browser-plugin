@@ -1,24 +1,24 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 
+import { IconDirective } from '../../directives/icon.directive';
 import { SectionId } from '../../model/navigation';
 import { ConditionsService } from '../../services/conditions.service';
 import { ContentFlowService } from '../../services/content-flow.service';
 import { CurationService } from '../../services/curation.service';
 import { NavigationService } from '../../services/navigation.service';
 import { NodeConnectorService } from '../../services/node-connector.service';
-import { IconId, OptionIconService } from '../../services/option-icon.service';
 import { ContentCardComponent } from '../content-card.component';
 import { DetailsLinkComponent } from '../details-link.component';
 
 /**
- * One way on from a known content. `section` is the step it leads to — its condition, and the icon
- * it is picked by unless `icon` names another: several options lead into the same section (the
- * Inhaltsübersicht's Vorschau, Nutzung and Inhalt teilen), and a row is told apart by its icon
- * before it is read.
+ * One way on from a known content. `section` is the step it leads to, and decides whether the option
+ * applies at all; `icon` is the Material Symbols glyph the row is picked by — several options lead
+ * into the same section (the Inhaltsübersicht's Vorschau, Nutzung and Inhalt teilen), so each row
+ * names its own icon rather than taking the section's.
  */
 interface ContentOption {
   section: SectionId;
-  icon?: IconId;
+  icon: string;
   label: string;
   description: string;
   run: () => void | Promise<void>;
@@ -34,7 +34,7 @@ interface ContentOption {
 // (see NodeConnectorService) — so the row appears once that answer is in.
 @Component({
   selector: 'es-content-options-screen',
-  imports: [ContentCardComponent, DetailsLinkComponent],
+  imports: [ContentCardComponent, DetailsLinkComponent, IconDirective],
   templateUrl: './content-options-screen.component.html',
   styleUrl: './content-options-screen.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -42,7 +42,6 @@ interface ContentOption {
 export class ContentOptionsScreenComponent {
   protected readonly curation = inject(CurationService);
   protected readonly flow = inject(ContentFlowService);
-  protected readonly icons = inject(OptionIconService);
   private readonly navigation = inject(NavigationService);
   private readonly conditions = inject(ConditionsService);
   private readonly nodeConnector = inject(NodeConnectorService);
@@ -92,53 +91,60 @@ export class ContentOptionsScreenComponent {
     const options: ContentOption[] = [
       {
         section: 'overview',
-        label: 'Vorschau',
-        description: 'Den Inhalt ansehen',
+        icon: 'visibility',
+        label: 'Vorschau anzeigen',
+        description: 'Inhalt und hinterlegte Informationen ansehen',
         run: () => this.flow.showOverview()
-      },
-      {
-        section: 'overview',
-        icon: 'usages',
-        label: 'Nutzung',
-        description: 'Aufrufe und Verwendungen des Inhalts ansehen',
-        run: () => this.flow.showUsages()
-      },
-      // The working steps in the order the flow walks them: where the content goes is settled
-      // before it is described, and the Qualitätsprüfung is what ends with the save.
-      {
-        section: 'editorial-forward',
-        label: 'An Redaktionen weiterleiten',
-        description: 'Den Inhalt an eine oder mehrere Redaktionen weiterleiten',
-        run: () => this.flow.showEditorialForward()
-      },
-      {
-        section: 'personal-storage',
-        label: 'Persönliche Ablage',
-        description: 'Den Inhalt in der eigenen Ablage einsortieren',
-        run: () => this.flow.showPersonalStorage()
-      },
-      {
-        section: 'quality',
-        label: 'Qualitätsprüfung',
-        description: 'Qualität prüfen und Metadaten anreichern',
-        run: () => this.flow.showQuality()
       }
     ];
     if (this.opensInConnector()) {
       options.push({
         section: 'editing',
+        icon: 'edit',
         label: 'Inhalt bearbeiten',
-        description: 'Im Connector öffnen und bearbeiten',
+        description: 'Inhalt und hinterlegte Informationen bearbeiten',
         run: () => this.flow.edit()
       });
     }
-    options.push({
-      section: 'overview',
-      icon: 'share',
-      label: 'Inhalt teilen',
-      description: 'Den Inhalt für andere freigeben',
-      run: () => this.flow.showShare()
-    });
+    // The working steps in the order the flow walks them: where the content goes is settled before
+    // it is described, and the Qualitätsprüfung is what ends with the save.
+    options.push(
+      {
+        section: 'editorial-forward',
+        icon: 'person_add',
+        label: 'An Redaktion weiterleiten',
+        description: 'Den Inhalt an eine oder mehrere Redaktionen weiterleiten',
+        run: () => this.flow.showEditorialForward()
+      },
+      {
+        section: 'personal-storage',
+        icon: 'folder_open',
+        label: 'Ablageort ändern',
+        description: 'Inhalt in einer anderen persönlichen Ablage speichern',
+        run: () => this.flow.showPersonalStorage()
+      },
+      {
+        section: 'quality',
+        icon: 'check_circle',
+        label: 'Qualität prüfen',
+        description: 'Qualitätskriterien kontrollieren und bestätigen',
+        run: () => this.flow.showQuality()
+      },
+      {
+        section: 'overview',
+        icon: 'bar_chart',
+        label: 'Nutzung anzeigen',
+        description: 'Letzte Aktivitäten anzeigen',
+        run: () => this.flow.showUsages()
+      },
+      {
+        section: 'overview',
+        icon: 'share',
+        label: 'Inhalt teilen',
+        description: 'Link oder QR-Code erstellen und weitergeben',
+        run: () => this.flow.showShare()
+      }
+    );
     return options.filter((option) => this.navigation.isVisible(option.section, conditions));
   });
 }
