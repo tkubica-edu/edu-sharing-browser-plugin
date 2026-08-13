@@ -13,7 +13,7 @@ const EDU_SHARING_CONFIG = {
 
     network: {
         defaultTimeoutMs: 20000,
-        generateTimeoutMs: 60000
+        generateTimeoutMs: 300000
     },
 
     // The agent of the DEFAULT repository, for a worker message that names no base. The sidebar
