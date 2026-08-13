@@ -1,115 +1,63 @@
-import {
-  afterRenderEffect, ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, ElementRef,
-  OnDestroy, inject, signal, viewChild
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
 import { CurationService } from '../../services/curation.service';
-import { loadWebComponentBundle } from '../../services/web-component-bundle.service';
+import { IconDirective } from '../../directives/icon.directive';
+import { QrCodeComponent } from '../qr-code.component';
 
-const SHARE_TAG = 'edu-sharing-share-qr';
+/** Edge length of the code — as wide as the panel's card allows, so it is scanned off the screen. */
+const QR_SIZE = 220;
 
-/** The <edu-sharing-share-qr> element, typed for the inputs we set. */
-interface ShareQrElement extends HTMLElement {
-  nodeId?: string;
-  showLink?: boolean;
-  size?: number;
-  /** 'permalink' (default) | anything else → a share link, see below. */
-  mode?: string;
-}
+/** How long the copy confirmation stays on the button. */
+const COPIED_MS = 2000;
 
-/** Width of the QR code. Below the element's own 220 default: the panel is narrower than a page. */
-const QR_SIZE = 200;
-
-// "Inhalt teilen": the link to the content plus its QR code, rendered by the repository's own
-// <edu-sharing-share-qr> element.
+// "Inhalt teilen": the link to the content plus its QR code, both from the address the flow already
+// holds (`ActiveNode.link` — the node's page in the repository).
 //
-// The element REQUIRES `nodeId` and reads it in ngOnInit, which Angular Elements runs on append —
-// BEFORE a host template's property bindings are applied. `[nodeId]="…"` in a template is therefore
-// too late and the element fails with "no `node-id` given". So it is created imperatively with its
-// inputs set as properties before it is appended, exactly as in MdsEditorComponent.
+// Nothing is requested for either. The element edu-sharing brings for this,
+// `<edu-sharing-share-qr>`, takes a node *id* and resolves the address itself, which means it loads
+// the node: for a content written by the metadata agent the panel session may not read that node
+// (see CurationService.applySavedNode) and the whole card stayed empty — although the address was
+// known from the moment the content was saved. So the code is encoded here (QrCodeComponent) and
+// the link is written out as it is.
 //
-// It resolves the link itself, which means it loads the node: a session that may not read it —
-// a guest on someone else's content — gets a 403 and no link at all. So `failed` is surfaced
-// rather than swallowed, as a sentence about the missing permission instead of the HTTP error.
-//
-// `mode` is left at its default 'permalink' — the node's own URL. The alternative creates a share
-// link with an unlimited expiry as a side effect, which sharing a *view* of the content must not do.
+// It is the node's own page, never a share link: creating one has an unlimited expiry as a side
+// effect, which sharing a *view* of the content must not do.
 @Component({
   selector: 'es-share-screen',
+  imports: [IconDirective, QrCodeComponent],
   templateUrl: './share-screen.component.html',
   styleUrl: './share-screen.component.scss',
-  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ShareScreenComponent implements OnDestroy {
+export class ShareScreenComponent {
   protected readonly curation = inject(CurationService);
 
-  protected readonly bundle = loadWebComponentBundle('edu', SHARE_TAG);
+  protected readonly qrSize = QR_SIZE;
 
-  /** Set when the element could not resolve a link (typically: the node is not readable here). */
-  protected readonly error = signal<string | null>(null);
+  /** The address to share; null while there is no content. */
+  protected readonly link = computed(() => this.curation.activeNode()?.link || null);
 
-  private readonly host = viewChild.required<ElementRef<HTMLElement>>('host');
+  /** Set for a moment after the link was copied, so the button reports that it happened. */
+  protected readonly copied = signal(false);
 
-  private element: ShareQrElement | null = null;
-  /** Which node the mounted element was built for; it reads its id only once. */
-  private mountedNodeId: string | null = null;
+  /** Set when the clipboard refused the link — the field is still there to copy by hand. */
+  protected readonly copyError = signal(false);
 
-  /** 403 when the session may not read the node, 401 once it has expired. */
-  private readonly onFailed = (event: Event): void => {
-    const detail = (event as CustomEvent).detail as { status?: number; message?: string } | null;
-    // The raw HttpErrorResponse text ("Http failure response for …: 403") tells the user nothing,
-    // so it stays in the console and never reaches the screen.
-    console.warn('[share] Der Link zum Inhalt konnte nicht erzeugt werden', detail);
-    const status = detail?.status;
-    this.error.set(
-      status === 401 || status === 403
-        ? 'Du hast nicht die nötigen Rechte, um diesen Inhalt zu teilen.'
-        : 'Der Link zum Inhalt konnte nicht erzeugt werden.'
-    );
-  };
+  private copiedTimer: ReturnType<typeof setTimeout> | null = null;
 
-  private readonly onLinkReady = (): void => this.error.set(null);
-
-  constructor() {
-    // afterRenderEffect (write phase), not a plain effect: this writes to the DOM and needs the
-    // #host element. Re-mounts for a different node, since the element takes its id only on init.
-    afterRenderEffect({
-      write: () => {
-        const nodeId = this.curation.activeNode()?.nodeId ?? null;
-        if (!this.bundle.ready() || !nodeId || nodeId === this.mountedNodeId) return;
-        this.mount(nodeId);
-      }
-    });
-  }
-
-  ngOnDestroy(): void {
-    this.unmount();
-  }
-
-  /** Create the element, set every input as a property, THEN append (see the class comment). */
-  private mount(nodeId: string): void {
-    this.unmount();
-    this.error.set(null);
-    const element = document.createElement(SHARE_TAG) as ShareQrElement;
-    element.nodeId = nodeId;
-    element.showLink = true;
-    element.size = QR_SIZE;
-    element.addEventListener('linkReady', this.onLinkReady);
-    element.addEventListener('failed', this.onFailed);
-    // Sized inline, not via the stylesheet: an imperatively created element carries no view
-    // encapsulation attribute, so this component's styles would not match it.
-    element.style.cssText = 'display:block;width:100%';
-    this.host().nativeElement.appendChild(element);
-    this.element = element;
-    this.mountedNodeId = nodeId;
-  }
-
-  private unmount(): void {
-    this.element?.removeEventListener('linkReady', this.onLinkReady);
-    this.element?.removeEventListener('failed', this.onFailed);
-    this.element?.remove();
-    this.element = null;
-    this.mountedNodeId = null;
+  protected async copy(): Promise<void> {
+    const link = this.link();
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      this.copyError.set(false);
+      this.copied.set(true);
+      if (this.copiedTimer) clearTimeout(this.copiedTimer);
+      this.copiedTimer = setTimeout(() => this.copied.set(false), COPIED_MS);
+    } catch (cause: unknown) {
+      console.warn('[share] Der Link konnte nicht kopiert werden', cause);
+      this.copied.set(false);
+      this.copyError.set(true);
+    }
   }
 }

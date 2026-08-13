@@ -4,6 +4,7 @@ import { BrowserExtensionCustomWebComponentService } from '../../services/browse
 import { CurationService } from '../../services/curation.service';
 import { DetailsLinkComponent } from '../details-link.component';
 import { PreviewNodeComponent } from '../preview-node.component';
+import { ShareTeaserComponent } from '../share-teaser.component';
 import { WloCanvasComponent } from '../wlo-canvas.component';
 
 // "Vorschau", the first sub step of the Inhaltsübersicht: shows the active node. The footer's next
@@ -15,7 +16,7 @@ import { WloCanvasComponent } from '../wlo-canvas.component';
 // title and its preview image are supplied here — otherwise the preview never names what is shown.
 @Component({
   selector: 'es-preview-screen',
-  imports: [DetailsLinkComponent, PreviewNodeComponent, WloCanvasComponent],
+  imports: [DetailsLinkComponent, PreviewNodeComponent, ShareTeaserComponent, WloCanvasComponent],
   templateUrl: './preview-screen.component.html',
   styleUrl: './preview-screen.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

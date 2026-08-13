@@ -1,14 +1,74 @@
-// "Inhalt teilen" — the element brings the QR code and the copyable link; only the surrounding card
-// layout is ours.
+// "Inhalt teilen" — the code above the link it encodes, both from the address the flow holds.
 :host { display: block; }
 
 .share {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--es-space-3);
 }
 
-// The card is always in the template (it is the mount point), so it must not show as an empty box
-// before the element is in it.
-.share:empty {
-  display: none;
+es-qr-code {
+  // Never wider than the card, however large the code is asked to be.
+  max-width: 100%;
+
+  ::ng-deep svg { max-width: 100%; height: auto; }
+}
+
+.share-link {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.sl-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--es-muted);
+}
+
+.sl-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+// The whole address fits in the field by scrolling, so the layout never widens with the link.
+.sl-field {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--es-text);
+  background: var(--es-surface);
+  border: 1px solid var(--es-border);
+  border-radius: var(--es-radius);
+}
+
+.sl-copy {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  color: var(--es-blue);
+  background: var(--es-surface);
+  border: 1px solid var(--es-border);
+  border-radius: var(--es-radius);
+  cursor: pointer;
+
+  &:hover { background: var(--es-hint-bg); }
+
+  i { font-size: 20px; }
+}
+
+.sl-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--es-muted);
+
+  &.is-error { color: var(--es-danger); }
 }

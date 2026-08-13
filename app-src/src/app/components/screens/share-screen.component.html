@@ -6,19 +6,33 @@
     </p>
   </section>
 
-  @if (bundle.error()) {
-    <section class="es-card">
-      <p class="es-error">Teilen konnte nicht geladen werden: {{ bundle.error() }}</p>
-    </section>
-  } @else if (error(); as message) {
-    <section class="es-card"><p class="es-error">{{ message }}</p></section>
-  } @else if (!curation.activeNode()) {
-    <p class="es-muted">Noch kein Inhalt vorhanden.</p>
-  } @else if (!bundle.ready()) {
-    <p class="es-muted">Teilen wird geladen …</p>
-  }
+  @if (link(); as url) {
+    <section class="es-card share">
+      <es-qr-code [data]="url" [size]="qrSize" label="QR-Code zum Inhalt"></es-qr-code>
 
-  <!-- The element is created and filled in here rather than by a binding — it reads its node id on
-       init, before template bindings would have run (see the component comment). -->
-  <section class="es-card share" #host></section>
+      <div class="share-link">
+        <label class="sl-label" for="share-link-field">Link</label>
+        <div class="sl-row">
+          <!-- Readonly rather than a plain line of text: the link can be selected and copied by hand
+               wherever the clipboard is not available to the panel. -->
+          <input class="sl-field" id="share-link-field" type="text" readonly [value]="url"
+                 (click)="$any($event.target).select()" />
+          <button class="sl-copy" (click)="copy()" title="Link kopieren" aria-label="Link kopieren">
+            <i [esIcon]="copied() ? 'check' : 'content_copy'"></i>
+          </button>
+        </div>
+        <p class="sl-hint" [class.is-error]="copyError()">
+          @if (copyError()) {
+            Der Link konnte nicht kopiert werden — er kann im Feld markiert und kopiert werden.
+          } @else if (copied()) {
+            Link kopiert.
+          } @else {
+            QR-Code scannen oder Link kopieren
+          }
+        </p>
+      </div>
+    </section>
+  } @else {
+    <p class="es-muted">Noch kein Inhalt vorhanden.</p>
+  }
 </div>

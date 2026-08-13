@@ -1,4 +1,10 @@
 <div class="es-screen-body">
+  <!-- The share offer above everything else: it is about handing this content on rather than about
+       what it is, and it shows itself only once there is a code (see ShareTeaserComponent). -->
+  @if (curation.activeNode()) {
+    <es-share-teaser></es-share-teaser>
+  }
+
   <section class="es-hint-card">
     @if (curation.activeNode()) {
       <!-- What the content is called, and the way to everything else about it: the panel shows a

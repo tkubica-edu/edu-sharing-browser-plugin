@@ -1,0 +1,17 @@
+@if (link(); as url) {
+  <button class="share-teaser" (click)="openShare()" title="Inhalt teilen — QR-Code und Link">
+    <span class="st-qr">
+      <es-qr-code [data]="url" [size]="qrSize" label="QR-Code zum Inhalt"></es-qr-code>
+    </span>
+
+    <span class="st-main">
+      <span class="st-title">Inhalt teilen</span>
+      <span class="st-link">{{ url }}</span>
+      <span class="st-action">
+        QR-Code scannen oder Link kopieren
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+      </span>
+    </span>
+  </button>
+}
