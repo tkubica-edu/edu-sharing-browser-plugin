@@ -358,6 +358,17 @@ function hasPreviewImage(result) {
 
 // /generate PROXY
 
+/**
+ * The content-type schema every extraction is filled against, named by its file as the agent
+ * expects it (`/info/schemas/<context>/<version>` lists them; the single-field extraction names
+ * `core.json` the same way, see MetadataAgentService).
+ *
+ * Named rather than left to the endpoint's own `auto`, which would let the agent pick a profile per
+ * page — the panel curates learning material, so that is the profile its fields belong to.
+ * `include_core` adds the core fields (title, description, keywords …) beside it.
+ */
+const GENERATE_SCHEMA_FILE = 'learning_material.json';
+
 // Build the /generate request body: prefer text mode, fall back to URL mode.
 function buildGenerateBody(pageData, language) {
   const text = pageData?.formattedText || pageData?.mainContent || pageData?.text || '';
@@ -367,6 +378,7 @@ function buildGenerateBody(pageData, language) {
       text,
       context: 'default',
       version: 'latest',
+      schema_file: GENERATE_SCHEMA_FILE,
       language: lang,
       include_core: true,
       enable_geocoding: true
@@ -379,6 +391,7 @@ function buildGenerateBody(pageData, language) {
     extraction_method: 'browser',
     context: 'default',
     version: 'latest',
+    schema_file: GENERATE_SCHEMA_FILE,
     language: lang,
     include_core: true,
     enable_geocoding: true,
