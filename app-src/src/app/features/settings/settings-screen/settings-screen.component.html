@@ -68,3 +68,38 @@
     </div>
   }
 </section>
+
+<!-- Woraus die Sammlung ermittelt wird, die „An Redaktionen weiterleiten“ vorschlägt. -->
+<section class="es-card">
+  <h2>Zugehörige Sammlungen empfehlen</h2>
+
+  <p class="desc">
+    Die Schlagworte des Inhalts werden gegen seinen Text bewertet; mit den besten davon wird der
+    Themen-Assistent befragt, und die passendste Sammlung wird vorgeschlagen und ausgewählt.
+  </p>
+
+  <label class="es-field-label" for="rec-keywords">Anzahl Schlagworte</label>
+  <input id="rec-keywords" type="number" class="es-input" min="1" step="1"
+         [ngModel]="recommendations.maxKeywords()"
+         (ngModelChange)="setRecommendationKeywords($event)" />
+  <p class="desc">
+    Höchstens so viele Schlagworte gehen in die Anfrage. Jedes weitere verbreitert die Antwort eher,
+    als sie zu schärfen — der Assistent gewichtet ein Thema danach, wie viele Schlagworte es treffen.
+  </p>
+
+  <label class="es-field-label" for="rec-score">Mindest-Score</label>
+  <input id="rec-score" type="number" class="es-input" min="0" max="1" step="0.05"
+         [ngModel]="recommendations.minScore()"
+         (ngModelChange)="setRecommendationMinScore($event)" />
+  <p class="desc">
+    Diesen Wert muss ein Schlagwort erreichen, um überhaupt gefragt zu werden — 0 bis 1, gemessen am
+    bestbewerteten Schlagwort des Inhalts. Erreicht keines ihn, wird keine Sammlung vorgeschlagen.
+    Ohne Text zum Bewerten (etwa bei einem Inhalt ohne erschlossenen Volltext) greift nur die Anzahl.
+  </p>
+
+  <div class="es-row">
+    <button class="es-btn es-btn--text" (click)="resetRecommendation()">
+      Auf Standard zurücksetzen
+    </button>
+  </div>
+</section>

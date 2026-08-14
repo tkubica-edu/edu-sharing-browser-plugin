@@ -48,7 +48,10 @@
           <button type="button" class="folder" (click)="selectCollection(group)">
             <span class="folder-label">
               @if (groups.folderOf(group); as folder) {
-                Sammlung: <strong>{{ folder.name }}</strong>
+                <!-- Named as a proposal for as long as it is one: the collection was picked from the
+                     content's keywords rather than by the user, who may well want another. -->
+                {{ groups.isRecommended(group) ? 'Empfohlene Sammlung' : 'Sammlung' }}:
+                <strong>{{ folder.name }}</strong>
               } @else {
                 Sammlung auswählen
               }
@@ -61,6 +64,12 @@
       </li>
     }
   </ul>
+
+  <!-- The proposal is asked for as the step opens and takes a moment to arrive; said so, because when
+       it does it ticks a group and picks a collection inside it. -->
+  @if (groups.recommending()) {
+    <p class="es-muted">Eine passende Sammlung wird ermittelt …</p>
+  }
 
   <!-- Groups the config names but the repository would not hand back: named, because the list is
        otherwise silently short and a group that is not offered cannot be forwarded to. -->

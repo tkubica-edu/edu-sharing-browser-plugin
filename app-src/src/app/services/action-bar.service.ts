@@ -216,10 +216,9 @@ export class ActionBarService {
         ];
       }
 
-      // "Prüfprozess auswählen": the two processes are the ways on, and each is offered by the card
-      // that describes it (FlowChoiceScreenComponent). The footer's own way on repeats whichever one
-      // is selected — the screen registers it as its apply handler, the same arrangement "Sammlung
-      // auswählen" makes for its selector.
+      // "Prüfprozess auswählen": the two processes are options of one choice, marked on the screen
+      // (FlowChoiceScreenComponent) and opened from here — the screen registers the way on as its
+      // apply handler, the same arrangement "Sammlung auswählen" makes for its selector.
       case 'flow-choice': {
         const handler = this.applyHandler();
         return [

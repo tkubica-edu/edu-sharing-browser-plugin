@@ -125,6 +125,10 @@ export const APP_CONFIG = {
     resumeState: 'eduSharingResumeState',
     debugMode: 'eduSharingDebugMode',
     debugDocumentNodeId: 'eduSharingDebugDocumentNodeId',
+    /** How many keywords a collection proposal is read from — see CollectionRecommendationService. */
+    recommendationKeywords: 'eduSharingRecommendationKeywords',
+    /** The score a keyword has to reach to be one of them. */
+    recommendationMinScore: 'eduSharingRecommendationMinScore',
     /**
      * The dev mode's switch (see DevModeService). Also read by the background worker, which fakes the
      * metadata agent's answers under the same flag — the literal there has to stay in step with this
@@ -145,6 +149,9 @@ export function toApiRootUrl(repositoryBase: string): string {
 /** Where a repository that hosts the metadata agent itself proxies it, relative to its base. */
 const AGENT_PROXY_PATH = '/rest/bapi/api/v1/proxy/metadata-agent-canvas';
 
+/** Where a repository proxies the kidra topic assistant, relative to its base. */
+const TOPIC_ASSISTANT_PROXY_PATH = '/rest/bapi/api/v1/proxy/kidra/topic-assistant-keywords';
+
 /**
  * The metadata agent behind a repository's own proxy. Unlike the agent's own deployment this
  * endpoint authorizes by repository session (401/403 without one), so it is only usable from a
@@ -152,6 +159,15 @@ const AGENT_PROXY_PATH = '/rest/bapi/api/v1/proxy/metadata-agent-canvas';
  */
 export function toAgentProxyUrl(repositoryBase: string): string {
   return toApiRootUrl(repositoryBase).replace(/\/rest$/, '') + AGENT_PROXY_PATH;
+}
+
+/**
+ * The topic assistant behind a repository's own B-API proxy: it answers a text with the topics of the
+ * topic tree that text belongs to, each named by a URI whose last segment is the id of the collection
+ * node the topic is kept as. Like the agent's proxy it authorizes by repository session.
+ */
+export function toTopicAssistantUrl(repositoryBase: string): string {
+  return toApiRootUrl(repositoryBase).replace(/\/rest$/, '') + TOPIC_ASSISTANT_PROXY_PATH;
 }
 
 /**

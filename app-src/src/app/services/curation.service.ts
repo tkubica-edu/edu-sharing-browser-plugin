@@ -7,9 +7,9 @@ import {
   createdAtOf, fieldOrigins, isPickedPicture, previewImageOf, previewSrcOfNode, toDataUrl,
   toDraftNode, toPartialNode, toSavedMetadata, toWrittenNode, withCanvasScalars, withReadablePreview
 } from '../util/curation-node';
-import { MdsValues, firstString, toMdsEditorValues } from '../util/mds-values';
+import { MdsValues, firstString, stringValues, toMdsEditorValues } from '../util/mds-values';
 import { withAgentLicense } from '../util/agent-fields';
-import { toExtendedFields } from '../util/agent-payload';
+import { EXTENDED_TEXT_FIELD, SOURCE_TEXT_KEY, toExtendedFields } from '../util/agent-payload';
 import { errorMessage } from '../util/errors';
 import { renderLink } from '../util/repository-links';
 import { BrowserExtensionCustomWebComponentService } from './browser-extension-custom-web-component.service';
@@ -398,6 +398,27 @@ export class CurationService {
       firstString(this.previewNode()?.title) ??
       firstString(this.activeNode()?.name),
   );
+
+  /**
+   * The content's keywords, one per entry: what was generated for it, or what its node carries where it
+   * has been edited since. They describe the content in the words a repository indexes it under, which
+   * is what anything asking "what is this about" works from (see CollectionRecommendationService).
+   */
+  readonly contentKeywords = computed<readonly string[]>(() =>
+    stringValues(this.editorMetadata()?.['cclom:general_keyword']),
+  );
+
+  /**
+   * The text the content's metadata was read from: the agent's payload carries it, and a node that was
+   * written from such a payload keeps it as a field of its own. `''` where none is known — for a node
+   * this session merely found open, nothing states what it says.
+   */
+  readonly contentText = computed<string>(() => {
+    const metadata = this.editorMetadata();
+    return (
+      firstString(metadata?.[SOURCE_TEXT_KEY]) ?? firstString(metadata?.[EXTENDED_TEXT_FIELD]) ?? ''
+    );
+  });
 
   /**
    * The content's picture, ranked by how much each source says about *this* content: a picture the

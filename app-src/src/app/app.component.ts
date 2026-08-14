@@ -10,6 +10,7 @@ import { AuthService } from './services/auth.service';
 import { BrowserExtensionService } from './services/browser-extension.service';
 import { ContentFlowService } from './services/content-flow.service';
 import { BusyService } from './services/busy.service';
+import { CollectionRecommendationService } from './services/collection-recommendation.service';
 import { ConditionsService } from './services/conditions.service';
 import { CurationService } from './services/curation.service';
 import { DebugService } from './services/debug.service';
@@ -101,6 +102,7 @@ export class AppComponent implements OnInit {
   private readonly pageRecognition = inject(PageRecognitionService);
   private readonly debug = inject(DebugService);
   private readonly devMode = inject(DevModeService);
+  private readonly recommendations = inject(CollectionRecommendationService);
   private readonly sessionResume = inject(SessionResumeService);
 
   /** A node received while logged out — opened once the user logs in. */
@@ -165,6 +167,9 @@ export class AppComponent implements OnInit {
     // Before anything can ask one of the faked services — a resumed session may start an
     // Erschließung of its own further down this boot.
     await this.devMode.load();
+    // How a collection is proposed, before a step can ask for one — a proposal picks a collection, and
+    // it should be the one the settings ask for rather than the one the defaults would.
+    await this.recommendations.load();
     await this.auth.init();
     await this.history.load();
     const tab = await this.browserExtension.getActiveTab().catch(() => null);

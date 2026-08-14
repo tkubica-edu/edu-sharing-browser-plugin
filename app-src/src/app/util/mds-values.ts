@@ -13,6 +13,19 @@ export function firstString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value : null;
 }
 
+/**
+ * A property's values as separate strings. Beyond the array/scalar split it also splits on commas: a
+ * multi-value field's schema describes it as comma-separated, so a payload may state the whole property
+ * as one joined string. Blanks are dropped, so an empty property answers with an empty list.
+ */
+export function stringValues(value: unknown): string[] {
+  if (value === null || value === undefined) return [];
+  return (Array.isArray(value) ? value : [value])
+    .flatMap((entry) => String(entry).split(','))
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 /** Coerce arbitrary property values to the `string[]` shape MDS and the repository expect. */
 export function toMdsValues(values: Record<string, unknown> | null | undefined): MdsValues {
   const result: MdsValues = {};

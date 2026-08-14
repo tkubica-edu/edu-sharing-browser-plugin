@@ -3,6 +3,7 @@ import { CollectionService, ConfigService, Node } from 'ngx-edu-sharing-api';
 import { firstValueFrom } from 'rxjs';
 
 import { errorMessage } from '../util/errors';
+import { CollectionRecommendationService, RecommendedCollection } from './collection-recommendation.service';
 import { Collection, CurationService, EditorialTarget } from './curation.service';
 
 /**
@@ -11,6 +12,9 @@ import { Collection, CurationService, EditorialTarget } from './curation.service
  * forwarding step then has nothing to offer.
  */
 const CONFIG_VARIABLE = 'browserExtensionEditorialGroups';
+
+/** Log prefix, as everywhere else in the extension (`[edu-sharing][<station>]`). */
+const LOG = '[edu-sharing][collection]';
 
 /**
  * One editorial group a content can be forwarded to: the collection it is, plus the collection folders inside
@@ -69,6 +73,7 @@ export class EditorialGroupsService {
   private readonly collections = inject(CollectionService);
   // Where the choices this service's views make are recorded — the flow carries them to the save.
   private readonly curation = inject(CurationService);
+  private readonly recommendations = inject(CollectionRecommendationService);
 
   private readonly groupsState = signal<readonly EditorialGroup[]>([]);
   /** The groups that could be loaded, in the order the config names them. */
@@ -103,16 +108,37 @@ export class EditorialGroupsService {
   private readonly pickingState = signal<EditorialGroup | null>(null);
   readonly picking = this.pickingState.asReadonly();
 
-  /** Set once the load ran, so re-entering the step does not fetch the groups again. */
-  private loaded = false;
+  /**
+   * The collection the topic assistant proposed and the group it was taken over for, while it is still
+   * that group's choice. Held to say so where the choice is shown: what a proposal was is not readable
+   * off the choice itself, and the user has not made it yet.
+   */
+  private readonly recommendedState = signal<{ groupId: string; collectionId: string } | null>(null);
+
+  private readonly recommendingState = signal(false);
+
+  /** A proposal is being asked for right now — see {@link recommendCollection}. */
+  readonly recommending = this.recommendingState.asReadonly();
+
+  /**
+   * The keywords a proposal was already asked for, so re-entering the step does not ask again — and
+   * does not undo what the user did with the last answer. Null while none was asked for.
+   */
+  private recommendedFor: string | null = null;
+
+  /** The load, from the first caller on — see {@link load}. */
+  private pending: Promise<void> | null = null;
 
   /**
    * Read the config and load the groups it names. Idempotent — the answer is the same for the whole
-   * session, so the second caller gets what the first one loaded.
+   * session, so every later caller gets (and waits for) what the first one started.
    */
-  async load(): Promise<void> {
-    if (this.loaded) return;
-    this.loaded = true;
+  load(): Promise<void> {
+    this.pending ??= this.runLoad();
+    return this.pending;
+  }
+
+  private async runLoad(): Promise<void> {
     this.loadingState.set(true);
     this.error.set(null);
     try {
@@ -128,10 +154,89 @@ export class EditorialGroupsService {
       this.error.set(errorMessage(cause));
       // Not loaded after all: a session that arrives later (or a repository that answers again) may
       // still produce the list, and the step is re-entered often enough for that to matter.
-      this.loaded = false;
+      this.pending = null;
     } finally {
       this.loadingState.set(false);
     }
+  }
+
+  /**
+   * Have a collection proposed for the content and take it over as a group's choice: the topic assistant
+   * reads the content's best keywords — ranked against the text they were generated from — and answers
+   * with the topics they belong to, and the collection the best of those is kept as is picked for the
+   * group whose own collection it sits in (see {@link CollectionRecommendationService}). Once per set of
+   * keywords — from the answer on the choice is the user's, including the choice to drop it again.
+   */
+  async recommendCollection(): Promise<void> {
+    await this.load();
+    const keywords = this.curation.contentKeywords();
+    const asked = keywords.join('|');
+    if (!asked || this.recommendedFor === asked || !this.groupsState().length) return;
+    this.recommendedFor = asked;
+    this.recommendingState.set(true);
+    try {
+      const found = await this.recommendations.recommend(keywords, this.curation.contentText());
+      if (found) this.applyRecommendation(found);
+      else console.log(`${LOG} no collection to propose for:`, keywords);
+    } catch (cause: unknown) {
+      // A proposal that could not be made changes nothing about the step: every group is still there
+      // to be forwarded to, and every collection inside it still there to be picked by hand.
+      console.warn(`${LOG} no collection proposed:`, errorMessage(cause));
+    } finally {
+      this.recommendingState.set(false);
+    }
+  }
+
+  /**
+   * Take a proposed collection over: the group it belongs to is forwarded to, and the collection becomes
+   * the one inside it the content is filed in. A collection that belongs to no configured group is
+   * dropped — the content would land somewhere no editorial team was picked for.
+   */
+  private applyRecommendation(found: RecommendedCollection): void {
+    const group = this.groupsState().find((candidate) =>
+      found.ancestry.includes(candidate.collection.id),
+    );
+    if (!group) {
+      console.log(`${LOG} proposed collection belongs to no editorial group:`, found.ancestry);
+      return;
+    }
+    // A collection the user picked for this group themselves stands: the keywords may have changed
+    // since (which is what produced this second proposal), but the choice was still theirs to make.
+    if (this.folderOf(group) && !this.isRecommended(group)) {
+      console.log(`${LOG} proposal dropped, the group's collection was picked by hand`);
+      return;
+    }
+    // The group's own collection: there is nothing to pick inside it, so forwarding to it is the whole
+    // answer.
+    if (group.collection.id === found.node.ref.id) {
+      this.toggle(group, true);
+      return;
+    }
+    const offered = this.offer(group, found.node);
+    const folder = toCollection(found.node);
+    this.recommendedState.set({ groupId: offered.collection.id, collectionId: folder.id });
+    this.chooseFolder(offered, folder);
+  }
+
+  /**
+   * Add a collection to what a group offers, so one proposed from deeper inside its tree is listed and
+   * picked like the collections directly in it. Pointed at the group as its parent for the same reason
+   * the loaded children are — see {@link loadGroup}. Answers the group as it now stands.
+   */
+  private offer(group: EditorialGroup, node: Node): EditorialGroup {
+    if (group.folders.some((folder) => folder.id === node.ref.id)) return group;
+    const child = node.parent
+      ? { ...node, parent: { ...node.parent, id: group.collection.id } }
+      : node;
+    const offered: EditorialGroup = {
+      ...group,
+      folders: [toCollection(child), ...group.folders],
+      collectionTree: [...group.collectionTree, child]
+    };
+    this.groupsState.update((groups) =>
+      groups.map((entry) => (entry.collection.id === group.collection.id ? offered : entry)),
+    );
+    return offered;
   }
 
   /** Name the group the *Sammlung auswählen* step is entered for. */
@@ -147,6 +252,19 @@ export class EditorialGroupsService {
   /** The collection picked inside this group, if any. */
   folderOf(group: EditorialGroup): Collection | undefined {
     return this.targetOf(group)?.folder;
+  }
+
+  /**
+   * Whether the collection picked inside this group is the proposed one rather than one the user picked
+   * — what tells the two apart where the choice is shown.
+   */
+  isRecommended(group: EditorialGroup): boolean {
+    const recommended = this.recommendedState();
+    return (
+      !!recommended &&
+      recommended.groupId === group.collection.id &&
+      this.folderOf(group)?.id === recommended.collectionId
+    );
   }
 
   /** Forward to this group, or stop doing so — the checkbox's answer. */

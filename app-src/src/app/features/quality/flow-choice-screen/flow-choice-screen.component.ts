@@ -10,14 +10,12 @@ interface FlowOption {
   section: SectionId;
   label: string;
   description: string;
-  /** What the card's own button says. Names the process being started, not the step it opens. */
-  action: string;
 }
 
 // "Prüfprozess auswählen": the junction between the filing steps and the checking. The content is written by now,
 // so the choice is only which of the two processes the user works through — the guided Qualitätsprüfung, or the
-// AI dialogue whose step is still to be built. The card's button starts its process straight away, the footer's
-// *Weiter* starts whichever card is selected; both are the same choice made in two ways.
+// AI dialogue whose step is still to be built. Marking a process does not start it; the footer's *Weiter* opens
+// whichever one is marked, so this step has the same pair of controls as every other one.
 @Component({
   selector: 'es-flow-choice-screen',
   templateUrl: './flow-choice-screen.component.html',
@@ -28,7 +26,7 @@ export class FlowChoiceScreenComponent implements OnDestroy {
   private readonly navigation = inject(NavigationService);
   private readonly actionBar = inject(ActionBarService);
 
-  /** The card the user marked; null until one is. */
+  /** The marked process — preset in the constructor, so the way on is open from the start. */
   private readonly selected = signal<SectionId | null>(null);
 
   private readonly allOptions: readonly FlowOption[] = [
@@ -36,15 +34,13 @@ export class FlowChoiceScreenComponent implements OnDestroy {
       section: 'quality',
       label: 'Geführte Qualitätsprüfung',
       description:
-        'Prüfe Qualitätskriterien und Metadaten Schritt für Schritt. KI unterstützt dich mit Vorschlägen.',
-      action: 'Geführte Prüfung starten'
+        'Prüfe Qualitätskriterien und Metadaten Schritt für Schritt. KI unterstützt dich mit Vorschlägen.'
     },
     {
       section: 'ai-quality',
       label: 'Individuelle Qualitätsprüfung mit KI',
       description:
-        'Lass deinen Inhalt von der KI anhand der Anforderungen der gewählten Sammlung analysieren und erhalte individuelle Empfehlungen im Dialog.',
-      action: 'KI-Analyse starten'
+        'Lass deinen Inhalt von der KI anhand der Anforderungen der gewählten Sammlung analysieren und erhalte individuelle Empfehlungen im Dialog.'
     }
   ];
 
@@ -53,14 +49,17 @@ export class FlowChoiceScreenComponent implements OnDestroy {
     this.allOptions.filter((option) => this.navigation.isVisible(option.section)),
   );
 
-  /** The way on the footer repeats: whichever card is selected. */
+  /** The way on: the process that is marked, opened by the footer. */
   private readonly handler: ApplyHandler = {
-    apply: () => this.start(this.selected()),
+    apply: () => this.open(this.selected()),
     canApply: computed(() => this.selected() !== null)
   };
 
   constructor() {
     this.actionBar.registerApplyHandler(this.handler);
+    // The guided Qualitätsprüfung is the ordinary process, so it is marked to begin with — it heads
+    // the list, and where it is not on offer the first process that is takes its place.
+    this.selected.set(this.options()[0]?.section ?? null);
   }
 
   ngOnDestroy(): void {
@@ -71,19 +70,14 @@ export class FlowChoiceScreenComponent implements OnDestroy {
     return this.selected() === option.section;
   }
 
-  /** Mark a card, so the footer's own way on knows which process it starts. */
+  /** Mark a process, so the footer's way on knows which step it opens. */
   protected select(option: FlowOption): void {
     this.selected.set(option.section);
   }
 
-  /**
-   * Start a process: the card is marked as the one chosen and its step is opened. Marking it as well
-   * as opening it keeps the two ways on saying the same thing — coming back from the step it opened
-   * finds the choice as it was left.
-   */
-  protected start(section: SectionId | null): void {
+  /** Open the marked process's step. The mark stays, so coming back finds the choice as it was left. */
+  private open(section: SectionId | null): void {
     if (!section) return;
-    this.selected.set(section);
     // The Qualitätsprüfung is entered on its first view, which is what its own step does too — the
     // criteria are what it is entered for, and the metadata are worked on off the back of them.
     this.navigation.go(section, section === 'quality' ? { tab: 'quality-check' } : undefined);

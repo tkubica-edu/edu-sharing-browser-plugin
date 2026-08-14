@@ -20,6 +20,12 @@ export interface JsonRequest {
   headers?: Record<string, string>;
   /** Serialised as the request's JSON body. Omitted entirely for a request that has none. */
   body?: unknown;
+  /**
+   * Whether the request carries the browser's cookies. `include` is what a service behind the
+   * repository's own proxy needs, since it authorizes by repository session and a cross-origin fetch
+   * sends no cookie unless it is asked to. Left out, the browser's default applies.
+   */
+  credentials?: RequestCredentials;
   timeoutMs: number;
 }
 
@@ -29,7 +35,7 @@ export interface JsonRequest {
  * with a message naming the service and the cause, carrying the whole untruncated body for a non-2xx status.
  */
 export async function fetchJson<T>(request: JsonRequest): Promise<T> {
-  const { service, url, method = 'GET', headers = {}, body, timeoutMs } = request;
+  const { service, url, method = 'GET', headers = {}, body, credentials, timeoutMs } = request;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   // The timeout bounds the whole exchange, the body included — so it is cleared once there is an answer
@@ -45,6 +51,7 @@ export async function fetchJson<T>(request: JsonRequest): Promise<T> {
           ...headers,
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        ...(credentials ? { credentials } : {}),
         signal: controller.signal,
       });
     } catch (cause: unknown) {

@@ -1,4 +1,4 @@
-// "Prüfprozess auswählen" — one card per process, each with the button that starts it.
+// "Prüfprozess auswählen" — one card per process, each the label of the radio that marks it.
 @use 'mixins' as m;
 
 :host { display: block; }
@@ -8,35 +8,53 @@
 
   display: flex;
   flex-direction: column;
-  gap: var(--es-space-4);
+  // The two cards are the whole content of the step, so they stand well apart — the gap is what
+  // reads them as two separate processes rather than one block.
+  gap: 24px;
 }
 
 // A card per process. Selected it carries the panel's blue, like the forwarding's group cards do —
-// which one is chosen has to be readable from the list as a whole.
+// the radio is small, and which process is chosen has to be readable from the list as a whole.
 .choice {
+  display: flex;
+  // The radio sits centred against the text it marks, whatever the description's length.
+  align-items: center;
+  gap: var(--es-space-3);
   margin-bottom: 0;
+  padding: 16px;
   border-width: 2px;
+  cursor: pointer;
 
   &.is-selected {
     border-color: var(--es-blue);
     background: var(--es-hint-bg);
   }
 
-  h2 { margin: 0 0 var(--es-space-2); }
+  input[type='radio'] {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--es-blue);
+    cursor: pointer;
+  }
 }
 
-// The card's text is the control that marks it, so it fills the card and reads as the card itself
-// rather than as a button drawn inside one.
 .choice-body {
-  display: block;
-  width: 100%;
-  padding: 0;
-  margin: 0 0 var(--es-space-3);
-  background: none;
-  border: none;
-  text-align: left;
-  color: inherit;
-  font: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: var(--es-space-2);
+  min-width: 0;
+}
 
-  p { margin: 0; }
+// Names the process — the card's heading, without a heading element, since a label carries text only.
+.choice-label {
+  font-weight: 600;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.choice-description {
+  font-size: 12px;
+  line-height: 1.45;
 }

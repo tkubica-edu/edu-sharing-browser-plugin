@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 
 import { APP_CONFIG } from '../../../config';
 import { AuthService } from '../../../services/auth.service';
+import { CollectionRecommendationService } from '../../../services/collection-recommendation.service';
 import { ContextRefreshService } from '../../../services/context-refresh.service';
 import { DebugService } from '../../../services/debug.service';
 import { DevModeService } from '../../../services/dev-mode.service';
@@ -20,6 +21,7 @@ export class SettingsScreenComponent implements OnDestroy {
   protected readonly auth = inject(AuthService);
   protected readonly debug = inject(DebugService);
   protected readonly devMode = inject(DevModeService);
+  protected readonly recommendations = inject(CollectionRecommendationService);
 
   private readonly contextRefresh = inject(ContextRefreshService);
 
@@ -54,6 +56,27 @@ export class SettingsScreenComponent implements OnDestroy {
   /** Take the changed repository over right away, instead of leaving it to the screen being left. */
   protected reload(): void {
     void this.contextRefresh.refresh();
+  }
+
+  // ---- Collection proposal ------------------------------------------------
+  // Written as it is edited, like every other setting here. A field the user has emptied reports no
+  // number at all — that is a field halfway through being typed in, not a value, so it is ignored and
+  // the setting keeps what it had until a number arrives.
+
+  protected setRecommendationKeywords(count: number | null): void {
+    if (typeof count === 'number' && Number.isFinite(count)) {
+      void this.recommendations.setMaxKeywords(count);
+    }
+  }
+
+  protected setRecommendationMinScore(score: number | null): void {
+    if (typeof score === 'number' && Number.isFinite(score)) {
+      void this.recommendations.setMinScore(score);
+    }
+  }
+
+  protected resetRecommendation(): void {
+    void this.recommendations.resetToDefaults();
   }
 
   // ---- Debug mode ---------------------------------------------------------

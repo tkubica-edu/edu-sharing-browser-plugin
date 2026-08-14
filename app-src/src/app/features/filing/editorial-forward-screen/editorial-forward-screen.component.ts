@@ -24,8 +24,11 @@ export class EditorialForwardScreenComponent {
   private readonly navigation = inject(NavigationService);
 
   constructor() {
-    // Reads the config and loads the collections once per session (see EditorialGroupsService.load).
+    // Reads the config and loads the collections once per session (see EditorialGroupsService.load),
+    // then has a collection proposed for the content from its keywords — once per content, and only
+    // once the groups are there to take the proposal over for.
     void this.groups.load();
+    void this.groups.recommendCollection();
   }
 
   /** Open the step that picks the collection this group's forwarding lands in. */

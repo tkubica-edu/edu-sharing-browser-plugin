@@ -214,6 +214,16 @@ export class RepositoryNodeService {
   }
 
   /**
+   * The node and the nodes it sits in, closest first — where a node is in the repository, in one answer
+   * rather than by following `parent` from node to node. Read for a collection whose place inside a
+   * collection tree decides what it belongs to (see CollectionRecommendationService).
+   */
+  async ancestors(nodeId: string): Promise<Node[]> {
+    const entries = await firstValueFrom(this.nodes.getParents(nodeId));
+    return entries.nodes ?? [];
+  }
+
+  /**
    * Normalize editor values for a new node and make sure it carries a `cm:name` — a node cannot be
    * created without one. Creating is the only case that may invent a name; see {@link update}.
    */
