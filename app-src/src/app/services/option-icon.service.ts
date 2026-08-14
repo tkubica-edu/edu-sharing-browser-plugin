@@ -6,8 +6,12 @@ import { ScreenId, SectionId } from '../model/navigation';
 /** Anything that renders with an icon: a section (menu entry, topbar) or a tab. */
 export type IconId = SectionId | ScreenId;
 
-/** Full-width, stroke-style icons (24×24), keyed by section / screen id. */
-const ICONS: Record<IconId, string> = {
+/**
+ * Full-width, stroke-style icons (24×24), keyed by section / screen id. Only for the entries that
+ * still draw their own icon — whatever {@link MATERIAL_ICONS} names is rendered from the icon font
+ * and has no entry here.
+ */
+const ICONS: Partial<Record<IconId, string>> = {
   menu:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>',
   login:
@@ -35,19 +39,14 @@ const ICONS: Record<IconId, string> = {
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
   'find-content':
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M21 21l-5.2-5.2"/><path d="M10.5 6.5l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9z"/></svg>',
-  editing:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M14.5 5.5l4 4"/></svg>',
   quality:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.4-3.2 8-8 9-4.8-1-8-4.6-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>',
   'quality-check':
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>',
   metadata:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
-  // The two ways a curated content is filed: handing it on (an arrow leaving a group of people),
-  // and filing it away in one's own place (a folder with the person on it). Under the forwarding
-  // sits the choice of the collection it lands in — stacked layers with a tick.
-  'editorial-forward':
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7.5" r="3"/><path d="M2.5 19v-1.5A4.5 4.5 0 0 1 7 13h1.5"/><circle cx="16.5" cy="8" r="2.2"/><path d="M12.5 17.5v-.8a4 4 0 0 1 4-4"/><path d="M13 20.5h7"/><path d="M17.5 18l3 2.5-3 2.5"/></svg>',
+  // Filing a curated content in one's own place: a folder with the person on it. Under it sits the
+  // choice of the collection it lands in — stacked layers with a tick.
   'personal-storage':
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2l2 2.5H19.5A1.5 1.5 0 0 1 21 10v7.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.8" r="1.8"/><path d="M9 17.2a3.2 3.2 0 0 1 6 0"/></svg>',
   'select-collection':
@@ -63,12 +62,6 @@ const ICONS: Record<IconId, string> = {
   // The assistant: a speech bubble for the asking, with the spark that marks what a machine answers.
   'ai-assistant':
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A2.5 2.5 0 0 1 17.5 17H12l-4.5 3.5V17H6a2.5 2.5 0 0 1-2.5-2.5v-8A2.5 2.5 0 0 1 6 4h11.5A2.5 2.5 0 0 1 20 6.5z"/><path d="M11.75 7.5l1.05 2.7 2.7 1.05-2.7 1.05-1.05 2.7-1.05-2.7L8 11.25l2.7-1.05z"/></svg>',
-  preview:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
-  usages:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg>',
-  share:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4"/><path d="M15.4 6.5l-6.8 4"/></svg>',
   settings:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.09a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
 };
@@ -86,7 +79,15 @@ const MATERIAL_ICONS: Partial<Record<IconId, string>> = {
   history: 'history',
   // The Qualitätsprüfung's two views.
   'quality-check': 'check_circle',
-  metadata: 'sell'
+  metadata: 'sell',
+  // The steps the Inhaltsoptionen offer as rows: those rows already carry these glyphs (see
+  // ContentOptionsScreenComponent.options), so the same step is drawn the same way wherever it is
+  // reached from.
+  editing: 'edit',
+  'editorial-forward': 'person_add',
+  preview: 'visibility',
+  usages: 'bar_chart',
+  share: 'share'
 };
 
 // The icons, shared by the three places that render navigation entries: the main menu, the tab bar
