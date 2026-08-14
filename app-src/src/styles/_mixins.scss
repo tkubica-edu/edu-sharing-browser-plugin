@@ -184,9 +184,9 @@
     &[disabled] { opacity: 0.5; cursor: not-allowed; }
   }
 
-  // Blue and larger than the text: the icon is what the eye picks the row by. Either an inline SVG
-  // or a Material ligature (esIcon), so both are given the same box — the font size fills it for the
-  // glyph, and overrides the 24px the Material stylesheet sets on its own class.
+  // Blue and larger than the text: the icon is what the eye picks the row by. A Material ligature
+  // (esIcon), so the font size fills the box — and overrides the 24px the Material stylesheet sets
+  // on its own class.
   .mi-icon {
     flex: 0 0 auto;
     display: block;
@@ -195,8 +195,6 @@
     color: var(--es-blue);
     font-size: 34px;
     line-height: 34px;
-
-    ::ng-deep svg { width: 34px; height: 34px; display: block; }
   }
 
   .mi-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }

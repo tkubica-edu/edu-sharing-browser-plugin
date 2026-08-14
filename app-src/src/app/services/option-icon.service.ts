@@ -7,9 +7,13 @@ import { ScreenId, SectionId } from '../model/navigation';
 export type IconId = SectionId | ScreenId;
 
 /**
- * Full-width, stroke-style icons (24×24), keyed by section / screen id. Only for the entries that
- * still draw their own icon — whatever {@link MATERIAL_ICONS} names is rendered from the icon font
- * and has no entry here.
+ * Full-width, stroke-style icons (24×24), keyed by section / screen id — the four whose motif the icon
+ * font has nothing for. Everything else is a ligature (see {@link MATERIAL_ICONS}) and has no entry
+ * here.
+ *
+ * Only the tab bar still draws one of these: it is the one place that falls back to an SVG, and
+ * `find-content` is the only one of the four that reaches a tab bar today. The others are kept for
+ * the same reason — they are tab ids, and a section that gains a second tab shows its tabs' icons.
  */
 const ICONS: Partial<Record<IconId, string>> = {
   // A page with what is done to it: the options as a ticked line, the search for a fitting content as
@@ -27,9 +31,12 @@ const ICONS: Partial<Record<IconId, string>> = {
 };
 
 /**
- * Google Material icons instead of the drawn ones above — the panel's rows and tabs then read like
- * the rest of edu-sharing. Names are Material Symbols ligatures, rendered by the `esIcon` directive.
- * Whatever is not listed here keeps its SVG, so the two can be mixed while this spreads.
+ * Google Material icons, so the panel's rows and tabs read like the rest of edu-sharing. Names are
+ * Material Symbols ligatures, rendered by the `esIcon` directive.
+ *
+ * Every entry the menu, the topbar and the Add-Content rows can show is named here — those three
+ * render nothing else, so a section added to any of them needs its name in this map. Only a tab id
+ * may be missing: the tab bar draws {@link ICONS} where it is.
  */
 const MATERIAL_ICONS: Partial<Record<IconId, string>> = {
   // The main menu's entries.
@@ -65,8 +72,8 @@ const MATERIAL_ICONS: Partial<Record<IconId, string>> = {
   settings: 'settings'
 };
 
-// The icons, shared by the three places that render navigation entries: the main menu, the tab bar
-// and the topbar (the utility sections, see AppSection.topbar).
+// The icons, shared by the four places that render navigation entries: the main menu, the tab bar,
+// the topbar (the utility sections, see AppSection.topbar) and the Add-Content rows.
 @Injectable({ providedIn: 'root' })
 export class OptionIconService {
   private readonly sanitizer = inject(DomSanitizer);
@@ -77,7 +84,11 @@ export class OptionIconService {
     return MATERIAL_ICONS[id] ?? null;
   }
 
-  /** The entry's inline icon. Trusted: the SVGs are the constants above, not user input. */
+  /**
+   * The entry's inline icon, for the tab bar — the one place that still draws one. Empty for
+   * everything {@link MATERIAL_ICONS} names. Trusted: the SVGs are the constants above, not user
+   * input.
+   */
   icon(id: IconId): SafeHtml {
     let icon = this.cache.get(id);
     if (!icon) {

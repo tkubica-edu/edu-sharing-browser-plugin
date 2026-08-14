@@ -11,10 +11,10 @@
     @for (option of options(); track option.section) {
       <li>
         <button class="menu-item" (click)="navigation.go(option.section)">
+          <!-- Every option's section is named in OptionIconService.material; a new one has to be
+               added there to carry an icon here. -->
           @if (icons.material(option.section); as glyph) {
             <i class="mi-icon" [esIcon]="glyph"></i>
-          } @else {
-            <span class="mi-icon" [innerHTML]="icons.icon(option.section)"></span>
           }
           <span class="mi-main">
             <span class="mi-title">{{ option.label }}</span>

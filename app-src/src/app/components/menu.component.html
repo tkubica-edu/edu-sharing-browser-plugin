@@ -25,10 +25,10 @@
              repository) — see AppSection.enabled and entryDescription. -->
         <button class="menu-item" (click)="navigation.go(section.id)"
                 [disabled]="section.disabled">
+          <!-- Every section listed in the menu is named in OptionIconService.material; a new one has
+               to be added there to carry an icon here. -->
           @if (icons.material(section.id); as glyph) {
             <i class="mi-icon" [esIcon]="glyph"></i>
-          } @else {
-            <span class="mi-icon" [innerHTML]="icons.icon(section.id)"></span>
           }
           <span class="mi-main">
             <span class="mi-title">

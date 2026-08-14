@@ -9,10 +9,10 @@
             [disabled]="busy.busy()" [title]="busy.hint() ?? section.label"
             [attr.aria-label]="section.label"
             (click)="navigation.go(section.id)">
+      <!-- Every section that reaches the topbar is named in OptionIconService.material; a new one has
+           to be added there to carry an icon here. -->
       @if (icons.material(section.id); as glyph) {
         <i class="tb-icon" [esIcon]="glyph"></i>
-      } @else {
-        <span class="tb-icon" [innerHTML]="icons.icon(section.id)"></span>
       }
       @if (section.id === 'settings' && auth.needsReload()) {
         <span class="dot" title="Änderung übernehmen"></span>

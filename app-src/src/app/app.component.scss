@@ -45,15 +45,13 @@
 
 .close i { display: block; font-size: 20px; line-height: 1; }
 
-// Either an inline SVG or a Material ligature (esIcon) — the same box for both, with the font size
-// filling it for the glyph.
+// A Material ligature (esIcon): the box is the icon's, and the font size fills it — which also
+// overrides the 24px the Material stylesheet sets on its own class.
 .tb-icon {
   display: block;
   width: 20px; height: 20px;
   font-size: 20px;
   line-height: 20px;
-
-  ::ng-deep svg { width: 20px; height: 20px; display: block; }
 }
 
 // Badges pinned to the icon's top-right corner: the history entry count, and the dot marking a
