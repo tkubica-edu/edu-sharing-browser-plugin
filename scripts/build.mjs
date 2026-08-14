@@ -20,7 +20,8 @@ const SIDEBAR = path.join(ROOT, 'sidebar');
 //   scripts/edu → edu/  — edu-sharing bundle (edu-sharing-mds-editor-wrapper, …)
 //   scripts/wlo → wlo/  — WLO bundle (metadata-agent-canvas, …), loaded only when the repository
 //                         config enables the browser extension custom web component
-const BUNDLE_DIRS = ['edu', 'wlo'];
+//   scripts/boerdi → boerdi/ — chat widget of the KI assistant (boerdi-chat), loaded by its screen
+const BUNDLE_DIRS = ['edu', 'wlo', 'boerdi'];
 
 const TARGETS = ['chrome', 'firefox', 'safari'];
 

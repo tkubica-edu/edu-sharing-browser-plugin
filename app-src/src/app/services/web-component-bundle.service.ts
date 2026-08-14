@@ -9,10 +9,10 @@ import { MetadataAgentApiService } from './metadata-agent-api.service';
 
 /**
  * The pre-built web-component bundles packaged with the extension: `edu` for the edu-sharing elements, `wlo`
- * for the metadata-agent canvas that the repository config enables. Each name is both the source folder
- * (`scripts/<name>/`) and the folder in the built extension.
+ * for the metadata-agent canvas that the repository config enables, `boerdi` for the chat widget of the KI
+ * assistant. Each name is both the source folder (`scripts/<name>/`) and the folder in the built extension.
  */
-export type WebComponentBundle = 'edu' | 'wlo';
+export type WebComponentBundle = 'edu' | 'wlo' | 'boerdi';
 
 /** One `<script>` of a bundle, in load order. */
 interface BundleScript {
@@ -94,9 +94,9 @@ export class WebComponentBundleService {
   }
 
   /**
-   * The edu bundle has stable file names, so its entries are declared here. The wlo bundle
-   * uses content-hashed names, so they are read from its own `index.html` — nothing to keep
-   * in sync after a rebundle.
+   * The edu and boerdi bundles have stable file names, so their entries are declared here — the boerdi
+   * widget is a single script that carries its styles itself. The wlo bundle uses content-hashed names,
+   * so they are read from its own `index.html` — nothing to keep in sync after a rebundle.
    */
   private async entriesOf(bundle: WebComponentBundle): Promise<BundleEntries> {
     if (bundle === 'edu') {
@@ -108,6 +108,9 @@ export class WebComponentBundleService {
           { src: this.assetUrl(bundle, 'main.js'), module: true },
         ],
       };
+    }
+    if (bundle === 'boerdi') {
+      return { styles: [], scripts: [{ src: this.assetUrl(bundle, 'boerdi-widget.js'), module: true }] };
     }
     return this.readIndexHtml(bundle);
   }
@@ -135,13 +138,15 @@ export class WebComponentBundleService {
   /**
    * Publish the globals a bundle reads at bootstrap, where both freeze their value — so this runs before the scripts
    * do. The edu bundle's API URL must be absolute: a relative one would resolve against the extension origin, which
-   * no connector navigation can load. The wlo bundle's agent URL keeps it on the configured API.
+   * no connector navigation can load. The wlo bundle's agent URL keeps it on the configured API. The boerdi widget
+   * reads no global at all — it is configured through the attributes of its element.
    */
   private publishEnvironment(bundle: WebComponentBundle): void {
     const globals = window as unknown as {
       __env?: Record<string, string>;
       __ENV?: Record<string, string>;
     };
+    if (bundle === 'boerdi') return;
     if (bundle === 'wlo') {
       globals.__ENV = { ...(globals.__ENV ?? {}), agentUrl: this.agentApi.baseUrl() };
       return;

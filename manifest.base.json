@@ -37,7 +37,7 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["sidebar/*", "edu/*", "wlo/*"],
+      "resources": ["sidebar/*", "edu/*", "wlo/*", "boerdi/*"],
       "matches": ["https://*/*", "http://*/*"]
     }
   ],

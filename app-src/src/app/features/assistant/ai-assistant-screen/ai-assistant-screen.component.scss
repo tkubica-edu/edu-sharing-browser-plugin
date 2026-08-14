@@ -1,3 +1,18 @@
-:host { display: block; }
+// The chat is the screen: it takes the whole height it is given so its own input row sits at the
+// bottom edge, and scrolls inside itself rather than growing the panel's content area.
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
 
-.placeholder { text-align: center; }
+:host > p { padding: var(--es-space-4); margin: 0; }
+
+boerdi-chat {
+  display: block;
+  flex: 1 1 auto;
+  // A floor for the case where the panel cannot hand down a height of its own — a chat that
+  // collapses to nothing is unusable, a scrolling one is not.
+  min-height: 420px;
+}
