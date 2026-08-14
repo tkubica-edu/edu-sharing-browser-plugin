@@ -11,9 +11,7 @@
         <span class="ub-title">{{ title() }}</span>
         <span class="ub-name">{{ subtitle() }}</span>
       </span>
-      <svg class="ub-chevron" [class.is-open]="expanded()" viewBox="0 0 24 24" fill="none"
-           stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
-           aria-hidden="true"><path d="M5 9l7 7 7-7" /></svg>
+      <i class="ub-chevron" [class.is-open]="expanded()" esIcon="expand_more"></i>
     </button>
 
     <!-- What the row folds out is what can be done about the session it names: end it, or sign in. -->

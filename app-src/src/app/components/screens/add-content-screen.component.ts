@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 
+import { IconDirective } from '../../directives/icon.directive';
 import { SectionId } from '../../model/navigation';
 import { ConditionsService } from '../../services/conditions.service';
 import { NavigationService } from '../../services/navigation.service';
@@ -18,6 +19,7 @@ interface AddOption {
 // is implemented here.
 @Component({
   selector: 'es-add-content-screen',
+  imports: [IconDirective],
   templateUrl: './add-content-screen.component.html',
   styleUrl: './add-content-screen.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

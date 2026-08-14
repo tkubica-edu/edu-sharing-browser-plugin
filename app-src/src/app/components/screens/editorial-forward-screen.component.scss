@@ -106,7 +106,7 @@
 
   &:hover { background: var(--es-surface); }
 
-  .chevron { flex: 0 0 auto; width: 14px; height: 14px; }
+  .chevron { flex: 0 0 auto; width: 14px; height: 14px; font-size: 14px; line-height: 14px; }
 }
 
 .folder-none { @include m.muted; }

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
+import { IconDirective } from '../directives/icon.directive';
 import { CurationService } from '../services/curation.service';
 
 /**
@@ -13,6 +14,7 @@ import { CurationService } from '../services/curation.service';
  */
 @Component({
   selector: 'es-details-link',
+  imports: [IconDirective],
   templateUrl: './details-link.component.html',
   styleUrl: './details-link.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

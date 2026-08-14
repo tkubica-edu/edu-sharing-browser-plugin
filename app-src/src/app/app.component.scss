@@ -43,7 +43,7 @@
 // The open view's icon stays highlighted, since these two are reached from anywhere.
 .topbar-btn.is-active { background: rgba(0, 59, 124, 0.14); }
 
-.close svg { width: 20px; height: 20px; display: block; }
+.close i { display: block; font-size: 20px; line-height: 1; }
 
 .tb-icon {
   display: block;
@@ -103,7 +103,7 @@ $step-control: 28px;
   justify-content: center;
   flex: 0 0 auto;
 }
-.back-btn svg { width: 18px; height: 18px; }
+.back-btn i { font-size: 18px; line-height: 1; }
 .back-btn:hover:not([disabled]) { background: #eef1f4; }
 
 // The shell's controls while a write is in flight (see BusyService): still on screen, so the panel

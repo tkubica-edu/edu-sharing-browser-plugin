@@ -61,6 +61,8 @@
   width: 20px;
   height: 20px;
   color: var(--es-blue);
+  font-size: 20px;
+  line-height: 20px;
   transition: transform 0.15s ease;
 
   &.is-open { transform: rotate(180deg); }

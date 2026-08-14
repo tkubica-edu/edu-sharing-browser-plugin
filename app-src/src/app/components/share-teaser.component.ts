@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 
+import { IconDirective } from '../directives/icon.directive';
 import { CurationService } from '../services/curation.service';
 import { NavigationService } from '../services/navigation.service';
 import { QrCodeComponent } from './qr-code.component';
@@ -21,7 +22,7 @@ const QR_SIZE = 104;
  */
 @Component({
   selector: 'es-share-teaser',
-  imports: [QrCodeComponent],
+  imports: [IconDirective, QrCodeComponent],
   templateUrl: './share-teaser.component.html',
   styleUrl: './share-teaser.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

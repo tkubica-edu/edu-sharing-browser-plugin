@@ -21,6 +21,7 @@ import { OptionIconService } from './services/option-icon.service';
 import { PageRecognitionService } from './services/page-recognition.service';
 import { SessionResumeService } from './services/session-resume.service';
 
+import { IconDirective } from './directives/icon.directive';
 import { ActionBarComponent } from './components/action-bar.component';
 import { AiAssistantBarComponent } from './components/ai-assistant-bar.component';
 import { HistoryComponent } from './components/history.component';
@@ -59,6 +60,7 @@ const DISCARD_PROMPT =
 @Component({
   selector: 'es-root',
   imports: [
+    IconDirective,
     ActionBarComponent, TabBarComponent, UserBarComponent, AiAssistantBarComponent, MenuComponent,
     LoginComponent, AiAssistantScreenComponent, HistoryComponent, SettingsComponent,
     SearchComponent, AddContentScreenComponent,

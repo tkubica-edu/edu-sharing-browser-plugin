@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 
+import { IconDirective } from '../directives/icon.directive';
 import { BrowserExtensionCustomWebComponentService } from '../services/browser-extension-custom-web-component.service';
 import { AuthService } from '../services/auth.service';
 import { BusyService } from '../services/busy.service';
@@ -17,6 +18,7 @@ const ASSISTANT_NAME = 'Boerdi - KI-Assistent';
 // shell renders it unconditionally.
 @Component({
   selector: 'es-ai-assistant-bar',
+  imports: [IconDirective],
   templateUrl: './ai-assistant-bar.component.html',
   styleUrl: './ai-assistant-bar.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

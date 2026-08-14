@@ -202,7 +202,16 @@
   .mi-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
   .mi-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; }
   .mi-desc { font-size: 13px; color: var(--es-muted); line-height: 1.35; }
-  .chevron { flex: 0 0 auto; width: 20px; height: 20px; color: var(--es-blue); }
+  // A Material ligature (esIcon), so the box needs the font size to fill it — and that size also
+  // overrides the 24px the Material stylesheet sets on its own class.
+  .chevron {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    color: var(--es-blue);
+    font-size: 20px;
+    line-height: 20px;
+  }
 }
 
 /**

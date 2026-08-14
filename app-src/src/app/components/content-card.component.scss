@@ -100,10 +100,11 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 
-  svg {
-    width: 9px;
-    height: 9px;
+  // As small as the line it follows: the arrow belongs to the label, it is not an icon of its own.
+  .fc-chevron {
     flex: 0 0 auto;
+    font-size: 12px;
+    line-height: 1;
   }
 }
 
