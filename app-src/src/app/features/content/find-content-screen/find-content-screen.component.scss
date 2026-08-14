@@ -1,0 +1,34 @@
+// "Passende Inhalte finden" — the derived keywords above the embedded search.
+//
+// Not a height:100% box: `<edu-sharing-search>` scrolls its result list internally, inside the
+// height the embedder gives it. Filling the panel as a flex item swallows the scroll — the list is
+// clipped to the squeezed box and the panel has nothing left to scroll. So the element gets a
+// definite height of its own and the keyword card above it scrolls away with the page (`.content`
+// in AppComponent), like on every other screen.
+:host {
+  display: block;
+}
+
+
+// A keyword that is shown but not part of the query (only the first few are searched).
+.es-chip.is-unused {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.find-wrap {
+  display: flex;
+  flex-direction: column;
+  padding: var(--es-space-4);
+  gap: var(--es-space-3);
+}
+
+.results {
+  display: block;
+  // Tall enough to work as a result list, bounded so it always has the definite height the
+  // element needs; `flex: none` keeps it at that height instead of being squeezed by the card.
+  flex: none;
+  height: 70vh;
+  min-height: 360px;
+  overflow-y: auto;
+}

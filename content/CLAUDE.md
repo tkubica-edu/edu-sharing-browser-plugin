@@ -365,7 +365,7 @@ only string fields and the extension re-hydrates from `id`.
 
 | File | Role |
 |---|---|
-| `app-src/src/app/components/search.component.ts` | selector's `onNodesChoosen` → `insertNodes` (outbound) |
+| `app-src/src/app/features/content/search-screen/search-screen.component.ts` | selector's `onNodesChoosen` → `insertNodes` (outbound) |
 | `app-src/src/app/services/browser-extension.service.ts` | `insertNodes`, `requestDocumentContent`, `requestDocumentInfo` (outbound), `signalReady` (ready handshake) |
 | `content/panel-host.js` | relay hub: broadcasts `INSERT_NODE` / `REQUEST_DOCUMENT_*`; relays inbound envelopes, buffers only `PREVIEW_NODE` |
 | `app-src/src/app/app.component.ts` | single `window:message` listener: `DOCUMENT_*` → the document bridge, `PREVIEW_NODE` → the flow |

@@ -60,11 +60,11 @@
       @case ('add-content') { <es-add-content-screen></es-add-content-screen> }
       @case ('new-document') { <es-new-document-screen></es-new-document-screen> }
       @case ('add-material') { <es-add-material-screen></es-add-material-screen> }
-      @case ('search') { <es-search></es-search> }
+      @case ('search') { <es-search-screen></es-search-screen> }
       @case ('curation') { <es-curation-screen></es-curation-screen> }
       @case ('curation-preview') { <es-curation-preview-screen></es-curation-preview-screen> }
       @case ('own-content') { <es-own-content-screen></es-own-content-screen> }
-      @case ('history') { <es-history (open)="openFromHistory($event)"></es-history> }
+      @case ('history') { <es-history-screen (open)="openFromHistory($event)"></es-history-screen> }
       @case ('content-options') { <es-content-options-screen></es-content-options-screen> }
       @case ('find-content') { <es-find-content-screen></es-find-content-screen> }
       @case ('quality-check') { <es-quality-check-screen></es-quality-check-screen> }
@@ -77,7 +77,7 @@
       @case ('preview') { <es-preview-screen></es-preview-screen> }
       @case ('usages') { <es-usages-screen></es-usages-screen> }
       @case ('share') { <es-share-screen></es-share-screen> }
-      @case ('settings') { <es-settings></es-settings> }
+      @case ('settings') { <es-settings-screen></es-settings-screen> }
     }
   }
 </main>

@@ -8,30 +8,9 @@ import { ConditionsService } from './conditions.service';
 import { CurationService } from './curation.service';
 
 /**
- * Recognises what the open page is about, so that content arrives on its own — the counterpart, for
- * every other page, of the OnlyOffice plugin announcing the document it has open.
- *
- * Two ways, in this order, because the page can *say* what it shows and only otherwise has to be
- * looked up:
- *
- * 1. **A repository page names its node in its own URL** — `…/components/render/<id>`, the `id` of
- *    the open collection or folder (see `nodeIdFromRepositoryUrl`). That is the page stating its
- *    content, so it is taken as it stands and only loaded; no lookup can improve on it. This is
- *    the same standing the OnlyOffice document has, arrived at from the URL rather than from a
- *    message.
- * 2. **Any other page is looked up by URL** — the same question the *Datei oder Link* dialog asks
- *    while a link is being typed: `getWebsiteInformation` answers, among the page's own metadata,
- *    with the nodes that already carry it (`duplicateNodes`, matched on `ccm:wwwurl`). A hit means
- *    the page has been erschlossen before, so there is nothing to curate — the existing content is
- *    what the panel should work on.
- *
- * Either way the finding surfaces as the *Inhalt erkannt* menu entry.
- *
- * Not on an insert host (the OnlyOffice editor, `…/eduservlet/connector`): there the plugin
- * announces the document it has open, a statement about the *editor* rather than about the page's
- * URL, and the accurate one — the editor's own URL says nothing about the content being edited.
- * And not by lookup on a repository page: its URL is the repository's own, so asking about it would
- * at best repeat what step 1 already read and at worst contradict it.
+ * Recognises what the open page is about, so content arrives on its own — the counterpart, for every other page, of
+ * the plugin announcing its document. A repository page names its node in its own URL; every other page is looked up
+ * by URL, where a hit means it has been erschlossen before. Not on an insert host, where the plugin speaks.
  */
 @Injectable({ providedIn: 'root' })
 export class PageRecognitionService {
@@ -41,14 +20,9 @@ export class PageRecognitionService {
   private readonly curation = inject(CurationService);
 
   /**
-   * Recognise the open page's content and adopt it. Answers whether one was found.
-   *
-   * Reports being under way through `ConditionsService.recognizingContent` and clears it on every way
-   * out — a flag left set would leave the panel checking forever.
-   *
-   * Silent on every failure: this is a bonus (a guest session may not be allowed to read the node or
-   * to run the lookup, and an unreachable page is not an error either) — without it the user simply
-   * gets the *Inhalt erschließen* offer they would have got anyway.
+   * Recognise the open page's content and adopt it; answers whether one was found. Reports being under way through
+   * `ConditionsService.recognizingContent` and clears it on every way out, since a flag left set would leave the panel
+   * checking forever. Silent on every failure — without it the user simply gets the *Inhalt erschließen* offer.
    */
   async recognize(): Promise<boolean> {
     // Nothing to ask under, and the login runs this again (AppComponent) — so the question stays open

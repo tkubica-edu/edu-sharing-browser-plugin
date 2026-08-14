@@ -54,26 +54,12 @@
   line-height: 20px;
 }
 
-// Badges pinned to the icon's top-right corner: the history entry count, and the dot marking a
-// repository-URL change that still needs applying.
-.topbar-btn .count,
+// The dot marking a repository-URL change that still needs applying, pinned to the icon's corner.
 .topbar-btn .dot {
   position: absolute;
   top: 0; right: 0;
-  border: 1px solid var(--es-surface);
-}
-.topbar-btn .count {
-  background: var(--es-blue);
-  color: #fff;
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 1;
-  min-width: 14px;
-  padding: 2px 3px;
-  border-radius: 999px;
-}
-.topbar-btn .dot {
   width: 8px; height: 8px;
+  border: 1px solid var(--es-surface);
   border-radius: 50%;
   background: #e0a800;
 }

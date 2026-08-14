@@ -106,11 +106,9 @@ export class MetadataAgentService {
   }
 
   /**
-   * Generate **one** field from text the caller already holds (`/extract-field`) and return its
-   * values. Deliberately not a full {@link run}: a flow that only consumes a single value has no
-   * use for the other fields and should not pay for their extraction — and the outcome is not
-   * stored as {@link lastRun}, so it neither opens in the metadata editor nor counts as unsaved
-   * work (deriving search keywords, see ContentSuggestionsService).
+   * Generate one field from text the caller already holds and return its values. Deliberately not a full
+   * {@link run}: the other fields would be paid for and thrown away. The outcome is not stored as
+   * {@link lastRun}, so it neither opens in the metadata editor nor counts as unsaved work.
    */
   async extractField(text: string, fieldId: string): Promise<FieldOutcome> {
     const trimmed = text.trim();
@@ -167,17 +165,9 @@ export class MetadataAgentService {
   }
 
   /**
-   * POST the text to the agent's `/extract-field`, straight from the sidebar document — the same
-   * way the WLO canvas calls `/generate` (`window.__ENV.agentUrl`, the same base — see
-   * MetadataAgentApiService), and unlike {@link run}, which goes through the background worker.
-   *
-   * Deliberately so: the call shows up in the panel's own DevTools like every other request the
-   * sidebar makes, and there is no second build artifact that can fall out of sync — a worker still
-   * running an older script silently drops messages it does not know. The extension's
-   * `host_permissions` are what let this document reach a foreign origin at all.
-   *
-   * `schema_file` and `field_id` are the endpoint's only required parameters; the field definition
-   * (and its prompt) is resolved from that schema.
+   * POST the text to the agent's `/extract-field`, straight from the sidebar document — unlike {@link run}, which
+   * goes through the background worker: the call then shows up in the panel's own DevTools and no second build
+   * artifact can fall out of sync. `schema_file` and `field_id` are the only required parameters.
    */
   private async postExtractField(text: string, fieldId: string): Promise<ExtractFieldAnswer> {
     if (this.devMode.enabled()) {
@@ -219,10 +209,8 @@ export class MetadataAgentService {
   }
 
   /**
-   * A single field's value as a list of separate values. Beyond {@link flatten} it also splits on
-   * commas: a multi-value field's schema describes it as comma-separated (`cclom:general_keyword`
-   * is "Schlagwörter (kommagetrennt)") and its examples allow either form, so the agent may answer
-   * with one joined string instead of an array.
+   * A single field's value as separate values. Beyond {@link flatten} it splits on commas as well: a multi-value
+   * field's schema describes it as comma-separated, so the agent may answer with one joined string.
    */
   private splitValues(value: unknown): string[] {
     return this.flatten(value)

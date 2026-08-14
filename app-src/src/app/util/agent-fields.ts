@@ -28,15 +28,9 @@ export const LICENSE_FIELDS: readonly string[] = [
 ];
 
 /**
- * The payload with its values also under the names the edu-sharing form uses:
- *
- * - `ccm:oeh_publisher_combined` copied to `ccm:author_freetext`, which is the free text the agent's
- *   value actually is — the publisher widget takes vocabulary badges instead.
- * - `ccm:commonlicense_key` from the licence's label to its key (`CC BY-SA` → `CC_BY_SA`), plus
- *   {@link LICENSE_DEFAULTS} beside it. Only where a licence is stated: they are statements about one.
- *
- * A new object. Nothing is removed, nothing already stated is overwritten, so running it twice changes
- * nothing the first run did not.
+ * The payload with its values also under the names the edu-sharing form uses: the combined publisher copied to
+ * the author free text it actually is, and the licence label turned into its key plus the defaults that belong
+ * with it. A new object; nothing is removed or overwritten, so a second run changes nothing.
  */
 export function mapAgentFields(
   payload: Record<string, unknown> | null | undefined
@@ -58,11 +52,9 @@ export function mapAgentFields(
 }
 
 /**
- * The values as they are written to the node, with the licence taken from `payload` where the form
- * reported none — not every form has a widget for it, and a value no widget carries never comes back.
- * One the form did report is normalised rather than replaced.
- *
- * On the save rather than in either editor, because both write through it (CurationService.save).
+ * The values as they are written to the node, with the licence taken from `payload` where the form reported none
+ * — not every form has a widget for it, and a value no widget carries never comes back. One the form did report
+ * is normalised rather than replaced. On the save, because both editors write through it.
  */
 export function withAgentLicense(
   values: MdsValues,

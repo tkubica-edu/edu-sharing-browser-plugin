@@ -8,14 +8,10 @@ type Authority = Partial<User & Group> & {
   lastName?: string;
 };
 
-// `AuthorityNamePipe` from ngx-edu-sharing-ui, ported. The original is not standalone (it lives in
-// EduSharingUiCommonModule), so using it would mean pulling in that module — Angular Material,
-// ngx-translate and material-design-icons — into a sidebar bundle, against peer ranges that stop at
-// Angular 18. The name resolution below is the original's, in its order.
-//
-// Left out of the port: the `avatarShortcut` mode (no avatars here), the vCard salutation prefixed
-// to first/last name, and the translated GROUP_EVERYONE / DELETED_USER special cases — none of them
-// apply to naming the signed-in user.
+// `AuthorityNamePipe` from ngx-edu-sharing-ui, ported: the original is not standalone, so using it would pull
+// Angular Material, ngx-translate and material-design-icons into the sidebar bundle, against peer ranges that stop
+// at Angular 18. The name resolution below is the original's, in its order. Left out: the avatar mode, the vCard
+// salutation and the translated group/deleted-user cases, none of which apply to naming the signed-in user.
 @Pipe({ name: 'authorityName' })
 export class AuthorityNamePipe implements PipeTransform {
   transform(authority: Authority | null | undefined): string {

@@ -22,35 +22,35 @@ import { PageRecognitionService } from './services/page-recognition.service';
 import { SessionResumeService } from './services/session-resume.service';
 
 import { IconDirective } from './directives/icon.directive';
-import { ActionBarComponent } from './components/action-bar.component';
-import { AiAssistantBarComponent } from './components/ai-assistant-bar.component';
-import { HistoryComponent } from './components/history.component';
-import { LoginComponent } from './components/login.component';
-import { LoginGateComponent } from './components/login-gate.component';
-import { MenuComponent } from './components/menu.component';
-import { SearchComponent } from './components/search.component';
-import { SettingsComponent } from './components/settings.component';
-import { TabBarComponent } from './components/tab-bar.component';
-import { UserBarComponent } from './components/user-bar.component';
-import { AddContentScreenComponent } from './components/screens/add-content-screen.component';
-import { AddMaterialScreenComponent } from './components/screens/add-material-screen.component';
-import { ContentOptionsScreenComponent } from './components/screens/content-options-screen.component';
-import { CurationPreviewScreenComponent } from './components/screens/curation-preview-screen.component';
-import { CurationScreenComponent } from './components/screens/curation-screen.component';
-import { FindContentScreenComponent } from './components/screens/find-content-screen.component';
-import { EditorialForwardScreenComponent } from './components/screens/editorial-forward-screen.component';
-import { FlowChoiceScreenComponent } from './components/screens/flow-choice-screen.component';
-import { AiQualityScreenComponent } from './components/screens/ai-quality-screen.component';
-import { PersonalStorageScreenComponent } from './components/screens/personal-storage-screen.component';
-import { SelectCollectionScreenComponent } from './components/screens/select-collection-screen.component';
-import { MetadataScreenComponent } from './components/screens/metadata-screen.component';
-import { NewDocumentScreenComponent } from './components/screens/new-document-screen.component';
-import { OwnContentScreenComponent } from './components/screens/own-content-screen.component';
-import { PreviewScreenComponent } from './components/screens/preview-screen.component';
-import { AiAssistantScreenComponent } from './components/screens/ai-assistant-screen.component';
-import { QualityCheckScreenComponent } from './components/screens/quality-check-screen.component';
-import { ShareScreenComponent } from './components/screens/share-screen.component';
-import { UsagesScreenComponent } from './components/screens/usages-screen.component';
+import { ActionBarComponent } from './template/action-bar/action-bar.component';
+import { AiAssistantBarComponent } from './template/ai-assistant-bar/ai-assistant-bar.component';
+import { MenuComponent } from './template/menu/menu.component';
+import { TabBarComponent } from './template/tab-bar/tab-bar.component';
+import { UserBarComponent } from './template/user-bar/user-bar.component';
+import { AiAssistantScreenComponent } from './features/assistant/ai-assistant-screen/ai-assistant-screen.component';
+import { LoginGateComponent } from './features/auth/login-gate/login-gate.component';
+import { LoginComponent } from './features/auth/login/login.component';
+import { AddContentScreenComponent } from './features/content/add-content-screen/add-content-screen.component';
+import { AddMaterialScreenComponent } from './features/content/add-material-screen/add-material-screen.component';
+import { ContentOptionsScreenComponent } from './features/content/content-options-screen/content-options-screen.component';
+import { FindContentScreenComponent } from './features/content/find-content-screen/find-content-screen.component';
+import { HistoryScreenComponent } from './features/content/history-screen/history-screen.component';
+import { NewDocumentScreenComponent } from './features/content/new-document-screen/new-document-screen.component';
+import { OwnContentScreenComponent } from './features/content/own-content-screen/own-content-screen.component';
+import { SearchScreenComponent } from './features/content/search-screen/search-screen.component';
+import { CurationPreviewScreenComponent } from './features/curation/curation-preview-screen/curation-preview-screen.component';
+import { CurationScreenComponent } from './features/curation/curation-screen/curation-screen.component';
+import { EditorialForwardScreenComponent } from './features/filing/editorial-forward-screen/editorial-forward-screen.component';
+import { PersonalStorageScreenComponent } from './features/filing/personal-storage-screen/personal-storage-screen.component';
+import { SelectCollectionScreenComponent } from './features/filing/select-collection-screen/select-collection-screen.component';
+import { MetadataScreenComponent } from './features/metadata/metadata-screen/metadata-screen.component';
+import { PreviewScreenComponent } from './features/overview/preview-screen/preview-screen.component';
+import { ShareScreenComponent } from './features/overview/share-screen/share-screen.component';
+import { UsagesScreenComponent } from './features/overview/usages-screen/usages-screen.component';
+import { AiQualityScreenComponent } from './features/quality/ai-quality-screen/ai-quality-screen.component';
+import { FlowChoiceScreenComponent } from './features/quality/flow-choice-screen/flow-choice-screen.component';
+import { QualityCheckScreenComponent } from './features/quality/quality-check-screen/quality-check-screen.component';
+import { SettingsScreenComponent } from './features/settings/settings-screen/settings-screen.component';
 
 /** Window in which the same node delivery is treated as a duplicate. */
 const DUPLICATE_WINDOW_MS = 3000;
@@ -63,8 +63,8 @@ const DISCARD_PROMPT =
   imports: [
     IconDirective,
     ActionBarComponent, TabBarComponent, UserBarComponent, AiAssistantBarComponent, MenuComponent,
-    LoginComponent, LoginGateComponent, AiAssistantScreenComponent, HistoryComponent, SettingsComponent,
-    SearchComponent, AddContentScreenComponent,
+    LoginComponent, LoginGateComponent, AiAssistantScreenComponent, HistoryScreenComponent,
+    SettingsScreenComponent, SearchScreenComponent, AddContentScreenComponent,
     ContentOptionsScreenComponent, CurationScreenComponent, CurationPreviewScreenComponent,
     FindContentScreenComponent,
     NewDocumentScreenComponent, AddMaterialScreenComponent, OwnContentScreenComponent,
@@ -202,9 +202,8 @@ export class AppComponent implements OnInit {
     // request that is waiting for them.
     if (this.onlyOfficeDocument.accept(message)) return;
     if (message.event !== 'PREVIEW_NODE') return;
-    // SUSPENDED: a double-click on an object in the editor fires this, and loading its node as the
-    // active node throws the user out of whatever they were doing. Uncomment to restore it.
-    // void this.receiveNode((message.data as { id?: string } | undefined)?.id);
+    // PREVIEW_NODE is deliberately not routed into the flow: a double-click on an object in the editor fires it, and
+    // adopting that node would throw the user out of whatever they are doing. {@link receiveNode} is what would do it.
   }
 
   protected close(): void {
@@ -232,15 +231,9 @@ export class AppComponent implements OnInit {
   }
 
   /**
-   * Adopt a page this app was not rebooted for.
-   *
-   * Everything derived from the URL has to follow it: the conditions (which page this is, whether it
-   * is an insert host or the repository), the content that described the *previous* page — a detected
-   * one, see CurationService.releaseDetectedContent — and then the new page is recognised like any
-   * other, so its own node surfaces as *Inhalt erkannt*.
-   *
-   * Order matters: the conditions first, because the recognition reads them; the release before it,
-   * because it refuses to adopt while a content is still held.
+   * Adopt a page this app was not rebooted for: the conditions, the content that described the previous page, and then
+   * the recognition of the new one. Order matters — the conditions first, because the recognition reads them, and the
+   * release before that, since it refuses to adopt while a content is still held.
    */
   private pageChanged(url: string): void {
     if (url === this.conditions.activeUrl()) return;
@@ -250,12 +243,9 @@ export class AppComponent implements OnInit {
   }
 
   /**
-   * On an OnlyOffice page, ask once for the open document's identity so it becomes the node the app
-   * works on (the effect in the constructor adopts it).
-   *
-   * This is the recognition for such a page — the plugin states the document instead of the URL being
-   * looked up (see PageRecognitionService) — so it settles `recognizingContent` as well, including
-   * when the plugin is switched off and the request runs into its timeout.
+   * On an OnlyOffice page, ask once for the open document's identity so it becomes the node the app works on. This
+   * is the recognition for such a page — the plugin states the document instead of the URL being looked up — so it
+   * settles `recognizingContent` too, including when the plugin is off and the request times out.
    */
   private async askHostForItsDocument(): Promise<void> {
     try {
@@ -278,11 +268,9 @@ export class AppComponent implements OnInit {
     const nodeId = pending?.data?.data?.id;
     if (!nodeId) return;
     await this.browserExtension.storageSet(APP_CONFIG.storageKeys.pendingPreview, null);
-    // SUSPENDED together with the live PREVIEW_NODE relay in `onWindowMessage` — this is the same
-    // event, only buffered while the sidebar was closed or booting. The entry is still read and
-    // cleared above, so a stale one cannot surface later. Uncomment to restore it.
+    // Read and cleared, but not adopted: this is the buffered PREVIEW_NODE, which is not routed into the flow either
+    // (see onWindowMessage). Clearing it here keeps a stale entry from surfacing later.
     void nodeId;
-    // await this.receiveNode(nodeId);
   }
 
   /**
@@ -306,11 +294,9 @@ export class AppComponent implements OnInit {
   }
 
   /**
-   * Load a node into the flow; surface a failure to the user. Callers confirm discarding unsaved
-   * work first (see {@link confirmDiscardUnsaved}).
-   *
-   * Without an `enter` the app re-lands on the main menu, where the loaded node shows up as the
-   * *Inhalt erkannt* menu entry — a node that merely arrived never navigates for the user.
+   * Load a node into the flow and surface a failure to the user; callers confirm discarding unsaved work first.
+   * Without an `enter` the app re-lands on the main menu, where the node shows up as the *Inhalt erkannt* entry — a
+   * node that merely arrived never navigates for the user.
    */
   private async openNode(load: () => Promise<void>, enter?: () => Promise<void>): Promise<void> {
     try {

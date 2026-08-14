@@ -1,0 +1,89 @@
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+
+import { IconDirective } from '../../directives/icon.directive';
+import { AuthorityNamePipe } from '../../pipes/authority-name.pipe';
+import { AuthService } from '../../services/auth.service';
+import { BusyService } from '../../services/busy.service';
+import { NavigationService } from '../../services/navigation.service';
+
+// The bottom bar naming who the panel is acting as, and where that session is changed. It is about the session
+// rather than about the open page, hence the bottom edge. Like ActionBarComponent it decides for itself whether
+// it is on screen, so the shell renders it unconditionally.
+@Component({
+  selector: 'es-user-bar',
+  imports: [IconDirective],
+  templateUrl: './user-bar.component.html',
+  styleUrl: './user-bar.component.scss',
+  providers: [AuthorityNamePipe],
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class UserBarComponent {
+  private readonly auth = inject(AuthService);
+  protected readonly busy = inject(BusyService);
+  private readonly navigation = inject(NavigationService);
+  private readonly authorityName = inject(AuthorityNamePipe);
+
+  /**
+   * When the bar is shown: an authorized session — "as a guest" is an answer as much as a name is — on the main
+   * menu or on a screen that is a plain list. Elsewhere the bottom edge belongs to the screen or to the action bar.
+   */
+  protected readonly visible = computed(
+    () =>
+      this.auth.authorized() &&
+      // Not under the login gate: it brings the panel's bottom edge itself (LoginGateComponent).
+      !this.navigation.sessionGate() &&
+      (this.navigation.section() === 'menu' || !!this.navigation.currentSection()?.plain),
+  );
+
+  /**
+   * No session of the user's own: the repository lets the panel work without a login, so there is a
+   * guest where the name would be — and {@link login} is still on offer.
+   */
+  protected readonly guest = computed(() => !this.auth.loggedIn());
+
+  /** What the bar says, in the two states it has. */
+  protected readonly title = computed(() => (this.guest() ? 'Gastzugang' : 'Angemeldet'));
+  /**
+   * Who the session belongs to, said the way the repository says it everywhere else — the profile's
+   * name via {@link AuthorityNamePipe}, not the login name. The login name is the fallback the pipe
+   * itself ends on, and what is shown while the person record is still on its way (or did not come).
+   */
+  protected readonly subtitle = computed(() => {
+    // For a guest it names what the login is *for* rather than that none is required: a section a
+    // guest session cannot serve asks for one (see AppSection.requiresSession), and this row is where
+    // it can be had beforehand — folding it out offers "Anmelden".
+    if (this.guest()) return 'Anmelden schaltet weitere Funktionen frei';
+    const user = this.auth.currentUser();
+    const name = user ? this.authorityName.transform(user) : null;
+    return (name === 'invalid' ? null : name) || this.auth.username() || '–';
+  });
+
+  /** The row's tooltip: what folding it out would offer. */
+  protected readonly hint = computed(() => {
+    if (this.expanded()) return 'Schließen';
+    return this.guest()
+      ? 'Als Gast unterwegs — hier anmelden, um alle Funktionen zu nutzen'
+      : `Angemeldet als ${this.subtitle()}`;
+  });
+
+  /** The session's actions are folded away until asked for — the bar itself is the answer. */
+  protected readonly expanded = signal(false);
+
+  protected toggle(): void {
+    this.expanded.update((open) => !open);
+  }
+
+  /**
+   * Sign in although nothing demands it — a guest only sees the repository's public view. Opens the
+   * login screen, which falls away once the session exists, so the guard returns to the menu.
+   */
+  protected login(): void {
+    this.expanded.set(false);
+    this.navigation.go('login');
+  }
+
+  protected logout(): void {
+    this.expanded.set(false);
+    void this.auth.logout();
+  }
+}

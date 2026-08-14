@@ -5,11 +5,9 @@ import { CurationService } from './curation.service';
 import { NavigationService } from './navigation.service';
 
 /**
- * What the metadata screen hands to the footer: how to save, and whether saving is possible
- * right now. `canSave` is a signal, so the footer derives its state instead of being pushed to.
- *
- * `save` answers whether the write succeeded, because the footer's action continues on the back of
- * it — a step that is entered after a failed save would leave the content behind unwritten.
+ * What the metadata screen hands to the footer: how to save, and whether saving is possible right now.
+ * `canSave` is a signal, so the footer derives its state instead of being pushed to. `save` answers whether the
+ * write succeeded, since the footer's action continues on the back of it.
  */
 export interface SaveHandler {
   save: () => Promise<boolean>;
@@ -99,12 +97,9 @@ export class ActionBarService {
           }
         ];
 
-      // The preview step of the Erschließung, and the step that WRITES the content: confirming the
-      // picture and the title is the point at which enough is known to save it, so the node is
-      // created here and every step behind this one edits it (see CurationService.createContent).
-      //
-      // Only on the back of a write that held: a step entered after a failed save would work on a
-      // content that is not there, and the failure is reported on this screen.
+      // The preview step of the Erschließung, and the step that writes the content: the node is created here and
+      // every step behind this one edits it. Only on the back of a write that held — a step entered after a
+      // failed save would work on a content that is not there.
       case 'curation-preview':
         return [
           this.backAction(),
@@ -135,13 +130,9 @@ export class ActionBarService {
       // carries that walk — the way on out of the Qualität view, the way back out of the Metadaten
       // one. The tab bar is still on screen; this is the way through the step, not the only one.
       case 'quality': {
-        // The Qualität view: its way on IS the confirmation — the criteria decide whether the content
-        // may be published, so going on without giving it would walk past the one question this view
-        // asks. It is available once the criteria allow it (CurationService.qualityCriteriaMet, which
-        // the view reports), and the Metadaten sub step is locked until then for the same reason.
-        //
-        // Once the confirmation is given the way on is the plain step forward: it is a statement
-        // about the content, made once — coming back to this view later must still lead on.
+        // The Qualität view: its way on is the confirmation, since the criteria decide whether the content may be
+        // published — available once they allow it, which is also what unlocks the Metadaten sub step. Once given,
+        // the way on is the plain step forward, so returning to this view later still leads on.
         if (this.navigation.screen() !== 'metadata') {
           const next = this.navigation.nextTab();
           if (this.curation.qualityConfirmed()) {
@@ -299,19 +290,9 @@ export class ActionBarService {
   }
 
   /**
-   * The way out of the Qualitätsprüfung and into the Inhaltsübersicht — the last write of the flow.
-   *
-   * The content exists from the preview step on, so what is written here is the metadata the editor
-   * commits now, the WLO extended fields, and the handover to the editorial queue that ends the
-   * flow's part in it (see MetadataScreenComponent.save). The next step is entered only once that
-   * succeeded — going on after a failed save would leave the content behind as it was.
-   *
-   * The editor is on screen here, so it commits and its values are written. Without one — it has not
-   * mounted, or the section carries no Metadaten view — what the other steps recorded is written on
-   * its own (CurationService.saveCollected).
-   *
-   * Unlike the other steps this one always has something to write: the handover is what leaving the
-   * view means, however little was changed in it.
+   * The way out of the Qualitätsprüfung and into the Inhaltsübersicht — the last write of the flow: the metadata the
+   * editor commits, the WLO extended fields and the handover to the editorial queue. The next step follows only on a
+   * write that succeeded. Without an editor on screen, what the other steps recorded is written on its own.
    */
   private finishAction(): FooterAction {
     const handler = this.navigation.screen() === 'metadata' ? this.saveHandler() : null;

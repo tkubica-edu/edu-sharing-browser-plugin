@@ -10,19 +10,9 @@ const CONFIG_VARIABLE = 'browserExtensionCustomWebComponent';
 const THEME_CLASS = 'wlo-theme';
 
 /**
- * The optional WLO metadata editor.
- *
- * When the repository config enables `browserExtensionCustomWebComponent`, the metadata screen embeds
- * WloCanvasComponent (`metadata-agent-canvas` from the packaged `wlo/` bundle) instead of the
- * edu-sharing MDS editor. Everything else is unchanged: "Inhalt erschließen" still runs the
- * metadata agent, its result is loaded into the editor, and saving still creates or updates the
- * repository node.
- *
- * When the variable is absent or false, the bundle is never loaded and the MDS editor is used.
- *
- * Enabling it also puts {@link THEME_CLASS} on the document element, which gives the footer buttons
- * the pill shape of the bundle's own buttons (see `_wlo-theme.scss`). The panel's colours stay its
- * own either way.
+ * The optional WLO metadata editor. Where the repository config enables `browserExtensionCustomWebComponent`, the
+ * metadata screen embeds the WLO canvas instead of the MDS editor and the footer buttons take the bundle's pill
+ * shape ({@link THEME_CLASS}); without the variable the wlo bundle is never loaded.
  */
 @Injectable({ providedIn: 'root' })
 export class BrowserExtensionCustomWebComponentService {
@@ -34,13 +24,9 @@ export class BrowserExtensionCustomWebComponentService {
   readonly enabled = this.enabledState.asReadonly();
 
   /**
-   * The metadata set the panel's forms are built from: the WLO set (`APP_CONFIG.metadataSet`) where
-   * this is a WLO panel, the repository's own default set anywhere else.
-   *
-   * Tied to the flag rather than configured on its own, because the flag is what makes the panel a
-   * WLO one — the same switch loads the WLO canvas and {@link THEME_CLASS}. A repository that does
-   * not ask for any of that is not one whose contents are described with WLO fields, and asking it
-   * for a set it does not have leaves every form blank.
+   * The metadata set the panel's forms are built from: the WLO set where this is a WLO panel, the repository's own
+   * default set elsewhere. Tied to the flag, since a repository that asks for none of this does not describe its
+   * contents with WLO fields — and asking it for a set it lacks leaves every form blank.
    */
   readonly metadataSet = computed(() => (this.enabled() ? APP_CONFIG.metadataSet : DEFAULT));
 

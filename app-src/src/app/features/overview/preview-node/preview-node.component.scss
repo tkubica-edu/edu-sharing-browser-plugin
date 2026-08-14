@@ -1,0 +1,10 @@
+:host { display: block; }
+
+.preview-wrap { display: flex; flex-direction: column; }
+
+edu-sharing-preview-sidebar {
+  display: block;
+  width: 100%;
+  min-height: 520px;
+  background: var(--es-surface);
+}

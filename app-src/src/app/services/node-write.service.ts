@@ -4,17 +4,14 @@ import { MdsValues } from '../util/mds-values';
 import { SOURCE_TEXT_KEY, toEnvelope, toPayloadFields } from '../util/agent-payload';
 import { BrowserExtensionService, SavedNode } from './browser-extension.service';
 import { MetadataAgentApiService } from './metadata-agent-api.service';
-import { errorMessage } from './../util/errors';
+import { errorMessage } from '../util/errors';
 
 /** What a `/nodes` call does beyond putting the values on the node. */
 export interface NodeWriteSteps {
   /**
-   * The content's picture, which the endpoint puts on the node as its **preview** — a
-   * `POST …/nodes/-home-/{id}/preview` of its own, not a metadata field.
-   *
-   * Either an address the service fetches (`http(s)://…`) or the picture itself, as the data URL
-   * `/generate` states `preview_image_url` in (bare base64 is taken as well). Left out entirely
-   * where there is nothing to say: a node keeps the preview it has unless one is sent.
+   * The content's picture, which the endpoint puts on the node as its preview rather than as a metadata field:
+   * either an address it fetches or the picture itself as a data URL. Left out where there is nothing to say —
+   * a node keeps the preview it has unless one is sent.
    */
   preview?: string;
   /** Reference the node in these collections (`collection_id`). */
@@ -65,22 +62,9 @@ export interface NodeWriteOutcome {
 const ALREADY_IN_COLLECTION = 'DuplicateNodeException';
 
 /**
- * Writing the flow's node through the metadata agent's `POST /nodes` — the web component's way of
- * putting a curated content into the repository: it creates the node, references it in collections,
- * writes the extended fields and runs the editorial workflow steps, none of which the plain node API
- * does for a session that is not the user's own.
- *
- * Used instead of writing the node ourselves while the browser extension custom web component is
- * enabled *and* nobody is signed in (see {@link CurationService.savesThroughAgent}): the guest
- * session that web component brings may not create a node in the repository at all, and the agent
- * writes with the agent's own privileges.
- *
- * Unlike the `/upload` this replaces, the endpoint also UPDATES: a body that names a `node_id`
- * rewrites that node instead of creating a second one, which is what lets the flow save the content
- * early and edit it from there on. The repository holds it to a window of two hours after the node
- * was created — after that the endpoint answers 403 and the editorial interface takes over.
- *
- * The request is proxied by the background worker to stay CORS-portable, exactly like `/generate`.
+ * Writing the flow's node through the metadata agent's `POST /nodes`: it creates the node, files it, writes the
+ * extended fields and runs the workflow steps, none of which the plain node API does for a session that is not the
+ * user's own. A body naming a `node_id` updates instead, which the repository allows for two hours.
  */
 @Injectable({ providedIn: 'root' })
 export class NodeWriteService {
@@ -88,14 +72,8 @@ export class NodeWriteService {
   private readonly agentApi = inject(MetadataAgentApiService);
 
   /**
-   * Write the values to the node, creating it where `nodeId` is absent.
-   *
-   * @param values  the field values as the flow holds them.
-   * @param payload the agent result they came from — it carries the envelope (content type,
-   *   `_origins`, `_source_text`) that the endpoint expects alongside the values, and which the
-   *   values alone do not contain.
-   * @param nodeId  the node to update; absent creates one.
-   * @param steps   what the call does besides writing the values.
+   * Write the values to the node, creating it where `nodeId` is absent. `payload` is the agent result they came from:
+   * it carries the envelope the endpoint expects alongside them, which the values alone do not contain.
    */
   async write(
     values: MdsValues,
@@ -104,13 +82,9 @@ export class NodeWriteService {
     steps: NodeWriteSteps = {},
   ): Promise<NodeWriteOutcome> {
     const body: Record<string, unknown> = {
-      // The payload in the shape the canvas states it in (`getMetadataForExport`): the envelope at
-      // the top level, and the properties — `cclom:title`, `ccm:wwwurl`, the quality criteria — one
-      // level in under `metadata`. That is where the endpoint reads them, so this is not the panel's
-      // own arrangement to make.
-      //
-      // Before the options below, so a payload key that happened to be named like one cannot
-      // displace it.
+      // The payload in the shape the canvas states it in: the envelope at the top level, the properties one level
+      // in under `metadata`, which is where the endpoint reads them. Before the options below, so a payload key
+      // named like one cannot displace it.
       ...toEnvelope(payload),
       metadata: toPayloadFields(values),
       // Stated explicitly in both directions: the endpoint's own default for the extended data is
@@ -134,21 +108,21 @@ export class NodeWriteService {
     try {
       const response = await this.browserExtension.saveNode(body, this.agentApi.baseUrl());
       if (!response.success) return { ok: false, error: response.error ?? 'Speichern fehlgeschlagen.' };
-      const result = response.result ?? {};
-      const ok = result.success === true;
+      const written = response.result ?? {};
+      const ok = written.success === true;
       return {
         ok,
-        node: result.node,
-        nodeFull: result.node_full ?? null,
-        created: result.node_created ?? undefined,
-        error: ok ? undefined : result.error ?? 'Speichern fehlgeschlagen.',
-        workflowError: ok ? this.workflowProblem(result.workflow) : undefined,
-        collectionError: ok ? this.collectionProblem(result.collections) : undefined,
+        node: written.node,
+        nodeFull: written.node_full ?? null,
+        created: written.node_created ?? undefined,
+        error: ok ? undefined : written.error ?? 'Speichern fehlgeschlagen.',
+        workflowError: ok ? this.workflowProblem(written.workflow) : undefined,
+        collectionError: ok ? this.collectionProblem(written.collections) : undefined,
         // Read from `preview` rather than from the answer's `error`, which carries the same reason
         // beside a `success: true`: only this says whether the picture was the thing that failed.
         previewError:
-          ok && result.preview && result.preview.success === false
-            ? result.preview.error ?? 'Vorschaubild nicht gesetzt.'
+          ok && written.preview && written.preview.success === false
+            ? written.preview.error ?? 'Vorschaubild nicht gesetzt.'
             : undefined
       };
     } catch (cause: unknown) {

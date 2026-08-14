@@ -6,13 +6,9 @@ import { MetadataAgentService } from './metadata-agent.service';
 import { OnlyOfficeDocumentService } from './onlyoffice-document.service';
 
 /**
- * The keywords, in both roles: the agent field that is generated (`field_id` of
- * `/extract-field`, defined in the agent's `core.json`) and the MDS widget the search filters on.
- * The same id on purpose — the agent's values are meant to land in that filter unchanged.
- *
- * `cclom:general_keyword` is a free-text keyword in the search index, so they go in verbatim —
- * unlike vocabulary widgets (e.g. `ccm:educationalcontext`), which would need valuespace keys
- * instead of labels.
+ * The keywords in both roles: the agent field that is generated and the MDS widget the search filters on.
+ * The same id on purpose, so the agent's values land in that filter unchanged — free-text keywords go in
+ * verbatim, unlike vocabulary widgets, which would need valuespace keys.
  */
 const KEYWORD_WIDGET = 'cclom:general_keyword';
 
@@ -23,11 +19,9 @@ const KEYWORD_WIDGET = 'cclom:general_keyword';
 const MAX_KEYWORDS = 8;
 
 /**
- * How many keywords the search *starts* with. All values of one widget go into a single search
- * criterion, and the repository's `ngsearch` query template joins them in a way that narrows the
- * result set — so a long list of agent-invented keywords matches nothing at all, while the two
- * best-supported ones still find promising content. Which two those are is decided by
- * {@link KeywordRankingService}, not by the agent's order. See {@link step} for the relaxation.
+ * How many keywords the search starts with. All values of one widget go into a single criterion, which the
+ * repository's query template joins so that the result set narrows — a long list of invented keywords
+ * matches nothing. Which ones those are is {@link KeywordRankingService}'s decision; {@link step} relaxes.
  */
 const SEARCH_KEYWORDS = 2;
 
@@ -38,19 +32,9 @@ const NO_KEYWORDS =
 const LOG = '[edu-sharing][keywords]';
 
 /**
- * Derives search words from the document the host page has open, for "Passende Inhalte finden":
- * ask the OnlyOffice plugin for the document content, have the metadata agent generate the keyword
- * field from its markdown and keep what it answered. Those become the keyword filter of
- * `<edu-sharing-search>`.
- *
- * Only that one field is requested ({@link MetadataAgentService.extractField}), not a whole
- * metadata set: everything else the agent could extract would be thrown away here, and a full run
- * takes considerably longer — which the user waits through, since the derivation starts when the
- * screen opens.
- *
- * The run deliberately does **not** become the app's {@link MetadataAgentService.lastRun}: this is
- * a search aid, not an erschließen result, so it must not turn up in the metadata editor nor count
- * as unsaved work.
+ * Derives search words from the document the host page has open: the plugin hands over its content, the agent
+ * generates the keyword field from it, and those become the keyword filter of the search element. Only that one
+ * field, since a full run takes far longer. The run does not become the app's `lastRun` — a search aid is no result.
  */
 @Injectable({ providedIn: 'root' })
 export class ContentSuggestionsService {
@@ -78,10 +62,9 @@ export class ContentSuggestionsService {
   readonly documentText = signal('');
 
   /**
-   * How far the search has been relaxed, because keywords the agent invented are often carried by
-   * no node at all: `0` = the first {@link SEARCH_KEYWORDS} keywords, `1` = the first one only,
-   * `2` = no keyword filter. Only ever advances (see {@link relax}), so a query can never
-   * ping-pong between two steps.
+   * How far the search has been relaxed, because invented keywords are often carried by no node at all: 0 is
+   * the first {@link SEARCH_KEYWORDS}, 1 the first one only, 2 no keyword filter. Only ever advances, so a
+   * query cannot ping-pong between two steps.
    */
   private readonly step = signal(0);
 
@@ -95,16 +78,9 @@ export class ContentSuggestionsService {
   readonly unfiltered = computed(() => this.step() === 2);
 
   /**
-   * The filters handed to `<edu-sharing-search>` as its `initialValues`: the searched keywords as
-   * values of the keyword widget, keyed by MDS widget id. Empty at the last step.
-   *
-   * Not the element's `searchString`: that goes in as an extra `ngsearchword` criterion AND-ed with
-   * the filters, so it only narrows further — as filter values the keywords are matched against the
-   * nodes' indexed keywords, which is what they are for.
-   *
-   * A `computed`, so the object identity only changes with the keywords or the step: the element's
-   * `initialValues` setter rebuilds its whole filter editor and re-runs the query on every set, so
-   * a fresh object per change detection would search in a loop.
+   * The filters handed to the search element as its `initialValues`, keyed by MDS widget id; empty at the last
+   * step. Not its `searchString`, which is AND-ed on top and only narrows further. A computed, so the object
+   * identity changes only with the keywords or the step — the setter re-runs the query on every set.
    */
   readonly filters = computed<Record<string, string[]>>(() => {
     const keywords = this.searchKeywords();

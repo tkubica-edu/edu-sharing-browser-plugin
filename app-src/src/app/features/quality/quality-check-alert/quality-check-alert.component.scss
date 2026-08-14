@@ -1,0 +1,244 @@
+// The same tokens the criteria panel states, since this block is embedded beside it and may travel on its own:
+// it reads the panel's variables where they exist and falls back to its own.
+:host {
+  --qc-accent: var(--es-blue, #003b7c);
+  --qc-text: var(--es-text, #1c2733);
+  --qc-muted: var(--es-muted, #63707e);
+  --qc-border: var(--es-border, #dfe3e8);
+  --qc-surface: var(--es-surface, #ffffff);
+  --qc-error: var(--es-error, #a3271f);
+  // Everything a machine put there — a box it filled in, its judgements, the wait for them — in one
+  // colour, so it is recognisable as such wherever it turns up.
+  --qc-ai: var(--es-ai, #7362ec);
+  // A machine's objection: the finding and the criteria it is about. Loud on purpose — it is the one
+  // thing in this view that asks for a decision instead of recording one.
+  --qc-alert: var(--es-danger, #c0392b);
+  // The finding's own ground. A fixed tint rather than one mixed from the colour above, so it stays
+  // legible under a theme that repaints only the foreground.
+  --qc-alert-surface: #fbe4e7;
+
+  display: block;
+  color: var(--qc-text);
+}
+
+// The one glyph this component takes from the panel's icon font (see IconDirective). Sized and lifted
+// to sit on the line of the text rather than on top of it.
+.ai-glyph {
+  font-size: 15px;
+  line-height: 1;
+  vertical-align: -3px;
+}
+
+// What the machines are doing or have found, in one block above the criteria. Its height is fixed
+// rather than following its content, so the criteria under it do not move when the wait turns into the
+// result — which happens a minute in, with the user's eyes on the list. In the machines' colour
+// throughout: the block reports a check, and only the objection inside it wears the alarm colour.
+.ai-check {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  min-height: 170px;
+  padding: 14px 12px;
+  border-radius: var(--es-radius, 8px);
+  background: rgba(115, 98, 236, 0.1);
+  color: var(--qc-ai);
+
+  // One height across every objection, however long its caption and its finding are: they are answered
+  // on the criteria below, which a resizing block would move out from under the pointer. A hard height,
+  // because that is what makes a long finding give way — it shrinks into what the rest leaves over and
+  // scrolls there (see .alert-body). Tall enough for the heading over a four-line sentence.
+  &.has-violation { height: 216px; }
+}
+
+// The wait: the house spinner alone, in no box and no bigger than it has to be. Nothing is being
+// reported yet, so nothing takes the room the report will need.
+.ai-check-waiting {
+  display: flex;
+  justify-content: center;
+  padding: var(--es-space-1, 4px) 0;
+
+  es-spinner { --es-spinner-size: 30px; }
+}
+
+// The all-clear, centred in the room the alert would otherwise fill.
+.ai-check-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+// The alert folded away: nothing left but the way back to it, in the machines' colour since that is
+// what it leads to. The room the alert took is given back to the criteria.
+.ai-check-handled {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--qc-ai);
+}
+
+// Reads as a link: it opens something up, it does not act on the content.
+.ai-check-toggle {
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+
+  &:focus-visible { outline: 2px solid currentcolor; outline-offset: 1px; }
+}
+
+// What the objection is about, over the finding itself: which of them is on screen, that it is one,
+// and which criterion it concerns.
+.alert-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+// Folds the alert away. Only rendered while every objection is answered (see the template), which is
+// also why it is a quiet glyph: by then the alert is a record, not a question.
+.alert-close {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+
+  i { font-size: 18px; }
+
+  &:focus-visible { outline: 2px solid currentcolor; outline-offset: 2px; }
+}
+
+// The glyph over the count. In the text colour like the sentence beside it: the head says what is
+// being asked, the box below it is what is red.
+.alert-mark {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--qc-text);
+}
+
+.alert-count {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.alert-glyph {
+  font-size: 20px;
+  line-height: 1;
+}
+
+// Title and sentence share one left edge, with the mark beside them as a column rather than between.
+.alert-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+// The same size as the sentence under it and only heavier: it labels that sentence, it does not title
+// the view.
+.alert-title {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--qc-text);
+}
+
+// What the user is asked to do about the finding — ordinary text, since it is an instruction and not
+// the objection itself.
+.alert-lead {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: var(--qc-text);
+}
+
+// The finding between the two arrows that lead through the rest. As tall as what it says and no taller,
+// but the first thing to give way when the block runs out of room — `stretch`, so that giving way
+// reaches the scrolling text inside it rather than stopping here.
+.alert-body {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 0;
+}
+
+// The finding itself, the only part of the block drawn as a box of its own and the only one in the
+// alarm colour: what surrounds it reports about the check, this is what the check found.
+.alert-finding {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 8px 10px;
+  border-radius: var(--es-radius, 8px);
+  background: var(--qc-alert-surface);
+  color: var(--qc-alert);
+
+  h4 {
+    flex: 0 0 auto;
+    margin: 0 0 2px;
+    font-size: 12px;
+    font-weight: 700;
+    color: inherit;
+    text-align: left;
+  }
+}
+
+// What the checks said, in the room the block has left over — several paragraphs at worst, so it
+// scrolls there instead of pushing everything else around.
+.alert-reasons {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  // The panel behind it stays put once the end of the text is reached.
+  overscroll-behavior: contain;
+}
+
+// One check's words. The line breaks it brought are kept.
+.alert-reason {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+
+  + .alert-reason { margin-top: 6px; }
+}
+
+// Drawn as a bare glyph: the arrows are part of the alert, not buttons sitting in it. Disabled while
+// there is only one finding, where there is nothing to page through.
+.alert-arrow {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+
+  i { font-size: 22px; }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  &:focus-visible { outline: 2px solid currentcolor; outline-offset: 2px; }
+}

@@ -38,12 +38,9 @@
     } catch (_) { /* ignore persistence failures */ }
   }
 
-  // Tell the worker whether this tab has a panel. It keeps that as a property of the TAB and puts
-  // the panel back after every navigation while it holds — the panel is an iframe in the page, so
-  // any page change destroys it, and the user expects it to stay open regardless.
-  //
-  // Reported from here because this is where opening and closing are decided; the worker only
-  // remembers. Best effort: without it the panel merely does not come back.
+  // Tell the worker whether this tab has a panel: it keeps that as a property of the tab and puts the panel back after
+  // every navigation, since the panel is an iframe in the page and any page change destroys it. Reported from here
+  // because this is where opening and closing are decided. Best effort — without it the panel merely stays away.
   function reportPanelState(open) {
     try {
       const reply = api.runtime.sendMessage({ action: 'panel.state', open: open });

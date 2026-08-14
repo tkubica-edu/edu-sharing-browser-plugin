@@ -8,15 +8,9 @@ import { AuthService } from './auth.service';
 import { MetadataAgentApiService } from './metadata-agent-api.service';
 
 /**
- * The pre-built web-component bundles packaged with the extension. Each name is both the
- * source folder (`scripts/<name>/`) and the folder in the built extension (see
- * `scripts/build.mjs`, and `web_accessible_resources` in `manifest.base.json`).
- *
- * - `edu` — the edu-sharing bundle (`edu-sharing-mds-editor-wrapper`,
- *   `edu-sharing-preview-sidebar`, `edu-sharing-nodes-selector`,
- *   `edu-sharing-add-with-connector`).
- * - `wlo` — the additional WLO bundle (`metadata-agent-canvas`), enabled by repository
- *   config (see BrowserExtensionCustomWebComponentService).
+ * The pre-built web-component bundles packaged with the extension: `edu` for the edu-sharing elements, `wlo`
+ * for the metadata-agent canvas that the repository config enables. Each name is both the source folder
+ * (`scripts/<name>/`) and the folder in the built extension.
  */
 export type WebComponentBundle = 'edu' | 'wlo';
 
@@ -44,21 +38,9 @@ export interface BundleStatus {
 const ELEMENT_TIMEOUT_MS = 15_000;
 
 /**
- * Loads the packaged web-component bundles into THIS document (the sidebar) — no iframe — so their
- * custom elements can be used as real tags. Each bundle is loaded at most once (memoised).
- *
- * Remote loading is unsupported by design: MV3 forbids remote code on extension pages and the
- * extension CSP is `script-src 'self'`, so every bundle ships as a `web_accessible_resource`.
- *
- * Constraints that shaped this (see README "Direct web-component embedding"):
- * - `window.__env.EDU_SHARING_API_URL` must be set BEFORE the edu bundle boots; its HttpClient
- *   freezes the value at bootstrap.
- * - A bundle's `polyfills` script is its own zone.js. The sidebar app is zoneless, so the first
- *   bundle to load provides Zone — a second load throws "Zone already loaded", hence the guard in
- *   {@link addScript}.
- * - `main` is loaded as an ES module so its relative dynamic chunk imports resolve against the
- *   bundle folder, not the sidebar document.
- * - The edu bundle's `scripts.js` (jQuery + globals) is a classic script and must run first.
+ * Loads the packaged bundles into this document — no iframe — so their custom elements can be used as real tags;
+ * each at most once. Remote loading is impossible by design: MV3 forbids remote code and the CSP is `script-src
+ * 'self'`. Load order and globals are constrained, see {@link publishEnvironment} and {@link addScript}.
  */
 @Injectable({ providedIn: 'root' })
 export class WebComponentBundleService {
@@ -151,16 +133,9 @@ export class WebComponentBundleService {
   }
 
   /**
-   * Publish the globals a bundle reads at bootstrap — both freeze their value there, so this has
-   * to happen before the scripts run.
-   *
-   * - `edu` reads `window.__env.EDU_SHARING_API_URL`, which MUST be absolute: the bundle passes it
-   *   through unchanged only when it starts with http(s):// (getAbsoluteEndpointUrl). A relative
-   *   value would resolve against this document's origin — the extension — so the top-level
-   *   connector navigation (…/eduservlet/connector) would become chrome-extension://ID/… and never
-   *   load. Better to refuse booting with a clear error than to produce that URL silently.
-   * - `wlo` reads `window.__ENV.agentUrl` for the metadata-agent API, falling back to its own
-   *   hardcoded default if unset — so this keeps it on the configured API.
+   * Publish the globals a bundle reads at bootstrap, where both freeze their value — so this runs before the scripts
+   * do. The edu bundle's API URL must be absolute: a relative one would resolve against the extension origin, which
+   * no connector navigation can load. The wlo bundle's agent URL keeps it on the configured API.
    */
   private publishEnvironment(bundle: WebComponentBundle): void {
     const globals = window as unknown as {
@@ -213,18 +188,9 @@ export class WebComponentBundleService {
 }
 
 /**
- * Load a bundle and track it as signals, for components that embed one of its elements:
- *
- * ```ts
- * protected readonly bundle = loadWebComponentBundle('edu', 'edu-sharing-preview-sidebar');
- * ```
- * ```html
- * @if (bundle.ready()) { <edu-sharing-preview-sidebar … /> }
- * ```
- *
- * Pass `elementTag` when the element must be defined before it is rendered (its inputs have
- * to be in place as it upgrades); omit it when the element is created imperatively.
- * Must be called in an injection context (i.e. as a field initializer).
+ * Load a bundle and track it as signals, for a component that embeds one of its elements. Pass `elementTag`
+ * where the element must be defined before it is rendered, so its inputs are in place as it upgrades; omit it
+ * for an element created imperatively. Must be called in an injection context.
  */
 export function loadWebComponentBundle(
   bundle: WebComponentBundle,

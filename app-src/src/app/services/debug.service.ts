@@ -10,10 +10,9 @@ import {
 import { BrowserExtensionService } from './browser-extension.service';
 
 /**
- * Node id the simulated document reports as the edited one. A deliberately fake default: the
- * repository load then fails silently and the app falls back to the bare id. Put a real node id
- * of the configured repository in the settings to let the whole flow run through, including saving
- * metadata onto that node.
+ * Node id the simulated document reports as the edited one. Deliberately fake by default: the repository load
+ * then fails silently and the app falls back to the bare id. A real node id in the settings lets the whole flow
+ * run through, saving included.
  */
 const DEFAULT_DOCUMENT_NODE_ID = 'debug-document-node';
 
@@ -60,14 +59,9 @@ const SIMULATED_LATENCY_MS = 250;
 const LOG = '[edu-sharing][debug]';
 
 /**
- * Development mode that stands in for the host-side OnlyOffice plugin: every page counts as an
- * insert host (see ConditionsService) and each `REQUEST_DOCUMENT_*` is answered right away with the
- * fixtures above, instead of being broadcast to a host page that would never reply.
- *
- * The answers are **fed in through the real inbound path** — a window message carrying the plugin's
- * own {@link PLUGIN_SOURCE} marker, which `AppComponent` routes to
- * `OnlyOfficeDocumentService.accept()`. So the `requestId` correlation, the identity handling and
- * the node hydration run exactly as in production; nothing downstream knows it is a fixture.
+ * Development mode standing in for the host-side OnlyOffice plugin: every page counts as an insert host and each
+ * `REQUEST_DOCUMENT_*` is answered from the fixtures above. The answers are fed in through the real inbound path,
+ * so the requestId correlation, the identity handling and the node hydration run exactly as in production.
  */
 @Injectable({ providedIn: 'root' })
 export class DebugService {
@@ -152,10 +146,9 @@ export class DebugService {
   }
 
   /**
-   * Post the envelope to our own window, where `AppComponent`'s single `window:message` listener
-   * picks it up — the same route a relayed plugin message takes. Delayed, so a caller that
-   * registers its pending request synchronously after sending is never surprised by an answer
-   * that arrived first.
+   * Post the envelope to our own window, where the shell's single message listener picks it up — the route a
+   * relayed plugin message takes. Delayed, so a caller that registers its pending request right after sending is
+   * never surprised by an answer that arrived first.
    */
   private emit(envelope: PluginEnvelope): void {
     const message = { source: PLUGIN_SOURCE, ...envelope };

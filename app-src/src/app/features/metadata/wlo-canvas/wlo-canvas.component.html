@@ -1,0 +1,44 @@
+<!-- `inert` locks the keyboard too (the class below only stops the pointer), so a locked canvas
+     cannot be edited by tabbing into it either. -->
+<div class="canvas-wrap" [attr.data-mode]="mode()" [class.is-locked]="locked()"
+     [attr.inert]="locked() ? '' : null">
+  @if (bundle.error()) {
+    <p class="es-error">WLO-Editor konnte nicht geladen werden: {{ bundle.error() }}</p>
+  } @else if (!bundle.ready()) {
+    <p class="es-muted">WLO-Editor wird geladen…</p>
+  }
+
+  <!-- Inside the @if so the element's inputs are applied before it is inserted and upgraded. Its own save and upload
+       buttons stay off because the footer owns saving; everything that differs between editing and previewing comes
+       from `config`. Locking takes the per-field actions and the reset button with it, since both would offer changes
+       that can no longer be saved. With a `sourceUrl` the canvas erschließt that page itself on mount. -->
+  @if (bundle.ready()) {
+    <metadata-agent-canvas
+      [metadataInput]="seed()"
+      [previewImage]="previewImage()"
+      [inputMode]="sourceUrl() ? 'url' : 'text'"
+      [url]="sourceUrl()"
+      [autoExtract]="!!sourceUrl()"
+      [layout]="config().layout"
+      [columns]="config().columns"
+      [borderless]="config().borderless"
+      [showInputArea]="config().showInputArea"
+      [showFooter]="config().showFooter"
+      [showFloatingControls]="config().showFloatingControls"
+      [showContentType]="config().showContentType"
+      [showContentTypeOnly]="config().showContentTypeOnly"
+      [readonly]="config().readonly || locked()"
+      [showFieldActions]="config().showFieldActions && !locked()"
+      [showResetButton]="config().showResetButton && !locked()"
+      [language]="'de'"
+      [highlightAi]="config().highlightAi"
+      [showStatusBar]="false"
+      [showSaveButton]="false"
+      [showUploadButton]="false"
+      [showJsonLoader]="false"
+      [showPageMode]="false"
+      (metadataChange)="onMetadataChange($event)"
+      (metadataSubmit)="onMetadataSubmit($event)"
+    ></metadata-agent-canvas>
+  }
+</div>

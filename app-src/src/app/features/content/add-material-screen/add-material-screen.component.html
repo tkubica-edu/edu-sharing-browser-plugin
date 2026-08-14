@@ -1,0 +1,35 @@
+<!-- The requirement, stated wherever it is not already met — which is not the same as the login gate below:
+     `authorized()` is also true where the panel skips the login, while the dialog still needs a repository session
+     to write. So it hangs on the session itself. -->
+@if (!auth.loggedIn()) {
+  <section class="es-hint-card material-hint">
+    <p class="es-muted">
+      Zum Hochladen einer Datei oder zum Speichern eines Links ist eine Anmeldung am Repository
+      erforderlich — der Inhalt wird unter deinem Konto angelegt.
+    </p>
+  </section>
+}
+
+<!-- Login required to write into the repository — reuse the shared gate. -->
+@if (auth.authorized()) {
+  <div class="material-wrap">
+    @if (error() || bundle.error(); as message) {
+      <p class="es-error">{{ message }}</p>
+    }
+
+    @if (saving()) {
+      <p class="es-muted">Der Inhalt wird hinzugefügt …</p>
+    } @else if (!bundle.ready() && !bundle.error()) {
+      <p class="es-muted">Dialog wird geladen …</p>
+    }
+
+    <!--
+      <edu-sharing-add-material> is created imperatively into #host rather than used as a template
+      tag, because its dialogData must be a property before it connects — see mount() and the
+      component comment.
+    -->
+    <div #host class="material-host"></div>
+  </div>
+} @else {
+  <es-login-gate></es-login-gate>
+}

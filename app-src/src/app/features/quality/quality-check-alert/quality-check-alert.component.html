@@ -1,0 +1,83 @@
+<!-- One shape per state: the wait, the all-clear, or the objections. `role="status"` throughout, because the wait
+     is a minute long and ends while the user is already reading the criteria below. -->
+@switch (shownState()) {
+  @case ('running') {
+    <!-- The house spinner and nothing else. What is being waited for is deliberately not said: the
+         criteria below stay answerable throughout, and a caption would claim the room the result is
+         about to need. The spinner is decoration (see SpinnerComponent), so the label sits here. -->
+    <div class="ai-check-waiting" role="status" aria-label="Die KI-Prüfung läuft">
+      <es-spinner></es-spinner>
+    </div>
+  }
+  @case ('handled') {
+    <!-- The alert folded away by the user. All that is left is the way back to it: the findings can
+         still be looked at, and a decision taken can be taken differently. What became of the check
+         stands beside every criterion it answered anyway. -->
+    <p class="ai-check-handled" role="status">
+      <button type="button" class="ai-check-toggle" (click)="openAlert()">
+        Hinweise der KI-Prüfung anzeigen
+      </button>
+    </p>
+  }
+  @case ('done') {
+    <div class="ai-check" role="status">
+      <p class="ai-check-state">
+        <i class="ai-glyph" esIcon="smart_toy"></i>
+        KI-Prüfung abgeschlossen
+      </p>
+    </div>
+  }
+  @case ('violations') {
+    <div class="ai-check has-violation" role="status" aria-live="polite">
+      @if (current(); as violation) {
+        <!-- One hint at a time, the arrows leading through the rest; the count says how many there
+             are, since the alert looks the same for one as for five. An information glyph rather
+             than an alarm: whether this is a problem is exactly what the user is being asked. -->
+        <div class="alert-head">
+          <span class="alert-mark">
+            <i class="alert-glyph" esIcon="info"></i>
+            <!-- `role="img"`, so the label really replaces the shorthand — "1/2" is read out as
+                 "one slash two", and a bare `aria-label` on a span is ignored. -->
+            <span class="alert-count" role="img" [attr.aria-label]="'Prüfhinweis ' + (shown() + 1)
+                  + ' von ' + violations().length">{{ shown() + 1 }}/{{ violations().length }}</span>
+          </span>
+          <div class="alert-text">
+            <h3 class="alert-title">Automatischer Prüfhinweis</h3>
+            <p class="alert-lead">
+              Bei der Prüfung wurde eine mögliche Auffälligkeit zu
+              „{{ captionOf(violation) }}“ erkannt. Bitte prüfe den Hinweis und
+              entscheide, ob das Kriterium erfüllt ist.
+            </p>
+          </div>
+          <!-- Only offered once everything here is answered: folding an open question away would
+               hide exactly what the content is being held back for. -->
+          @if (allDecided()) {
+            <button type="button" class="alert-close" (click)="closeAlert()"
+                    aria-label="Prüfhinweise ausblenden"><i esIcon="close"></i></button>
+          }
+        </div>
+
+        <div class="alert-body">
+          <button type="button" class="alert-arrow" (click)="showPrevious()"
+                  [disabled]="violations().length < 2"
+                  aria-label="Vorheriger Prüfhinweis"><i esIcon="chevron_left"></i></button>
+          <div class="alert-finding">
+            <h4>Erkannte Auffälligkeit</h4>
+            <!-- What the checks said, in their own words — one scrolling area for all of them,
+                 since several can object to the one criterion and they are all its argument. -->
+            <div class="alert-reasons">
+              @for (finding of violation.findings; track finding.scheme) {
+                <p class="alert-reason">„{{ findingText(finding) }}“</p>
+              }
+            </div>
+          </div>
+          <button type="button" class="alert-arrow" (click)="showNext()"
+                  [disabled]="violations().length < 2"
+                  aria-label="Nächster Prüfhinweis"><i esIcon="chevron_right"></i></button>
+        </div>
+        <!-- The hint is answered on the criterion's own box below, not here: it asks whether the
+             criterion is met, and that is the question that box already is. -->
+      }
+    </div>
+  }
+}

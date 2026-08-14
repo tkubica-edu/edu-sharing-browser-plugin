@@ -1,20 +1,13 @@
-// The metadata agent's payload as a whole: the envelope it states its values against, the export
-// shape it hands the payload over in, and the WLO extended fields that carry that shape onto a node.
-//
-// Shared by the two ways a curated content is written — the agent's own `/upload`
-// (MetadataUploadService) and the panel writing the node itself (CurationService.save) — so both
-// state the same payload.
+// The metadata agent's payload as a whole: the envelope it states its values against, the export shape it is
+// handed over in, and the WLO extended fields that carry that shape onto a node. Shared by both ways a
+// curated content is written, so each states the same payload.
 
 import { MdsValues } from './mds-values';
 
 /**
- * The envelope keys a payload carries alongside the field values: which set the values are read
- * against, and where they came from. They travel at the top level, next to the `metadata` the fields
- * themselves are in (see {@link toExportPayload}).
- *
- * `_source_text` is not among them although the payload carries it: the page's whole raw text is
- * carried separately (as `extended_text` in a request, as `ccm:oeh_extendedText` on a node), and
- * would otherwise travel twice.
+ * The envelope keys a payload carries alongside the field values: which set the values are read against, and
+ * where they came from. They travel at the top level, next to the `metadata` the fields are in.
+ * `_source_text` is left out although the payload carries it — the raw text travels separately.
  */
 export const ENVELOPE_KEYS = [
   'contextName',
@@ -46,15 +39,9 @@ export const EXTENDED_DATA_FIELD = 'ccm:oeh_extendedData';
 export const EXTENDED_TEXT_FIELD = 'ccm:oeh_extendedText';
 
 /**
- * The field values as the payload's `metadata`, each as the list the property is.
- *
- * Deliberately NOT unwrapped to a bare value when there happens to be one of it: how many values a
- * property holds right now says nothing about how many it *takes*. `ccm:oeh_buffet_criteria` is a
- * list of criteria, and stating the single one that is ticked as a bare string makes it a different
- * property than the one with two ticked.
- *
- * An empty one is left out altogether — it says nothing, and sending it would clear a field the
- * editor never touched.
+ * The field values as the payload's `metadata`, each as the list the property is. Deliberately not unwrapped
+ * to a bare value where there happens to be one of it: how many values a property holds says nothing about
+ * how many it takes. An empty one is left out — sending it would clear a field the editor never touched.
  */
 export function toPayloadFields(values: MdsValues): Record<string, unknown> {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value?.length));
@@ -72,10 +59,9 @@ export function toEnvelope(payload: Record<string, unknown> | null): Record<stri
 }
 
 /**
- * The payload in the shape the canvas states it in (`getMetadataForExport`): the envelope at the top
- * level, the properties one level in under `metadata`. That is the shape the agent's `/upload` reads
- * and the one `ccm:oeh_extendedData` is expected to hold, so it is not the panel's own arrangement
- * to make.
+ * The payload in the shape the canvas states it in: the envelope at the top level, the properties one level
+ * in under `metadata`. That is the shape the agent's `/upload` reads and `ccm:oeh_extendedData` is expected
+ * to hold, so it is not the panel's own arrangement to make.
  */
 export function toExportPayload(
   values: MdsValues,
@@ -85,17 +71,9 @@ export function toExportPayload(
 }
 
 /**
- * The WLO extended fields for a node: the content type, the whole payload as JSON, and the raw text
- * the metadata was read from.
- *
- * These are the fields the metadata set does not define, so they are written in a call of their own
- * that does not obey it — a write that obeys the set drops them (see
- * RepositoryNodeService.writeExtendedData).
- *
- * A field is only stated where there is something to state: an empty one would clear what the node
- * carries. `ccm:oeh_lrt` in particular is taken over where the payload names it and otherwise left
- * alone — mapping a content type to a learning resource type is the agent's own table, and guessing
- * one would write a value from the wrong vocabulary.
+ * The WLO extended fields for a node: content type, the whole payload as JSON and the raw text the metadata was read
+ * from. The metadata set does not define them, hence a call of its own that does not obey it. A field is stated only
+ * where there is something to state, and `ccm:oeh_lrt` only where the payload names it.
  */
 export function toExtendedFields(
   values: MdsValues,

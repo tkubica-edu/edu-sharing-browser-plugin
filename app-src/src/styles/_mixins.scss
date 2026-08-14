@@ -35,13 +35,6 @@
   word-break: break-word;
 }
 
-@mixin card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--es-space-2);
-}
-
 // ---- Form controls ---------------------------------------------------------
 @mixin input {
   width: 100%;
@@ -84,11 +77,9 @@
   padding: 4px;
 }
 @mixin btn-small { padding: 6px 10px; font-size: 12px; }
-@mixin btn-large { width: 100%; padding: 12px; font-size: 14px; margin-bottom: 12px; }
 
 // ---- Small inline elements -------------------------------------------------
 @mixin badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
-@mixin badge-guest { background: #eef1f4; color: var(--es-muted); }
 @mixin badge-user { background: #e2f0e8; color: var(--es-success); }
 
 @mixin chip {

@@ -21,15 +21,9 @@ const LOG_METALOOKUP = '[edu-sharing][metalookup]';
 const LOG_CONTENT_JUDGE = '[edu-sharing][contentjudge]';
 
 /**
- * How far one judge got with this content:
- *
- * - `idle` — not asked yet;
- * - `running` — asked, still out;
- * - `done` — answered;
- * - `skipped` — never asked, because this content holds nothing it could judge;
- * - `failed` — asked and did not answer (unreachable, a missing credential, a timeout).
- *
- * The last two are the ones worth showing: without them an empty result looks like "found nothing".
+ * How far one judge got with this content. `skipped` means it was never asked, because the content holds
+ * nothing it could judge, and `failed` that it was asked and did not answer — those two are worth showing,
+ * since without them an empty result looks like "found nothing".
  */
 export type JudgeState = 'idle' | 'running' | 'done' | 'skipped' | 'failed';
 
@@ -42,17 +36,9 @@ export interface JudgeStatus {
 }
 
 /**
- * Has the content's quality judged, and holds what came back for whoever asks later.
- *
- * A service rather than the view's own business, because of *when* it runs: the judgement is started as
- * soon as the content is erschlossen (CurationService.analyze), and it is read several steps later, in
- * the Qualitätsprüfung (QualityCriteriaComponent). ContentJudge takes about a minute for a set of
- * master gates — run from the view, that minute would be the user waiting; run from here it passes while
- * they walk through the preview and the metadata.
- *
- * Two judges, side by side and independent of each other: MetalookUp measures the resource itself,
- * ContentJudge has an LLM assess its text against evaluation schemes. Which schemes those are follows
- * from the quality criteria — see {@link configuredSchemes}.
+ * Has the content's quality judged and holds what came back. A service rather than the view's business because of
+ * when it runs: started as soon as the content is erschlossen and read several steps later, so the minute it takes
+ * passes while the user walks the flow. Two independent judges, one measuring the resource, one assessing its text.
  */
 @Injectable({ providedIn: 'root' })
 export class QualityJudgeService {
@@ -87,17 +73,9 @@ export class QualityJudgeService {
   private started = false;
 
   /**
-   * Have the content judged, once. Fire and forget: the caller gets on with the flow, and the answer is
-   * picked up from {@link evaluation} whenever the step that shows it is reached.
-   *
-   * Once **per content**, not per call: whoever asks second is the flow passing this point again, not a
-   * new question — and it is {@link reset} that says a different content is in hand now. That is what
-   * lets the step which *shows* the judgement ask for it too, as a fallback for a content that never
-   * came through an analysis (one opened from the Verlauf, say) without judging the same page twice.
-   *
-   * The resource is the caller's to name and is never guessed from the open tab: the content the flow
-   * works on and the page the browser happens to show are two different things (see
-   * CurationService.judgeQuality).
+   * Have the content judged, once per content — fire and forget, with the answer picked up from
+   * {@link evaluation} wherever it is shown; {@link reset} says a different content is in hand. The resource is
+   * the caller's to name and never guessed from the open tab, which shows a different thing.
    */
   start(resource: MetalookupResource): void {
     if (this.started) return;
@@ -122,10 +100,9 @@ export class QualityJudgeService {
     const schemes = configuredSchemes();
     console.log(`${LOG_QUALITY} schemes`, schemes);
     await Promise.allSettled([
+      // ContentJudge is switched off: one judgement costs far more than the criteria it answers are worth. Everything
+      // it feeds is still in place, so {@link runContentJudge} can join this list again.
       this.runMetalookup(resource)
-      // ContentJudge is switched off: one judgement costs far more than the criteria it answers are
-      // worth. Put the call back once that is fixed — everything it feeds is still in place.
-      // this.runContentJudge(resource, schemes.schemes)
     ]);
     this.contentJudgeStatus.set({
       judge: 'ContentJudge',
@@ -199,17 +176,9 @@ export class QualityJudgeService {
   }
 
   /**
-   * How this content is handed to ContentJudge — which of its three input sources fits follows from what
-   * the content *is*, and that is exactly what identifies it here:
-   *
-   * - an address means the content is a web page, and a page is judged by address: the service fetches
-   *   it whole, rather than being handed the extract this extension could read off the open tab;
-   * - only a node id means the repository holds the content as a file, so the service reads it from
-   *   there — its own configured repository, which has to be the same one the panel works against;
-   * - neither leaves the text, read off the open page. A content that is not reachable from outside at
-   *   all (behind a login, on an intranet) is judged this way and no other.
-   *
-   * `null` when even that yields nothing to judge.
+   * How this content is handed to ContentJudge, which follows from what it is: an address means a web page the
+   * service fetches whole, a node id alone means a file in its own configured repository, and neither leaves the
+   * text read off the open page. Null when even that yields nothing.
    */
   private async contentJudgeInput(
     resource: MetalookupResource

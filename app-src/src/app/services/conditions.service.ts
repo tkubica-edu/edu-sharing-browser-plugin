@@ -7,12 +7,9 @@ import { CurationService } from './curation.service';
 import { DebugService } from './debug.service';
 
 /**
- * URL patterns that mark an insert host — the OnlyOffice editor, where searching applies and where
- * the plugin speaks for the open document. Two of them: the editor as the repository opens it
- * (`…/eduservlet/connector`), and the standalone integration the examples use.
- *
- * Matched on the path, never on the whole URL: a page merely *about* OnlyOffice
- * (de.wikipedia.org/wiki/OnlyOffice) is a page like any other.
+ * URL patterns that mark an insert host — the OnlyOffice editor, where searching applies and the plugin speaks for
+ * the open document: the editor as the repository opens it, and the standalone integration. Matched on the path,
+ * never on the whole URL, so a page merely *about* OnlyOffice stays a page like any other.
  */
 const INSERT_HOST_PATTERNS = [/\/src\/tools\/onlyoffice/, /\/eduservlet\/connector/];
 
@@ -48,15 +45,9 @@ export class ConditionsService {
   /** The active browser tab's URL (set by the shell on boot). */
   readonly activeUrl = signal<string | null>(null);
 
-  /** True while the metadata editor screen is open. */
-  readonly editMode = signal(false);
-
   /**
-   * Whether it is still open what the active page's content is. Set by PageRecognitionService and, on
-   * an insert host, by the request for the host's document (see AppComponent).
-   *
-   * True to begin with: on boot nothing has answered yet, and only once this is false does the absence
-   * of a content mean there is none.
+   * Whether it is still open what the active page's content is. True to begin with: on boot nothing has answered
+   * yet, and only once this is false does the absence of a content mean there is none.
    */
   readonly recognizingContent = signal(true);
 
@@ -96,10 +87,6 @@ export class ConditionsService {
   // save (the node is created on save, so the metadata option must open on a result too).
   readonly hasEditableMetadata = this.curation.hasEditableMetadata;
 
-  // A curation that has not been saved yet. Narrower than the above: a saved node has editable
-  // metadata but nothing pending.
-  readonly hasCuratedDraft = this.curation.hasUnsavedWork;
-
   // A content read off a page in this session, saved or not — what the preview step of "Inhalt
   // erschließen" works on, which it keeps doing after that step has written it.
   readonly hasCuratedContent = this.curation.hasCuratedResult;
@@ -120,9 +107,7 @@ export class ConditionsService {
     hasActiveNode: this.hasActiveNode(),
     hasDetectedNode: this.hasDetectedNode(),
     hasEditableMetadata: this.hasEditableMetadata(),
-    hasCuratedDraft: this.hasCuratedDraft(),
     hasCuratedContent: this.hasCuratedContent(),
-    editMode: this.editMode(),
     recognizingContent: this.recognizingContent(),
     browserExtensionCustomWebComponent: this.browserExtensionCustomWebComponent(),
     qualityCriteriaMet: this.qualityCriteriaMet()

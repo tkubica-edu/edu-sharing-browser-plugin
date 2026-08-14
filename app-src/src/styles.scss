@@ -27,11 +27,6 @@ button {
 // ---- Shared, define-once primitives (namespaced `es-*` — see _mixins.scss) --
 .es-card { @include m.card; }
 .es-hint-card { @include m.hint-card; }
-.es-card-head {
-  @include m.card-head;
-  h2 { font-size: 14px; margin: 0; }
-}
-
 .es-input { @include m.input; }
 .es-field-label { @include m.field-label; }
 .es-req { color: var(--es-danger); }
@@ -41,10 +36,8 @@ button {
 .es-btn--tonal { @include m.btn-tonal; }
 .es-btn--text { @include m.btn-text; }
 .es-btn--small { @include m.btn-small; }
-.es-btn--large { @include m.btn-large; }
 
 .es-badge { @include m.badge; }
-.es-badge--guest { @include m.badge-guest; }
 .es-badge--user { @include m.badge-user; }
 
 .es-chip { @include m.chip; }

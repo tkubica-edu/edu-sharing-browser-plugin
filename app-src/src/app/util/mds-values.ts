@@ -24,12 +24,9 @@ export function toMdsValues(values: Record<string, unknown> | null | undefined):
 }
 
 /**
- * Convert a metadata-agent payload into MDS editor values: keep only namespaced property
- * keys (those containing a `:`, e.g. `cclom:title`) and drop envelope fields (`url`,
- * `description`, `metadataset`, `_origins`, …).
- *
- * `edu-sharing-mds-editor-wrapper` expects already-normalized `currentValues`; without this
- * conversion a scalar field gets indexed like an array and renders as "0".
+ * Convert a metadata-agent payload into MDS editor values: keep only namespaced property keys and drop the
+ * envelope fields. The wrapper expects already-normalized `currentValues` — without this a scalar field gets
+ * indexed like an array and renders as "0".
  */
 export function toMdsEditorValues(payload: Record<string, unknown> | null | undefined): MdsValues {
   const namespaced = Object.fromEntries(

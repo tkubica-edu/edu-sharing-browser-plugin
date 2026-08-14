@@ -1,10 +1,6 @@
-// The MDS editor's metadata suggestions, as the wrapper's `suggestions` input takes them.
-//
-// The wrapper accepts the repository's own suggestion payload from outside (see
-// `mds-editor-wrapper.suggestions` → `MdsEditorInstanceService.setExternalSuggestions`), which is
-// how this panel gets the agent's fields marked as KI-Vorschläge: the editor's own path to them
-// needs the mongo-plugin, the b-api and a toolpermission, and generates its own suggestions on top
-// (see KI-MARKIERUNG.md). Handing them in needs none of that and works for any repository.
+// The MDS editor's metadata suggestions, as the wrapper's `suggestions` input takes them. Handing them in from
+// outside is how the panel gets the agent's fields marked as KI-Vorschläge: the editor's own path to them needs
+// the mongo-plugin, the b-api and a toolpermission, and generates suggestions of its own on top.
 
 import { toMdsEditorValues } from './mds-values';
 
@@ -27,12 +23,9 @@ export interface NodeSuggestions {
 }
 
 /**
- * The properties a metadata payload's `_origins` attributes to the metadata agent — the fields whose
- * values are a machine's proposal rather than the user's or the repository's statement.
- *
- * Only what the map says, and only namespaced keys: a payload without `_origins` yields nothing here,
- * rather than declaring everything the agent's (which is how the WLO canvas reads it — see
- * CurationService's `fieldOrigins`, which is why it always writes the map out in full).
+ * The properties a payload's `_origins` attributes to the metadata agent — the fields whose values are a
+ * machine's proposal. Only what the map says, and only namespaced keys: a payload without `_origins` yields
+ * nothing here rather than declaring everything the agent's.
  */
 export function aiFieldsOf(payload: Record<string, unknown> | null | undefined): string[] {
   const origins = (payload?.['_origins'] ?? {}) as Record<string, unknown>;
@@ -40,11 +33,9 @@ export function aiFieldsOf(payload: Record<string, unknown> | null | undefined):
 }
 
 /**
- * The agent's fields of a payload as suggestions for one node — `null` when it has none, so the
- * caller can leave the editor's input unset rather than hand it an empty offer.
- *
- * One suggestion per value, because that is the grain the widgets work at: a multi-value widget
- * offers each of them as a chip to take or leave.
+ * The agent's fields of a payload as suggestions for one node; null where it has none, so the caller can leave
+ * the editor's input unset rather than hand it an empty offer. One suggestion per value, which is the grain
+ * the widgets work at.
  */
 export function aiSuggestionsFor(
   payload: Record<string, unknown> | null | undefined,

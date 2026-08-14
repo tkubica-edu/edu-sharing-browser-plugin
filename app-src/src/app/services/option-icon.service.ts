@@ -7,13 +7,9 @@ import { ScreenId, SectionId } from '../model/navigation';
 export type IconId = SectionId | ScreenId;
 
 /**
- * Full-width, stroke-style icons (24×24), keyed by section / screen id — the four whose motif the icon
- * font has nothing for. Everything else is a ligature (see {@link MATERIAL_ICONS}) and has no entry
- * here.
- *
- * Only the tab bar still draws one of these: it is the one place that falls back to an SVG, and
- * `find-content` is the only one of the four that reaches a tab bar today. The others are kept for
- * the same reason — they are tab ids, and a section that gains a second tab shows its tabs' icons.
+ * Full-width, stroke-style icons (24×24) keyed by section / screen id — the few whose motif the icon font has
+ * nothing for; everything else is a ligature (see {@link MATERIAL_ICONS}). Only the tab bar still draws these,
+ * and the entries it does not reach today are kept because they are tab ids.
  */
 const ICONS: Partial<Record<IconId, string>> = {
   // A page with what is done to it: the options as a ticked line, the search for a fitting content as
@@ -31,12 +27,9 @@ const ICONS: Partial<Record<IconId, string>> = {
 };
 
 /**
- * Google Material icons, so the panel's rows and tabs read like the rest of edu-sharing. Names are
- * Material Symbols ligatures, rendered by the `esIcon` directive.
- *
- * Every entry the menu, the topbar and the Add-Content rows can show is named here — those three
- * render nothing else, so a section added to any of them needs its name in this map. Only a tab id
- * may be missing: the tab bar draws {@link ICONS} where it is.
+ * Google Material icons, so the panel's rows and tabs read like the rest of edu-sharing; the names are Material
+ * Symbols ligatures rendered by the `esIcon` directive. Every entry the menu, the topbar and the Add-Content rows
+ * can show is named here — only a tab id may be missing, since the tab bar draws {@link ICONS} where it is.
  */
 const MATERIAL_ICONS: Partial<Record<IconId, string>> = {
   // The main menu's entries.

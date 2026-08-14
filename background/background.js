@@ -6,10 +6,8 @@
 /* global EDU_SHARING_CONFIG, EDU_SHARING_DEV_FIXTURES */
 
 /**
- * Fallback metadata agent, for a call that arrives without one. The agent is a repository's own
- * B-API proxy, and which repository that is belongs to the sidebar (see MetadataAgentApiService),
- * so it names the base in every message — this is what is used when it does not. The default
- * repository's proxy, which is what the sidebar currently names anyway.
+ * Fallback metadata agent for a call that arrives without one: which repository's B-API proxy the agent is belongs to
+ * the sidebar, so it names the base in every message. This is what is used when it does not.
  */
 const API_URL = (typeof EDU_SHARING_CONFIG !== 'undefined' && EDU_SHARING_CONFIG.getApiUrl())
   || 'https://repository.staging.openeduhub.net/edu-sharing/rest/bapi/api/v1/proxy/metadata-agent-canvas';
@@ -33,10 +31,8 @@ const DEV_MODE_DEFAULT = false;
 const DEV_LATENCY_MS = 300;
 
 /**
- * Whether the metadata agent's answers are faked instead of asked for (see EDU_SHARING_DEV_FIXTURES).
- *
- * Read per call rather than cached: the worker outlives the sidebar and is not restarted when the
- * switch is flipped, so a cached value would keep faking after the mode was turned off.
+ * Whether the metadata agent's answers are faked instead of asked for. Read per call rather than cached: the worker
+ * outlives the sidebar and is not restarted when the switch is flipped.
  */
 async function devModeEnabled() {
   try {
@@ -71,12 +67,9 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_M
 }
 
 /**
- * Fetch options for a call to the metadata agent, which sits behind the repository's own proxy and
- * authorizes by repository session (see MetadataAgentApiService).
- *
- * `credentials: 'include'` is what puts the session cookie on the request: a worker's fetch defaults
- * to `same-origin`, and the agent's base never is this worker's origin — so without it every call
- * arrives unauthenticated, however valid the panel's session is.
+ * Fetch options for a call to the metadata agent, which sits behind the repository's own proxy and authorizes by
+ * repository session. `credentials: 'include'` is what puts the session cookie on the request — a worker's fetch
+ * defaults to `same-origin`, and the agent's base never is this worker's origin.
  */
 function agentRequest(options = {}) {
   return { credentials: 'include', ...options };
@@ -119,14 +112,9 @@ browser.action.onClicked.addListener((tab) => { togglePanel(tab); });
 
 // PANEL SURVIVAL ACROSS A PAGE CHANGE
 //
-// The panel is an iframe injected INTO the page, so EVERY navigation destroys it — a link the user
-// clicks just as much as a page change the panel asked for itself. Being open is therefore treated
-// as a property of the TAB, not of the document: while it holds, this worker puts the panel back
-// after every load. Only the worker outlives a load, so this is its job.
-//
-// panel-host.js reports the state it puts the page into ('panel.state'), so opening and closing stay
-// in one place — the content script decides, this only remembers. The state lives in storage, not in
-// a variable: an MV3 worker is evicted between events.
+// The panel is an iframe injected into the page, so every navigation destroys it. Being open is therefore a property
+// of the tab: while it holds, this worker puts the panel back after every load. panel-host.js decides and reports
+// that state; this only remembers it, in storage, because an MV3 worker is evicted between events.
 
 const OPEN_PANELS_KEY = 'eduSharingOpenPanels';
 
@@ -186,11 +174,9 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
 });
 
 /**
- * Tell the sidebar the tab's URL changed.
- *
- * A broadcast to the extension's own pages, so it names the tab it is about — every open panel hears
- * it and only the one sitting in that tab acts on it (see BrowserExtensionService.announcedUrl).
- * Having no listener is not an error: a tab whose panel is closed has nobody to tell.
+ * Tell the sidebar the tab's URL changed. A broadcast to the extension's own pages, so it names the tab it is about
+ * and only the panel sitting there acts on it. Having no listener is not an error — a tab whose panel is closed has
+ * nobody to tell.
  */
 function announceUrl(tabId, url) {
   return browser.runtime.sendMessage({ action: 'tab.url', tabId, url }).catch(() => {});
@@ -245,15 +231,9 @@ const SCREENSHOT_MAX_WIDTH = 1200;
 const PANEL_ELEMENT_ID = 'edusharing-panel-root';
 
 /**
- * How much of the tab's viewport the page itself occupies, as a fraction of its width.
- *
- * The panel is docked INTO the page rather than beside it, so a capture of the viewport shows this
- * extension next to the content unless that share is cut away. A fraction rather than a pixel count:
- * the captured image is in device pixels, and their ratio to the CSS pixels measured here depends on
- * the display and on the page zoom.
- *
- * `null` when the page cannot be measured — then nothing is captured at all, since a picture that
- * might have the panel in it is worse than none.
+ * How much of the tab's viewport the page itself occupies, as a fraction of its width: the panel is docked into the
+ * page, so a capture would show this extension next to the content. A fraction rather than a pixel count, since the
+ * captured image is in device pixels. Null where the page cannot be measured, and then nothing is captured at all.
  */
 async function pageWidthFraction(tabId) {
   try {
@@ -286,11 +266,8 @@ function blobToDataUrl(blob) {
 }
 
 /**
- * A base64 data URL as a blob, decoded by hand rather than by `fetch`.
- *
- * `fetch` would be the short way and is the wrong one here: this worker runs under the extension's
- * own content security policy, whose `connect-src` names http and https — a request for a `data:`
- * URL is refused by it, which is what `captureVisibleTab` hands back.
+ * A base64 data URL as a blob, decoded by hand rather than by `fetch`: this worker runs under the extension's own
+ * content security policy, whose `connect-src` names http and https, so a request for a `data:` URL is refused.
  */
 function dataUrlToBlob(dataUrl) {
   const match = /^data:([^;,]+);base64,(.*)$/s.exec(dataUrl ?? '');
@@ -321,14 +298,9 @@ async function cropToPage(captured, fraction) {
 }
 
 /**
- * The visible part of a tab as a picture, with the panel's share of the viewport cut away.
- *
- * Only the *visible* part: `captureVisibleTab` photographs the viewport, so this is the page as the
- * user has it in front of them, not the whole document. Deliberately not scrolled to the top first —
- * the page belongs to the user, and a capture must not move it under them.
- *
- * A bonus, never a reason for the analysis to fail: every failure answers `null` and the content
- * simply keeps having no picture.
+ * The visible part of a tab as a picture, with the panel's share of the viewport cut away. Only the visible part, and
+ * deliberately not scrolled to the top first — the page belongs to the user, and a capture must not move it under
+ * them. A bonus, never a reason for the analysis to fail: every failure answers null.
  */
 async function captureVisiblePage(tab) {
   try {
@@ -359,13 +331,9 @@ function hasPreviewImage(result) {
 // /generate PROXY
 
 /**
- * The content-type schema every extraction is filled against, named by its file as the agent
- * expects it (`/info/schemas/<context>/<version>` lists them; the single-field extraction names
- * `core.json` the same way, see MetadataAgentService).
- *
- * Named rather than left to the endpoint's own `auto`, which would let the agent pick a profile per
- * page — the panel curates learning material, so that is the profile its fields belong to.
- * `include_core` adds the core fields (title, description, keywords …) beside it.
+ * The content-type schema every extraction is filled against, named by its file as the agent expects it. Named rather
+ * than left to the endpoint's own `auto`, which would let the agent pick a profile per page — the panel curates
+ * learning material. `include_core` adds the core fields beside it.
  */
 const GENERATE_SCHEMA_FILE = 'learning_material.json';
 
@@ -400,13 +368,9 @@ function buildGenerateBody(pageData, language) {
 }
 
 /**
- * `GET /health` — asked BEFORE every /generate.
- *
- * The agent sits behind the repository's `…/bapi/api/v1/proxy/metadata-agent-canvas`, which
- * authorizes by repository session. A base that is wrong, or a session the proxy refuses, would
- * otherwise only show up as a failing /generate — after the full generate timeout, and reported as
- * if the extraction had failed. The health call turns that into an immediate, unambiguous answer,
- * and it carries the session like the call it guards.
+ * `GET /health` — asked before every /generate. The agent sits behind the repository's proxy, which authorizes by
+ * repository session, so a wrong base or a refused session would otherwise only show up after the full generate
+ * timeout and read as a failed extraction. This turns that into an immediate answer, and carries the session too.
  */
 async function callHealth(apiUrl) {
   if (await devModeEnabled()) return fakeAnswer('GET /health', EDU_SHARING_DEV_FIXTURES.agentHealth);

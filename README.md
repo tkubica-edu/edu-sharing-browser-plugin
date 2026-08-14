@@ -351,7 +351,12 @@ before the scripts run — mirroring `window.__env.EDU_SHARING_API_URL` for the 
 
 ## Architecture
 
-- **Sidebar UI** (`app-src/`) — an Angular 21 standalone app, built to `sidebar/`.
+- **Sidebar UI** (`app-src/`) — an Angular 21 standalone app, built to `sidebar/`. Every component sits in
+  a folder of its own with its `.ts`, `.html` and `.scss`, grouped by domain: `template/` for the panel's
+  frame (topbar actions, tab bar, session and assistant bars, main menu), `features/<domain>/` for the
+  steps of the flow (`auth`, `content`, `curation`, `metadata`, `quality`, `filing`, `overview`,
+  `assistant`, `settings`), and `shared/components/` for what more than one domain renders. Services,
+  `model/` and `util/` are flat, as they carry no templates.
 - **Panel host** (`content/panel-host.js`) — injected on toolbar click; mounts the
   sidebar as a docked, resizable `<iframe>` (drag the left edge; width persists).
   This is the cross-browser replacement for the Chromium-only side-panel API.

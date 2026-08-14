@@ -1,10 +1,6 @@
-// Faked answers of the metadata agent, for the dev mode (see `devModeEnabled` in
-// background/background.js). Loaded into the background worker beside config.js; the sidebar has its
-// own fixtures for the services it calls itself (app-src/src/app/util/dev-fixtures.ts).
-//
-// A real answer, captured from the agent rather than invented: the Erschließung of the Wikipedia
-// article on Dresden, with the envelope (`processing`, `_origins`, `_source_text`) the panel reads
-// besides the metadata fields.
+// Faked answers of the metadata agent for the dev mode, loaded into the background worker beside config.js; the
+// sidebar has its own fixtures for the services it calls itself. A real answer captured from the agent rather than
+// invented, with the envelope (`processing`, `_origins`, `_source_text`) the panel reads besides the fields.
 
 const EDU_SHARING_DEV_FIXTURES = {
   /** `GET /health` of the metadata agent. */

@@ -1,12 +1,7 @@
-// The navigation registry: the flow is a list of *sections*, each with one or more *tabs* (sub
-// steps). Visibility is driven purely by the current conditions — no section is "owned" by a
-// flow. The same registry feeds the main menu, the tab bar, the navigation guards and the
-// landing logic.
-//
-// Several of the sections are the big steps of the content flow — Bearbeitungsmodus → An
-// Redaktionen weiterleiten / Persönliche Ablage → Qualitätsprüfung → Inhaltsübersicht. They are not
-// listed in the main menu: they are entered from a node (created, selected or detected), see
-// ContentFlowService.
+// The navigation registry: sections, each with one or more tabs (sub steps). Visibility is driven purely
+// by the current conditions, and the same registry feeds the main menu, the tab bar, the guards and the
+// landing logic. The big steps of the content flow are not listed in the menu — they are entered from a
+// node, see ContentFlowService.
 
 /** A leaf screen: exactly one component is rendered for it. */
 export type ScreenId =
@@ -75,15 +70,10 @@ export interface Conditions {
   /** Editable metadata exists: an active node OR a fresh /generate result not yet saved.
    *  (The node is created on the first save, so the metadata tab opens on a result too.) */
   hasEditableMetadata: boolean;
-  /** A fresh /generate result that has not been written to a node yet — a content still being
-   *  curated. Narrower than {@link hasEditableMetadata}, which a saved node satisfies too. */
-  hasCuratedDraft: boolean;
-  /** A content this session read off a page: a metadata agent run that succeeded. Wider than
-   *  {@link hasCuratedDraft} — it still holds once the content has been written to a node, which is
-   *  what keeps the Erschließung's own steps returnable after that first save. */
+  /** A content this session read off a page: a metadata agent run that succeeded. It still holds once
+   *  that content has been written to a node, which is what keeps the Erschließung's own steps
+   *  returnable after the first save. */
   hasCuratedContent: boolean;
-  /** The metadata editor is currently open. */
-  editMode: boolean;
   /** The recognition has not answered yet what this page's content is (PageRecognitionService).
    *  Only once this is false does "no content" mean there is none. */
   recognizingContent: boolean;
@@ -128,10 +118,9 @@ export interface AppSection {
   description: SectionText;
   visible: (conditions: Conditions) => boolean;
   /**
-   * Whether the section can be entered right now; defaults to always. Like a tab's
-   * {@link SectionTab.enabled}, a section that does not apply *at the moment* stays **visible and
-   * disabled** rather than disappearing: the menu is the list of what the panel can do, and a row
-   * that vanishes takes its explanation with it.
+   * Whether the section can be entered right now; defaults to always. A section that does not apply at
+   * the moment stays visible and disabled rather than disappearing: a row that vanishes takes its
+   * explanation with it.
    */
   enabled?: (conditions: Conditions) => boolean;
   /**
@@ -145,13 +134,9 @@ export interface AppSection {
   /** Listed as an entry of the main menu. Without it the section is only reachable from the flow. */
   menu?: boolean;
   /**
-   * The section needs a session of the user's own ({@link Conditions.hasSession}), so a guest cannot
-   * be served by it: it acts *as* a person — writing into their storage, listing what is theirs — and
-   * a guest session belongs to none.
-   *
-   * It stays enterable nonetheless: what a guest gets there is the login (LoginGateComponent, rendered
-   * in place of the screen), because "sign in and carry on" is the answer to this, and a row that only
-   * says no leaves the user to find the way to the login themselves.
+   * The section acts as a person — writing into their storage, listing what is theirs — so a guest
+   * session cannot serve it. It stays enterable: what a guest gets there is the login
+   * (LoginGateComponent) rather than a row that only says no.
    */
   requiresSession?: boolean;
   /**
@@ -176,11 +161,8 @@ export interface AppSection {
    */
   topbar?: boolean;
   /**
-   * A section that must never be *returned* to: entering it starts something rather than showing
-   * something, so re-entering it would start that again — for "Inhalt erstellen", whose screen opens
-   * the OnlyOffice create-dialog the moment it mounts. Back (and a resume after a page change) walks
-   * past such a step to the one behind it, so the user cannot be caught in the dialog they just left.
-   * It is still entered normally; only the way back skips it.
+   * A section that must never be returned to, because entering it starts something rather than showing
+   * something. Back and resume walk past it to the step behind; it is still entered normally.
    */
   oneWay?: boolean;
 }
@@ -271,19 +253,10 @@ export const SECTIONS: readonly AppSection[] = [
     label: 'Inhalt erschließen',
     description: 'Aktuelle Seite als Inhalt erfassen',
     visible: requiresLogin(),
-    // Two kinds of page have nothing to erschließen, and the entry stays listed on both to say which:
-    //
-    // - Edu-Sharing itself: its pages are the repository showing what it already holds, never a
-    //   source to read metadata off. That holds for the whole of it, so the option is off there for
-    //   good — not just where a node was recognised.
-    // - any page whose content was already detected: the repository holds it (PageRecognitionService
-    //   found it by URL) or the host has it open, and *that* content is what the panel offers to work
-    //   on under "Inhalt erkannt". Curating again would produce a second node for the same page.
-    //
-    // And not while the recognition is still running: whether this page is the second kind is exactly
-    // what it is answering (it matches the URL against the nodes that already carry it), so starting
-    // the Erschließung before that answer is in is what would produce the duplicate node the second
-    // rule exists to prevent.
+    // Nothing to erschließen on two kinds of page, and the entry stays listed to say which: edu-sharing's
+    // own pages show what the repository already holds, and a page whose content was already detected is
+    // offered under "Inhalt erkannt" — curating it again would produce a second node for it. Not while the
+    // recognition runs either: that is what answers whether this page is the second kind.
     enabled: (c) => !c.onEduSharing && !c.hasDetectedNode && !c.recognizingContent,
     disabledHint: (c) =>
       c.onEduSharing
@@ -326,12 +299,9 @@ export const SECTIONS: readonly AppSection[] = [
     // asks for the picture and the title, and the user never left "Inhalt erschließen" for that.
     label: 'Inhalt erschließen',
     description: 'Vorschaubild und Titel des erschlossenen Inhalts prüfen',
-    // The second step of "Inhalt erschließen", reached the moment its run succeeded — and the step
-    // that WRITES the content: confirming the picture and the title creates the node, and everything
-    // after it edits that node (see ActionBarService).
-    //
-    // So the condition is the curated content and not the unsaved draft: the step stays returnable
-    // once the content has a node, and it then works on that node rather than on the stand-in.
+    // The second step of "Inhalt erschließen", and the one that writes the content: confirming picture and
+    // title creates the node. The condition is the curated content rather than the unsaved draft, so the
+    // step stays returnable once that node exists and then works on it.
     visible: requiresLogin((c) => c.hasCuratedContent),
     tabs: [{ id: 'curation-preview', label: 'Vorschau' }]
   },
@@ -366,12 +336,9 @@ export const SECTIONS: readonly AppSection[] = [
     label: 'Bearbeitungsmodus',
     description: 'Der Inhalt ist im Connector geöffnet und wird dort bearbeitet',
     visible: requiresLogin((c) => c.hasActiveNode),
-    // Two ways to reach content for the document being edited, because they answer different
-    // questions: the nodes selector lets the user go and find something themselves (Suche,
-    // Sammlungen, Workspace), the extended search *suggests* what fits the document (keywords
-    // derived from its text). Both hand the chosen node to the host page, so either can be used at
-    // any point. Searching comes first — it is the one that works without reading the document,
-    // and it is what the user is here for; the suggestions are the offer on top.
+    // Two ways to reach content for the document being edited: the nodes selector to go and find something,
+    // the extended search to be offered what fits the document's text. Searching comes first — it works
+    // without reading the document.
     tabs: [
       { id: 'search', label: 'Inhalt auswählen' },
       { id: 'find-content', label: 'Passende Inhalte' }
@@ -381,14 +348,9 @@ export const SECTIONS: readonly AppSection[] = [
     id: 'editorial-forward',
     label: 'An Redaktionen weiterleiten',
     description: 'Den Inhalt an eine oder mehrere Redaktionen weiterleiten',
-    // Editable metadata, NOT a node: where the content goes is decided before it is written, and the
-    // save that writes it comes at the end of the Qualitätsprüfung behind this — so a freshly curated
-    // content reaches this step before it has a node at all.
-    //
-    // The browser extension custom web component is what the forwarding exists for: the groups are
-    // the editorial teams a submitted content is judged by, and where nothing is submitted there is
-    // nobody to forward to. Without it the step falls away and the flow goes on to the filing behind
-    // it.
+    // Editable metadata, not a node: where the content goes is decided before it is written. The forwarding
+    // exists for the browser extension custom web component — the groups are the editorial teams a
+    // submitted content is judged by, so without it the step falls away.
     visible: requiresLogin((c) => c.hasEditableMetadata && c.browserExtensionCustomWebComponent),
     tabs: [{ id: 'editorial-forward', label: 'An Redaktionen weiterleiten' }]
   },
@@ -437,17 +399,10 @@ export const SECTIONS: readonly AppSection[] = [
     description: 'Qualität prüfen und Metadaten bearbeiten',
     // An active node OR a fresh /generate result (the node is created by this step's own save).
     visible: requiresLogin((c) => c.hasEditableMetadata),
-    // Two views of the same content, in the order they are worked through: what the content's
-    // quality is, and then the metadata that is edited off the back of it. The footer walks between
-    // them (Zurück / Weiter), so the two are one step and not two — see ActionBarService.
-    //
-    // The last step before the Inhaltsübersicht, and therefore the one that writes the content:
-    // everything the flow collected is saved on the way out of the Metadaten view.
-    //
-    // The quality view belongs to the browser extension custom web component, like the forwarding
-    // step does: the criteria are what an editorial team judges a submitted content by, and where
-    // nothing is submitted there is nobody they are answered for. Without it the step is the
-    // Metadaten view alone — which is why the section itself needs no condition of its own.
+    // Two views of the same content in the order they are worked through, walked between by the footer, so
+    // the two are one step. The last step before the Inhaltsübersicht and therefore the one that writes the
+    // content. The quality view belongs to the browser extension custom web component, like the forwarding
+    // does; without it the step is the Metadaten view alone, which is why the section needs no condition.
     tabs: [
       { id: 'quality-check', label: 'Qualität', visible: (c) => c.browserExtensionCustomWebComponent },
       {

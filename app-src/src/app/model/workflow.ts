@@ -5,10 +5,9 @@
 
 export enum WorkflowStatus {
   /**
-   * The handover: the content is passed to the editorial queue to be checked. Outside the numbered
-   * ladder below — it occurs in live data but is not one of the repository config's workflow states
-   * — and it is what the metadata agent's `start_review_workflow` writes, so the panel's two routes
-   * hand a content over under the same status.
+   * The handover: the content is passed to the editorial queue to be checked. Outside the numbered ladder below —
+   * it occurs in live data but is not one of the repository config's states — and it is what the agent's
+   * `start_review_workflow` writes, so both routes hand a content over under the same status.
    */
   TO_CHECK = '200_tocheck',
 
@@ -33,12 +32,8 @@ export enum WorkflowStatus {
 }
 
 /**
- * The queue {@link WorkflowStatus.TO_CHECK} addresses — the WLO upload management, which is who
- * checks a content submitted from here. The same authority the metadata agent hands over to
- * (`DEFAULT_WORKFLOW_RECEIVER`), so a content reaches the same desk along either route.
- *
- * A WLO group, so it is only addressed where the panel is a WLO one (see
- * `BrowserExtensionCustomWebComponentService`): elsewhere the status is recorded without a receiver
- * rather than addressed to a group that repository does not have.
+ * The queue {@link WorkflowStatus.TO_CHECK} addresses — the WLO upload management, and the same authority the
+ * metadata agent hands over to, so a content reaches the same desk along either route. A WLO group, so it is only
+ * addressed where the panel is a WLO one; elsewhere the status is recorded without a receiver.
  */
 export const REVIEW_RECEIVER = ['GROUP_ORG_WLO-Uploadmanager'] as const;

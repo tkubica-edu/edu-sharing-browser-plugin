@@ -15,13 +15,9 @@ export interface PageSource {
 }
 
 /**
- * What the content script reads off the open page (`content/content.js`), as far as anything here uses
- * it. It carries a good deal more — the page's Open Graph, breadcrumbs, tags, JSON-LD — which
- * {@link PageData.formattedText} already contains as text.
- *
- * The three texts are the same page in decreasing preparation: `formattedText` is the metadata blocks
- * followed by the main content, `mainContent` is that content alone, `text` the fallback for a page
- * whose main content could not be told apart from its chrome.
+ * What the content script reads off the open page, as far as anything here uses it; it carries more, which
+ * {@link PageData.formattedText} already contains as text. The three texts are the same page in decreasing
+ * preparation: metadata blocks plus main content, that content alone, and a whole-page fallback.
  */
 export interface PageData {
   url: string;
@@ -87,12 +83,9 @@ export class BrowserExtensionService {
   readonly available = typeof browser !== 'undefined' && !!browser.runtime?.id;
 
   /**
-   * The URL the background worker last announced for THIS tab; null until one arrives.
-   *
-   * It announces every URL change of the tab, **including the ones a page makes in place**: an
-   * edu-sharing page routes with the History API, so its URL becomes another page's without a load —
-   * this panel is never torn down and would otherwise keep working on the URL it booted with. Only
-   * the worker sees that happen (see background.js, `tab.url`).
+   * The URL the background worker last announced for this tab; null until one arrives. It announces every
+   * change including the ones a page makes in place — an edu-sharing page routes with the History API, and
+   * only the worker sees that happen, so this panel would otherwise keep working on its boot URL.
    */
   readonly announcedUrl = signal<string | null>(null);
 
@@ -114,11 +107,9 @@ export class BrowserExtensionService {
   }
 
   /**
-   * Ask the background worker to analyze the active tab.
-   *
-   * `apiUrl` is which metadata agent to call: it follows from the configured repository, which only
-   * the panel knows (see MetadataAgentApiService) — the worker has no repository of its own and
-   * falls back to the agent's public deployment when told nothing.
+   * Ask the background worker to analyze the active tab. `apiUrl` names which metadata agent to call: it
+   * follows from the configured repository, which only the panel knows — told nothing, the worker falls
+   * back to the agent's public deployment.
    */
   async analyzeActiveTab(language: string, apiUrl?: string): Promise<AnalyzeResponse> {
     const response = (await browser.runtime.sendMessage({
@@ -130,10 +121,8 @@ export class BrowserExtensionService {
   }
 
   /**
-   * Ask the background worker to POST a node body to the metadata agent's `/nodes`, which writes
-   * the curated content into the repository itself — creating the node, or updating the one the
-   * body names. The reply carries the endpoint's own answer verbatim (see
-   * {@link SaveNodeResponse}). `apiUrl` as in {@link analyzeActiveTab}.
+   * Ask the background worker to POST a node body to the metadata agent's `/nodes`, which writes the
+   * curated content into the repository itself. The reply carries the endpoint's answer verbatim.
    */
   async saveNode(body: Record<string, unknown>, apiUrl?: string): Promise<SaveNodeResponse> {
     const response = (await browser.runtime.sendMessage({
@@ -146,11 +135,9 @@ export class BrowserExtensionService {
 
 
   /**
-   * The id of the tab this panel sits in, as the background worker sees it (`sender.tab`). Null
-   * outside an extension context.
-   *
-   * Not the same as {@link getActiveTab}: a panel restored on a background tab would read the wrong
-   * one there. Needed to keep per-tab state apart — see SessionResumeService.
+   * The id of the tab this panel sits in, as the background worker sees it; null outside an extension
+   * context. Not {@link getActiveTab}: a panel restored on a background tab would read the wrong one, and
+   * per-tab state has to be kept apart (see SessionResumeService).
    */
   async getOwnTabId(): Promise<number | null> {
     const response = (await browser.runtime
@@ -195,10 +182,9 @@ export class BrowserExtensionService {
   }
 
   /**
-   * Ask the host page for the content of the document it has open (OnlyOffice: the edited
-   * document). The answer arrives asynchronously as a `DOCUMENT_CONTENT` message carrying the
-   * same `requestId` — see OnlyOfficeDocumentService, which owns that correlation. Returns false
-   * when there is no host page to ask.
+   * Ask the host page for the content of the document it has open. The answer arrives asynchronously as a
+   * `DOCUMENT_CONTENT` message with the same `requestId` (see OnlyOfficeDocumentService). False when there
+   * is no host page to ask.
    */
   requestDocumentContent(requestId: string): boolean {
     return this.postToHost({ type: 'edusharing-request-document-content', requestId });
@@ -210,12 +196,9 @@ export class BrowserExtensionService {
   }
 
   /**
-   * Take the active tab to `url`, and have the panel reopened on the new page.
-   *
-   * Driven by the background worker, not by the host page: the panel is an iframe in the page being
-   * navigated, so it is destroyed by the load — the worker is the only party that outlives it and can
-   * inject the panel again. What the panel was *doing* is restored separately, from storage
-   * (SessionResumeService), so it comes back in the same state.
+   * Take the active tab to `url` and have the panel reopened there. Driven by the background worker rather
+   * than by the host page: the panel is an iframe in the page being navigated, so only the worker outlives
+   * the load. What it was doing is restored separately (SessionResumeService).
    */
   async navigateTab(url: string): Promise<void> {
     await browser.runtime.sendMessage({ action: 'tabs.navigate', url });

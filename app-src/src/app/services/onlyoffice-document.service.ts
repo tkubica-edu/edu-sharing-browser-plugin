@@ -25,21 +25,9 @@ const UNSUPPORTED = 'Nur Textdokumente können ausgelesen werden (keine Tabellen
 const READ_FAILED = 'Das Dokument konnte nicht ausgelesen werden.';
 
 /**
- * Request/response bridge to the document the host page has open (the OnlyOffice plugin).
- *
- * Requests go through the panel host (`BrowserExtensionService`) and are correlated by `requestId`,
- * since several may be in flight and the answer is a plain window message. The plugin is an
- * optional background plugin the user can switch off, so every request is bounded by a timeout —
- * without one a disabled plugin leaves the caller hanging forever.
- *
- * Inbound envelopes are not read here: `AppComponent` owns the single `window:message` listener and
- * hands the DOCUMENT_* events to {@link accept}.
- *
- * The plugin only reports the node id, so this service loads that node once and derives title,
- * permalink and write permission from it — see {@link documentNode}.
- *
- * In debug mode requests never leave the sidebar: {@link DebugService} answers them with fixtures
- * through the same inbound path — see {@link send}.
+ * Request/response bridge to the document the host page has open. Requests are correlated by `requestId`, since
+ * several may be in flight and the answer is a plain window message, and each is bounded by a timeout, because a
+ * switched-off plugin never replies. The plugin reports only the node id, so this loads that node once.
  */
 @Injectable({ providedIn: 'root' })
 export class OnlyOfficeDocumentService {
@@ -199,10 +187,8 @@ export class OnlyOfficeDocumentService {
   }
 
   /**
-   * Ask for the document — from the host page, or from the simulator while debug mode is on. The
-   * simulated answer takes the same route back (a window message with the plugin's source
-   * marker), so only this one line differs between the two worlds. False means there is nobody
-   * to ask.
+   * Ask for the document — from the host page, or from the simulator while debug mode is on, whose answer takes the
+   * same route back. False means there is nobody to ask.
    */
   private send(kind: DocumentRequestKind, requestId: string): boolean {
     if (this.debug.enabled()) return this.debug.answerDocumentRequest(kind, requestId);

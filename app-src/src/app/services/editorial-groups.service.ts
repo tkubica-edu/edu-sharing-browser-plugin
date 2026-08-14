@@ -13,12 +13,9 @@ import { Collection, CurationService, EditorialTarget } from './curation.service
 const CONFIG_VARIABLE = 'browserExtensionEditorialGroups';
 
 /**
- * One editorial group a content can be forwarded to: the collection it *is*, plus the collection
- * folders inside it.
- *
- * A group without folders takes the content directly. A group with folders expects one to be picked
- * — the content then goes into that folder rather than into the group's own collection, which is
- * where a collection keeps what it holds anyway (see {@link EditorialTarget}).
+ * One editorial group a content can be forwarded to: the collection it is, plus the collection folders inside
+ * it. A group without folders takes the content directly; with folders one is picked, and the content goes
+ * there rather than into the group's own collection.
  */
 export interface EditorialGroup {
   /** The group's own collection — the target where no folder is picked. */
@@ -32,13 +29,9 @@ export interface EditorialGroup {
   /** The collections inside the group; empty when it has none. */
   folders: readonly Collection[];
   /**
-   * The group as the embedded selector shows it: its own collection node followed by the collection
-   * nodes inside it, each pointed at the group as its parent.
-   *
-   * Tree *data*, not a list of ids — the selector hands it straight to its tree's data source, which
-   * builds the hierarchy from each node's `parent.id` (the same shape the selector builds for its own
-   * roots). So the nodes are kept as the repository handed them over, rather than reduced to
-   * {@link folders}. See NodesSelectorComponent.collectionTree.
+   * The group as the embedded selector shows it: its own collection node followed by the nodes inside it, each
+   * pointed at the group as its parent. Tree data rather than ids — the selector builds the hierarchy from each
+   * node's `parent.id`, so the nodes stay as the repository handed them over.
    */
   collectionTree: readonly Node[];
 }
@@ -66,11 +59,9 @@ function toCollection(node: Node): Collection {
 }
 
 /**
- * The editorial groups a content can be forwarded to, as the repository config names them (see
- * {@link CONFIG_VARIABLE}) — read once, then held for the session.
- *
- * Loaded on demand rather than at boot: the collections are read through the repository session, and
- * the only step that shows them is behind the login gate anyway (EditorialForwardScreenComponent).
+ * The editorial groups a content can be forwarded to, as the repository config names them — read once, then
+ * held for the session. Loaded on demand rather than at boot: the collections are read through the repository
+ * session, and the only step that shows them sits behind the login anyway.
  */
 @Injectable({ providedIn: 'root' })
 export class EditorialGroupsService {
@@ -221,11 +212,9 @@ export class EditorialGroupsService {
   }
 
   /**
-   * The collections inside a group, as the repository hands them over — the selector needs the nodes
-   * themselves, not just their names (see {@link EditorialGroup.collectionTree}).
-   *
-   * An empty list on failure: it reads as "no collection to choose", which is the harmless of the two
-   * outcomes — the content then goes to the group itself rather than into one that could not be shown.
+   * The collections inside a group as the repository hands them over, since the selector needs the nodes
+   * themselves. An empty list on failure reads as "no collection to choose", so the content goes to the group
+   * itself rather than into one that could not be shown.
    */
   private async loadChildren(id: string): Promise<Node[]> {
     try {

@@ -19,17 +19,9 @@ const LATENCY_MS = 300;
 const LOG = '[edu-sharing][devmode]';
 
 /**
- * Development mode that answers the LLM-backed services from fixtures instead of asking them: the
- * metadata agent's `/health` and `/generate` (faked in the background worker, which is where those
- * calls go out) and ContentJudge's `/health/` and `/evaluate/` (see `util/dev-fixtures.ts`).
- *
- * What it saves is time per run: an Erschließung is a minute of LLM work, a set of master gates
- * several — paid again on every reload of the panel, and for a flow whose next steps have nothing to
- * do with either service. The switch is in the settings and off by default, so the saving is there
- * for the asking while a normal run always gets the real answers.
- *
- * Distinct from {@link DebugService}, which stands in for the host-side OnlyOffice plugin: that one
- * fakes what the *browser* cannot deliver here, this one what a *service* takes too long to.
+ * Development mode that answers the LLM-backed services from fixtures instead of asking them, saving the minute or
+ * more of LLM work each run costs; off by default. Distinct from {@link DebugService}, which fakes what the browser
+ * cannot deliver here rather than what a service takes too long to.
  */
 @Injectable({ providedIn: 'root' })
 export class DevModeService {

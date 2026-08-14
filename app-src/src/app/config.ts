@@ -1,10 +1,7 @@
 /**
- * Which way a scheme's number has to go for the criterion it judges to count as met:
- *
- * - `atLeast` — the higher the better. The 0–5 rubrics, and the legal gates whose top value is the
- *   compliant one (`criminal_law_gate` 2 = LEGAL, `data_privacy_gate` 3 = COMPLIANT).
- * - `atMost` — the lower the better. `protection_of_minors_gate` answers an age rating (0, 6, 12, 16,
- *   18, and 100 for jugendgefährdend), so its scale runs the other way.
+ * Which way a scheme's number has to go for the criterion it judges to count as met: `atLeast` where the higher
+ * value is the better one (the 0–5 rubrics and the legal gates), `atMost` where the lower one is — the minors gate
+ * answers an age rating, so its scale runs the other way.
  */
 export type SchemeDirection = 'atLeast' | 'atMost';
 
@@ -20,11 +17,8 @@ export interface CriterionScheme {
 /** One of MetalookUp's checks, and the criterion it answers — see `APP_CONFIG.qualityMetalookupRules`. */
 export interface MetalookupRule {
   /**
-   * How the check is recognised in the answer: the key it reports its result under
-   * (`featureExtractions[].propertyId`), which each of MetalookUp's sidecars carries as a deployment
-   * variable of its own (`PROPERTY_ID` / `DYNACONF_PROPERTY_ID`).
-   *
-   * A key this list does not name is not read at all — see `measurementOf` in `util/quality-schemes.ts`.
+   * How the check is recognised in the answer: the key it reports its result under, which each of MetalookUp's
+   * sidecars carries as a deployment variable of its own. A key this list does not name is not read at all.
    */
   readonly propertyId: string;
   /** What the check is called where its result is shown; MetalookUp reports no name of its own. */
@@ -70,26 +64,9 @@ export const APP_CONFIG = {
    */
   contentJudgeCrawlerMethod: 'simple' as 'simple' | 'browser',
   /**
-   * Which ContentJudge scheme judges which quality criterion, and how its answer is read — the map
-   * that both turns the criteria of the Qualitätsprüfung into what the service is asked for and turns
-   * what it answers back into a verdict per criterion (see `schemesForCriteria`,
-   * `judgementsForCriteria`).
-   *
-   * Keyed by the criterion's id as the metadata set states it: a node property for the knock-out
-   * criteria (`virtual:unmetLegalCriteria`, where every value *is* a property), a bare value id for
-   * the editorial ones (`ccm:oeh_buffet_criteria`, values of that one property).
-   *
-   * `null` says the deployment has no scheme for that criterion; it is then reported as unjudged
-   * rather than answered by a scheme that means something else. Listed all the same, so the map shows
-   * every criterion that was considered.
-   *
-   * Every scheme here is a MASTER GATE, which aggregates all part checks of its area — thorough, but
-   * many LLM passes each. Where that takes too long, the single-pass scheme of the same area is named
-   * beside it; its scale is the same 0–5 one, so only the id changes.
-   *
-   * The thresholds follow each scheme's own scale (`output_range` of its definition): the rubrics run
-   * 0–5, where 3 is "Befriedigend" — the point at which the criterion is taken as answered rather
-   * than merely not failed.
+   * Which ContentJudge scheme judges which quality criterion and how its answer is read, keyed by the criterion's id as
+   * the metadata set states it; `null` marks a criterion the deployment has no scheme for, which is then reported as
+   * unjudged. Every scheme here is a master gate — thorough but many LLM passes, so a single-pass one is named beside it.
    */
   qualityCriterionSchemes: {
     // single pass: strafrecht_gate. 0–2, 2 = LEGAL, 1 = Prüfung erforderlich.
@@ -120,18 +97,9 @@ export const APP_CONFIG = {
     accessible: null
   } as Record<string, CriterionScheme | null>,
   /**
-   * Which of MetalookUp's checks answers which quality criterion — the counterpart of
-   * `qualityCriterionSchemes` for the other judge (see `judgementsForCriteria`).
-   *
-   * The list is what is read of the answer: an extraction under a key it does not name is discarded,
-   * however much the answer carries. So one entry, for the one check whose key the deployment states
-   * distinctly — the AXE audit of the rendered page under `ccm:accessibilitySummary`. It is also the
-   * criterion an LLM cannot answer at all: ContentJudge has no scheme for Barrierearmut, so
-   * MetalookUp is its only judge.
-   *
-   * Several checks may answer the same criterion; each is then shown and counted on its own, and the
-   * criterion is only met while none of them fails. A check the answer does not carry is simply absent,
-   * and one that reports no value ("No files to extract") does not count either way.
+   * Which of MetalookUp's checks answers which quality criterion — the counterpart of `qualityCriterionSchemes` for the
+   * other judge, and also what is read of the answer, so an extraction under an unnamed key is discarded. Hence one
+   * entry: the AXE audit is the only judge Barrierearmut has. A criterion is met only while none of its checks fails.
    */
   qualityMetalookupRules: [
     {
@@ -145,17 +113,9 @@ export const APP_CONFIG = {
   defaultRepositoryUrl: 'https://repository.staging.openeduhub.net/edu-sharing',
  //defaultRepositoryUrl: 'http://repository.127.0.0.1.nip.io:8100/edu-sharing',
   /**
-   * The WLO metadata set.
-   *
-   * The panel's forms are built from it wherever the panel is a WLO one, and from the repository's own
-   * default set everywhere else — which of the two applies is not this constant's to say, see
-   * `BrowserExtensionCustomWebComponentService.metadataSet`. The quality criteria are the exception:
-   * they are WLO criteria (`virtual:unmetLegalCriteria`, `ccm:oeh_buffet_criteria`) and no other set
-   * defines them, so their view reads this one directly.
-   *
-   * Named rather than resolved from the repository, because a repository's default is not its WLO set:
-   * staging's default is "Contentbuffet", which knows neither those criteria nor the fields the panel
-   * curates.
+   * The WLO metadata set: the panel's forms are built from it wherever the panel is a WLO one, and from the
+   * repository's default set elsewhere. The quality criteria are the exception — no other set defines them, so their
+   * view reads this one directly. Named rather than resolved, because a repository's default is not its WLO set.
    */
   metadataSet: 'mds_oeh',
   storageKeys: {
@@ -195,13 +155,9 @@ export function toAgentProxyUrl(repositoryBase: string): string {
 }
 
 /**
- * Where the metadata agent is — the base every one of its endpoints is appended to (`/health`,
- * `/generate`, `/upload`, `/extract-field`), for the panel as much as for the background worker it
- * hands the address to (see MetadataAgentApiService).
- *
- * The default repository's own proxy, which authorizes by repository session. The commented line is
- * an agent running locally on its own deployment, which authorizes nothing: swap the two to develop
- * against it, and note that a session of *this* repository is then no longer what makes it answer.
+ * Where the metadata agent is — the base every one of its endpoints is appended to, for the panel as much as for
+ * the background worker it hands the address to. The default is the repository's own proxy, which authorizes by
+ * repository session; the commented line is a local agent, which authorizes nothing.
  */
 export const METADATA_AGENT_API_URL = toAgentProxyUrl(APP_CONFIG.defaultRepositoryUrl);
 // export const METADATA_AGENT_API_URL = 'http://localhost:8010';

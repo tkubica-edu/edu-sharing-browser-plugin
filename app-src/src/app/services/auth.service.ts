@@ -40,12 +40,9 @@ export class AuthService {
   readonly apiRootUrl = computed(() => toApiRootUrl(this.repositoryUrl()));
 
   /**
-   * The gate every feature is behind: a real session, OR a repository that enables the additional
-   * web component — there the session is brought by the embedding host, so the panel must never ask
-   * for credentials. {@link loggedIn} stays the plain fact of a repository session and is what the
-   * login screen reports; everything that only needs to know *whether it may
-   * work* (option visibility, the landing view, the screens' gates, the API-backed actions) uses
-   * this instead.
+   * The gate every feature is behind: a real session, or a repository that enables the additional web component,
+   * where the session is brought by the embedding host and the panel must never ask for credentials.
+   * {@link loggedIn} stays the plain fact of a repository session and is what the login screen reports.
    */
   readonly authorized = computed(() => this.loggedIn() || this.browserExtensionCustomWebComponent.enabled());
 
@@ -68,12 +65,9 @@ export class AuthService {
     await this.restoreSession();
   }
 
-  // Restore an existing repository session on startup. The library authenticates via a
-  // session cookie — Basic auth is sent only on the login request; every later request
-  // carries the cookie (withCredentials). That cookie survives sidebar reloads, so we
-  // ask the backend for the current login info and, if a valid non-guest session is
-  // still active, mark the user logged in. No credentials are stored; if the cookie is
-  // gone (browser restart, Safari ITP, server logout) this simply resolves to guest.
+  // Restore an existing repository session on startup: the library authenticates by session cookie, which survives
+  // a sidebar reload — so the backend is asked for the current login info and a valid non-guest session is taken
+  // up. No credentials are stored; without the cookie this resolves to guest.
   private async restoreSession(): Promise<void> {
     try {
       const info = await firstValueFrom(

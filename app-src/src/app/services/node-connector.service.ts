@@ -45,10 +45,9 @@ export class NodeConnectorService {
   }
 
   /**
-   * The connector this node opens in, or null — the branch point of the content flow, and the
-   * source of the URL that editing navigates to ({@link getConnectorUrl}). Resolves null when the
-   * connector list cannot be read: without that knowledge the flow must not claim the node is being
-   * edited elsewhere.
+   * The connector this node opens in, or null — the branch point of the content flow and the source of the URL that
+   * editing navigates to. Null as well when the connector list cannot be read: without that knowledge the flow must
+   * not claim the node is being edited elsewhere.
    */
   async connectorFor(node: Node): Promise<Connector | null> {
     try {

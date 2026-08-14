@@ -3,6 +3,8 @@
 // configuration (APP_CONFIG.qualityCriterionSchemes / .qualityMetalookupRules) — what is here is the
 // reading of them, so the rule has one place and the view that asks stays free of it.
 
+import type { MdsValue } from 'ngx-edu-sharing-api';
+
 import { APP_CONFIG, CriterionScheme, MetalookupRule, SchemeDirection } from '../config';
 // Type-only, so this leaf utility does not pull the services (and Angular with them) into the bundle.
 import type { ContentJudgeEvaluation, ContentJudgeResult } from '../services/content-judge.service';
@@ -15,6 +17,14 @@ import type { MetalookupEvaluation } from '../services/metalookup.service';
 const MAX_SCHEMES = 10;
 
 /** What a set of criteria amounts to as a ContentJudge request — see {@link schemesForCriteria}. */
+/** One criterion the checks objected to, as the alert above the criteria lists shows it — one at a time. */
+export interface CriterionViolation {
+  /** The criterion the objection is about, as the metadata set lists it. */
+  criterion: MdsValue;
+  /** What the checks found; more than one where several of them bear on this criterion. */
+  findings: readonly CriterionJudgement[];
+}
+
 export interface CriteriaSchemes {
   /** The schemes to ask for: deduplicated, in the order the criteria came in. */
   schemes: string[];
@@ -54,11 +64,9 @@ export interface CriterionJudgement {
 }
 
 /**
- * The schemes that judge these criteria.
- *
- * Deduplicated, because two criteria can point at the same scheme — a gate that covers both areas is
- * asked once, not twice. Cut to {@link MAX_SCHEMES}, and what was cut is reported rather than dropped
- * silently: a request that quietly judges less than it was asked to looks like a complete answer.
+ * The schemes that judge these criteria, deduplicated: a gate covering both areas is asked once. Cut to
+ * {@link MAX_SCHEMES}, and what was cut is reported rather than dropped silently — a request that quietly
+ * judges less than it was asked to looks like a complete answer.
  */
 export function schemesForCriteria(criterionIds: readonly string[]): CriteriaSchemes {
   const schemes: string[] = [];
@@ -79,22 +87,18 @@ export function schemesForCriteria(criterionIds: readonly string[]): CriteriaSch
 }
 
 /**
- * Every scheme the map holds, for a judgement that has to start before the metadata set has been read
- * (see QualityJudgeService): which criteria a set actually defines is not known then, and the map is
- * written for exactly the criteria of that set anyway. A scheme too many costs one LLM pass; waiting
- * for the set would cost the whole head start.
+ * Every scheme the map holds, for a judgement that has to start before the metadata set has been read: which
+ * criteria the set defines is not known then, and the map is written for exactly those criteria anyway. A
+ * scheme too many costs one LLM pass, waiting for the set the whole head start.
  */
 export function configuredSchemes(): CriteriaSchemes {
   return schemesForCriteria(Object.keys(APP_CONFIG.qualityCriterionSchemes));
 }
 
 /**
- * What both judges said about each criterion, keyed by criterion id — several answers per criterion
- * where several checks bear on it.
- *
- * Driven by the criteria rather than by the answers, because that is the direction the view reads in:
- * a criterion nothing judged gets no entry, and an answer about nothing the criteria ask is left out.
- * The maps, not the answers, decide what a result is about.
+ * What both judges said about each criterion, keyed by criterion id — several answers where several checks bear
+ * on one. Driven by the criteria rather than by the answers, because that is the direction the view reads in:
+ * the maps decide what a result is about.
  */
 export function judgementsForCriteria(
   criterionIds: readonly string[],
@@ -124,15 +128,9 @@ function rulesFor(criterion: string): readonly MetalookupRule[] {
 }
 
 /**
- * What MetalookUp's answer holds for one of its checks; `null` when the check is not in there, or when
- * it reports no value — "No files to extract" is not an answer to anything.
- *
- * The check is found by the key it reports under, so an extraction no rule names is read by nobody:
- * the answer carries every check the deployment ran, and only the configured keys are taken from it
- * (see `APP_CONFIG.qualityMetalookupRules`).
- *
- * Its whole description travels on as the reasoning: it is where the check says what it found, and for
- * the AXE audit that is the only useful part — the number of accessibility violations behind the score.
+ * What MetalookUp's answer holds for one of its checks; null where the check is absent or reports no value. Only
+ * the configured keys are read out of an answer that carries every check the deployment ran, and the check's whole
+ * description travels on as the reasoning.
  */
 function measurementOf(
   rule: MetalookupRule,

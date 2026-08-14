@@ -13,14 +13,9 @@ const PATHS = {
 } as const;
 
 /**
- * The repository's own pages, for what the panel does not do itself: registering an account and
- * resetting a password. Both are forms of the repository, on the instance the panel is configured
- * for — so they are *opened*, never rebuilt here.
- *
- * They open in the tab the panel is docked in rather than in a new one, which the panel does not
- * survive: it is an iframe in that page. So the state is saved first and the panel comes back on the
- * new page where it left off — the same arrangement ContentFlowService makes for the content's own
- * pages (see its `openPage`), minus the flow's business of carrying a step across.
+ * The repository's own pages, for what the panel does not do itself: registering an account and resetting a password.
+ * They open in the tab the panel is docked in, which the panel does not survive, so the state is saved first and the
+ * panel comes back where it left off — the arrangement ContentFlowService makes for the content's own pages.
  */
 @Injectable({ providedIn: 'root' })
 export class RepositoryPageService {

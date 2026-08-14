@@ -28,15 +28,9 @@ const TEXT_MAX_LENGTH = 50_000;
 const LOG = '[edu-sharing][contentjudge]';
 
 /**
- * What ContentJudge should judge, and how it gets at it — the API's three input sources
- * (`EvaluationRequest.source`), each with the one field it requires:
- *
- * - `url` — the service crawls the page itself. For a content that *is* a web page: it then sees the
- *   whole page rather than the extract this extension could read off it.
- * - `nodeid` — the service reads metadata and text from the repository. For a content the repository
- *   holds as a file. Resolved against **ContentJudge's own** configured repository, not the panel's.
- * - `text` — the text travels with the request. The fallback for a content that is neither reachable by
- *   address nor stored as a node.
+ * What ContentJudge should judge, and how it gets at it — the API's three input sources, each with the
+ * one field it requires: `url` lets the service crawl the page itself, `nodeid` has it read the node from
+ * *its own* configured repository, and `text` carries the text along for a content that is neither.
  */
 export type ContentJudgeInput =
   | { source: 'url'; url: string }
@@ -90,10 +84,8 @@ export interface ContentJudgeDependency {
 }
 
 /**
- * One scheme's verdict on the content.
- *
- * The fields after `checks` are each written by one kind of scheme only — the shape follows `type`, and
- * asking for the wrong one yields `undefined` rather than a lie.
+ * One scheme's verdict on the content. The fields after `checks` are each written by one kind of scheme
+ * only — the shape follows `type`, and asking for the wrong one yields `undefined`.
  */
 export interface ContentJudgeResult {
   scheme_id: string;
@@ -193,12 +185,9 @@ export interface ContentJudgeMeta {
 }
 
 /**
- * ContentJudge's answer — the flat, view-facing shape its engine builds (`_build_flat_response`).
- *
- * Typed after that builder and not after the API's declared `EvaluationResponse`: the endpoint is
- * annotated `Dict[str, Any]` and returns the builder's dict, so the declared model is not what travels.
- * It names a `gates_passed`, an `overall_score`, an `overall_label` and a `provenance` that no answer
- * carries, and it omits `summary`, `findings` and `meta`, which every answer does carry.
+ * ContentJudge's answer — the flat, view-facing shape its engine builds. Typed after that builder rather
+ * than after the declared `EvaluationResponse`: the endpoint is annotated `Dict[str, Any]` and returns the
+ * builder's dict, so the declared model names fields no answer carries and omits ones every answer does.
  */
 export interface ContentJudgeEvaluation {
   summary: ContentJudgeSummary;
@@ -218,22 +207,9 @@ export interface ContentJudgeHealth {
 }
 
 /**
- * The page's text as ContentJudge should judge it, or `null` when the page has too little to judge.
- *
- * `formattedText` first, because the API takes no context of its own: `EvaluationRequest` carries a
- * text, a url or a node id and nothing besides, so whatever the judge should know has to be *in* the
- * text. That is exactly what the content script builds there (`buildFormattedText`): address, title,
- * canonical url, meta description and keywords, Open Graph, Dublin Core, LRMI, licence, publication
- * date, author, breadcrumbs, JSON-LD — and then the main content under `=== HAUPTINHALT ===`.
- *
- * Not noise in front of the prose, as long as the criteria are these: Urheberrecht is answered by the
- * licence block, Datenschutz and Aktualität by the meta data, Medial passend by the images — the
- * judgements that came back complained about missing source transparency and unclear authorship, which
- * is precisely what those blocks state. The plainer texts stay as the fallback for a page that offers
- * no such block at all.
- *
- * Cut to the length the API accepts: it rejects anything longer outright, and a judgement of the first
- * 50000 characters says more than no judgement at all.
+ * The page's text as ContentJudge should judge it, or null when the page has too little to judge. The
+ * formatted text comes first, since the API takes no context of its own: whatever the judge should know has
+ * to be in the text. Cut to the length the API accepts, which rejects anything longer outright.
  */
 export function judgeableText(page: PageData | null): string | null {
   const text = (page?.formattedText || page?.mainContent || page?.text || '').trim();
@@ -242,18 +218,9 @@ export function judgeableText(page: PageData | null): string | null {
 }
 
 /**
- * ContentJudge's evaluation of a content: an LLM's verdict on it per evaluation scheme
- * (`POST /evaluate/` — with the trailing slash, which is the route; without it the answer is a
- * redirect). Nothing is written anywhere; the sibling endpoint `/evaluate/suggest` would be the one
- * that does, and it is not used.
- *
- * Every judgement is preceded by `GET /health/`, for the reason given at {@link ContentJudgeService.health}.
- *
- * The request goes out from the panel document, like the metadata agent's and MetalookUp's: the
- * extension's `host_permissions` are what let this document reach a foreign origin.
- *
- * The deployment sits behind a Basic auth that guards the whole host, its own docs included, while the
- * API itself asks for nothing — so without a configured credential every call here answers `401`.
+ * ContentJudge's evaluation of a content: an LLM's verdict per evaluation scheme (`POST /evaluate/` — the
+ * trailing slash is the route). Nothing is written anywhere, every judgement is preceded by `GET /health/`,
+ * and the deployment's Basic auth guards the whole host.
  */
 @Injectable({ providedIn: 'root' })
 export class ContentJudgeService {
@@ -286,14 +253,9 @@ export class ContentJudgeService {
   }
 
   /**
-   * Judge a content against the given schemes — what is judged and which schemes those are is the
-   * caller's decision (in the panel: the content's kind and the quality criteria, see
-   * QualityJudgeService and `schemesForCriteria`).
-   *
-   * Rejects when the service cannot be reached, answers with a status the request cannot be served
-   * under, or sends something that is not a JSON object; {@link error} carries that for the view
-   * either way. A service that is not there at all is found by {@link health} before the judgement
-   * goes out, so it is answered in seconds instead of after the judgement's own timeout.
+   * Judge a content against the given schemes; what is judged and which those are is the caller's decision.
+   * Rejects when the service cannot be reached, answers with an unusable status or sends no JSON object;
+   * {@link error} carries that for the view.
    */
   async evaluate(
     input: ContentJudgeInput,
@@ -315,17 +277,9 @@ export class ContentJudgeService {
   }
 
   /**
-   * Whether the service is there and ready (`GET /health/`) — its status, its version and how many
-   * evaluation schemes it has loaded.
-   *
-   * Worth asking before a judgement because of what a judgement costs: it may be out for five minutes
-   * (see {@link JUDGE_TIMEOUT_MS}), so without this every misconfiguration — a wrong
-   * `contentJudgeApiUrl`, a missing `contentJudgeBasicAuth`, a deployment that is down — would surface
-   * as a five-minute wait, and where the user expects a verdict on the content rather than a technical
-   * fault. This answers in milliseconds and names the cause.
-   *
-   * Rejects for the same three reasons {@link evaluate} does — unreachable, a status the answer cannot
-   * be read under, no JSON object.
+   * Whether the service is there and ready: status, version and how many schemes are loaded. Asked before
+   * every judgement, because one may be out for minutes — a misconfiguration would otherwise surface as a
+   * long wait where the user expects a verdict.
    */
   async health(): Promise<ContentJudgeHealth> {
     const health = this.devMode.enabled()
@@ -341,12 +295,9 @@ export class ContentJudgeService {
   }
 
   /**
-   * The readiness check as a judgement's preflight: it stops one that has nowhere to go, and lets one
-   * through that merely might not fully succeed.
-   *
-   * A `degraded` deployment, or one with no schemes loaded, is logged and nothing more. It can still
-   * hold the schemes this request asks for, and where it does not, the answer is a `400 Unknown
-   * schemes: […]` naming them — which says more than a refusal decided here would.
+   * The readiness check as a judgement's preflight: it stops one that has nowhere to go and lets through
+   * one that merely might not fully succeed. A `degraded` deployment is logged and no more — where it
+   * lacks the schemes asked for, the answer names them, which says more than a refusal decided here.
    */
   private async checkReady(): Promise<void> {
     const health = await this.health();

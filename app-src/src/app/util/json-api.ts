@@ -24,19 +24,9 @@ export interface JsonRequest {
 }
 
 /**
- * The service's answer, parsed.
- *
- * Typed by the caller, and not checked against that type: what arrives is a foreign service's JSON, so
- * the type states the contract while this only guarantees that *some* JSON object arrived. A field the
- * contract promises and the answer lost is the caller's to survive.
- *
- * Rejects with a message that names the service and the cause:
- *
- * - unreachable, or slower than `timeoutMs` — the address is in the message, because a wrong one is the
- *   likeliest reason for it;
- * - a status outside 2xx — with the **whole** body, untruncated: the answers to expect here say what is
- *   wrong *in* the body (a guard's `401` page, ContentJudge's `400 Unknown schemes: […]`);
- * - a body that is not a JSON object.
+ * The service's answer, parsed. Typed by the caller and not checked against that type: what arrives is a foreign
+ * service's JSON, so the type states the contract while this only guarantees that some JSON object arrived. Rejects
+ * with a message naming the service and the cause, carrying the whole untruncated body for a non-2xx status.
  */
 export async function fetchJson<T>(request: JsonRequest): Promise<T> {
   const { service, url, method = 'GET', headers = {}, body, timeoutMs } = request;

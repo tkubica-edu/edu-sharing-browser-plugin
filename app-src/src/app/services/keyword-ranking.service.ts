@@ -1,20 +1,9 @@
 import { Injectable } from '@angular/core';
 
 /**
- * Ranks the keywords the metadata agent generated against the document they were generated from,
- * so the search starts with the ones that actually carry the document's subject.
- *
- * Why rank at all: only the first few keywords are searched (all values of one widget land in a
- * single criterion whose join narrows the result set — see ContentSuggestionsService), so *which*
- * ones come first decides whether anything is found. The agent returns 3–8 keywords in its own
- * order, and that order is a guess made without knowing which of them the document really leans
- * on: a term that appears in the heading and five times in the body describes the document better
- * than one the agent inferred and never wrote down.
- *
- * Scoring follows the shape of the WLO reranker (`wlo-mcp-sc/src/reranker.ts`): additive points
- * per signal, then a normalized blend in which the text evidence dominates and the agent's own
- * order only nudges the result — so consensus can break ties but never outvote what the document
- * says. Everything is local and synchronous; no second agent call is involved.
+ * Ranks the keywords the metadata agent generated against the document they came from, so the search starts with the
+ * ones that carry its subject: only the first few are searched, and the agent's order is a guess. Scoring follows the
+ * WLO reranker's shape — additive points per signal, blended so the text evidence dominates. Local and synchronous.
  */
 
 /** Above this length a term may match anywhere in a word (see {@link termMatches}). */
@@ -97,13 +86,9 @@ export interface RankedKeyword {
 @Injectable({ providedIn: 'root' })
 export class KeywordRankingService {
   /**
-   * Order `keywords` by how well the document supports each, best first.
-   *
-   * Nothing is dropped: the screen shows every keyword the agent produced and marks which of them
-   * the query uses, so ranking decides the *order* — and the caller's cut-off decides the rest.
-   *
-   * Without usable text (no document read, or a document too short to say anything) the agent's
-   * order is kept as-is rather than replaced by an arbitrary one.
+   * Order `keywords` by how well the document supports each, best first. Nothing is dropped — the screen shows
+   * every keyword and marks which the query uses, so this decides the order and the caller's cut-off the rest.
+   * Without usable text the agent's order is kept rather than replaced by an arbitrary one.
    */
   rank(keywords: readonly string[], text: string): RankedKeyword[] {
     const document = this.prepare(text);
@@ -220,15 +205,9 @@ function signalTerms(phrase: string): string[] {
 }
 
 /**
- * Does `term` occur in `text` as a signal rather than by accident?
- *
- * A plain substring test is right for German: "Rechnung" belongs inside "Bruchrechnung" and
- * "Mittelalter" inside "mittelalterlichen". For a SHORT term the same test is mostly accident —
- * "IT" sits inside "Pol-it-ik" and "Maur-it-ius". What separates the two is where the match sits:
- * a compound or an inflection carries the term at a word START, while accidental ones bury it
- * mid-word. So a short term must match at a word boundary, a longer one keeps the substring
- * behaviour German needs. Only the start is checked — requiring one at the end too would reject
- * exactly those compounds.
+ * Whether `term` occurs in `text` as a signal rather than by accident. A plain substring test is right for German,
+ * where a term sits inside compounds and inflections; for a short term it is mostly accident. Position separates
+ * them, so a short term must match at a word start — requiring the end too would reject those compounds.
  */
 function termMatches(term: string, text: string): boolean {
   if (!term || !text) return false;

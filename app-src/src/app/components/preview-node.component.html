@@ -1,9 +1,0 @@
-<div class="preview-wrap">
-  @if (bundle.error()) {
-    <p class="error">Vorschau konnte nicht geladen werden: {{ bundle.error() }}</p>
-  } @else if (!bundle.ready()) {
-    <p class="muted">Vorschau wird geladen…</p>
-  } @else {
-    <edu-sharing-preview-sidebar [node]="node()" [editorMode]="'viewer'"></edu-sharing-preview-sidebar>
-  }
-</div>

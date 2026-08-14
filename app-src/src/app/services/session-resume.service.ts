@@ -27,19 +27,9 @@ interface ResumeState {
 const RESUME_WINDOW_MS = 60000;
 
 /**
- * Carries the panel's state across a page change.
- *
- * The panel is an iframe inside the page, so ANY navigation destroys it and the app is booted from
- * scratch afterwards (the background worker reopens the panel — see background.js). Its state
- * therefore has to live outside the app, in extension storage, and be picked up again on boot.
- *
- * Written continuously, not at the moment of a navigation: a link the user clicks gives no warning,
- * so there is no point at which the app could still save. {@link track} starts that, after the
- * restore has had its turn.
- *
- * Only the node's id and where the user was are stored, so nothing here can go stale — the node
- * itself is re-loaded. The state is **per tab**: two tabs are two independent panels, and one must
- * never restore into the other.
+ * Carries the panel's state across a page change: the panel is an iframe inside the page, so any navigation destroys
+ * it and the app boots from scratch. Written continuously rather than at the moment of a navigation, since a link
+ * the user clicks gives no warning. Only the node's id and where the user was are stored, and per tab.
  */
 @Injectable({ providedIn: 'root' })
 export class SessionResumeService {
@@ -70,23 +60,9 @@ export class SessionResumeService {
   }
 
   /**
-   * Write the state right now and wait for it.
-   *
-   * For the app's own navigations (see ContentFlowService): the effect above is *scheduled*, so it
-   * would not have run before the page load tears this app down. Everything else is covered by it.
-   *
-   * `targetUrl` is the page the app is about to open. It is stored as the state's own page, so the
-   * node survives that navigation — see {@link restore}, which otherwise drops a node that only
-   * described the page being left.
-   *
-   * `state` is where the panel should come back, for a step that belongs on the page being opened:
-   * it is stored instead of the step the panel is on, so entering it never has to happen here — see
-   * NavigationService.stateFor.
-   *
-   * This is the app's LAST write: tracking is switched off first, because the navigation that
-   * brought us here was itself a state change, so the effect above is already scheduled and would
-   * otherwise land *after* this one — with the page being left as the state's page, which is exactly
-   * what this call is correcting. Whoever cancels the navigation calls {@link track} again.
+   * Write the state right now and wait for it — for the app's own navigations, where the scheduled effect above would
+   * not have run before the load tears the app down. `targetUrl` is stored as the state's page and `state` as where
+   * the panel should come back. The app's last write: tracking is switched off first, so nothing overwrites it.
    */
   async save(targetUrl?: string, state?: NavState): Promise<void> {
     this.tracking.set(false);
@@ -128,7 +104,7 @@ export class SessionResumeService {
     // The whole way the user came, not just where they stood: a step that does not apply on this
     // page (an OnlyOffice-only one, or one that needs a node that could not be loaded) hands over to
     // the one behind it, and only a state of which nothing applies is no restore at all — then the
-    // caller lands. A state from before the trail was stored has none, and restores as it used to.
+    // caller lands. A stored state that carries no trail restores its step alone.
     return this.navigation.resume(
       { section: state.section, tab: state.tab ?? null },
       state.trail ?? [],
@@ -136,19 +112,9 @@ export class SessionResumeService {
   }
 
   /**
-   * Whether the stored node is still the panel's content on THIS page.
-   *
-   * A `detected` node is a statement about the page it was found on (the document the host has
-   * open, the content the repository holds for that URL) — so it does not survive a page change:
-   * clicking a link on the page means the panel starts over there, and the new page is looked at
-   * on its own. What the app navigates to itself is not a change in that sense — it carries the
-   * page it is heading for into the state (see {@link save}), so the node stays.
-   *
-   * A `chosen` node is the user's own pick, which belongs to the flow they started rather than to
-   * the page, and is released only when that flow ends (CurationService.releaseChosenContent).
-   *
-   * A state without a page (written by an earlier version), or a page that cannot be read on this
-   * boot, is taken at face value: not knowing where we are is no reason to throw the node away.
+   * Whether the stored node is still the panel's content on this page. A `detected` node is a statement about the page
+   * it was found on and does not survive a page change, except one the app made itself. A `chosen` node belongs to the
+   * user's flow and stays. An unknown page is taken at face value rather than as a reason to drop the node.
    */
   private nodeStillApplies(state: ResumeState): boolean {
     const current = this.conditions.activeUrl();

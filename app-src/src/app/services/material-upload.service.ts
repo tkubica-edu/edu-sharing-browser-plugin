@@ -24,20 +24,9 @@ export type AddMaterialResult =
     };
 
 /**
- * Turns the choice `<edu-sharing-add-material>` emits into a repository node.
- *
- * The web component is only the dialog: it returns the picked files or the entered link and
- * leaves the writing to its host (that is what the repository's own UploadService does with the
- * dialog result too). This is that host part, reduced to what the panel needs:
- *
- * - a **file** becomes an empty `ccm:io` whose content is then written (two calls — the create API
- *   takes properties, not a body);
- * - a **link** becomes a `ccm:io` carrying the URL in `ccm:wwwurl`, marked as user generated,
- *   exactly like the repository does it (`_createUrlLink`). LTI credentials are carried over when
- *   the dialog collected them.
- *
- * The parent is whatever the dialog resolved, else the user's inbox — the same place a curated
- * content lands in (see RepositoryNodeService).
+ * Turns the choice `<edu-sharing-add-material>` emits into a repository node — the host part the dialog leaves to its
+ * caller: a file becomes an empty `ccm:io` whose content is written afterwards, since the create API takes properties
+ * rather than a body, and a link becomes one carrying the URL in `ccm:wwwurl`, marked as user generated.
  */
 @Injectable({ providedIn: 'root' })
 export class MaterialUploadService {

@@ -1,25 +1,16 @@
 /**
- * The inbound half of the host plugin's wire contract (OnlyOffice): the source marker every
- * envelope carries and the payloads this app reads out of it. See `content/CLAUDE.md` for the
- * full, application-agnostic event documentation.
- *
- * It lives apart from `OnlyOfficeDocumentService` because two consumers need it: the service
- * itself and the debug simulator, which fabricates exactly these envelopes — keeping the
- * contract here spares them an import cycle.
+ * The inbound half of the host plugin's wire contract (OnlyOffice): the source marker every envelope carries and the
+ * payloads this app reads out of it; see `content/CLAUDE.md` for the full event documentation. It lives apart from
+ * `OnlyOfficeDocumentService` because the debug simulator fabricates the same envelopes.
  */
 
 /** Sender id of the OnlyOffice plugin messages relayed by content/panel-host.js. */
 export const PLUGIN_SOURCE = 'edu-sharing-onlyoffice-plugin';
 
 /**
- * Identity of the document the host has open, as announced by the OnlyOffice plugin. Present on
- * every inbound envelope (envelope level, `data` for DOCUMENT_INFO) and `null` when the editor
- * was opened with a stale plugin config — so always treat it as optional.
- *
- * Deliberately just the node id: everything else the app needs (title, permalink, write
- * permission) is loaded from the repository, see `OnlyOfficeDocumentService.documentNode`. The id
- * *is* the edited node: the connector resolves a collection reference to its original before
- * reporting it, so there is nothing left to dereference here.
+ * Identity of the document the host has open, as the plugin announces it; null where the editor was opened with a
+ * stale plugin config, so always treat it as optional. Deliberately just the node id, and it is the edited node —
+ * the connector resolves a collection reference to its original before reporting it.
  */
 export interface DocumentIdentity {
   nodeId?: string;

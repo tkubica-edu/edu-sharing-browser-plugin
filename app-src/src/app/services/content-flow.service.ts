@@ -9,16 +9,9 @@ import { OnlyOfficeDocumentService } from './onlyoffice-document.service';
 import { SessionResumeService } from './session-resume.service';
 
 /**
- * Enters the big steps of the content flow for the active node.
- *
- * The branch is the connector: a node that opens in a connector is being edited there, so editing
- * it means accompanying that editor (Bearbeitungsmodus) — everything else has nothing to edit
- * outside the panel and goes straight to the Qualitätsprüfung. The check needs the repository's
- * connector list, so it is asynchronous; {@link deciding} lets the caller show that.
- *
- * It is also where the tab is taken along: two of the steps belong on a page of their own — the
- * editing on the editor's, the Inhaltsoptionen on the content's — and the panel is restored on it
- * (see {@link openPage}).
+ * Enters the big steps of the content flow for the active node. The branch is the connector: a node that opens in one
+ * is edited there, everything else goes straight to the Qualitätsprüfung — and that check needs the repository's
+ * connector list, hence {@link deciding}. Two steps belong on a page of their own, so the tab is taken along.
  */
 @Injectable({ providedIn: 'root' })
 export class ContentFlowService {
@@ -34,13 +27,9 @@ export class ContentFlowService {
   readonly deciding = signal(false);
 
   /**
-   * "Bearbeitungsmodus": that step when the node opens in a connector, else Qualitätsprüfung.
-   *
-   * The connector is asked for twice over: whether there is one at all decides the branch, and the
-   * one there is provides the URL that *opens* the content in it — the same for every way in (a
-   * freshly created document, a file from *Eigene Inhalte*, a Verlauf entry). Editing means being in
-   * the editor, so that is where the tab goes; the node's own page is only the fallback for a
-   * connector that reports no URL.
+   * "Bearbeitungsmodus" when the node opens in a connector, else Qualitätsprüfung. The connector is asked for
+   * twice over: whether there is one decides the branch, and the one there is provides the URL that opens the
+   * content in it. The node's own page is the fallback for a connector that reports no URL.
    */
   async edit(): Promise<void> {
     // The hydrated node, not just the active-node summary: the filetype matching reads its
@@ -68,21 +57,9 @@ export class ContentFlowService {
   }
 
   /**
-   * "Inhaltsoptionen" for a content the user picked themselves (Meine Inhalte, Verlauf), on that
-   * content's own page in the repository (`…/components/render/<id>`).
-   *
-   * Picking a content is choosing what to work on, so the tab follows: the page then shows the very
-   * node the panel's steps act on, and everything the repository knows about it is one click away
-   * instead of behind the panel. The panel comes back on this step, working on the same node — it
-   * cannot survive the load, so it is restored (see {@link openPage}).
-   *
-   * The step is *not* entered before that load: it belongs to the page being opened, so it is carried
-   * across in the stored state (NavigationService.stateFor) and the panel stays on the screen the user
-   * picked from until the page is there. Entering it here would show the Inhaltsoptionen for the
-   * moment before the load replaces them, which reads as the panel arriving and then reloading.
-   *
-   * Where no load follows — the content's page is already open, or the tab could not be taken there —
-   * the step is entered right away instead.
+   * "Inhaltsoptionen" for a content the user picked themselves, on that content's own page: picking is choosing
+   * what to work on, so the tab follows. The step is carried across in the stored state rather than entered
+   * first, so the panel stays where the user is until the page is there.
    */
   async showContentOptions(): Promise<void> {
     const target = this.curation.activeNode()?.link;
@@ -150,14 +127,9 @@ export class ContentFlowService {
   }
 
   /**
-   * Take the current tab to `target` and have the panel come back there — on the step it is on, or on
-   * `state` where the step belongs to the page being opened. A tab that already stands on that page is
-   * left alone: there is nothing to navigate to.
-   *
-   * The panel cannot survive the load — it is an iframe in the page — so it is *restored* instead:
-   * the state is written to storage first, the background worker reopens the panel on the new page,
-   * and the app picks the state back up on boot. Same tab, not a new one: a content opened in a
-   * window the panel cannot reach would leave the two apart.
+   * Take the current tab to `target` and have the panel come back there — on the step it is on, or on `state`
+   * where that step belongs to the page being opened. The panel cannot survive the load, so it is restored
+   * from storage instead. Same tab, since a window the panel cannot reach would leave the two apart.
    */
   private async openPage(target: string, state?: NavState): Promise<void> {
     if (this.conditions.activeUrl() === target) return;
@@ -177,27 +149,9 @@ export class ContentFlowService {
   }
 
   /**
-   * Whether the content is already open for editing on the current page — then the panel only has to
-   * switch into the Bearbeitungsmodus, and replacing the page would throw away the editor the user is
-   * working in (and the panel with it) to arrive where they already are.
-   *
-   * Two ways to tell, because the connector redirects: the page the editor ends up on is its own,
-   * not the URL we navigated to.
-   * - the connector on screen is showing **this** node;
-   * - or the tab is already on the exact page this navigation would open.
-   *
-   * The connector check needs the node identity, not just the connector's presence: a page with
-   * OnlyOffice on it says nothing about a *different* node — a document that was just created, or
-   * one picked from *Eigene Inhalte*, whose editor is somewhere else entirely. Reading presence
-   * alone as "already open" left the panel behind on the old page.
-   *
-   * An open document whose identity is unknown (the plugin is disabled, or its config is stale)
-   * still counts as open: without knowing which node it holds, navigating away would risk throwing
-   * away exactly the editor the user is working in — the mistake this check exists to prevent.
-   *
-   * Deliberately no "the URL mentions the node id" check: the node's *detail* page carries the id
-   * too, and standing there is not being in the editor — that reading kept the user on the detail
-   * page instead of taking them into the connector.
+   * Whether the content is already open for editing here — then the panel only switches into the
+   * Bearbeitungsmodus, since replacing the page would throw away the editor the user works in. Two ways to tell,
+   * because the connector redirects; an open document of unknown identity counts as open for the same reason.
    */
   private alreadyOpen(nodeId: string, target: string): boolean {
     if (this.conditions.onlyOfficePresent()) {

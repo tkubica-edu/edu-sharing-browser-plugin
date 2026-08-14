@@ -6,20 +6,9 @@ import { CurationService } from './curation.service';
 const BUSY_HINT = 'Der Inhalt wird gespeichert — bitte warten.';
 
 /**
- * Whether the panel is in the middle of a write that must not be steered away from — the one state the
- * whole chrome is disabled by (topbar, back button, tab bar, session bar, footer).
- *
- * There is more to a save than the one request the button waits for: the node is created, then the
- * confirmed quality, the picture and the forwarding are written onto it (see
- * {@link CurationService.save}). Leaving mid-way is what leaves a content half-written — a logout takes
- * the session those follow-ups run under, a page change tears the panel down, and re-entering a step
- * would offer to write again what is already being written.
- *
- * Deliberately DERIVED rather than a state of its own: the services that write already say when they
- * are writing, and a second flag beside them is a flag that can be left standing. For the same reason
- * it is not a condition of the navigation registry — a section that turns "disabled" is one the
- * guard re-lands away from (see NavigationService), and being thrown to the main menu is exactly what
- * this is here to prevent.
+ * Whether a write is in flight that must not be steered away from — the one state the whole chrome is disabled by,
+ * since a save is more than the request the button waits for and leaving mid-way leaves a content half-written.
+ * Derived rather than a state of its own, and deliberately not a navigation condition, which would re-land the user.
  */
 @Injectable({ providedIn: 'root' })
 export class BusyService {

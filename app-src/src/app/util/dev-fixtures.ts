@@ -7,12 +7,9 @@
 import type { ContentJudgeHealth } from '../services/content-judge.service';
 
 /**
- * The metadata agent's `POST /extract-field` — a real answer, captured rather than invented.
- *
- * The Schlagwörter of one content, because that is the field the endpoint is asked for
- * (ContentSuggestionsService derives its search terms from it) and the only one a single-field
- * request is made for. Sent whatever field is asked for, so a second caller would get keywords under
- * its own field's name; the requested id is logged, which is what makes that visible.
+ * The metadata agent's `POST /extract-field` — a real answer, captured rather than invented: the Schlagwörter of
+ * one content, since that is the field the endpoint is asked for. Sent whatever field is asked for, so a second
+ * caller would get keywords under its own field's name; the requested id is logged, which makes that visible.
  */
 export const EXTRACT_FIELD_ANSWER = {
   field_id: 'cclom:general_keyword',
@@ -48,12 +45,9 @@ export const CONTENT_JUDGE_HEALTH: ContentJudgeHealth = {
 };
 
 /**
- * The body of the `422` that stands in for a judgement — FastAPI's validation error, as the endpoint
- * answers one.
- *
- * A failure rather than a verdict, so the flow that shows the Qualitätsprüfung is exercised on the
- * branch where ContentJudge answers nothing. What a judgement of a real content looks like is what
- * the mode is meant to avoid waiting for; when its result is what has to be seen, the mode is off.
+ * The body of the `422` that stands in for a judgement — FastAPI's validation error, as the endpoint answers one.
+ * A failure rather than a verdict, so the flow is exercised on the branch where ContentJudge answers nothing;
+ * whoever needs a real verdict switches the mode off.
  */
 const CONTENT_JUDGE_EVALUATE_DETAIL = {
   detail: [

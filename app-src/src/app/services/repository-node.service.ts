@@ -10,15 +10,9 @@ import { MdsValues, toMdsValues } from '../util/mds-values';
 const INBOX = '-inbox-';
 
 /**
- * The setting that names the folder the user files content in by default — what the repository's own
- * Ablageort control writes when its „als Standard verwenden" box is ticked, so both read and write
- * the same one.
- *
- * It lives in two places, and which one applies is decided by the session rather than by the caller
- * (that is how the library's own SessionStorageService keeps it): in the **user's profile
- * preferences** where there is a profile to keep it in, and in the **browser** — plain key, the value
- * JSON-encoded — for a session that has none, the guest one the browser extension custom web
- * component brings. See {@link RepositoryNodeService.storedDefaultFolder}.
+ * The setting naming the folder the user files content in by default — the same one the repository's own
+ * Ablageort control writes. It lives in the profile preferences where there is a profile, and in the
+ * browser (JSON-encoded) for a session without one; see {@link RepositoryNodeService.storedDefaultFolder}.
  */
 const DEFAULT_FOLDER_KEY = 'defaultInboxFolder';
 
@@ -48,16 +42,9 @@ export class RepositoryNodeService {
   private readonly users = inject(UserService);
 
   /**
-   * The folder a curated content is filed in unless the user picks another one: the one they set as
-   * their default, else their inbox — the same answer the repository's own Ablageort control gives
-   * (NodeHelperService.getDefaultInboxFolder).
-   *
-   * The node itself rather than its id, because that is what the control shows: it renders the folder
-   * as a breadcrumb, which it resolves from the node.
-   *
-   * A default that cannot be loaded falls back to the inbox: the setting names a folder that may
-   * since have been deleted or become unreadable, and a filing place the user cannot see is worse
-   * than the one every content starts in.
+   * The folder a curated content is filed in unless the user picks another: their default, else their
+   * inbox. The node itself rather than its id, since the control renders it as a breadcrumb. A default
+   * that cannot be loaded falls back to the inbox — a filing place the user cannot see is worse.
    */
   async defaultParent(): Promise<Node> {
     const preferred = (await this.storedDefaultFolder()) || INBOX;
@@ -69,19 +56,9 @@ export class RepositoryNodeService {
   }
 
   /**
-   * The folder the user set as their default ({@link DEFAULT_FOLDER_KEY}); null when they set none.
-   *
-   * **Read on every ask, and not through `SessionStorageService`.** That service is what *writes* the
-   * setting — the Ablageort control calls it when the box is ticked — but it serves the profile
-   * preferences from a copy it holds for as long as the app lives, re-reading them only when the
-   * login changes. And the control does not run in this app: it is an element of the edu bundle,
-   * which brings its own copy of the library and therefore its own cache. So the write lands in the
-   * bundle's copy, this app's copy never hears of it, and the panel goes on offering the folder that
-   * was the default when it started.
-   *
-   * Both places the setting can live are consulted, the profile first: a session without a profile to
-   * keep preferences in has the browser's copy and nothing else, and one that has a profile has that
-   * as its answer — the browser's copy then only stands in where the profile names no folder at all.
+   * The folder the user set as their default; null when they set none. Read on every ask and not through
+   * `SessionStorageService`: the control that writes the setting runs in the edu bundle, whose copy of that
+   * cache this app never hears about. Profile first, browser copy standing in where it names none.
    */
   private async storedDefaultFolder(): Promise<string | null> {
     let preferences: Record<string, unknown> | null = null;
@@ -107,13 +84,9 @@ export class RepositoryNodeService {
   }
 
   /**
-   * Create a child (`ccm:io`) with the given MDS properties in `parent` — the folder picked for the
-   * content, or the user's inbox where there is none.
-   *
-   * `obeyMds` is stated rather than left to the server's default: the properties come from a form the
-   * metadata set defines, and the set is what decides which of them a node may carry. The fields it
-   * does not define are dropped here on purpose — the ones that still belong on the node are written
-   * afterwards, by the one call that does not obey it (see {@link writeExtendedData}).
+   * Create a child (`ccm:io`) with the given MDS properties in `parent`. `obeyMds` is stated rather than
+   * left to the server default: the metadata set decides which properties a node may carry, and the
+   * fields it does not define are written afterwards by the one call that does not obey it.
    */
   async create(values: MdsValues, parent: string = INBOX): Promise<NodeSummary> {
     const entry = await firstValueFrom(
@@ -131,14 +104,9 @@ export class RepositoryNodeService {
   }
 
   /**
-   * Write the WLO extended fields onto a node (see `toExtendedFields`) — a call of its own, because
-   * the metadata set does not define them: a write that obeys the set drops them silently, so this
-   * one does not obey it and says what it is for in its version comment.
-   *
-   * Answers which fields did not get through, so the caller can report an incomplete write without
-   * losing the content over it. A bulk write that fails is retried field by field: the repository
-   * refuses the whole request over a single property it will not take, and the other fields are
-   * worth having (the raw text is the largest of them by far and the likeliest to be refused).
+   * Write the WLO extended fields onto a node — a call of its own, since a write that obeys the metadata
+   * set drops fields the set does not define. Answers which fields did not get through; a failed bulk
+   * write is retried field by field, as one refused property fails the whole request.
    */
   async writeExtendedData(nodeId: string, fields: MdsValues): Promise<string[]> {
     const names = Object.keys(fields);
@@ -170,13 +138,9 @@ export class RepositoryNodeService {
   }
 
   /**
-   * Update an existing node's metadata in place. `currentName` keeps the node's name when the
-   * values carry none — generated metadata has no `cm:name`, and inventing one from the title
-   * would **rename the node** (for a real document that means losing its file extension).
-   *
-   * When the current name is unknown, no `cm:name` is sent at all. Leaving the property out is
-   * the lesser risk: a wrong one renames the document for certain, whereas the omission at worst
-   * lets the repository re-derive the name it would have derived anyway.
+   * Update an existing node's metadata in place. `currentName` keeps the node's name where the values
+   * carry none — inventing one from the title would rename the node and cost a document its extension.
+   * With the name unknown no `cm:name` is sent at all, which at worst lets the repository re-derive it.
    */
   async update(nodeId: string, values: MdsValues, currentName?: string): Promise<NodeSummary> {
     const body = toMdsValues(values);
@@ -188,12 +152,9 @@ export class RepositoryNodeService {
   }
 
   /**
-   * Set the node's preview picture — a multipart upload that REPLACES whatever preview it has, and
-   * the only way to give a node a picture of its own: a preview is content, not a property, so it
-   * cannot travel with the metadata (see {@link CurationService.writePendingPreview}).
-   *
-   * No version is created for it: the picture belongs to the metadata being written, not to a new
-   * revision of the document.
+   * Set the node's preview picture — a multipart upload that replaces the existing preview, and the only
+   * way to give a node a picture of its own, since a preview is content rather than a property. No
+   * version is created for it.
    */
   async setPreview(nodeId: string, image: Blob): Promise<void> {
     await firstValueFrom(
@@ -208,13 +169,9 @@ export class RepositoryNodeService {
   }
 
   /**
-   * Record a workflow status on the node — an entry in its workflow history, which is how the
-   * repository tracks the editorial ladder (see WorkflowStatus). It is a history, not a property:
-   * writing one adds a step, it does not overwrite the step before it.
-   *
-   * `receiver` are the authorities the step is addressed to, by name. Only the handover states have
-   * one — they name the queue the content lands in; a state that merely records an outcome is
-   * written on the acting user and passes none.
+   * Record a workflow status on the node: an entry in its workflow history, so writing one adds a step
+   * rather than overwriting the one before. `receiver` names the authorities a handover is addressed to;
+   * a state that merely records an outcome passes none.
    */
   async addWorkflowStatus(
     nodeId: string,
@@ -257,10 +214,8 @@ export class RepositoryNodeService {
   }
 
   /**
-   * Normalize editor values for a NEW node and make sure it carries a name (`cm:name`): the title
-   * if there is one, else a fallback — a node cannot be created without a name. Creating is the
-   * only case that may invent one; see {@link update} for why an existing node must not be
-   * renamed this way.
+   * Normalize editor values for a new node and make sure it carries a `cm:name` — a node cannot be
+   * created without one. Creating is the only case that may invent a name; see {@link update}.
    */
   private toCreateBody(values: MdsValues): MdsValues {
     const body = toMdsValues(values);

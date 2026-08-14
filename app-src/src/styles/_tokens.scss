@@ -19,6 +19,9 @@
 
   // Tinted hint-card background (used across intro/description cards)
   --es-hint-bg: #f0f4f9;
+  // A shade deeper than the hint background: the small tinted things that sit ON a card — the
+  // Verlauf's count badge, its "öffnen" button.
+  --es-blue-tint: #e6edf6;
 
   // Radius + spacing scale — the paddings and corner radius shared across the components
   --es-radius: 8px;

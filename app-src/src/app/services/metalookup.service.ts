@@ -24,12 +24,9 @@ export interface MetalookupResource {
 }
 
 /**
- * One check's result: the property it bears on, the number it rated, and how sure it is
- * (`MetadataUpdateRule` in the gateway).
- *
- * `value` and `confidence` are `double` there, so both really are numbers — but a check that could not
- * run reports its excuse in `description` and a `value` that means nothing ("No files to extract"), so
- * a number here is not yet an answer. That reading is `measurementOf`'s, in `util/quality-schemes.ts`.
+ * One check's result: the property it bears on, the number it rated and how sure it is. Both are doubles in the
+ * gateway, but a check that could not run reports its excuse in `description` and a meaningless `value` — so a
+ * number here is not yet an answer. That reading is `measurementOf`'s, in `util/quality-schemes.ts`.
  */
 export interface MetalookupRule {
   /**
@@ -45,11 +42,9 @@ export interface MetalookupRule {
 }
 
 /**
- * MetalookUp's answer (`Response` in the gateway).
- *
- * `error` and `featureExtractions` are absent rather than null where they are empty — the DTO is
- * serialised without its nulls (`@JsonInclude(NON_NULL)`). The other three are on every answer,
- * including the ones that report a failure: `status` carries it a second time, in the body.
+ * MetalookUp's answer. `error` and `featureExtractions` are absent rather than null where they are empty, since
+ * the DTO is serialised without its nulls. The other three are on every answer, including the ones that report
+ * a failure.
  */
 export interface MetalookupEvaluation {
   /** When the answer was made, ISO 8601. */
@@ -65,21 +60,9 @@ export interface MetalookupEvaluation {
 }
 
 /**
- * MetalookUp's evaluation of a content: what metadata can be extracted from the resource, and how
- * certain each value is. `POST /api/evaluation` — the endpoint that answers directly instead of
- * persisting anything to the suggestion service, so calling it has no effect beyond the answer.
- *
- * That endpoint is the deployment's and not the gateway sources': those declare `POST /api/extract`,
- * which starts the extraction and answers `202` with an empty body, and `POST /api/poll` to ask after
- * it. `/api/evaluation` answers on staging all the same — where the two disagree, the deployment is
- * what this client is written against, and the DTOs below are the sources' (`Response`,
- * `MetadataUpdateRule`), whose field names its answer matches.
- *
- * The request goes out from the panel document rather than through the background worker, like the
- * metadata agent's (see MetadataAgentService.postExtractField): the extension's `host_permissions`
- * are what let this document reach a foreign origin, and MetalookUp serves no CORS headers of its own
- * — a preflight from an extension origin is rejected outright. So this is reachable from the panel
- * and from the worker, but never from a page's own scripts.
+ * MetalookUp's evaluation of a content: what metadata can be extracted from the resource, and how certain each value
+ * is. `POST /api/evaluation` answers directly instead of persisting anything, and that route is the deployment's
+ * rather than the gateway sources'. Called from the panel document, since MetalookUp serves no CORS headers.
  */
 @Injectable({ providedIn: 'root' })
 export class MetalookupService {

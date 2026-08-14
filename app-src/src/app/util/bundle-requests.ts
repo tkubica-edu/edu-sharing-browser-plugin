@@ -1,17 +1,7 @@
 /**
- * Enforcement of the one rule the curation's stand-in node comes with: a request must never be built
- * from it (see DRAFT_NODE_ID). The panel keeps to it, the edu-sharing web-component bundle does not.
- *
- * The bundle's widgets read the node they are given off `MdsEditorInstanceService`, and some of them
- * ask the repository about it no matter which `editorMode` the editor runs in — the child-objects
- * widget is one: its `ngOnInit` subscribes to `nodes$` and fetches the node's children as soon as a
- * single node is set (`GET /node/v1/nodes/-home-/-draft-/children?assocName=ccm:childio`). For a
- * stand-in that 404s, and there is no input on the wrapper to leave such a widget out of a view group.
- *
- * So the request is stopped where it would leave the panel: an XHR opened on a stand-in URL is not
- * sent but answered locally with an empty result, which is the truth for a content the repository does
- * not hold yet. The widget then shows what it would show for a node without children, and nothing
- * reaches the repository under an id that identifies nothing there.
+ * Enforcement of the one rule the curation's stand-in node comes with: a request must never be built from it. The
+ * panel keeps to it, the bundle does not — some widgets ask the repository about the node whatever the editor mode.
+ * So an XHR opened on a stand-in URL is answered locally with an empty result, which is the truth for it.
  */
 
 import { DRAFT_NODE_ID } from './mds-node';
@@ -49,12 +39,9 @@ export function isDraftNodeUrl(url: string): boolean {
 }
 
 /**
- * Keep every request the bundle builds from the stand-in node inside the panel, for the rest of the
- * document's life. Idempotent, and a no-op for every other request — the guard only ever sees an XHR
- * after it was opened on such a URL.
- *
- * Patched on `XMLHttpRequest.prototype` rather than on the global constructor: the bundle's HttpClient
- * builds its own instances (`BrowserXhr`), and jQuery in the bundle's `scripts.js` builds others.
+ * Keep every request the bundle builds from the stand-in node inside the panel, for the rest of the document's
+ * life. Idempotent, and a no-op for every other request. Patched on `XMLHttpRequest.prototype` rather than on
+ * the global constructor, since the bundle's HttpClient and its jQuery each build their own instances.
  */
 export function installDraftRequestGuard(): void {
   if (patched) return;
@@ -91,11 +78,9 @@ export function installDraftRequestGuard(): void {
 }
 
 /**
- * Let an XHR report the empty result without ever having gone anywhere.
- *
- * The response state lives on the instance, shadowing the prototype's accessors, so every reader sees
- * a request that succeeded — `HttpXhrBackend` reads status, statusText, the headers and the response,
- * and takes the whole reply from them.
+ * Let an XHR report the empty result without ever having gone anywhere. The response state lives on the instance,
+ * shadowing the prototype's accessors, so every reader sees a request that succeeded — `HttpXhrBackend` takes the
+ * whole reply from status, statusText, the headers and the response.
  */
 function answerEmpty(xhr: XMLHttpRequest, url: string): void {
   const shadow = (property: string, value: unknown) =>
