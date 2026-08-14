@@ -1,65 +1,20 @@
-:host { display: block; }
+// The compact variant brings its own card — ground, border and radius from the theme's tokens — so
+// nothing is drawn around it here. Two of those tokens are set to the panel's own, so the card sits
+// among the panel's cards instead of beside them: they inherit into the element, which is a child in
+// the light DOM.
+:host {
+  display: block;
+  // The same distance the panel's cards keep from one another (see the `card` mixin).
+  margin-bottom: 12px;
+  --borderRadiusCards: var(--es-radius);
+  --borderLight: var(--es-border);
+}
 
-// The panel's card, as a control: the code on the left, what it is and where it leads beside it.
-.share-teaser {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  padding: 12px;
-  background: var(--es-surface);
-  border: 1px solid var(--es-border);
-  border-radius: var(--es-radius);
-  text-align: left;
-  color: var(--es-text);
+// The card as the way into "Inhalt teilen": its own controls — the link field and the copy button —
+// keep their click, so only the rest of it carries the pointer (see ShareTeaserComponent.openShare).
+edu-sharing-share-qr {
+  display: block;
   cursor: pointer;
 
-  &:hover { background: var(--es-hint-bg); }
-}
-
-// The code keeps its own square, white ground and all: it is scanned off the screen, and a tinted
-// backdrop is what a scanner reads worst.
-// The code brings its own white ground and quiet zone (see QrCodeComponent), so this only rounds it
-// off against the card.
-.st-qr {
-  flex: 0 0 auto;
-  display: block;
-  overflow: hidden;
-  border-radius: 6px;
-}
-
-.st-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
-
-.st-title { font-size: 14px; font-weight: 600; line-height: 1.35; }
-
-// One line, however long the link is: it stands for the link rather than being meant to be read off.
-.st-link {
-  font-size: 12px;
-  color: var(--es-muted);
-  line-height: 1.35;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-// What pressing the card does, written out as the link it stands for — the same line the menu's
-// focal card carries (see ContentCardComponent).
-.st-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  align-self: flex-start;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.35;
-  color: var(--es-blue);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-
-  // As small as the line it follows: the arrow belongs to the label, it is not an icon of its own.
-  .st-chevron {
-    flex: 0 0 auto;
-    font-size: 12px;
-    line-height: 1;
-  }
+  ::ng-deep input, ::ng-deep button, ::ng-deep a { cursor: auto; }
 }

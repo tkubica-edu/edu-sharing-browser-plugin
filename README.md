@@ -121,15 +121,18 @@ The options:
   stay in collapsibles.
 - **Vorschau** — the node's name and link plus a live `edu-sharing-preview-sidebar`. Its `node`
   input takes the full hydrated node, so the node is (re)loaded after a save. Above both sits the
-  share offer (`ShareTeaserComponent`): the content's QR code at thumbnail size, its address, and the
-  way into the *Inhalt teilen* tab, which shows the same code at full size.
-- **Inhalt teilen** — the node's page in the repository as a QR code and as a copyable link. Both are
-  built from the address the flow already holds (`ActiveNode.link`), and the code is encoded in the
-  panel (`QrCodeComponent`, `qrcode-generator`). Deliberately *not* `edu-sharing-share-qr`: that
-  element takes a node id and resolves the address by loading the node, which a session that may not
-  read it (a content written by the metadata agent) answers with 403 — the card then stayed empty
-  although the address was known all along. Never a share link either: creating one sets an unlimited
-  expiry as a side effect, which sharing a view of the content must not do.
+  share offer (`ShareTeaserComponent`): `edu-sharing-share-qr` in its `compact` variant — the code as
+  a thumbnail beside the link and its copy control.
+- **Inhalt teilen** — the same element in its `full` variant: the code above the link field, which
+  carries the copy button. The code can be laid enlarged over the panel (a second element with
+  `show-link="false"`), since the card's size is scanned from arm's length.
+
+  Both hand the address in as `link` instead of letting the element resolve one from `node-id`:
+  resolving loads the node, and a content written by the metadata agent is one the panel session may
+  not read (403) — the card then stayed empty although the address had been known since the save. The
+  flow holds it as `ActiveNode.link`, so nothing is requested at all. `mode` stays at `permalink` for
+  the same reason it always did: a share link would set an unlimited expiry as a side effect, which
+  sharing a view of the content must not do.
 - **Aufrufe & Nutzung** — the node's usage statistics, rendered by `edu-sharing-usages` (views,
   downloads, plays, and the embeddings/collections the node is used in). Its `nodes` input is a
   *selection*, so the hydrated node goes in as a single-element array; the element fetches the
@@ -235,7 +238,7 @@ extension). It is built from the edu-sharing frontend (`npm run build:app-as-com
 → `dist/web-components/app/`) and registers every element used here:
 `edu-sharing-mds-editor-wrapper`, `edu-sharing-preview-sidebar`,
 `edu-sharing-nodes-selector`, `edu-sharing-add-with-connector`, `edu-sharing-search`,
-`edu-sharing-usages`. A second bundle,
+`edu-sharing-usages`, `edu-sharing-share-qr`. A second bundle,
 `scripts/wlo/` → `wlo/`, provides the optional `metadata-agent-canvas` (see below).
 
 The elements are used as **real custom elements in the sidebar document — no iframes**.

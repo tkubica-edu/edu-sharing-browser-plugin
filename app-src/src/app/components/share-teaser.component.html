@@ -1,16 +1,8 @@
+<!-- Nothing while the bundle is still loading: the offer is an aside, and an aside does not report
+     that it is on its way. The element itself brings the card, its title and the copy control. -->
 @if (link(); as url) {
-  <button class="share-teaser" (click)="openShare()" title="Inhalt teilen — QR-Code und Link">
-    <span class="st-qr">
-      <es-qr-code [data]="url" [size]="qrSize" label="QR-Code zum Inhalt"></es-qr-code>
-    </span>
-
-    <span class="st-main">
-      <span class="st-title">Inhalt teilen</span>
-      <span class="st-link">{{ url }}</span>
-      <span class="st-action">
-        QR-Code scannen oder Link kopieren
-        <i class="st-chevron" esIcon="chevron_right"></i>
-      </span>
-    </span>
-  </button>
+  @if (bundle.ready()) {
+    <edu-sharing-share-qr variant="compact" [link]="url" [size]="qrSize"
+                          hint-label="QR-Code scannen oder Link kopieren"></edu-sharing-share-qr>
+  }
 }

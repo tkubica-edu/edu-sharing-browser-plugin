@@ -1,33 +1,31 @@
-// "Inhalt teilen" — the code above the link it encodes, both from the address the flow holds.
+// "Inhalt teilen" — the element brings the code, the link and its copy control; only the card around
+// it and the enlarged layer are ours.
 :host { display: block; }
 
 .share {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--es-space-3);
+  gap: var(--es-space-2);
 }
 
-es-qr-code {
+edu-sharing-share-qr {
+  display: block;
   // Never wider than the card, however large the code is asked to be.
   max-width: 100%;
-
-  ::ng-deep svg { max-width: 100%; height: auto; }
 }
 
-// The code as the control that enlarges it: no chrome of its own, so it reads as the code itself.
-// The ring on hover and focus is what says it can be pressed.
+// The way to the enlarged code, as the link it stands for rather than as another button on the card.
 .qr-zoom {
-  display: block;
-  max-width: 100%;
   padding: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--es-blue);
   background: none;
-  border: 0;
-  border-radius: 6px;
-  line-height: 0;
-  outline-offset: 3px;
-
-  &:hover, &:focus-visible { outline: 2px solid var(--es-blue); }
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 // Covers the panel only: the app is an iframe docked in the page (see content/panel-host.js), so a
@@ -48,11 +46,11 @@ es-qr-code {
   cursor: pointer;
 }
 
-// White ground and quiet zone come with the code (see QrCodeComponent); this only rounds it off
-// against the darkened panel.
+// The code's own ground is the element's; this only rounds it off against the darkened panel.
 .qz-code {
   border-radius: 8px;
   overflow: hidden;
+  background: #fff;
 }
 
 // On the dark layer, so not the muted token — that one is written for the panel's light surface.
@@ -60,62 +58,4 @@ es-qr-code {
   margin: 0;
   font-size: 13px;
   color: #ffffff;
-}
-
-.share-link {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-}
-
-.sl-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--es-muted);
-}
-
-.sl-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-// The whole address fits in the field by scrolling, so the layout never widens with the link.
-.sl-field {
-  flex: 1;
-  min-width: 0;
-  padding: 9px 10px;
-  font-size: 13px;
-  font-family: inherit;
-  color: var(--es-text);
-  background: var(--es-surface);
-  border: 1px solid var(--es-border);
-  border-radius: var(--es-radius);
-}
-
-.sl-copy {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  color: var(--es-blue);
-  background: var(--es-surface);
-  border: 1px solid var(--es-border);
-  border-radius: var(--es-radius);
-  cursor: pointer;
-
-  &:hover { background: var(--es-hint-bg); }
-
-  i { font-size: 20px; }
-}
-
-.sl-hint {
-  margin: 0;
-  font-size: 12px;
-  color: var(--es-muted);
-
-  &.is-error { color: var(--es-danger); }
 }
