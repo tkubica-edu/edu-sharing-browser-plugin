@@ -8,7 +8,12 @@
 
   @if (link(); as url) {
     <section class="es-card share">
-      <es-qr-code [data]="url" [size]="qrSize" label="QR-Code zum Inhalt"></es-qr-code>
+      <!-- A control rather than a picture: pressing it lays the code over the panel, where it is
+           large enough to be scanned from further away. -->
+      <button class="qr-zoom" (click)="openZoom()" title="QR-Code vergrößern"
+              aria-label="QR-Code vergrößern">
+        <es-qr-code [data]="url" [size]="qrSize" label="QR-Code zum Inhalt"></es-qr-code>
+      </button>
 
       <div class="share-link">
         <label class="sl-label" for="share-link-field">Link</label>
@@ -32,6 +37,17 @@
         </p>
       </div>
     </section>
+
+    <!-- Over the panel, not over the page: the app is a docked iframe, so a fixed layer ends at the
+         panel's edge. Anywhere on it closes it again, Escape as well (see the host bindings). -->
+    @if (zoomed()) {
+      <div class="qr-zoom-overlay" role="dialog" aria-modal="true"
+           aria-label="QR-Code zum Inhalt, vergrößert" (click)="closeZoom()">
+        <es-qr-code class="qz-code" [data]="url" [size]="zoomSize()"
+                    label="QR-Code zum Inhalt"></es-qr-code>
+        <p class="qz-hint">Zum Schließen tippen</p>
+      </div>
+    }
   } @else {
     <p class="es-muted">Noch kein Inhalt vorhanden.</p>
   }

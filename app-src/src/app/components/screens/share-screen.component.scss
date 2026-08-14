@@ -15,6 +15,53 @@ es-qr-code {
   ::ng-deep svg { max-width: 100%; height: auto; }
 }
 
+// The code as the control that enlarges it: no chrome of its own, so it reads as the code itself.
+// The ring on hover and focus is what says it can be pressed.
+.qr-zoom {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  line-height: 0;
+  outline-offset: 3px;
+
+  &:hover, &:focus-visible { outline: 2px solid var(--es-blue); }
+}
+
+// Covers the panel only: the app is an iframe docked in the page (see content/panel-host.js), so a
+// fixed layer is bounded by the panel's own viewport.
+.qr-zoom-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--es-space-4);
+  padding: 24px;
+  // Dark rather than the panel's own ground: it separates the code from whatever it was laid over,
+  // and a scanner reads a code best against a wide contrast.
+  background: rgba(28, 39, 51, 0.72);
+  cursor: pointer;
+}
+
+// White ground and quiet zone come with the code (see QrCodeComponent); this only rounds it off
+// against the darkened panel.
+.qz-code {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+// On the dark layer, so not the muted token — that one is written for the panel's light surface.
+.qz-hint {
+  margin: 0;
+  font-size: 13px;
+  color: #ffffff;
+}
+
 .share-link {
   display: flex;
   flex-direction: column;
