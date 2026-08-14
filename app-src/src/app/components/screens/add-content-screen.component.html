@@ -11,7 +11,11 @@
     @for (option of options(); track option.section) {
       <li>
         <button class="menu-item" (click)="navigation.go(option.section)">
-          <span class="mi-icon" [innerHTML]="icons.icon(option.section)"></span>
+          @if (icons.material(option.section); as glyph) {
+            <i class="mi-icon" [esIcon]="glyph"></i>
+          } @else {
+            <span class="mi-icon" [innerHTML]="icons.icon(option.section)"></span>
+          }
           <span class="mi-main">
             <span class="mi-title">{{ option.label }}</span>
             <span class="mi-desc">{{ option.description }}</span>

@@ -45,9 +45,13 @@
 
 .close i { display: block; font-size: 20px; line-height: 1; }
 
+// Either an inline SVG or a Material ligature (esIcon) — the same box for both, with the font size
+// filling it for the glyph.
 .tb-icon {
   display: block;
   width: 20px; height: 20px;
+  font-size: 20px;
+  line-height: 20px;
 
   ::ng-deep svg { width: 20px; height: 20px; display: block; }
 }
