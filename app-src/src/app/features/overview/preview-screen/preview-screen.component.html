@@ -1,10 +1,4 @@
 <div class="es-screen-body">
-  <!-- The share offer above everything else: it is about handing this content on rather than about
-       what it is, and it shows itself only once there is a code (see ShareTeaserComponent). -->
-  @if (curation.activeNode()) {
-    <es-share-teaser></es-share-teaser>
-  }
-
   <section class="es-hint-card">
     @if (curation.activeNode()) {
       <!-- What the content is called, and the way to everything else about it: the panel shows a
@@ -18,6 +12,12 @@
       <p class="es-muted">Noch kein Node vorhanden.</p>
     }
   </section>
+
+  <!-- The share offer follows the naming of the content: once it is clear what this is, handing it
+       on is the next step. It shows itself only once there is a code (see ShareTeaserComponent). -->
+  @if (curation.activeNode()) {
+    <es-share-teaser></es-share-teaser>
+  }
 
   <!-- The WLO canvas shows the saved properties read-only while the repository config enables it;
        otherwise the edu-sharing preview element renders the node itself. -->
