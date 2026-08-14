@@ -29,6 +29,13 @@ export class SettingsScreenComponent implements OnDestroy {
   /** Whether ContentJudge may be asked at all — its switch is shown either way, see the template. */
   protected readonly contentJudgeAvailable = CONTENT_JUDGE_AVAILABLE;
 
+  /**
+   * The checks the measurement is asked for, as its description lists them. Read from the rules rather than
+   * written into the text, because the rules are also what the request asks for — a listing written by hand
+   * would state something the service is not doing.
+   */
+  protected readonly metalookupChecks = APP_CONFIG.qualityMetalookupRules;
+
   private readonly contextRefresh = inject(ContextRefreshService);
 
   protected readonly repositoryUrl = signal(this.auth.repositoryUrl());

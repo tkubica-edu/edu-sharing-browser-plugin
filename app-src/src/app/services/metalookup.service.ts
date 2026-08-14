@@ -74,12 +74,15 @@ export class MetalookupService {
   readonly error = signal<string | null>(null);
 
   /**
-   * Evaluate a resource. Rejects when the service cannot be reached, answers with a status the
-   * request cannot be served under, or sends something that is not a JSON object — the caller decides
-   * what to do with that; {@link error} carries it for the view either way.
+   * Evaluate a resource against the named features. Rejects when the service cannot be reached, answers
+   * with a status the request cannot be served under, or sends something that is not a JSON object — the
+   * caller decides what to do with that; {@link error} carries it for the view either way.
    */
-  async evaluate(resource: MetalookupResource): Promise<MetalookupEvaluation> {
-    const body = this.requestBody(resource);
+  async evaluate(
+    resource: MetalookupResource,
+    features: readonly string[]
+  ): Promise<MetalookupEvaluation> {
+    const body = this.requestBody(resource, features);
     this.running.set(true);
     this.error.set(null);
     try {
@@ -97,9 +100,13 @@ export class MetalookupService {
   /**
    * The request as the API wants it: `type` and `repository` are required, and one of `url`/`node`
    * identifies the resource. A resource with neither is refused here rather than sent — the answer
-   * would be a 400, which says less than the refusal does.
+   * would be a 400, which says less than the refusal does. `features` names the checks to run, and
+   * is left off when the caller names none — the deployment then runs every feature it has.
    */
-  requestBody(resource: MetalookupResource): Record<string, string> {
+  requestBody(
+    resource: MetalookupResource,
+    features: readonly string[]
+  ): Record<string, unknown> {
     const url = resource.url?.trim();
     const node = resource.nodeId?.trim();
     if (!url && !node) {
@@ -110,10 +117,11 @@ export class MetalookupService {
       repository: HOME_REPOSITORY,
       ...(url ? { url } : {}),
       ...(node ? { node } : {}),
+      ...(features.length ? { features: [...features] } : {}),
     };
   }
 
-  private postEvaluation(body: Record<string, string>): Promise<MetalookupEvaluation> {
+  private postEvaluation(body: Record<string, unknown>): Promise<MetalookupEvaluation> {
     return fetchJson<MetalookupEvaluation>({
       service: 'MetalookUp',
       url: `${APP_CONFIG.metalookupApiUrl}/api/evaluation`,

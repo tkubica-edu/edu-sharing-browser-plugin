@@ -131,9 +131,16 @@
     </label>
 
     <p class="desc">
-      Ruft den Inhalt selbst ab und misst ihn — davon wird derzeit die Barrierefreiheit (AXE)
-      ausgewertet. Abgeschaltet bleibt das zugehörige Kriterium unbeantwortet.
+      Ruft den Inhalt selbst ab und misst ihn. Abgeschaltet bleiben die Kriterien unbeantwortet, die
+      davon leben. Angefragt werden nur diese Prüfungen — was der Dienst sonst noch messen könnte,
+      läuft gar nicht erst:
     </p>
+
+    <ul class="desc-list">
+      @for (check of metalookupChecks; track check.propertyId) {
+        <li>{{ check.label }} — Feature „{{ check.feature }}“</li>
+      }
+    </ul>
 
     <label class="check">
       <input type="checkbox" [ngModel]="qualityJudge.contentJudgeEnabled()"

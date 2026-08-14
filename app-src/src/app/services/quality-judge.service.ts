@@ -8,7 +8,7 @@ import {
 import {
   MetalookupEvaluation, MetalookupResource, MetalookupService
 } from './metalookup.service';
-import { JudgementSource, configuredSchemes } from '../util/quality-schemes';
+import { JudgementSource, configuredSchemes, metalookupFeatures } from '../util/quality-schemes';
 import { errorMessage } from '../util/errors';
 
 /** A judge nobody has asked yet. */
@@ -28,8 +28,17 @@ const LOG_CONTENT_JUDGE = '[edu-sharing][contentjudge]';
  */
 export const CONTENT_JUDGE_AVAILABLE = false;
 
-/** Both judges are asked unless the settings say otherwise — judging the quality is what the step is for. */
-const DEFAULT_ENABLED = true;
+/**
+ * MetalookUp measures every content unless the settings say otherwise: the measurement is what answers
+ * Barrierearmut, and it is cheap enough to run unasked.
+ */
+const DEFAULT_METALOOKUP_ENABLED = true;
+
+/**
+ * ContentJudge likewise — stated for itself rather than shared with the measurement, since the two are
+ * worth very different amounts of a service's work and their defaults have no reason to move together.
+ */
+const DEFAULT_CONTENT_JUDGE_ENABLED = true;
 
 /**
  * How far one judge got with this content. `skipped` means it was never asked, because the content holds
@@ -83,12 +92,12 @@ export class QualityJudgeService {
   /** Whether the content in hand has been judged, so it is not judged twice. */
   private started = false;
 
-  private readonly metalookupEnabledState = signal(DEFAULT_ENABLED);
+  private readonly metalookupEnabledState = signal(DEFAULT_METALOOKUP_ENABLED);
 
   /** Whether MetalookUp measures the content at all. Persisted, so it survives a reload. */
   readonly metalookupEnabled = this.metalookupEnabledState.asReadonly();
 
-  private readonly contentJudgeEnabledState = signal(DEFAULT_ENABLED);
+  private readonly contentJudgeEnabledState = signal(DEFAULT_CONTENT_JUDGE_ENABLED);
 
   /** Whether ContentJudge judges the content: what the setting says, and what the build allows. */
   readonly contentJudgeEnabled = computed(
@@ -102,10 +111,10 @@ export class QualityJudgeService {
   async load(): Promise<void> {
     const keys = APP_CONFIG.storageKeys;
     this.metalookupEnabledState.set(
-      await this.browserExtension.storageGet(keys.qualityMetalookup, DEFAULT_ENABLED),
+      await this.browserExtension.storageGet(keys.qualityMetalookup, DEFAULT_METALOOKUP_ENABLED),
     );
     this.contentJudgeEnabledState.set(
-      await this.browserExtension.storageGet(keys.qualityContentJudge, DEFAULT_ENABLED),
+      await this.browserExtension.storageGet(keys.qualityContentJudge, DEFAULT_CONTENT_JUDGE_ENABLED),
     );
   }
 
@@ -145,9 +154,10 @@ export class QualityJudgeService {
    */
   private async judge(resource: MetalookupResource): Promise<void> {
     const schemes = configuredSchemes();
-    console.log(`${LOG_QUALITY} schemes`, schemes);
+    const features = metalookupFeatures();
+    console.log(`${LOG_QUALITY} schemes`, schemes, 'features', features);
     await Promise.allSettled([
-      this.runMetalookup(resource),
+      this.runMetalookup(resource, features),
       // Only the schemes themselves; what the mapping left out is in the log above.
       this.runContentJudge(resource, schemes.schemes)
     ]);
@@ -156,8 +166,12 @@ export class QualityJudgeService {
   /**
    * MetalookUp retrieves the resource itself, so it is given what identifies it: the address, and the
    * node id for a content the repository already holds. It takes either, and with both it can choose.
+   * The features bound what it runs — everything outside them would be measured for nobody.
    */
-  private async runMetalookup(resource: MetalookupResource): Promise<void> {
+  private async runMetalookup(
+    resource: MetalookupResource,
+    features: readonly string[]
+  ): Promise<void> {
     if (!this.metalookupEnabled()) {
       const detail = 'Die Messung ist in den Einstellungen abgeschaltet.';
       this.metalookupStatus.set({ judge: 'MetalookUp', state: 'skipped', detail });
@@ -170,11 +184,17 @@ export class QualityJudgeService {
       console.log(`${LOG_METALOOKUP} skipped — ${detail}`);
       return;
     }
+    if (!features.length) {
+      const detail = 'Kein Kriterium verweist auf eine Messung.';
+      this.metalookupStatus.set({ judge: 'MetalookUp', state: 'skipped', detail });
+      console.log(`${LOG_METALOOKUP} skipped — ${detail}`);
+      return;
+    }
     this.metalookupStatus.set({ judge: 'MetalookUp', state: 'running', detail: null });
     try {
       // Built here only to log what goes out; the call assembles its own, from the same pure method.
-      console.log(`${LOG_METALOOKUP} → request`, this.metalookup.requestBody(resource));
-      const measurement = await this.metalookup.evaluate(resource);
+      console.log(`${LOG_METALOOKUP} → request`, this.metalookup.requestBody(resource, features));
+      const measurement = await this.metalookup.evaluate(resource, features);
       this.measurement.set(measurement);
       this.metalookupStatus.set({ judge: 'MetalookUp', state: 'done', detail: null });
       console.log(`${LOG_METALOOKUP} ← response`, measurement);

@@ -19,8 +19,18 @@
   input:disabled { cursor: default; }
 }
 
-// A second switch in the same card sits under the first one's description, not against it.
-.desc + .check { margin-top: var(--es-space-3); }
+// What a description enumerates — indented under it, and in the description's own muted type, since the
+// list is part of the same explanation rather than content of its own.
+.desc-list {
+  color: var(--es-muted);
+  font-size: 12px;
+  margin: var(--es-space-2) 0 0;
+  padding-left: var(--es-space-4);
+}
+
+// A second switch in the same card sits under whatever ended the first one's description, not against it.
+.desc + .check,
+.desc-list + .check { margin-top: var(--es-space-3); }
 
 // The heading of a folded card, as the control that unfolds it: the whole width, so the target is the
 // row and not the chevron at its end.

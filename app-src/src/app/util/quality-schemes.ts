@@ -96,6 +96,19 @@ export function configuredSchemes(): CriteriaSchemes {
 }
 
 /**
+ * The MetalookUp features whose checks are read, deduplicated and in the order the config lists them — one feature
+ * may carry several checks. This is what an evaluation asks for, and the deployment then runs nothing besides: the
+ * unasked features cost the request their own time, and their extractions would be discarded anyway.
+ */
+export function metalookupFeatures(): string[] {
+  const features: string[] = [];
+  for (const rule of APP_CONFIG.qualityMetalookupRules) {
+    if (!features.includes(rule.feature)) features.push(rule.feature);
+  }
+  return features;
+}
+
+/**
  * What both judges said about each criterion, keyed by criterion id — several answers where several checks bear
  * on one. Driven by the criteria rather than by the answers, because that is the direction the view reads in:
  * the maps decide what a result is about.

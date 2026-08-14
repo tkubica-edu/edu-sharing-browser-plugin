@@ -21,6 +21,11 @@ export interface MetalookupRule {
    * sidecars carries as a deployment variable of its own. A key this list does not name is not read at all.
    */
   readonly propertyId: string;
+  /**
+   * The MetalookUp feature that produces the check, by the name the gateway's own configuration gives it
+   * (`application.features.*`). It is what the request asks for, so a feature nobody names here does not run.
+   */
+  readonly feature: string;
   /** What the check is called where its result is shown; MetalookUp reports no name of its own. */
   readonly label: string;
   /** The criterion it answers, by the id the metadata set gives it. */
@@ -98,12 +103,14 @@ export const APP_CONFIG = {
   } as Record<string, CriterionScheme | null>,
   /**
    * Which of MetalookUp's checks answers which quality criterion — the counterpart of `qualityCriterionSchemes` for the
-   * other judge, and also what is read of the answer, so an extraction under an unnamed key is discarded. Hence one
-   * entry: the AXE audit is the only judge Barrierearmut has. A criterion is met only while none of its checks fails.
+   * other judge. It decides both halves of the exchange: the features the request asks for, and what is read of the
+   * answer, so an extraction under an unnamed key is discarded. Hence one entry: the AXE audit is the only judge
+   * Barrierearmut has. A criterion is met only while none of its checks fails.
    */
   qualityMetalookupRules: [
     {
       propertyId: 'ccm:accessibilitySummary',
+      feature: 'accessibility',
       label: 'Barrierefreiheit (AXE)',
       criterion: 'accessible',
       met: 'atLeast',
