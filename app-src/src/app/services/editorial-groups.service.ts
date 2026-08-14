@@ -167,16 +167,30 @@ export class EditorialGroupsService {
    * with the topics they belong to, and the collection the best of those is kept as is picked for the
    * group whose own collection it sits in (see {@link CollectionRecommendationService}). Once per set of
    * keywords — from the answer on the choice is the user's, including the choice to drop it again.
+   *
+   * Asked for alongside the groups rather than after them: the two answers are only worth anything
+   * together, but neither request needs the other's answer, and the assistant is the slower of the two.
    */
   async recommendCollection(): Promise<void> {
-    await this.load();
     const keywords = this.curation.contentKeywords();
     const asked = keywords.join('|');
-    if (!asked || this.recommendedFor === asked || !this.groupsState().length) return;
+    // A repository the config named no group for was read as such by an earlier load — nothing to ask
+    // for, since a proposal is only ever taken over as a group's choice.
+    if (!asked || this.recommendedFor === asked || this.configuredState() === false) return;
     this.recommendedFor = asked;
     this.recommendingState.set(true);
     try {
-      const found = await this.recommendations.recommend(keywords, this.curation.contentText());
+      const [found] = await Promise.all([
+        this.recommendations.recommend(keywords, this.curation.contentText()),
+        this.load()
+      ]);
+      // The groups did not load, so there is nothing to take a proposal over for; asked again the next
+      // time the step is entered, since by then they may well be there.
+      if (!this.groupsState().length) {
+        this.recommendedFor = null;
+        console.log(`${LOG} proposal dropped, no editorial group was loaded`);
+        return;
+      }
       if (found) this.applyRecommendation(found);
       else console.log(`${LOG} no collection to propose for:`, keywords);
     } catch (cause: unknown) {
