@@ -1,4 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { take } from 'rxjs';
 import { ConfigService, DEFAULT } from 'ngx-edu-sharing-api';
 
 import { APP_CONFIG } from '../config';
@@ -33,14 +34,31 @@ export class BrowserExtensionCustomWebComponentService {
   /** Watch the repository config for the flag. */
   initialize(): void {
     this.config.observeVariables().subscribe((variables) => {
+      // No config (yet) is not an answer: leave the flag as it is rather than reading the absence
+      // of variables as the absence of the flag.
+      if (!variables) return;
       // `Variables` types every value as string, so a config that delivers the raw string
       // "true" is honoured as well as a real boolean.
-      const value = variables?.[CONFIG_VARIABLE] as unknown;
-      const enabled = typeof value === 'boolean' ? value : String(value).trim() === 'true';
-      if (enabled) {
-        this.enabledState.set(true);
-        document.documentElement.classList.add(THEME_CLASS);
+      const value = variables[CONFIG_VARIABLE] as unknown;
+      this.apply(typeof value === 'boolean' ? value : String(value).trim() === 'true');
+    });
+  }
+
+  /**
+   * Fetch the repository config again, so a config that changed since the boot reaches the
+   * subscription above. The variables share the library's config update trigger, which is what
+   * `forceUpdate` pulls.
+   */
+  refresh(): void {
+    this.config.observeConfig({ forceUpdate: true }).pipe(take(1)).subscribe({
+      error: () => {
+        /* unreachable repository — the flag stays as it is */
       }
     });
+  }
+
+  private apply(enabled: boolean): void {
+    this.enabledState.set(enabled);
+    document.documentElement.classList.toggle(THEME_CLASS, enabled);
   }
 }

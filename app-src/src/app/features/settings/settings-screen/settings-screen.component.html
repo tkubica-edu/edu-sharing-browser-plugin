@@ -12,8 +12,8 @@
 
   @if (auth.needsReload()) {
     <div class="es-notice">
-      <span>Repository geändert. Zum Übernehmen neu laden.</span>
-      <button class="es-btn es-btn--tonal es-btn--small" (click)="reload()">Übernehmen</button>
+      <span>Repository geändert. Wird beim Verlassen der Einstellungen übernommen — dazu lädt das Panel neu.</span>
+      <button class="es-btn es-btn--tonal es-btn--small" (click)="reload()">Jetzt übernehmen</button>
     </div>
   }
 

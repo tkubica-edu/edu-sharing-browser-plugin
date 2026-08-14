@@ -79,6 +79,26 @@ export class AuthService {
     }
   }
 
+  /**
+   * Ask the repository again what this session is. Unlike the boot's restore this also drops a session
+   * that is gone — it answers the question "is what the panel shows still true?", which a check that
+   * can only ever log in would leave half-answered.
+   */
+  async revalidate(): Promise<void> {
+    // Without this the library answers from the login info it already holds, which is exactly the
+    // stale answer this is here to replace.
+    this.authentication.forceLoginInfoRefresh();
+    try {
+      const info = await firstValueFrom(
+        this.authentication.observeLoginInfo().pipe(timeout(RESTORE_TIMEOUT_MS)),
+      );
+      if (this.isValidUser(info)) this.applyLogin(info.authorityName ?? this.username());
+      else this.applyLogout(null);
+    } catch {
+      /* unreachable — keep the session as it is rather than logging the user out on a hiccup */
+    }
+  }
+
   /** Persist the repository base; flag needsReload if it differs from the booted URL. */
   setRepositoryUrl(repositoryBase: string): void {
     const base = repositoryBase.trim();
