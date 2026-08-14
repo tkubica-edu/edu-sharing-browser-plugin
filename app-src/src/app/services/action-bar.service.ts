@@ -77,6 +77,10 @@ export class ActionBarService {
   }
 
   readonly actions = computed<FooterAction[]>(() => {
+    // Under the login gate the section's own actions belong to a screen that is not on display, and
+    // the only way on the gate has is the login on it — so what the footer carries there is the way
+    // back out, as on every other step (see NavigationService.sessionGate).
+    if (this.navigation.sessionGate()) return [this.backAction()];
     switch (this.navigation.section()) {
       // "Inhalt erschließen": run the metadata agent on the page and hand its result to the preview
       // step. The screen starts that itself on entry, so what is left for the footer is the repeat —

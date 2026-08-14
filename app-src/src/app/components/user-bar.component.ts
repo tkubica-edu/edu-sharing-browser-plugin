@@ -39,6 +39,8 @@ export class UserBarComponent {
   protected readonly visible = computed(
     () =>
       this.auth.authorized() &&
+      // Not under the login gate: it brings the panel's bottom edge itself (LoginGateComponent).
+      !this.navigation.sessionGate() &&
       (this.navigation.section() === 'menu' || !!this.navigation.currentSection()?.plain),
   );
 
@@ -56,9 +58,9 @@ export class UserBarComponent {
    * itself ends on, and what is shown while the person record is still on its way (or did not come).
    */
   protected readonly subtitle = computed(() => {
-    // For a guest it names what the login is *for* rather than that none is required: the sections a
-    // guest session cannot serve are listed and disabled (see GUEST_HINT), and this row is where the
-    // way out of that is — folding it out offers "Anmelden".
+    // For a guest it names what the login is *for* rather than that none is required: a section a
+    // guest session cannot serve asks for one (see AppSection.requiresSession), and this row is where
+    // it can be had beforehand — folding it out offers "Anmelden".
     if (this.guest()) return 'Anmelden schaltet weitere Funktionen frei';
     const user = this.auth.currentUser();
     const name = user ? this.authorityName.transform(user) : null;

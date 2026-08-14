@@ -6,38 +6,46 @@
     <button class="es-btn es-btn--text logout" (click)="logout()">Abmelden</button>
   </div>
 } @else {
-  <section class="es-card">
-    <div class="es-card-head">
-      <h2>Anmeldung</h2>
-      <span class="es-badge es-badge--guest">Nicht angemeldet</span>
+  <section class="es-card login">
+    <i class="lg-avatar" esIcon="account_circle"></i>
+    <h2 class="lg-heading">{{ heading() }}</h2>
+    <p class="lg-lead">{{ leadText() }}</p>
+
+    <input type="text" class="es-input" [placeholder]="userPlaceholder" autocomplete="username"
+           [ngModel]="username()" (ngModelChange)="username.set($event)" />
+
+    <!-- The password with the eye that shows it: a password typed into a panel docked in a page is
+         typed without a second try, so being able to read it back is what saves the retry. -->
+    <div class="lg-password">
+      <input class="es-input" [type]="passwordVisible() ? 'text' : 'password'" placeholder="Passwort"
+             autocomplete="current-password" [ngModel]="password()"
+             (ngModelChange)="password.set($event)" (keyup.enter)="login()" />
+      <button class="lg-reveal" type="button" (click)="togglePassword()"
+              [attr.aria-pressed]="passwordVisible()"
+              [title]="passwordVisible() ? 'Passwort verbergen' : 'Passwort anzeigen'"
+              [attr.aria-label]="passwordVisible() ? 'Passwort verbergen' : 'Passwort anzeigen'">
+        <i [esIcon]="passwordVisible() ? 'visibility_off' : 'visibility'"></i>
+      </button>
     </div>
 
-    <input type="text" class="es-input" placeholder="Benutzername" autocomplete="username"
-           [ngModel]="username()" (ngModelChange)="username.set($event)" />
-    <input type="password" class="es-input" placeholder="Passwort" autocomplete="current-password"
-           [ngModel]="password()" (ngModelChange)="password.set($event)" (keyup.enter)="login()" />
+    <!-- The repository's own form, so the tab is taken there — see RepositoryPageService. -->
+    <button class="lg-link" type="button" (click)="openPasswordReset()">Passwort vergessen?</button>
 
     @if (auth.error()) {
       <p class="es-error">{{ auth.error() }}</p>
     }
 
-    <div class="es-row">
-      <button class="es-btn es-btn--primary" [disabled]="!canSubmit()" (click)="login()">
-        {{ loggingIn() ? 'Anmelden…' : 'Anmelden' }}
-      </button>
-      <!-- Not always required: without a required login the user came here from the user bar. -->
-      <span class="es-muted">
-        @if (auth.loginRequired()) {
-          Anmeldung ist erforderlich.
-        } @else {
-          Ohne Anmeldung sind nur öffentliche Inhalte verfügbar.
-        }
-      </span>
-    </div>
+    <button class="lg-submit" [disabled]="!canSubmit()" (click)="login()">
+      {{ loggingIn() ? 'Anmelden…' : 'Anmelden' }}
+    </button>
+
+    <p class="lg-or"><span>oder</span></p>
+
+    <button class="lg-secondary" type="button" (click)="openRegister()">Account erstellen</button>
 
     @if (auth.needsReload()) {
       <p class="es-hint">
-        Repository geändert – bitte in „Einstellungen" übernehmen, um dich anzumelden.
+        Repository geändert – bitte in „Einstellungen“ übernehmen, um dich anzumelden.
       </p>
     }
   </section>

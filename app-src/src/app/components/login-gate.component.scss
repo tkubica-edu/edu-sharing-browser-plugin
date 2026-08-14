@@ -1,0 +1,17 @@
+// Fills the screen's place like every other view; the way back is the footer's (ActionBarService).
+:host {
+  display: block;
+  height: 100%;
+}
+
+// The card takes the height it is given, so the form sits in the panel rather than in a box at the
+// top of it — what is asked for here is the whole screen's business.
+es-login {
+  height: 100%;
+
+  // Centred in the height it now has: the form is the whole screen here, not a card at the top of one.
+  ::ng-deep .login {
+    height: 100%;
+    justify-content: center;
+  }
+}

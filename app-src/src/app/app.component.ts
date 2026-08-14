@@ -26,6 +26,7 @@ import { ActionBarComponent } from './components/action-bar.component';
 import { AiAssistantBarComponent } from './components/ai-assistant-bar.component';
 import { HistoryComponent } from './components/history.component';
 import { LoginComponent } from './components/login.component';
+import { LoginGateComponent } from './components/login-gate.component';
 import { MenuComponent } from './components/menu.component';
 import { SearchComponent } from './components/search.component';
 import { SettingsComponent } from './components/settings.component';
@@ -62,7 +63,7 @@ const DISCARD_PROMPT =
   imports: [
     IconDirective,
     ActionBarComponent, TabBarComponent, UserBarComponent, AiAssistantBarComponent, MenuComponent,
-    LoginComponent, AiAssistantScreenComponent, HistoryComponent, SettingsComponent,
+    LoginComponent, LoginGateComponent, AiAssistantScreenComponent, HistoryComponent, SettingsComponent,
     SearchComponent, AddContentScreenComponent,
     ContentOptionsScreenComponent, CurationScreenComponent, CurationPreviewScreenComponent,
     FindContentScreenComponent,

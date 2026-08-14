@@ -217,6 +217,17 @@ re-enter credentials when reopening the panel or switching pages, and **no passw
 stored**. If the cookie is gone (browser restart, explicit logout, or Safari ITP blocking the third-party cookie)
 it resolves to guest and the login gate appears.
 
+**Sections a guest cannot be served by** (`AppSection.requiresSession`: *Inhalt hinzufügen*, *Meine
+Inhalte*) stay listed and enterable. What they show is the login instead of their screen —
+`LoginGateComponent` around the same `LoginComponent` the Login section renders, filling the screen's
+place like any other view. Its footer is the shared action bar with the way back on it, and the
+session bar and the assistant bar stay away for as long as the gate is up
+(`NavigationService.sessionGate`, read by the shell, `ActionBarService` and both bars). Nothing has to be re-entered once the session
+exists: the gate is a condition, not a step, so the screen behind it renders the moment the login
+succeeds. *Register* and *Passwort vergessen* are the repository's own forms
+(`/components/register`, `/components/register/request`) and open in the docked tab —
+`RepositoryPageService`, which saves the resume state first because the load tears the panel down.
+
 ## Direct web-component embedding
 
 The pre-built edu-sharing bundle lives in `scripts/edu/` (packaged as `edu/` in the built

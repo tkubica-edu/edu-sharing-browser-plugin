@@ -1,3 +1,5 @@
+@use 'mixins' as m;
+
 :host { display: block; padding: var(--es-space-4); }
 
 // Component-specific: compact one-line status shown once logged in.
@@ -11,3 +13,122 @@
   border-radius: var(--es-radius);
 }
 .status .logout { margin-left: auto; }
+
+// The form is the whole card and nothing else is on it, so it is centred: what is asked for is one
+// thing, and the panel is narrow enough that a left-aligned column reads as a fragment of a page.
+.login {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--es-space-3);
+  padding: var(--es-space-4);
+  text-align: center;
+
+  // The inputs and the buttons take the card's width; only the texts are centred.
+  .es-input, .lg-password, .lg-submit, .lg-secondary, .lg-or { width: 100%; }
+  // The card's own gap spaces the fields — the input mixin's own margin would double it.
+  .es-input { margin-bottom: 0; }
+  // Every row keeps its own height: the card may be taller than the form (the login gate gives it the
+  // whole screen), and a growing row would stretch a button to fill that height.
+  > * { flex: 0 0 auto; }
+}
+
+.lg-avatar {
+  color: var(--es-blue);
+  font-size: 52px;
+  line-height: 1;
+}
+
+.lg-heading {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--es-blue);
+}
+
+.lg-lead {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--es-text);
+}
+
+// The password field with the eye inside it, so the row stays one control to the eye.
+.lg-password {
+  position: relative;
+
+  .es-input { padding-right: 42px; }
+}
+
+.lg-reveal {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--es-blue);
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+
+  &:hover { background: var(--es-hint-bg); }
+
+  i { font-size: 20px; }
+}
+
+// A link rather than a button, although it is one: it leads out of the panel to the repository's own
+// form, and it sits where the field it belongs to ends.
+.lg-link {
+  align-self: flex-end;
+  margin-top: calc(-1 * var(--es-space-2));
+  padding: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--es-blue);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.lg-submit {
+  @include m.fbtn;
+  @include m.fbtn-primary;
+
+  cursor: pointer;
+  padding: 12px;
+  font-size: 14px;
+}
+
+.lg-secondary {
+  @include m.fbtn;
+  @include m.fbtn-secondary;
+
+  cursor: pointer;
+  padding: 12px;
+  font-size: 14px;
+}
+
+// "oder" between the two ways in, with a rule running out to both sides of it.
+.lg-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--es-muted);
+
+  &::before, &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--es-border);
+  }
+}

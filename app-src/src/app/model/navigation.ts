@@ -145,6 +145,16 @@ export interface AppSection {
   /** Listed as an entry of the main menu. Without it the section is only reachable from the flow. */
   menu?: boolean;
   /**
+   * The section needs a session of the user's own ({@link Conditions.hasSession}), so a guest cannot
+   * be served by it: it acts *as* a person — writing into their storage, listing what is theirs — and
+   * a guest session belongs to none.
+   *
+   * It stays enterable nonetheless: what a guest gets there is the login (LoginGateComponent, rendered
+   * in place of the screen), because "sign in and carry on" is the answer to this, and a row that only
+   * says no leaves the user to find the way to the login themselves.
+   */
+  requiresSession?: boolean;
+  /**
    * The screen is a plain list of rows or entries — no form, no embedded editor or selector, no
    * footer action. Its bottom edge is free, which is where the session bar shows (UserBarComponent).
    */
@@ -174,16 +184,6 @@ export interface AppSection {
    */
   oneWay?: boolean;
 }
-
-/**
- * Why a section is off for a guest, said the same way wherever that is the reason.
- *
- * A guest session is the panel working without a login (the repository allows it, see
- * `AuthService.authorized`) — it belongs to no person, so everything that acts *as* one has nothing
- * to act on: a storage to write into, a list of one's own contents. Those sections stay listed and
- * disabled, so the menu keeps saying what the panel can do and this says what it takes.
- */
-const GUEST_HINT = 'Nur mit eigener Anmeldung — als Gast steht diese Funktion nicht zur Verfügung.';
 
 /** Everything except login and settings requires a valid login. */
 const requiresLogin =
@@ -259,10 +259,9 @@ export const SECTIONS: readonly AppSection[] = [
     description: 'Inhalt erstellen oder hochladen',
     visible: requiresLogin(),
     menu: true,
-    // Both ways of adding something write into the user's own storage, which a guest has none of —
-    // see GUEST_HINT.
-    enabled: (c) => c.hasSession,
-    disabledHint: GUEST_HINT,
+    // Both ways of adding something write into the user's own storage, which a guest session has
+    // none of — see AppSection.requiresSession.
+    requiresSession: true,
     // Two rows to pick from — the ways of adding something. The forms are behind them.
     plain: true,
     tabs: [{ id: 'add-content', label: 'Hinzufügen' }]
@@ -305,9 +304,8 @@ export const SECTIONS: readonly AppSection[] = [
     visible: requiresLogin(),
     menu: true,
     // "Eigene" is what a guest session has nothing of: it belongs to no person, so there is no such
-    // list to show — see GUEST_HINT.
-    enabled: (c) => c.hasSession,
-    disabledHint: GUEST_HINT,
+    // list to show — see AppSection.requiresSession.
+    requiresSession: true,
     tabs: [{ id: 'own-content', label: 'Auswählen' }]
   },
   {

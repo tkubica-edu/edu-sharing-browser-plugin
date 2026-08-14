@@ -45,6 +45,8 @@ export class AiAssistantBarComponent {
     () =>
       this.webComponent.enabled() &&
       this.auth.authorized() &&
+      // Not under the login gate: it brings the panel's bottom edge itself (LoginGateComponent).
+      !this.navigation.sessionGate() &&
       (this.navigation.section() === 'menu' || !!this.navigation.currentSection()?.plain),
   );
 

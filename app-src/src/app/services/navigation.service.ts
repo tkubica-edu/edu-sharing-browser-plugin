@@ -96,6 +96,19 @@ export class NavigationService {
   /** The open section's definition; undefined on the menu. */
   readonly currentSection = computed<AppSection | undefined>(() => this.sectionOf(this.section()));
 
+  /**
+   * Whether the open section asks for a login the panel does not have: it needs a session of the
+   * user's own and this one is a guest's (see AppSection.requiresSession).
+   *
+   * The section is entered all the same — what it shows then is the login instead of its screen
+   * (LoginGateComponent), and its footer is the gate's own. So this is read by the shell, which
+   * decides what to render, and by ActionBarService, whose actions belong to a screen that is not on
+   * display.
+   */
+  readonly sessionGate = computed(
+    () => !!this.currentSection()?.requiresSession && !this.conditions.hasSession(),
+  );
+
   /** The open section's sub steps that apply right now, each with its current openability. */
   readonly tabs = computed<readonly TabView[]>(() => {
     const conditions = this.conditions.snapshot();

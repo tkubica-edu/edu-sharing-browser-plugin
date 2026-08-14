@@ -49,6 +49,10 @@
 <main class="content">
   @if (navigation.section() === 'menu') {
     <es-menu></es-menu>
+  } @else if (navigation.sessionGate()) {
+    <!-- The section needs a login this session does not have, so what it shows is that login rather
+         than its own screen — see AppSection.requiresSession. -->
+    <es-login-gate></es-login-gate>
   } @else {
     @switch (navigation.screen()) {
       @case ('login') { <es-login></es-login> }
