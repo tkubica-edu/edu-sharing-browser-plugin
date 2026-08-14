@@ -13,11 +13,13 @@
   } @else if (link(); as url) {
     @if (bundle.ready()) {
       <section class="es-card share">
-        <edu-sharing-share-qr [link]="url" [size]="qrSize"
-                              hint-label="QR-Code scannen oder Link kopieren"></edu-sharing-share-qr>
+        <!-- No heading of its own: the tab is already named "Inhalt teilen". A click on the code
+             enlarges it; the link field and its copy button keep their own click. -->
+        <edu-sharing-share-qr [link]="url" [size]="qrSize" title-label=""
+                              hint-label="QR-Code scannen oder Link kopieren"
+                              (click)="onCardClick($event)"></edu-sharing-share-qr>
 
-        <!-- Beside the code rather than on it: the element's card carries the link field too, and a
-             card that is a button cannot hold one. -->
+        <!-- The same way by keyboard, for which the code itself offers no target. -->
         <button class="qr-zoom" (click)="openZoom()">QR-Code vergrößern</button>
       </section>
     } @else {

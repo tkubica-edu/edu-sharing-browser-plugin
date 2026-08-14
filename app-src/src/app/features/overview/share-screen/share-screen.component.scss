@@ -13,6 +13,15 @@ edu-sharing-share-qr {
   display: block;
   // Never wider than the card, however large the code is asked to be.
   max-width: 100%;
+  width: 100%;
+
+  // The element is a child in the light DOM, so its own layout is reachable from here: the card
+  // already pads, and the link belongs to a panel narrow enough to need its whole width.
+  ::ng-deep .share-qr { padding: 0; }
+  ::ng-deep .share-qr__link { max-width: none; }
+
+  // The code leads to the enlarged layer (see ShareScreenComponent.onCardClick).
+  ::ng-deep .share-qr__code { cursor: pointer; }
 }
 
 // The way to the enlarged code, as the link it stands for rather than as another button on the card.

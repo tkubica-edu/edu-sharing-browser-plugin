@@ -8,8 +8,12 @@ import { loadWebComponentBundle } from '../../../services/web-component-bundle.s
 /** The element is only rendered once its tag is defined, so bindings hit an upgraded element. */
 const SHARE_TAG = 'edu-sharing-share-qr';
 
-/** Edge length of the code in the card — the element's default for the full variant. */
-const QR_SIZE = 220;
+/**
+ * Edge length of the code in the card. Wider than the element's own default for the full variant:
+ * the code is the screen's subject, and it is drawn no wider than the card in any case (see the
+ * element's `max-width` on the image).
+ */
+const QR_SIZE = 280;
 
 /**
  * Largest the enlarged code is drawn. The panel can be dragged to nine tenths of the window (see
@@ -66,6 +70,16 @@ export class ShareScreenComponent {
   protected readonly zoomSize = computed(() =>
     Math.max(QR_SIZE, Math.min(this.viewportWidth() - ZOOM_INSET, ZOOM_MAX))
   );
+
+  /**
+   * A click on the code enlarges it. The element renders code, link field and copy button as one
+   * card, so only the code carries this — its own controls keep their click.
+   */
+  protected onCardClick(event: MouseEvent): void {
+    const target = event.target as HTMLElement | null;
+    if (!target?.closest('.share-qr__code')) return;
+    this.openZoom();
+  }
 
   protected openZoom(): void {
     this.measureViewport();
