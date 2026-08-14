@@ -4,8 +4,8 @@ import { firstValueFrom } from 'rxjs';
 
 import { REVIEW_RECEIVER, WorkflowStatus } from '../model/workflow';
 import {
-  fieldOrigins, isPickedPicture, previewImageOf, previewSrcOfNode, toDataUrl, toDraftNode,
-  toPartialNode, toSavedMetadata, toWrittenNode, withCanvasScalars, withReadablePreview
+  createdAtOf, fieldOrigins, isPickedPicture, previewImageOf, previewSrcOfNode, toDataUrl,
+  toDraftNode, toPartialNode, toSavedMetadata, toWrittenNode, withCanvasScalars, withReadablePreview
 } from '../util/curation-node';
 import { MdsValues, firstString, toMdsEditorValues } from '../util/mds-values';
 import { withAgentLicense } from '../util/agent-fields';
@@ -84,6 +84,21 @@ export interface ActiveNode {
   name: string | null;
   link: string;
 }
+
+/**
+ * How long the metadata agent's `POST /nodes` may still edit a node after it was created. The
+ * repository refuses the write afterwards, and the panel's session has no other way to write — see
+ * {@link CurationService.agentEditWindowClosed}.
+ */
+const AGENT_EDIT_WINDOW_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * What is said in place of the repository's own refusal once that window has closed: it answers with
+ * the node's id, its creation date and its age in hours, none of which names the one thing that
+ * reopens the content for editing.
+ */
+const EDIT_WINDOW_CLOSED_TEXT =
+  'Dieser Inhalt kann in dieser Sitzung nicht mehr bearbeitet werden. Melde dich an, um ihn weiter zu bearbeiten.';
 
 // The node the app works on, plus the actions the flow's steps run on it (curating, saving,
 // assigning). Navigation lives in NavigationService and ActionBarService — this service only owns
@@ -293,6 +308,23 @@ export class CurationService {
   );
 
   /**
+   * Whether the active content is beyond what this session may still write: it saves through the
+   * agent, and that route stops editing a node two hours after the node was created (see
+   * {@link AGENT_EDIT_WINDOW_MS}). A signing-in user writes the node themselves and is not bound by
+   * it, which is why this is what a login answers.
+   *
+   * The age is measured against the moment the content is taken up, not against a running clock: a
+   * flow that started inside the window is carried through to its end rather than being cut off
+   * halfway. False for a node whose creation date is unknown — the repository's refusal then still
+   * reports it (see {@link agentRefusalText}).
+   */
+  readonly agentEditWindowClosed = computed(() => {
+    if (!this.savesThroughAgent()) return false;
+    const created = createdAtOf(this.previewNode());
+    return created !== null && Date.now() - created > AGENT_EDIT_WINDOW_MS;
+  });
+
+  /**
    * A content this session read off a page: a metadata-agent run that succeeded. It stays true once
    * that content has been written to a node — the run is what the content *is*, not what is still
    * outstanding about it (see {@link hasUnsavedWork} for that question).
@@ -473,7 +505,15 @@ export class CurationService {
     const written = await this.save({}, null, { quality: true });
     const problem = written ? this.workflowError() : this.saveError();
     this.quality.set(!problem);
-    if (problem) this.qualityError.set('Die Qualität konnte nicht bestätigt werden: ' + problem);
+    // A closed editing window is not a statement about this content's quality but about what the
+    // session may still write, so it is reported as it is rather than as a failed confirmation.
+    if (problem) {
+      this.qualityError.set(
+        this.agentEditWindowClosed()
+          ? problem
+          : `Die Qualität konnte nicht bestätigt werden: ${problem}`,
+      );
+    }
   }
 
   /**
@@ -842,10 +882,10 @@ export class CurationService {
       extended: steps.metadata
     });
     if (!outcome.ok) {
-      this.saveError.set(outcome.error ?? 'Speichern fehlgeschlagen.');
+      this.saveError.set(this.agentRefusalText(outcome.error) ?? 'Speichern fehlgeschlagen.');
       return false;
     }
-    this.workflowError.set(outcome.workflowError ?? null);
+    this.workflowError.set(this.agentRefusalText(outcome.workflowError));
     // The filing travelled with the request, so its outcome is read from the same answer — the
     // route's counterpart of what assignToCollections reports on the other one.
     this.assignError.set(outcome.collectionError ?? null);
@@ -865,6 +905,18 @@ export class CurationService {
       this.assignedCollections.update((list) => [...list, ...filed]);
     }
     return true;
+  }
+
+  /**
+   * A refusal from the agent's route as it can be shown; null where there was none. Once the editing
+   * window has closed the repository's own account of it is replaced: it names the node's id, the
+   * date it was created and its age in hours, which describe a state rather than the way out of it
+   * (see {@link EDIT_WINDOW_CLOSED_TEXT}). Every other refusal is passed on as it stands — it is the
+   * best description there is of what went wrong.
+   */
+  private agentRefusalText(problem: string | null | undefined): string | null {
+    if (!problem) return null;
+    return this.agentEditWindowClosed() ? EDIT_WINDOW_CLOSED_TEXT : problem;
   }
 
   /**

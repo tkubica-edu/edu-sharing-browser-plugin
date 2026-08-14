@@ -17,6 +17,20 @@ export function previewImageOf(payload: Record<string, unknown> | null | undefin
 }
 
 /**
+ * When a node was created, as a timestamp; null for a node that states no creation date — a stand-in,
+ * or one assembled from what a save reported back. Read from the API's own `createdAt` and from
+ * `cm:created`, which a node built from stored properties carries instead; either may be stated as an
+ * ISO date or as epoch milliseconds.
+ */
+export function createdAtOf(node: Node | null | undefined): number | null {
+  const stated = node?.createdAt ?? firstString(node?.properties?.['cm:created']);
+  if (!stated) return null;
+  // A bare number is epoch milliseconds; `Date.parse` would read it as a year.
+  const parsed = /^\d+$/.test(stated) ? Number(stated) : Date.parse(stated);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
  * Provenance per metadata field — the `_origins` map an editor marks the generated fields by. Stated
  * for every field, because an unmentioned one counts as generated. `generated` is the agent run's own
  * map, `recorded` names what the flow set outside it and outranks it. Only namespaced keys are fields.

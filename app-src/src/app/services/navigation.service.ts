@@ -98,9 +98,11 @@ export class NavigationService {
    * entered all the same and shows the login instead of its screen, so this is read by the shell — which
    * decides what to render — and by ActionBarService, whose actions belong to that hidden screen.
    */
-  readonly sessionGate = computed(
-    () => !!this.currentSection()?.requiresSession && !this.conditions.hasSession(),
-  );
+  readonly sessionGate = computed(() => {
+    const asks = this.currentSection()?.requiresSession ?? false;
+    const applies = typeof asks === 'function' ? asks(this.conditions.snapshot()) : asks;
+    return applies && !this.conditions.hasSession();
+  });
 
   /** The open section's sub steps that apply right now, each with its current openability. */
   readonly tabs = computed<readonly TabView[]>(() => {

@@ -221,7 +221,8 @@ stored**. If the cookie is gone (browser restart, explicit logout, or Safari ITP
 it resolves to guest and the login gate appears.
 
 **Sections a guest cannot be served by** (`AppSection.requiresSession`: *Inhalt hinzufügen*, *Meine
-Inhalte*) stay listed and enterable. What they show is the login instead of their screen —
+Inhalte*, and — while the content is past the agent route's two-hour editing window, see below —
+*Qualitätsprüfung*, *An Redaktionen weiterleiten*, *Sammlung auswählen*) stay listed and enterable. What they show is the login instead of their screen —
 `LoginGateComponent` around the same `LoginComponent` the Login section renders, filling the screen's
 place like any other view. Its footer is the shared action bar with the way back on it, and the
 session bar and the assistant bar stay away for as long as the gate is up
@@ -322,7 +323,14 @@ The session decides, not the flag (`CurationService.savesThroughAgent`):
   be honoured along that route, because the node is the agent's rather than the panel session's: a
   folder picked for the user's own storage — it always creates in the inbox the agent is configured
   with. The repository also only lets that endpoint edit a node **within two hours of its creation**;
-  after that it answers 403 and the editorial interface takes over.
+  after that it answers 403 and the editorial interface takes over. The panel does not wait for that
+  refusal: `CurationService.agentEditWindowClosed` compares the node's `createdAt` against the window,
+  and the steps that write show the login in place of their screen (`AppSection.requiresSession`) —
+  signing in is what lifts the limit, since a signed-in user takes the route above. The age is read
+  when the content is taken up rather than from a running clock, so a flow that started inside the
+  window is carried through to its end. Where the node states no creation date the refusal still
+  arrives; it is then reported as what it is rather than in the repository's own words, which name
+  the node's id, its creation date and its age in hours (`CurationService.agentRefusalText`).
 
 The **picture** is a preview rather than a property, so neither route writes it with the metadata: it
 is uploaded to the node (`POST …/nodes/-home-/{id}/preview`). Writing the node itself, the panel does

@@ -83,6 +83,11 @@ export interface Conditions {
   /** The Qualitätsprüfung's knock-out criteria are answered, so the quality may be confirmed
    *  (QualityCriteriaComponent reports it, CurationService holds it). */
   qualityCriteriaMet: boolean;
+  /** The active content is past what this session may still write: it saves through the metadata
+   *  agent, whose window for editing a node closes two hours after that node was created. A login
+   *  lifts it, because a signed-in user writes the node themselves
+   *  (CurationService.agentEditWindowClosed). */
+  agentEditWindowClosed: boolean;
 }
 
 /** A text that may depend on the conditions — for an entry that names its own state. */
@@ -134,11 +139,13 @@ export interface AppSection {
   /** Listed as an entry of the main menu. Without it the section is only reachable from the flow. */
   menu?: boolean;
   /**
-   * The section acts as a person — writing into their storage, listing what is theirs — so a guest
-   * session cannot serve it. It stays enterable: what a guest gets there is the login
-   * (LoginGateComponent) rather than a row that only says no.
+   * The section cannot be served by a guest session — because it acts as a person (writing into their
+   * storage, listing what is theirs), or because it writes to a content that only a session of the
+   * user's own may still write to. It stays enterable: what a guest gets there is the login
+   * (LoginGateComponent) rather than a row that only says no. A function where it depends on the
+   * state rather than on what the section is.
    */
-  requiresSession?: boolean;
+  requiresSession?: boolean | ((conditions: Conditions) => boolean);
   /**
    * The screen is a plain list of rows or entries — no form, no embedded editor or selector, no
    * footer action. Its bottom edge is free, which is where the session bar shows (UserBarComponent).
@@ -352,6 +359,9 @@ export const SECTIONS: readonly AppSection[] = [
     // exists for the browser extension custom web component — the groups are the editorial teams a
     // submitted content is judged by, so without it the step falls away.
     visible: requiresLogin((c) => c.hasEditableMetadata && c.browserExtensionCustomWebComponent),
+    // The way on out of the step writes what it picked, which a guest session may no longer do for a
+    // content past its editing window — see AppSection.requiresSession.
+    requiresSession: (c) => c.agentEditWindowClosed,
     tabs: [{ id: 'editorial-forward', label: 'An Redaktionen weiterleiten' }]
   },
   {
@@ -361,6 +371,8 @@ export const SECTIONS: readonly AppSection[] = [
     // A step of the forwarding rather than one of the flow: it is entered from a group's row and
     // returns to it, so it applies exactly where the forwarding does.
     visible: requiresLogin((c) => c.hasEditableMetadata && c.browserExtensionCustomWebComponent),
+    // As for the forwarding it is a step of: what is picked here is written with it.
+    requiresSession: (c) => c.agentEditWindowClosed,
     tabs: [{ id: 'select-collection', label: 'Sammlung auswählen' }]
   },
   {
@@ -399,6 +411,10 @@ export const SECTIONS: readonly AppSection[] = [
     description: 'Qualität prüfen und Metadaten bearbeiten',
     // An active node OR a fresh /generate result (the node is created by this step's own save).
     visible: requiresLogin((c) => c.hasEditableMetadata),
+    // Both views write: the Qualität view confirms the quality onto the content, the Metadaten view
+    // describes it. For a content past its editing window a guest session gets neither through, so
+    // the login stands in front of them — see AppSection.requiresSession.
+    requiresSession: (c) => c.agentEditWindowClosed,
     // Two views of the same content in the order they are worked through, walked between by the footer, so
     // the two are one step. The last step before the Inhaltsübersicht and therefore the one that writes the
     // content. The quality view belongs to the browser extension custom web component, like the forwarding

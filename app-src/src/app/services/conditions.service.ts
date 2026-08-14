@@ -98,6 +98,10 @@ export class ConditionsService {
   // What the Qualität view reports of its criteria — the gate the Metadaten sub step sits behind.
   readonly qualityCriteriaMet = this.curation.qualityCriteriaMet;
 
+  // The content is older than the agent's route may still write to, so every step that writes it
+  // needs a session of the user's own instead — see CurationService.agentEditWindowClosed.
+  readonly agentEditWindowClosed = this.curation.agentEditWindowClosed;
+
   /** The snapshot handed to every option's visible() predicate. */
   readonly snapshot = computed<Conditions>(() => ({
     onlyOfficePresent: this.onlyOfficePresent(),
@@ -110,6 +114,7 @@ export class ConditionsService {
     hasCuratedContent: this.hasCuratedContent(),
     recognizingContent: this.recognizingContent(),
     browserExtensionCustomWebComponent: this.browserExtensionCustomWebComponent(),
-    qualityCriteriaMet: this.qualityCriteriaMet()
+    qualityCriteriaMet: this.qualityCriteriaMet(),
+    agentEditWindowClosed: this.agentEditWindowClosed()
   }));
 }
