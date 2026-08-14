@@ -103,3 +103,34 @@
     </button>
   </div>
 </section>
+
+<!-- Welche Dienste die Qualitätsprüfung befragt. -->
+<section class="es-card">
+  <h2>Qualitätsprüfung</h2>
+
+  <label class="check">
+    <input type="checkbox" [ngModel]="qualityJudge.metalookupEnabled()"
+           (ngModelChange)="setMetalookup($event)" />
+    <span>MetalookUp: Inhalt messen</span>
+  </label>
+
+  <p class="desc">
+    Ruft den Inhalt selbst ab und misst ihn — davon wird derzeit die Barrierefreiheit (AXE)
+    ausgewertet. Abgeschaltet bleibt das zugehörige Kriterium unbeantwortet.
+  </p>
+
+  <label class="check">
+    <input type="checkbox" [ngModel]="qualityJudge.contentJudgeEnabled()"
+           (ngModelChange)="setContentJudge($event)"
+           [disabled]="!contentJudgeAvailable" />
+    <span>ContentJudge: Inhalt per LLM bewerten</span>
+  </label>
+
+  <p class="desc">
+    Beurteilt den Text des Inhalts gegen die Bewertungsschemata der Qualitätskriterien.
+    @if (!contentJudgeAvailable) {
+      Derzeit unabhängig von dieser Einstellung abgeschaltet: eine Bewertung kostet mehr, als die
+      Kriterien einbringen, die sie beantwortet.
+    }
+  </p>
+</section>

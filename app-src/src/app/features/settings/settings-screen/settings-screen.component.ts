@@ -7,6 +7,7 @@ import { CollectionRecommendationService } from '../../../services/collection-re
 import { ContextRefreshService } from '../../../services/context-refresh.service';
 import { DebugService } from '../../../services/debug.service';
 import { DevModeService } from '../../../services/dev-mode.service';
+import { CONTENT_JUDGE_AVAILABLE, QualityJudgeService } from '../../../services/quality-judge.service';
 
 // Repository configuration plus the two development switches. Changing the URL requires a reload,
 // because the API library freezes its rootUrl at bootstrap (see AuthService).
@@ -22,6 +23,10 @@ export class SettingsScreenComponent implements OnDestroy {
   protected readonly debug = inject(DebugService);
   protected readonly devMode = inject(DevModeService);
   protected readonly recommendations = inject(CollectionRecommendationService);
+  protected readonly qualityJudge = inject(QualityJudgeService);
+
+  /** Whether ContentJudge may be asked at all — its switch is shown either way, see the template. */
+  protected readonly contentJudgeAvailable = CONTENT_JUDGE_AVAILABLE;
 
   private readonly contextRefresh = inject(ContextRefreshService);
 
@@ -77,6 +82,18 @@ export class SettingsScreenComponent implements OnDestroy {
 
   protected resetRecommendation(): void {
     void this.recommendations.resetToDefaults();
+  }
+
+  // ---- Quality judges -----------------------------------------------------
+  // Which of the two services a quality check asks. Fire-and-forget like the other switches: the signal
+  // already carries the new state, and a failed write only means it is not remembered across reloads.
+
+  protected setMetalookup(enabled: boolean): void {
+    void this.qualityJudge.setMetalookupEnabled(enabled);
+  }
+
+  protected setContentJudge(enabled: boolean): void {
+    void this.qualityJudge.setContentJudgeEnabled(enabled);
   }
 
   // ---- Debug mode ---------------------------------------------------------

@@ -20,6 +20,7 @@ import { NavigationService } from './services/navigation.service';
 import { OnlyOfficeDocumentService } from './services/onlyoffice-document.service';
 import { OptionIconService } from './services/option-icon.service';
 import { PageRecognitionService } from './services/page-recognition.service';
+import { QualityJudgeService } from './services/quality-judge.service';
 import { SessionResumeService } from './services/session-resume.service';
 
 import { IconDirective } from './directives/icon.directive';
@@ -103,6 +104,7 @@ export class AppComponent implements OnInit {
   private readonly debug = inject(DebugService);
   private readonly devMode = inject(DevModeService);
   private readonly recommendations = inject(CollectionRecommendationService);
+  private readonly qualityJudge = inject(QualityJudgeService);
   private readonly sessionResume = inject(SessionResumeService);
 
   /** A node received while logged out — opened once the user logs in. */
@@ -170,6 +172,9 @@ export class AppComponent implements OnInit {
     // How a collection is proposed, before a step can ask for one — a proposal picks a collection, and
     // it should be the one the settings ask for rather than the one the defaults would.
     await this.recommendations.load();
+    // Which judges are asked, before a content can be judged — a resumed session may start its
+    // Erschließung on this boot, and the judgement follows it.
+    await this.qualityJudge.load();
     await this.auth.init();
     await this.history.load();
     const tab = await this.browserExtension.getActiveTab().catch(() => null);

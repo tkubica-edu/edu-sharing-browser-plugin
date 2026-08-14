@@ -129,6 +129,10 @@ export const APP_CONFIG = {
     recommendationKeywords: 'eduSharingRecommendationKeywords',
     /** The score a keyword has to reach to be one of them. */
     recommendationMinScore: 'eduSharingRecommendationMinScore',
+    /** Whether MetalookUp measures the content's quality — see QualityJudgeService. */
+    qualityMetalookup: 'eduSharingQualityMetalookup',
+    /** Whether ContentJudge judges it. */
+    qualityContentJudge: 'eduSharingQualityContentJudge',
     /**
      * The dev mode's switch (see DevModeService). Also read by the background worker, which fakes the
      * metadata agent's answers under the same flag — the literal there has to stay in step with this

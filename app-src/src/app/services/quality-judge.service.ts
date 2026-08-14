@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 
+import { APP_CONFIG } from '../config';
 import { BrowserExtensionService } from './browser-extension.service';
 import {
   ContentJudgeEvaluation, ContentJudgeInput, ContentJudgeService, judgeableText
@@ -19,6 +20,16 @@ function idle(judge: JudgementSource): JudgeStatus {
 const LOG_QUALITY = '[edu-sharing][quality]';
 const LOG_METALOOKUP = '[edu-sharing][metalookup]';
 const LOG_CONTENT_JUDGE = '[edu-sharing][contentjudge]';
+
+/**
+ * Whether ContentJudge may be asked at all. It may not: one judgement costs far more than the criteria
+ * it answers are worth. This outranks the setting, which is therefore shown but not operable — everything
+ * the judge needs is in place, so it is asked again as soon as this says so.
+ */
+export const CONTENT_JUDGE_AVAILABLE = false;
+
+/** Both judges are asked unless the settings say otherwise — judging the quality is what the step is for. */
+const DEFAULT_ENABLED = true;
 
 /**
  * How far one judge got with this content. `skipped` means it was never asked, because the content holds
@@ -72,6 +83,42 @@ export class QualityJudgeService {
   /** Whether the content in hand has been judged, so it is not judged twice. */
   private started = false;
 
+  private readonly metalookupEnabledState = signal(DEFAULT_ENABLED);
+
+  /** Whether MetalookUp measures the content at all. Persisted, so it survives a reload. */
+  readonly metalookupEnabled = this.metalookupEnabledState.asReadonly();
+
+  private readonly contentJudgeEnabledState = signal(DEFAULT_ENABLED);
+
+  /** Whether ContentJudge judges the content: what the setting says, and what the build allows. */
+  readonly contentJudgeEnabled = computed(
+    () => CONTENT_JUDGE_AVAILABLE && this.contentJudgeEnabledState(),
+  );
+
+  /**
+   * Load the persisted switches. Before anything is judged, so a content is judged the way the settings
+   * say — a judgement takes a minute of a service's work, which is not something to spend against them.
+   */
+  async load(): Promise<void> {
+    const keys = APP_CONFIG.storageKeys;
+    this.metalookupEnabledState.set(
+      await this.browserExtension.storageGet(keys.qualityMetalookup, DEFAULT_ENABLED),
+    );
+    this.contentJudgeEnabledState.set(
+      await this.browserExtension.storageGet(keys.qualityContentJudge, DEFAULT_ENABLED),
+    );
+  }
+
+  async setMetalookupEnabled(enabled: boolean): Promise<void> {
+    this.metalookupEnabledState.set(enabled);
+    await this.browserExtension.storageSet(APP_CONFIG.storageKeys.qualityMetalookup, enabled);
+  }
+
+  async setContentJudgeEnabled(enabled: boolean): Promise<void> {
+    this.contentJudgeEnabledState.set(enabled);
+    await this.browserExtension.storageSet(APP_CONFIG.storageKeys.qualityContentJudge, enabled);
+  }
+
   /**
    * Have the content judged, once per content — fire and forget, with the answer picked up from
    * {@link evaluation} wherever it is shown; {@link reset} says a different content is in hand. The resource is
@@ -100,15 +147,10 @@ export class QualityJudgeService {
     const schemes = configuredSchemes();
     console.log(`${LOG_QUALITY} schemes`, schemes);
     await Promise.allSettled([
-      // ContentJudge is switched off: one judgement costs far more than the criteria it answers are worth. Everything
-      // it feeds is still in place, so {@link runContentJudge} can join this list again.
-      this.runMetalookup(resource)
+      this.runMetalookup(resource),
+      // Only the schemes themselves; what the mapping left out is in the log above.
+      this.runContentJudge(resource, schemes.schemes)
     ]);
-    this.contentJudgeStatus.set({
-      judge: 'ContentJudge',
-      state: 'skipped',
-      detail: 'Die LLM-Bewertung ist derzeit abgeschaltet.'
-    });
   }
 
   /**
@@ -116,6 +158,12 @@ export class QualityJudgeService {
    * node id for a content the repository already holds. It takes either, and with both it can choose.
    */
   private async runMetalookup(resource: MetalookupResource): Promise<void> {
+    if (!this.metalookupEnabled()) {
+      const detail = 'Die Messung ist in den Einstellungen abgeschaltet.';
+      this.metalookupStatus.set({ judge: 'MetalookUp', state: 'skipped', detail });
+      console.log(`${LOG_METALOOKUP} skipped — ${detail}`);
+      return;
+    }
     if (!resource.url && !resource.nodeId) {
       const detail = 'Der Inhalt hat weder eine Adresse noch einen Node.';
       this.metalookupStatus.set({ judge: 'MetalookUp', state: 'skipped', detail });
@@ -142,6 +190,14 @@ export class QualityJudgeService {
     resource: MetalookupResource,
     schemes: readonly string[]
   ): Promise<void> {
+    if (!this.contentJudgeEnabled()) {
+      const detail = CONTENT_JUDGE_AVAILABLE
+        ? 'Die LLM-Bewertung ist in den Einstellungen abgeschaltet.'
+        : 'Die LLM-Bewertung ist derzeit abgeschaltet.';
+      this.contentJudgeStatus.set({ judge: 'ContentJudge', state: 'skipped', detail });
+      console.log(`${LOG_CONTENT_JUDGE} skipped — ${detail}`);
+      return;
+    }
     if (!schemes.length) {
       const detail = 'Kein Kriterium verweist auf ein Bewertungsschema.';
       this.contentJudgeStatus.set({ judge: 'ContentJudge', state: 'skipped', detail });

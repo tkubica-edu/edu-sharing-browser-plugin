@@ -3,7 +3,7 @@
 // Component-specific: descriptive helper text under the field.
 .desc { color: var(--es-muted); font-size: 12px; margin: 8px 0 0; }
 
-// The only checkbox in the app (debug switch) — label and box on one clickable line.
+// The app's checkboxes (the switches on this screen) — label and box on one clickable line.
 .check {
   display: flex;
   align-items: center;
@@ -12,4 +12,12 @@
   cursor: pointer;
 
   input { margin: 0; accent-color: var(--es-blue); cursor: pointer; }
+
+  // A switch the build does not leave to the settings: shown, so what it stands for is readable, but
+  // not offered as a choice.
+  &:has(input:disabled) { color: var(--es-muted); cursor: default; }
+  input:disabled { cursor: default; }
 }
+
+// A second switch in the same card sits under the first one's description, not against it.
+.desc + .check { margin-top: var(--es-space-3); }
