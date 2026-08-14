@@ -411,6 +411,33 @@ publish a GitHub **Release** with `edu-sharing-{chrome,firefox,safari}-<version>
 attached — those need no login and are the ones to hand to testers. Loading them is
 the same as loading a local build, see [Load & test](#load--test).
 
+### Cutting a release
+
+A pushed `v*` tag is the whole trigger — CI builds, zips and publishes on its own.
+One-time prerequisite: *Settings → Actions → General → Workflow permissions* must be
+**Read and write**, otherwise `gh release create` fails with a 403.
+
+1. Raise `"version"` in **both** `package.json` and `manifest.base.json` — they are
+   maintained by hand and are not synced. The workflow only warns when the tag and
+   `manifest.base.json` disagree, it does not stop. Bumping the manifest matters:
+   Chrome and Firefox refuse to install an unchanged version number as an update.
+2. Commit the bump and push it.
+3. Tag and push the tag:
+   ```bash
+   git tag v0.2.0
+   git push origin v0.2.0
+   ```
+
+The build takes a few minutes and then a published release appears with
+`edu-sharing-{chrome,firefox,safari}-0.2.0.zip` attached.
+
+If a tagged run fails, delete tag and release before retrying — the workflow will not
+overwrite an existing release:
+```bash
+git push origin :v0.2.0 && git tag -d v0.2.0
+gh release delete v0.2.0
+```
+
 ## Build
 
 ```bash
