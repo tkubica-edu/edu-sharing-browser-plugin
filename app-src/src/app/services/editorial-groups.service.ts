@@ -109,11 +109,12 @@ export class EditorialGroupsService {
   readonly picking = this.pickingState.asReadonly();
 
   /**
-   * The collection the topic assistant proposed and the group it was taken over for, while it is still
-   * that group's choice. Held to say so where the choice is shown: what a proposal was is not readable
-   * off the choice itself, and the user has not made it yet.
+   * The collection the topic assistant proposed and the group it was taken over for. Held for as long
+   * as the step lives, and not only while it is what stands: it says what a proposal was where the
+   * choice is shown — that is not readable off the choice itself — and it is what a user who picked
+   * something else goes back to.
    */
-  private readonly recommendedState = signal<{ groupId: string; collectionId: string } | null>(null);
+  private readonly recommendedState = signal<{ groupId: string; folder: Collection } | null>(null);
 
   private readonly recommendingState = signal(false);
 
@@ -214,7 +215,7 @@ export class EditorialGroupsService {
     }
     const offered = this.offer(group, found.node);
     const folder = toCollection(found.node);
-    this.recommendedState.set({ groupId: offered.collection.id, collectionId: folder.id });
+    this.recommendedState.set({ groupId: offered.collection.id, folder });
     this.chooseFolder(offered, folder);
   }
 
@@ -263,8 +264,25 @@ export class EditorialGroupsService {
     return (
       !!recommended &&
       recommended.groupId === group.collection.id &&
-      this.folderOf(group)?.id === recommended.collectionId
+      this.folderOf(group)?.id === recommended.folder.id
     );
+  }
+
+  /**
+   * The proposed collection this group can be put back to: the one the topic assistant proposed, while
+   * something else is picked inside the group. `null` where nothing was proposed for it or the proposal
+   * is what stands — there is then nothing to go back to.
+   */
+  droppedRecommendation(group: EditorialGroup): Collection | null {
+    const recommended = this.recommendedState();
+    if (!recommended || recommended.groupId !== group.collection.id) return null;
+    return this.isRecommended(group) ? null : recommended.folder;
+  }
+
+  /** Pick the proposed collection for this group again — the way back from having picked another. */
+  restoreRecommendation(group: EditorialGroup): void {
+    const folder = this.droppedRecommendation(group);
+    if (folder) this.chooseFolder(group, folder);
   }
 
   /** Forward to this group, or stop doing so — the checkbox's answer. */

@@ -45,6 +45,16 @@ export class SelectCollectionScreenComponent implements OnDestroy {
     return group ? this.groups.folderOf(group) : undefined;
   });
 
+  /**
+   * The proposed collection, while something else is recorded — offered as the way back to it. A
+   * proposal is made from the content's keywords and picking past it is a step no other control undoes,
+   * since the proposal is one collection among many in the tree below.
+   */
+  protected readonly droppedRecommendation = computed<Collection | null>(() => {
+    const group = this.groups.picking();
+    return group ? this.groups.droppedRecommendation(group) : null;
+  });
+
   private readonly handler: ApplyHandler = {
     apply: () => this.selector()?.apply(),
     canApply: computed(() => this.selector()?.canApply() ?? false)
@@ -56,6 +66,13 @@ export class SelectCollectionScreenComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.actionBar.clearApplyHandler(this.handler);
+  }
+
+  /** Record the proposed collection for the group again and go back — it is a choice like any other. */
+  protected restoreRecommendation(): void {
+    const group = this.groups.picking();
+    if (group) this.groups.restoreRecommendation(group);
+    this.navigation.back();
   }
 
   /** Record the confirmed collection for the group and go back to the forwarding. */

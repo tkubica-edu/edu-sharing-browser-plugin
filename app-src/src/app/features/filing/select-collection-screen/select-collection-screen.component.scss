@@ -55,6 +55,20 @@
   font-weight: 600;
 }
 
+// Back to the proposed collection — under the choice it replaces, aligned with it and set apart from
+// it by weight alone, since it offers what the line above states.
+.restore {
+  display: flex;
+  align-items: center;
+  gap: var(--es-space-1);
+  margin-top: var(--es-space-2);
+  padding-inline: 0;
+  text-align: left;
+  cursor: pointer;
+
+  i { font-size: 18px; line-height: 1; }
+}
+
 // The room the card leaves over, as a definite height — the selector delegates its own height to
 // here (see collection-selector.component.scss), so without this it collapses to nothing.
 es-collection-selector {

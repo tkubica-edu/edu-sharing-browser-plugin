@@ -19,6 +19,16 @@
         Noch keine Sammlung ausgewählt
       }
     </p>
+
+    <!-- The way back to the collection the content's keywords led to, for as long as something else is
+         picked: it is one collection among all the others in the tree below, so finding it again by
+         hand is work the proposal already did. Taking it over ends the step, like confirming a pick. -->
+    @if (droppedRecommendation(); as recommended) {
+      <button type="button" class="es-btn es-btn--text restore" (click)="restoreRecommendation()">
+        <i esIcon="restore"></i>
+        Empfohlene Sammlung „{{ recommended.name }}“ übernehmen
+      </button>
+    }
   </section>
 
   <es-collection-selector
