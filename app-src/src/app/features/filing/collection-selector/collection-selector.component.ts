@@ -6,7 +6,7 @@ import {
 import { Node } from 'ngx-edu-sharing-api';
 
 import { Collection } from '../../../services/curation.service';
-import { NodesSelectorComponent, NodesSelectorOption, SelectedNode } from '../../../shared/components/nodes-selector/nodes-selector.component';
+import { CollectionsTreeConfig, NodesSelectorComponent, NodesSelectorOption, SelectedNode } from '../../../shared/components/nodes-selector/nodes-selector.component';
 
 /**
  * The apply control inside the embedded selector: the button of its own action bar that confirms the
@@ -62,6 +62,12 @@ export class CollectionSelectorComponent {
   readonly canApply = this.applyEnabled.asReadonly();
 
   protected readonly hiddenTabs = ['search', 'workspace', 'upload'];
+
+  /**
+   * A collection is the only thing this picker offers, so its tree leaves out the materials inside one. A field
+   * rather than a template literal — the element takes this by identity and reads it as its tree is set up.
+   */
+  protected readonly collectionsOnly: CollectionsTreeConfig = { showFiles: false };
 
   protected readonly option = computed<NodesSelectorOption>(() => ({
     optionConfig: {

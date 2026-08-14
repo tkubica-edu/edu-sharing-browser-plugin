@@ -9,6 +9,12 @@ export interface SelectedNode {
   name?: string;
 }
 
+/** How the Sammlungen tab's tree behaves — the part of it this panel sets. */
+export interface CollectionsTreeConfig {
+  /** Whether the materials inside a collection are listed alongside the collections in it. */
+  showFiles: boolean;
+}
+
 /**
  * The `option` object the selector is configured with. Its contract is callback-based:
  * `onNodesChoosen` receives the confirmed selection, `applyCallback` enables the apply button.
@@ -59,6 +65,11 @@ export class NodesSelectorComponent {
    * hierarchy from each node's `parent.id`. `undefined` is what the element sees when nobody sets it.
    */
   readonly collectionTree = input<readonly Node[] | undefined>(undefined);
+  /**
+   * How the Sammlungen tab shows its tree. `undefined` leaves the element at its own default, which lists the
+   * materials inside a collection along with the collections in it.
+   */
+  readonly collectionsTreeConfig = input<CollectionsTreeConfig | undefined>(undefined);
   /** Message shown when the bundle cannot be loaded. */
   readonly errorLabel = input('Auswahl konnte nicht geladen werden');
 
