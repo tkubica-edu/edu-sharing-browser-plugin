@@ -1,37 +1,31 @@
 <section class="criteria-panel">
   <h2 class="panel-title">Fachliche Qualitätskriterien</h2>
 
-  <!-- What the machines made of the content, above the criteria: the wait for them, their all-clear, or
-       what they objected to — one shape per state rather than one box that changes, since what each of
-       them needs is a different amount of room. `role="status"` throughout, so every state is announced
-       as it arrives rather than only drawn: the wait is a minute long, and it ends while the user is
-       already reading the criteria.
+  <!-- What the machines made of the content: the wait, their all-clear, or what they objected to — one
+       shape per state, since each needs a different amount of room. `role="status"` throughout, because
+       the wait is a minute long and ends while the user is already reading the criteria.
 
-       Two states show nothing at all: no check got through (`unavailable`, no case below), and the
-       objections are all answered (`handled`, one line).
+       Two states show all but nothing: `unavailable`, where no check got through (no case below), and
+       `handled`, the one line left where the user folded the objections away.
 
-       Only the two judges are reported here. The criteria themselves are loaded separately and have
-       their own wait further down; this block is about the checking, not about the view. -->
+       Only the judges are reported here; the criteria have their own wait further down. -->
   @if (judgesAsked()) {
     @switch (checkState()) {
       @case ('running') {
         <!-- The house spinner and nothing else. What is being waited for is deliberately not said: the
-             criteria below are readable and answerable throughout, so the wait is not the subject of
-             this screen — and a caption would claim the room the result is about to need. The spinner
-             itself is decoration (see SpinnerComponent), which is why the label sits out here. -->
+             criteria below stay answerable throughout, and a caption would claim the room the result is
+             about to need. The spinner is decoration (see SpinnerComponent), so the label sits here. -->
         <div class="ai-check-waiting" role="status" aria-label="Die KI-Prüfung läuft">
           <es-spinner></es-spinner>
         </div>
       }
       @case ('handled') {
-        <!-- Every objection answered, so the alert has nothing left to ask and folds into one line. The
-             line is also the way back to it: the findings are still there to be looked at, and a
-             decision taken can be taken differently. -->
+        <!-- The alert folded away by the user. All that is left is the way back to it: the findings can
+             still be looked at, and a decision taken can be taken differently. What became of the check
+             stands beside every criterion it answered anyway. -->
         <p class="ai-check-handled" role="status">
-          <i class="ai-glyph" esIcon="smart_toy"></i>
-          KI-Prüfung abgeschlossen
           <button type="button" class="ai-check-toggle" (click)="openAlert()">
-            {{ violations().length === 1 ? 'Verstoß anzeigen' : 'Verstöße anzeigen' }}
+            Hinweise der KI-Prüfung anzeigen
           </button>
         </p>
       }
@@ -46,37 +40,41 @@
       @case ('violations') {
         <div class="ai-check has-violation" role="status" aria-live="polite">
           @if (current(); as violation) {
-            <!-- One objection at a time, the arrows leading through the rest. The count says how many
-                 there are, since the alert looks the same for one as for five. -->
+            <!-- One hint at a time, the arrows leading through the rest; the count says how many there
+                 are, since the alert looks the same for one as for five. An information glyph rather
+                 than an alarm: whether this is a problem is exactly what the user is being asked. -->
             <div class="alert-head">
               <span class="alert-mark">
-                <!-- `role="img"`, so the label really replaces the shorthand: "1/2" is read out as
+                <i class="alert-glyph" esIcon="info"></i>
+                <!-- `role="img"`, so the label really replaces the shorthand — "1/2" is read out as
                      "one slash two", and a bare `aria-label` on a span is ignored. -->
-                <span class="alert-count" role="img" [attr.aria-label]="'Verstoß ' + (shown() + 1)
+                <span class="alert-count" role="img" [attr.aria-label]="'Prüfhinweis ' + (shown() + 1)
                       + ' von ' + violations().length">{{ shown() + 1 }}/{{ violations().length }}</span>
-                <i class="alert-glyph" esIcon="error"></i>
               </span>
-              <p class="alert-lead">
-                Die automatische Seitenprüfung hat einen möglichen Verstoß gegen
-                „{{ captionOf(violation.criterion) }}“ identifiziert. Bitte prüfe das Material.
-              </p>
-              <!-- Only offered once everything here is answered: while a question is open, folding it
-                   away would hide exactly what the content is being held back for. -->
+              <div class="alert-text">
+                <h3 class="alert-title">Automatischer Prüfhinweis</h3>
+                <p class="alert-lead">
+                  Bei der Prüfung wurde eine mögliche Auffälligkeit zu
+                  „{{ captionOf(violation.criterion) }}“ erkannt. Bitte prüfe den Hinweis und
+                  entscheide, ob das Kriterium erfüllt ist.
+                </p>
+              </div>
+              <!-- Only offered once everything here is answered: folding an open question away would
+                   hide exactly what the content is being held back for. -->
               @if (allDecided()) {
                 <button type="button" class="alert-close" (click)="closeAlert()"
-                        aria-label="Verstöße ausblenden"><i esIcon="close"></i></button>
+                        aria-label="Prüfhinweise ausblenden"><i esIcon="close"></i></button>
               }
             </div>
 
             <div class="alert-body">
               <button type="button" class="alert-arrow" (click)="showPrevious()"
                       [disabled]="violations().length < 2"
-                      aria-label="Vorheriger Verstoß"><i esIcon="chevron_left"></i></button>
+                      aria-label="Vorheriger Prüfhinweis"><i esIcon="chevron_left"></i></button>
               <div class="alert-finding">
-                <h4>Möglicher identifizierter Verstoß:</h4>
-                <!-- What the check said, in its own words, in the room the block has left over — one
-                     scrolling area for all of it, since several checks can object to the one
-                     criterion and they are all its argument. -->
+                <h4>Erkannte Auffälligkeit</h4>
+                <!-- What the checks said, in their own words — one scrolling area for all of them,
+                     since several can object to the one criterion and they are all its argument. -->
                 <div class="alert-reasons">
                   @for (finding of violation.findings; track finding.scheme) {
                     <p class="alert-reason">„{{ findingText(finding) }}“</p>
@@ -85,38 +83,21 @@
               </div>
               <button type="button" class="alert-arrow" (click)="showNext()"
                       [disabled]="violations().length < 2"
-                      aria-label="Nächster Verstoß"><i esIcon="chevron_right"></i></button>
+                      aria-label="Nächster Prüfhinweis"><i esIcon="chevron_right"></i></button>
             </div>
-
-            <!-- The two answers to the objection. Each answers the criterion below as well — met, or
-                 violated — and each moves on to the next objection.
-
-                 The answer given stays visible on them, because paging back through the objections has
-                 to show what was already decided: it is the filled one with the halo around it, and
-                 the other one has stepped back beside it. `aria-pressed` says the same to a screen
-                 reader, which is where colour reaches nobody. -->
-            <div class="alert-actions" [class.is-answered]="!!decisionOf(violation.criterion.id)">
-              <button type="button" class="alert-dismiss"
-                      [class.is-chosen]="decisionOf(violation.criterion.id) === 'dismissed'"
-                      [attr.aria-pressed]="decisionOf(violation.criterion.id) === 'dismissed'"
-                      (click)="dismissViolation()">kein Verstoß erkennbar</button>
-              <button type="button" class="alert-confirm"
-                      [class.is-chosen]="decisionOf(violation.criterion.id) === 'confirmed'"
-                      [attr.aria-pressed]="decisionOf(violation.criterion.id) === 'confirmed'"
-                      (click)="confirmViolation()">Verstoß bestätigen</button>
-            </div>
+            <!-- The hint is answered on the criterion's own box below, not here: it asks whether the
+                 criterion is met, and that is the question that box already is. -->
           }
         </div>
       }
     }
   }
 
-  <!-- The record is as necessary as the criteria: every box shows what the content answers, and a
-       click rewrites that answer — so neither is offered before it is known what it answers now. -->
+  <!-- Neither the criteria nor the record are offered before both are known: every box shows what the
+       content answers, and a click rewrites that answer. -->
   @if (loading() || !properties()) {
-    <!-- The house spinner, since this is the wait for the whole view: until the metadata set answers
-         there is not one criterion on screen. `role="status"`, so the wait is announced too — the
-         spinner itself is decoration (see SpinnerComponent). -->
+    <!-- The wait for the whole view — until the metadata set answers there is not one criterion on
+         screen. `role="status"`, since the spinner itself is decoration (see SpinnerComponent). -->
     <div class="note loading" role="status">
       <es-spinner></es-spinner>
       Die Qualitätskriterien werden geladen …
@@ -142,9 +123,9 @@
                        does not put a space in front of the star. -->
                   {{ captionOf(criterion) }}@if (isAiAnswered(criterion)) {<span class="auto-met"
                        role="note" aria-label="ohne maschinelle Auffälligkeiten">*</span>}
-                  <!-- What the machine objected to, beside the box rather than in it — the box stays
-                       the human's answer (see QualityCriteriaComponent.judgements). Its argument is not
-                       here: it is in the alert above, where the objection is decided about. -->
+                  <!-- What the machine objected to, beside the box rather than in it: the box stays the
+                       human's answer, and a click on it is what answers the hint. The argument for it
+                       is in the alert above. -->
                   @if (violationLabel(criterion); as found) {
                     <span class="violation" [class.is-dismissed]="isDismissed(criterion)">–
                       {{ found }} <i class="ai-glyph" esIcon="smart_toy"></i></span>
@@ -201,8 +182,8 @@
       </label>
     </div>
 
-    <!-- What the star behind a criterion means, for as long as any is on screen: the box is ticked, but
-         on a machine's word — which is a check of the material, not a review of it. -->
+    <!-- What the star behind a criterion means: the box is ticked, but on a machine's word — a check of
+         the material, not a review of it. -->
     @if (hasAiAnswers()) {
       <p class="note footnote">
         * bei unserer maschinellen Prüfung sind keine Auffälligkeiten gefunden worden. Eine zusätzliche

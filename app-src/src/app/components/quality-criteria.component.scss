@@ -1,7 +1,6 @@
-// Self-contained on purpose (no shared mixins, no import of the panel's tokens): this component is
-// meant to be built as a custom element of its own, where none of that travels with it. It reads the
-// panel's variables where they exist and falls back to its own values where they do not, so it looks
-// right in the panel and still looks like itself outside it.
+// Self-contained on purpose (no shared mixins, no import of the panel's tokens): the component is meant
+// to become a custom element of its own, where none of that travels with it. It reads the panel's
+// variables where they exist and falls back to its own, so it fits in and still looks like itself.
 :host {
   --qc-accent: var(--es-blue, #003b7c);
   --qc-text: var(--es-text, #1c2733);
@@ -9,11 +8,11 @@
   --qc-border: var(--es-border, #dfe3e8);
   --qc-surface: var(--es-surface, #ffffff);
   --qc-error: var(--es-error, #a3271f);
-  // Everything a machine put there is drawn in this one colour, so it is recognisable as such wherever
-  // it turns up: a box it filled in, its judgements, and the wait for them.
+  // Everything a machine put there — a box it filled in, its judgements, the wait for them — in one
+  // colour, so it is recognisable as such wherever it turns up.
   --qc-ai: var(--es-ai, #7362ec);
-  // A machine's objection: the finding itself, the criteria it is about, and the answers to it. Loud
-  // on purpose — it is the one thing in this view that asks for a decision instead of recording one.
+  // A machine's objection: the finding and the criteria it is about. Loud on purpose — it is the one
+  // thing in this view that asks for a decision instead of recording one.
   --qc-alert: var(--es-danger, #c0392b);
   // The finding's own ground. A fixed tint rather than one mixed from the colour above, so it stays
   // legible under a theme that repaints only the foreground.
@@ -152,8 +151,8 @@ input[type='checkbox'] {
   &.is-violated { color: var(--qc-alert); }
 }
 
-// That a check objected, stated and nothing more: what it found is in the alert above, where it is
-// decided about. The glyph after it says whose finding it is.
+// That a check objected, stated and nothing more: what it found is in the alert above, and the box in
+// front of it is where it is decided about. The glyph after it says whose finding it is.
 .violation {
   white-space: normal;
 
@@ -197,11 +196,9 @@ input[type='checkbox'] {
 }
 
 // What the machines are doing or have found, in one block above the criteria. Its height is fixed
-// rather than following its content, so the criteria under it do not move while it goes from the wait
-// to the result — which happens with the user's eyes on the list, a minute in.
-//
-// In the machines' colour throughout, whatever it carries: the block is the report of a check, and the
-// objection inside it is what wears the colour of an objection.
+// rather than following its content, so the criteria under it do not move when the wait turns into the
+// result — which happens a minute in, with the user's eyes on the list. In the machines' colour
+// throughout: the block reports a check, and only the objection inside it wears the alarm colour.
 .ai-check {
   display: flex;
   flex-direction: column;
@@ -213,14 +210,11 @@ input[type='checkbox'] {
   background: rgba(115, 98, 236, 0.1);
   color: var(--qc-ai);
 
-  // The alert keeps one height across every objection, however long its caption and its finding are:
-  // the two answers have to stay under the pointer while the user pages through them, and a block that
-  // resizes with each one would move them out from under it.
-  //
-  // A hard height, because that is what makes a long finding give way — it shrinks into what the rest
-  // leaves over and scrolls there (see .alert-body). Tall enough that even a four-line caption over
-  // answers wrapped onto two lines still fits, which is the narrowest a panel gets.
-  &.has-violation { height: 240px; }
+  // One height across every objection, however long its caption and its finding are: they are answered
+  // on the criteria below, which a resizing block would move out from under the pointer. A hard height,
+  // because that is what makes a long finding give way — it shrinks into what the rest leaves over and
+  // scrolls there (see .alert-body). Tall enough for the heading over a four-line sentence.
+  &.has-violation { height: 216px; }
 }
 
 // The wait: the house spinner alone, in no box and no bigger than it has to be. Nothing is being
@@ -244,15 +238,11 @@ input[type='checkbox'] {
   font-weight: 700;
 }
 
-// The alert folded away to one line, once every objection in it has been answered — and the way back
-// to it. In the machines' colour, since that is what it reports about; the room the alert took is given
-// back to the criteria.
+// The alert folded away: nothing left but the way back to it, in the machines' colour since that is
+// what it leads to. The room the alert took is given back to the criteria.
 .ai-check-handled {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
   justify-content: center;
-  gap: 4px 8px;
   margin: 0;
   font-size: 13px;
   font-weight: 700;
@@ -281,8 +271,8 @@ input[type='checkbox'] {
   gap: 10px;
 }
 
-// Folds the alert away again. Only rendered while every objection is answered (see the template), which
-// is also why it is a quiet glyph: by then the alert is a record, not a question.
+// Folds the alert away. Only rendered while every objection is answered (see the template), which is
+// also why it is a quiet glyph: by then the alert is a record, not a question.
 .alert-close {
   flex: 0 0 auto;
   margin-left: auto;
@@ -297,8 +287,8 @@ input[type='checkbox'] {
   &:focus-visible { outline: 2px solid currentcolor; outline-offset: 2px; }
 }
 
-// Which objection is on screen and that it is one. In the text colour like the sentence beside it:
-// the head says what is being asked, the box below it is what is red.
+// The glyph over the count. In the text colour like the sentence beside it: the head says what is
+// being asked, the box below it is what is red.
 .alert-mark {
   flex: 0 0 auto;
   display: flex;
@@ -318,6 +308,21 @@ input[type='checkbox'] {
   line-height: 1;
 }
 
+// Title and sentence share one left edge, with the mark beside them as a column rather than between.
+.alert-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+// The same size as the sentence under it and only heavier: it labels that sentence, it does not title
+// the view.
+.alert-title {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--qc-text);
+}
+
 // What the user is asked to do about the finding — ordinary text, since it is an instruction and not
 // the objection itself.
 .alert-lead {
@@ -328,12 +333,9 @@ input[type='checkbox'] {
   color: var(--qc-text);
 }
 
-// The finding between the two arrows that lead through the rest of them, with enough room around it
-// that the text does not read as part of them.
-//
-// As tall as what it says, and no taller — but the first thing to give way when the block runs out of
-// room, which is what keeps the answers under it in one place from objection to objection. `stretch`,
-// so that giving way reaches the scrolling text inside it rather than stopping here.
+// The finding between the two arrows that lead through the rest. As tall as what it says and no taller,
+// but the first thing to give way when the block runs out of room — `stretch`, so that giving way
+// reaches the scrolling text inside it rather than stopping here.
 .alert-body {
   display: flex;
   flex: 0 1 auto;
@@ -342,8 +344,8 @@ input[type='checkbox'] {
   min-height: 0;
 }
 
-// The objection itself, and the only part of the block that is drawn as one: a box of its own, in the
-// colour of an objection. What surrounds it reports about the check — this is what the check found.
+// The finding itself, the only part of the block drawn as a box of its own and the only one in the
+// alarm colour: what surrounds it reports about the check, this is what the check found.
 .alert-finding {
   display: flex;
   flex: 1 1 auto;
@@ -365,8 +367,8 @@ input[type='checkbox'] {
   }
 }
 
-// What the checks said, in the room the block has left over — several paragraphs of Markdown at worst,
-// so it scrolls there instead of pushing everything else around.
+// What the checks said, in the room the block has left over — several paragraphs at worst, so it
+// scrolls there instead of pushing everything else around.
 .alert-reasons {
   flex: 1 1 auto;
   min-height: 0;
@@ -405,73 +407,6 @@ input[type='checkbox'] {
   }
 
   &:focus-visible { outline: 2px solid currentcolor; outline-offset: 2px; }
-}
-
-// The two answers to the objection, at either end of the line and at the foot of the block — `auto`,
-// so whatever room the finding did not need collects above them instead of moving them up.
-.alert-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 12px;
-  margin-top: auto;
-}
-
-.alert-dismiss,
-.alert-confirm {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border: 0;
-  // `box-shadow` draws every outline here, so a button keeps its size whether it is filled or not — a
-  // border would grow the outlined ones by its own width and make the pair jump on every answer.
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 700;
-  font-family: inherit;
-
-  &:focus-visible { outline: 2px solid var(--qc-alert); outline-offset: 2px; }
-}
-
-// The quieter of the two answers: outlined while it is being offered, filled once it is the one that
-// was given.
-.alert-dismiss {
-  background: none;
-  color: var(--qc-text);
-  box-shadow: inset 0 0 0 2px currentcolor;
-
-  &.is-chosen {
-    background: var(--qc-text);
-    color: var(--qc-surface);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--qc-text) 30%, transparent);
-  }
-}
-
-// The loud one, filled from the start — it is what the alert asks for.
-.alert-confirm {
-  background: var(--qc-alert);
-  color: #fff;
-
-  &.is-chosen { box-shadow: 0 0 0 3px color-mix(in srgb, var(--qc-alert) 30%, transparent); }
-}
-
-// Answered: the answer given is the filled one, and it wears a halo. The other gives up its fill and
-// fades, so which way the objection went is legible at a glance rather than by comparison.
-//
-// Neither state changes the size of a button: the halo is a box-shadow and so is every outline here.
-// The two barely fit the panel side by side, and a pair that re-wraps on every answer would make the
-// criteria under it jump exactly while they are being answered.
-.alert-actions.is-answered {
-  .alert-dismiss:not(.is-chosen) { opacity: 0.45; }
-
-  .alert-confirm:not(.is-chosen) {
-    background: none;
-    color: var(--qc-alert);
-    box-shadow: inset 0 0 0 2px currentcolor;
-    opacity: 0.45;
-  }
 }
 
 // What the star behind a criterion means. Small and quiet: it explains a mark, it does not compete

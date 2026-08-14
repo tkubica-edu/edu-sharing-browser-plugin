@@ -18,9 +18,8 @@ import { SpinnerComponent } from './spinner.component';
 export type CriteriaProperties = Record<string, string[]>;
 
 /**
- * What became of a machine's objection once a person looked at it: they saw the violation too
- * (`confirmed`), or they did not (`dismissed`). Only the latter answers the criterion — a confirmed
- * violation leaves its box exactly as empty as it was.
+ * How a person answered a machine's objection — read off the criterion's box, which is where it is
+ * answered: a ticked box dismisses it, an empty one confirms it.
  */
 export type ViolationDecision = 'confirmed' | 'dismissed';
 
@@ -28,18 +27,15 @@ export type ViolationDecision = 'confirmed' | 'dismissed';
 interface CriterionViolation {
   /** The criterion the objection is about, as the metadata set lists it. */
   criterion: MdsValue;
-  /** Which of the two lists it belongs to — the answer is recorded differently in each. */
-  editorial: boolean;
   /** What the checks found; more than one where several of them bear on this criterion. */
   findings: readonly CriterionJudgement[];
 }
 
 /**
- * How far the machines got with the content — the state the block above the lists shows. Two of them are
- * not about the machines but about what is left to show: `handled`, where every objection has been
- * answered and the block folds into one line, and `unavailable`, where no check got through at all and
- * the block is not there. A service that is down is nothing to tell the user about — they can neither
- * do anything about it nor read anything into it, and the criteria are theirs to answer either way.
+ * What the block above the lists shows. Two states are about what is left to show rather than about the
+ * machines: `handled`, the one line left where the user folded the answered objections away, and
+ * `unavailable`, where no check got through at all — a service that is down is nothing the user can act
+ * on or read anything into, so nothing is said about it.
  */
 type CheckState = 'running' | 'violations' | 'handled' | 'unavailable' | 'done';
 
@@ -47,31 +43,28 @@ type CheckState = 'running' | 'violations' | 'handled' | 'unavailable' | 'done';
 const LOG_QUALITY = '[edu-sharing][quality]';
 
 /**
- * The valuespace ids a criterion's value carries in `alternativeIds` — from the quality vocabulary
- * (https://vocabs.openeduhub.de/w3id.org/openeduhub/vocabs/quality). A criterion is *met* only while
- * the property holds the value that maps to MET: a content nothing is recorded for is unjudged, and
- * unjudged is not the same as in order.
+ * The quality vocabulary's ids, as a criterion's values carry them in `alternativeIds`
+ * (https://vocabs.openeduhub.de/w3id.org/openeduhub/vocabs/quality). Met only while the property holds
+ * the value mapped to MET: a content nothing is recorded for is unjudged, which is not "in order".
  */
 const CRITERION_MET = '3';
 const CRITERION_VIOLATED = '0';
 
 /**
- * The same two answers on a criterion whose valuespace carries no `alternativeIds` at all — a plain
- * yes/no widget, whose value *ids* are the answer ("geeignet für eure Zielgruppe" is one: `1` = Ja,
- * `0` = Nein). Only consulted for such a widget: where a vocabulary is mapped, an unmapped value is
- * one the vocabulary deliberately does not offer, not one to guess at.
+ * The same two answers on a widget whose valuespace maps nothing, where the value *ids* are the answer
+ * ("geeignet für eure Zielgruppe": `1` = Ja, `0` = Nein). Only consulted for such a widget — under a
+ * mapped vocabulary an unmapped value is one it deliberately does not offer, not one to guess at.
  */
 const PLAIN_MET = '1';
 const PLAIN_VIOLATED = '0';
 
 /**
- * The vocabulary term a machine's all-clear is recorded as, where the criterion's valuespace states one
- * ("keine Auffälligkeiten gefunden (Maschine)"). Four of the knock-out criteria use that findings
- * vocabulary; the others are a 0–5 rating (Neutralität, Datenschutz) or a plain yes/no, and there a
+ * How a machine's all-clear is recorded, where the criterion's valuespace states a term for it
+ * ("keine Auffälligkeiten gefunden (Maschine)"); the rating and yes/no criteria state none, and there a
  * machine's answer cannot be told from a person's — see {@link autoMetValue}.
  *
- * Matched by the term at the end of the value's URI rather than through `alternativeIds`, because on a
- * rating scale those mean the rating: `2` there is two stars, not "no machine findings".
+ * Matched by the term at the end of the URI rather than through `alternativeIds`, because on a rating
+ * scale those mean the rating: `2` is two stars, not "no machine findings".
  */
 const AUTO_MET_TERM = 'no_auto_findings';
 
@@ -81,16 +74,14 @@ function termOf(id: string): string {
 }
 
 /**
- * The widget listing the knock-out criteria. Its *values* are the criteria, and each value's id is
- * itself the node property that criterion is recorded in — the widget is a table of contents, not a
- * property of its own.
+ * The widget listing the knock-out criteria — a table of contents, not a property of its own: its values
+ * are the criteria, and each value's id is the node property that criterion is recorded in.
  */
 const KNOCKOUT_WIDGET = 'virtual:unmetLegalCriteria';
 
 /**
- * The editorial criteria: one multi-value property, whose widget's values are the criteria. A
- * criterion is met while its id is among the property's values — the plain opposite of the
- * knock-out ones, where a recorded value is the objection.
+ * The editorial criteria: one multi-value property whose widget's values are the criteria. One is met
+ * while its id is among the values — the opposite of the knock-out ones, where a value is the objection.
  */
 const EDITORIAL_PROPERTY = 'ccm:oeh_buffet_criteria';
 
@@ -104,22 +95,14 @@ function asList(value: unknown): string[] {
  * "Fachliche Qualitätskriterien": the two lists of criteria a content is judged by, and — reported
  * rather than asked for here — whether they allow the confirmation that follows from them.
  *
- * Deliberately self-contained, so it can be built as a custom element of its own later. It takes the
- * content's properties in and reports the changed ones back out — it writes nothing itself and knows
- * nothing of the flow it currently sits in. The only thing it fetches is the metadata set, because
- * the criteria are *defined* there: which they are, what they are called, and which valuespace entry
- * means met.
+ * Deliberately self-contained, so it can be built as a custom element of its own later: properties in,
+ * changed properties out, and it writes nothing itself. Only the metadata set is fetched, because the
+ * criteria are *defined* there. Reporting rather than writing is also what lets it judge a content that
+ * has no node yet — the panel collects everything and saves it once, at the end of the flow.
  *
- * Reporting rather than writing is also what lets it judge a content that does not exist yet: in the
- * panel the criteria are collected with the rest of the metadata and written by the single save at
- * the end of the flow, which is where a curated content gets its node in the first place.
- *
- * The content is also judged by machine, and this view is where that judgement lands: what the check
- * found in order is reported as an answer to that criterion, like a click on its box would be, and what
- * it objected to is put in front of the user — one objection at a time, each to be dismissed or
- * confirmed. The checking itself happens elsewhere and much earlier (QualityJudgeService,
- * started as soon as the content is erschlossen), so by the time this view opens the answer is usually
- * already there — and where it is not, the wait is the tail of it.
+ * The machines' judgement lands here too (QualityJudgeService checks much earlier, so it is usually
+ * already in): what they found in order answers its criterion like a click on the box would, and what
+ * they objected to is put in front of the user, one at a time, to be answered on that same box.
  */
 @Component({
   selector: 'es-quality-criteria',
@@ -151,10 +134,9 @@ export class QualityCriteriaComponent {
   readonly propertiesChange = output<CriteriaProperties>();
 
   /**
-   * Whether the knock-out criteria stand in the way of nothing any more — see
-   * {@link knockoutSatisfied}. Reported because the confirmation that hangs off it is the host's: it
-   * offers it wherever its own actions live (in the panel, the footer's "Qualität bestätigen"), and
-   * this view is what knows when it may be given.
+   * Whether the knock-out criteria stand in the way of nothing any more — see {@link knockoutSatisfied}.
+   * Reported because the confirmation hanging off it is the host's (in the panel, the footer's "Qualität
+   * bestätigen"), while this view is what knows when it may be given.
    */
   readonly knockoutSatisfiedChange = output<boolean>();
 
@@ -162,9 +144,8 @@ export class QualityCriteriaComponent {
   private readonly mds = signal<MdsDefinition | null>(null);
 
   /**
-   * The changes made here, over the properties handed in. Kept because a host is not obliged to feed
-   * the reported values back: one that stores them re-supplies them and this agrees with it, one
-   * that does not still gets a view that answers to its own clicks.
+   * The changes made here, over the properties handed in — kept because a host is not obliged to feed the
+   * reported values back, and the view still has to answer to its own clicks.
    */
   private readonly changes = signal<CriteriaProperties>({});
 
@@ -181,11 +162,9 @@ export class QualityCriteriaComponent {
   protected readonly judgesAsked = this.qualityJudge.asked;
 
   /**
-   * The criteria whose answer the check put there rather than a person — what is drawn in the machine's
-   * colour, so nobody takes a filled-in box for someone's decision.
-   *
-   * A criterion the user answers themselves drops out of it again (see {@link takeOver}): the mark says
-   * where the value came from, and from then on it comes from somewhere else.
+   * The criteria whose answer a check put there rather than a person — drawn in the machine's colour, so
+   * nobody takes a filled-in box for someone's decision. A criterion the user answers themselves drops
+   * out again (see {@link takeOver}): the mark says where the value came from.
    */
   private readonly aiAnswered = signal<readonly string[]>([]);
 
@@ -197,20 +176,16 @@ export class QualityCriteriaComponent {
   private takenMeasurement: MetalookupEvaluation | null = null;
 
   /**
-   * What the judges answered per criterion, keyed by criterion id — several answers where several
-   * checks bear on one criterion. Empty until every check is back, which is what makes the criteria
-   * show a whole result rather than a growing one (see the constructor).
-   *
-   * A criterion they *all* found in order is ticked (see {@link tickJudged}); one they objected to is
-   * marked as such and argued about in the alert above the lists. Kept as its own state rather than
-   * derived from the record, because the record only holds the answer — the finding behind it is here.
+   * What the judges answered per criterion id — several answers where several checks bear on one.
+   * Empty until every check is back (see the constructor), so the criteria show a whole result rather
+   * than a growing one. Kept as its own state because the record holds only the answer: a criterion
+   * they all found in order is ticked (see {@link tickJudged}), and the finding behind it is here.
    */
   private readonly judgements = signal<Record<string, CriterionJudgement[]>>({});
 
   /**
-   * What a person decided about each objection, keyed by criterion id — empty until they decided
-   * anything. Kept per criterion rather than per finding: two checks objecting to the same criterion
-   * are two arguments about one question, and the answer is to the question.
+   * What a person decided about each objection, keyed by criterion id. Per criterion rather than per
+   * finding: two checks objecting to one criterion are two arguments about the same question.
    */
   private readonly decisions = signal<Record<string, ViolationDecision>>({});
 
@@ -219,15 +194,12 @@ export class QualityCriteriaComponent {
     effect(() => void this.load(this.metadataSet(), this.repository()));
 
     // Take the judgements over once every check is back and the criteria to map them onto are there.
+    // Not before: a criterion the faster judge found in order can still be objected to by the slower, and
+    // the tick would be taken back a moment later, with the user's eyes on the list.
     //
-    // Not before: the two judges answer at their own pace, and a criterion the faster one found in
-    // order can still be objected to by the slower. Ticking it in the meantime would show an answer
-    // that is then taken back a moment later — with the box already ticked in the machine's colour, and
-    // the user's eyes on the list while it happens.
-    //
-    // All four signals are read before the first return, so the run that follows the last check coming
-    // in actually happens. Each state of the answers is then applied once (see takenJudgement), so a
-    // judge that answers late still adds to what the other one said.
+    // All four signals are read before the first return, so the run that follows the last check actually
+    // happens. Each state of the answers is applied once (see takenJudgement), so a late judge still adds
+    // to what the other one said.
     effect(() => {
       const checking = this.checking();
       const criteria = this.criterionIds();
@@ -270,32 +242,27 @@ export class QualityCriteriaComponent {
   );
 
   /**
-   * Every criterion the checks objected to, both lists in the order they are shown — what the alert
-   * above them leads through.
-   *
-   * An objection is a finding of `met === false`: a check that answered nothing about a criterion
-   * (`null`) objects to nothing, and neither does one that found it in order.
+   * Every criterion the checks objected to, both lists in the order they are shown — what the alert above
+   * them leads through. An objection is a finding of `met === false`: a check that answered nothing about
+   * a criterion (`null`) objects to nothing, and neither does one that found it in order.
    */
   protected readonly violations = computed<readonly CriterionViolation[]>(() => [
-    ...this.violationsIn(this.knockoutCriteria(), false),
-    ...this.violationsIn(this.editorialCriteria(), true)
+    ...this.violationsIn(this.knockoutCriteria()),
+    ...this.violationsIn(this.editorialCriteria())
   ]);
 
   /**
-   * How far the machines got, as the block above the lists reports it. The wait covers the metadata set
-   * as well: until the criteria are there, nothing can be said to have been found — and an all-clear
-   * that is taken back a moment later is worse than one that comes late.
+   * How far the machines got. The wait covers the metadata set as well: until the criteria are there,
+   * nothing can be said to have been found, and an all-clear taken back a moment later is worse than one
+   * that comes late.
    *
-   * `unavailable` where not one judge got through — every one of them unreachable, or with nothing on
-   * this content it could check. There is no judgement then, not even an empty one, so nothing is
-   * claimed: neither that the content was checked nor that a service is broken.
-   *
-   * One judge answering is enough for `done`, whatever became of the other: what came back is a result,
-   * and the alert would carry it if it held an objection.
+   * `unavailable` where not one judge got through: there is no judgement then, not even an empty one, so
+   * nothing is claimed either way. One judge answering is enough for `done` — what came back is a result,
+   * and an objection in it would show as one.
    */
   protected readonly checkState = computed<CheckState>(() => {
     if (this.checking() || this.loading()) return 'running';
-    if (this.violations().length) return this.alertOpen() ? 'violations' : 'handled';
+    if (this.violations().length) return this.folded() ? 'handled' : 'violations';
     if (!this.judgeStatuses().some((status) => status.state === 'done')) return 'unavailable';
     return 'done';
   });
@@ -308,28 +275,24 @@ export class QualityCriteriaComponent {
   );
 
   /**
-   * Whether the objections are on screen. They are while any of them is unanswered, and once they are
-   * all answered only if the user asked for them back — the alert is a question, and an answered
-   * question should not keep the criteria pushed down the sheet.
+   * Whether the user folded the objections away — they stay on screen until they do. What a check found
+   * belongs beside the criteria it is about, and answering it is no reason to take the argument away.
    */
-  private readonly alertOpen = computed(() => !this.allDecided() || this.reopened());
+  private readonly folded = signal(false);
 
-  /** Whether the user asked the answered objections back on screen — see {@link alertOpen}. */
-  private readonly reopened = signal(false);
-
-  /** Put the answered objections back on screen, to look at them again or to answer differently. */
+  /** Put them back on screen, to look at them again or to answer differently. */
   protected openAlert(): void {
-    this.reopened.set(true);
+    this.folded.set(false);
   }
 
-  /** Fold them away again. Only ever offered while they are all answered (see the template). */
+  /** Fold them away. Only ever offered while they are all answered (see the template). */
   protected closeAlert(): void {
-    this.reopened.set(false);
+    this.folded.set(true);
   }
 
   /**
-   * Which objection the alert shows. Clamped to what is there, since the findings arrive while the view
-   * is open: an index into a list of two is nonsense the moment that list holds one.
+   * Which objection the alert shows, clamped to what is there: the findings arrive while the view is
+   * open, and an index into a list of two is nonsense the moment that list holds one.
    */
   protected readonly shown = linkedSignal<readonly CriterionViolation[], number>({
     source: this.violations,
@@ -343,34 +306,24 @@ export class QualityCriteriaComponent {
   );
 
   /** What a person decided about this criterion's objection; null while they decided nothing. */
-  protected decisionOf(criterion: string): ViolationDecision | null {
+  private decisionOf(criterion: string): ViolationDecision | null {
     return this.decisions()[criterion] ?? null;
   }
 
   /**
-   * What the objection to this criterion is called in its row: the finding while it stands on the
-   * machine's word alone, and the person's own verdict once they have given it. `null` where nothing
-   * objected — which is most rows.
+   * What the objection to this criterion is called in its row: an open question while it stands on the
+   * machine's word alone, settled once a person has looked at it — whichever way they decided, since the
+   * box beside it says what came of it. `null` where nothing objected, which is most rows.
    */
   protected violationLabel(criterion: MdsValue): string | null {
-    if (!this.judgementsOf(criterion).some((judged) => judged.met === false)) return null;
-    switch (this.decisionOf(criterion.id)) {
-      case 'confirmed':
-        return 'Verstoß bestätigt';
-      case 'dismissed':
-        return 'Verstoß nicht bestätigt';
-      default:
-        return 'Verstoß entdeckt';
-    }
+    if (!this.hasObjection(criterion.id)) return null;
+    return this.decisionOf(criterion.id) ? 'geprüft' : 'mögliche Auffälligkeit';
   }
 
   /**
-   * Whether the objection to this criterion is still one: nobody has answered it yet, or somebody
-   * confirmed it. That is what the row is drawn in the alarm colour for.
-   *
-   * A dismissed objection is not. The finding stays on record — a person disagreeing with a check does
-   * not unmake what it found — but the criterion is answered and in order, and a row that keeps
-   * shouting after that would send the user looking for a problem that has been dealt with.
+   * Whether the objection to this criterion is still one — unanswered, or confirmed. That is what the row
+   * is drawn in the alarm colour for. A dismissed one is not: the finding stays on record, but the
+   * criterion is in order, and a row that kept shouting would send the user after a settled problem.
    */
   protected isViolated(criterion: MdsValue): boolean {
     return !!this.violationLabel(criterion) && this.decisionOf(criterion.id) !== 'dismissed';
@@ -397,16 +350,6 @@ export class QualityCriteriaComponent {
     this.step(1);
   }
 
-  /** "kein Verstoß erkennbar": the person looked and did not see it, so the criterion is met. */
-  protected dismissViolation(): void {
-    this.answerViolation(true, 'dismissed');
-  }
-
-  /** "Verstoß bestätigen": the person saw it too, so the criterion is not met and its box comes off. */
-  protected confirmViolation(): void {
-    this.answerViolation(false, 'confirmed');
-  }
-
   protected readonly allKnockoutMet = computed(
     () =>
       this.knockoutCriteria().length > 0 &&
@@ -420,25 +363,22 @@ export class QualityCriteriaComponent {
   );
 
   /**
-   * Whether the knock-out criteria hold the content back no longer: every one of them is met, or the
-   * set defines none at all — criteria that do not exist cannot be answered, and a content would
-   * otherwise be stuck behind a list nobody can tick. Only these gate it: the editorial criteria
-   * describe the content's quality, they do not stand in the way of publishing it.
+   * Whether the knock-out criteria hold the content back no longer: every one met, or the set defines
+   * none at all — otherwise a content would be stuck behind a list nobody can tick. Only these gate it;
+   * the editorial criteria describe quality without standing in the way of publishing.
    *
-   * False while the set is still being read: what it will demand is not known yet, and a gate that
-   * opens for a moment because nothing has loaded is worse than one that opens late.
+   * False while the set is still being read, so the gate never opens for a moment just because nothing
+   * has loaded yet.
    */
   private readonly knockoutSatisfied = computed(
     () => !this.loading() && (this.knockoutCriteria().length === 0 || this.allKnockoutMet()),
   );
 
   /**
-   * Whether a knock-out criterion is met: the record holds a value that says so — the one a person's
-   * confirmation writes, or the one a machine's all-clear writes. Everything else counts as not met:
-   * nothing recorded at all, the vocabulary's own "Ungeprüft", and any kind of finding.
-   *
-   * So every box starts empty, and a tick is something that was actually established. The confirmation
-   * hangs off these boxes (see the template), which is why nothing here may be assumed.
+   * Whether a knock-out criterion is met: the record holds the value a person's confirmation writes, or
+   * the one a machine's all-clear writes. Everything else counts as not met — nothing recorded, the
+   * vocabulary's own "Ungeprüft", any kind of finding — so a tick is always something that was
+   * established. The confirmation hangs off these boxes, which is why nothing here may be assumed.
    */
   protected isMet(criterion: MdsValue): boolean {
     const recorded = this.valueOfProperty(criterion.id)[0];
@@ -460,8 +400,13 @@ export class QualityCriteriaComponent {
   }
 
   /** What the machines made of this criterion; empty while nothing judged it — see {@link judgements}. */
-  private judgementsOf(criterion: MdsValue): readonly CriterionJudgement[] {
-    return this.judgements()[criterion.id] ?? [];
+  private judgementsOf(criterion: string): readonly CriterionJudgement[] {
+    return this.judgements()[criterion] ?? [];
+  }
+
+  /** Whether any check objected to this criterion — whether, that is, there is a hint to answer. */
+  private hasObjection(criterion: string): boolean {
+    return this.judgementsOf(criterion).some((judged) => judged.met === false);
   }
 
   /** Whether this criterion's answer is the machine's — see {@link aiAnswered}. */
@@ -470,20 +415,21 @@ export class QualityCriteriaComponent {
   }
 
   /**
-   * Record a knock-out criterion as met or as violated — one property each. Reports whether it was
-   * recorded: the vocabulary may hold no value for what the click means, and then nothing was answered.
+   * Record a knock-out criterion as met or as violated — one property each. Records nothing where the
+   * vocabulary holds no value for what the click means, and says so instead; an objection to that
+   * criterion then stays unanswered too.
    */
-  protected setCriterion(criterion: MdsValue, met: boolean): boolean {
+  protected setCriterion(criterion: MdsValue, met: boolean): void {
     const value = this.valueFor(criterion.id, met ? CRITERION_MET : CRITERION_VIOLATED);
     if (!value) {
       // The vocabulary does not offer the value this click means. Saying so beats recording
       // something else: the criterion decides whether the content may be published.
       this.error.set(`Für „${this.captionOf(criterion)}“ ist kein passender Wert hinterlegt.`);
-      return false;
+      return;
     }
     this.takeOver([criterion.id]);
     this.report({ [criterion.id]: [value] });
-    return true;
+    this.decide(criterion.id, met);
   }
 
   /** Record an editorial criterion by adding it to the property's values, or taking it out. */
@@ -495,6 +441,7 @@ export class QualityCriteriaComponent {
         ? [...current.filter((id) => id !== criterion.id), criterion.id]
         : current.filter((id) => id !== criterion.id)
     });
+    this.decide(criterion.id, met);
   }
 
   /** Fulfil every knock-out criterion at once. */
@@ -506,6 +453,7 @@ export class QualityCriteriaComponent {
     }
     this.takeOver(Object.keys(met));
     this.report(met);
+    for (const criterion of Object.keys(met)) this.decide(criterion, true);
   }
 
   /** Fulfil every editorial criterion at once: the property holds all of their ids. */
@@ -513,6 +461,7 @@ export class QualityCriteriaComponent {
     const criteria = this.editorialCriteria().map((criterion) => criterion.id);
     this.takeOver(criteria);
     this.report({ [EDITORIAL_PROPERTY]: criteria });
+    for (const criterion of criteria) this.decide(criterion, true);
   }
 
   /** Both lists at once. */
@@ -525,15 +474,11 @@ export class QualityCriteriaComponent {
   protected readonly problemShown = computed(() => this.error() ?? this.problem());
 
   /** The objections among these criteria — see {@link violations}. */
-  private violationsIn(
-    criteria: readonly MdsValue[],
-    editorial: boolean
-  ): readonly CriterionViolation[] {
+  private violationsIn(criteria: readonly MdsValue[]): readonly CriterionViolation[] {
     return criteria
       .map((criterion) => ({
         criterion,
-        editorial,
-        findings: this.judgementsOf(criterion).filter((judged) => judged.met === false)
+        findings: this.judgementsOf(criterion.id).filter((judged) => judged.met === false)
       }))
       .filter((violation) => violation.findings.length > 0);
   }
@@ -546,63 +491,34 @@ export class QualityCriteriaComponent {
   }
 
   /**
-   * Answer the objection on screen, and move on to the next one nobody has answered yet — the alert is
-   * a queue of questions, and answering one is what asks the following one.
-   *
-   * Both answers are answers to the criterion, and each writes the value it means: the person did not
-   * see the violation, so the criterion is met; or they did, so it is violated. That is exactly what
-   * the vocabulary's "(Mensch)" values are for, and it is the same thing a click on the row's own box
-   * would record.
-   *
-   * The step forward happens either way, even where the value could not be recorded (see
-   * {@link setCriterion}) — the button has to do something visible. What is *not* recorded then is the
-   * decision: the objection stays in the queue, the row keeps reading as found, and the error says why.
+   * Note that an objection has been answered — it is answered on the criterion's own box, by the same
+   * click that records the value: ticked, so the person did not see what the check saw; empty, so they
+   * did. A criterion nothing objected to has nothing to decide. The alert then moves on to what is still
+   * open, since it is a queue of questions and answering one is what asks the next.
    */
-  private answerViolation(met: boolean, decision: ViolationDecision): void {
-    const violation = this.current();
-    if (!violation) return;
-    if (this.recordCriterion(violation, met)) {
-      this.decisions.update((decisions) => ({ ...decisions, [violation.criterion.id]: decision }));
-    }
-    this.advance();
+  private decide(criterion: string, met: boolean): void {
+    if (!this.hasObjection(criterion)) return;
+    this.decisions.update((decisions) => ({
+      ...decisions,
+      [criterion]: met ? 'dismissed' : 'confirmed'
+    }));
+    this.showOpen();
   }
 
   /**
-   * Record the criterion behind an objection, in whichever of the two lists it stands. Reports whether
-   * it was recorded; the editorial ones always are — their property simply takes the change.
+   * Show the first objection nobody has answered yet. Where they are all answered the alert stays where
+   * it is: nothing is left to ask, and what stands there is the record of the decision just taken.
    */
-  private recordCriterion(violation: CriterionViolation, met: boolean): boolean {
-    if (!violation.editorial) return this.setCriterion(violation.criterion, met);
-    this.setEditorialCriterion(violation.criterion, met);
-    return true;
+  private showOpen(): void {
+    const index = this.violations().findIndex(
+      (violation) => !this.decisionOf(violation.criterion.id)
+    );
+    if (index >= 0) this.shown.set(index);
   }
 
   /**
-   * Move on to the next objection nobody has answered yet, searching forwards from the one on screen
-   * and wrapping around — and where they are all answered, simply to the next one, so that an answer
-   * given always moves the alert on.
-   *
-   * That last case is the alert opened again to go over the decisions: on the way through it for the
-   * first time there is always an unanswered one left, and answering the final one folds the alert away
-   * (see {@link alertOpen}) rather than showing whatever this picked.
-   */
-  private advance(): void {
-    const violations = this.violations();
-    if (violations.length < 2) return;
-    const from = this.shown();
-    for (let step = 1; step <= violations.length; step++) {
-      const index = (from + step) % violations.length;
-      if (!this.decisionOf(violations[index].criterion.id)) {
-        this.shown.set(index);
-        return;
-      }
-    }
-    this.step(1);
-  }
-
-  /**
-   * Take both answers apart per criterion, so every box can say what the machines made of it — the same
-   * maps that chose the checks decide which result belongs to which criterion.
+   * Take both answers apart per criterion, so every box can say what the machines made of it — by the
+   * same maps that chose the checks in the first place.
    */
   private takeJudgements(
     criteria: readonly string[],
@@ -621,19 +537,14 @@ export class QualityCriteriaComponent {
   }
 
   /**
-   * Tick every criterion the checks found in order, and record it as the machine's answer where the
-   * valuespace can say so.
-   *
-   * *Every* check: where two of them bear on one criterion, one failure is enough to leave it open — a
-   * content whose security headers are missing is not confirmed by an LLM finding its prose harmless.
+   * Tick every criterion the checks found in order, recorded as the machine's answer where the valuespace
+   * can say so. *Every* check: where two bear on one criterion, one failure leaves it open — missing
+   * security headers are not made good by an LLM finding the prose harmless.
    *
    * Only where nothing is recorded yet. The answers arrive about a minute after the content was
-   * erschlossen, so the user may have answered in the meantime — and their answer is the one that
-   * counts. The same goes for a content that already carries one, an "Ungeprüft" included: what is there
-   * is not overwritten.
-   *
-   * A failed check ticks nothing and records nothing: the box already reads as unanswered, and the
-   * verdict beside it says what was found.
+   * erschlossen, so the user may have answered in the meantime, and what is already there — an
+   * "Ungeprüft" included — stands. A failed check ticks nothing: the box already reads as unanswered,
+   * and the verdict beside it says what was found.
    */
   private tickJudged(judgements: Record<string, CriterionJudgement[]>): void {
     const values: CriteriaProperties = {};
@@ -692,9 +603,8 @@ export class QualityCriteriaComponent {
   }
 
   /**
-   * Take these criteria over as the user's own: whatever the machine answered for them, the answer is
-   * now theirs, so it stops being drawn as the machine's — see {@link aiAnswered}. The judgement itself
-   * stays beside the criterion; it is a finding, and a person disagreeing with it does not unmake it.
+   * Take these criteria over as the user's own, so they stop being drawn as the machine's (see
+   * {@link aiAnswered}). The judgement stays beside them: disagreeing with a finding does not unmake it.
    */
   private takeOver(criteria: readonly string[]): void {
     this.aiAnswered.update((answered) => answered.filter((id) => !criteria.includes(id)));
@@ -727,12 +637,10 @@ export class QualityCriteriaComponent {
   }
 
   /**
-   * The value id that means MET / VIOLATED on this criterion's property.
-   *
-   * Normally the value mapped to that entry of the quality vocabulary. A widget that maps *nothing*
-   * is a plain yes/no one, whose value ids are the answer themselves — see {@link PLAIN_MET}. The
-   * distinction matters: a mapped vocabulary that simply lacks the entry has no answer to give, and
-   * falling through to a bare id would then pick an unrelated value out of a rating scale.
+   * The value id that means MET / VIOLATED on this criterion's property: the value mapped to that entry
+   * of the quality vocabulary, or — where the widget maps *nothing* — the plain yes/no id (see
+   * {@link PLAIN_MET}). The distinction matters: a mapped vocabulary that lacks the entry has no answer
+   * to give, and falling through would pick an unrelated value out of a rating scale.
    */
   private valueFor(property: string, vocabularyId: string): string | undefined {
     const values = this.widget(property)?.values ?? [];
