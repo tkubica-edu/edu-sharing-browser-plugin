@@ -21,3 +21,38 @@
 
 // A second switch in the same card sits under the first one's description, not against it.
 .desc + .check { margin-top: var(--es-space-3); }
+
+// The heading of a folded card, as the control that unfolds it: the whole width, so the target is the
+// row and not the chevron at its end.
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--es-space-2);
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+
+  h2 { margin: 0; }
+}
+
+// Points down while the card is folded and turns over when it opens — where the content went.
+.section-chevron {
+  flex: 0 0 auto;
+  color: var(--es-blue);
+  font-size: 20px;
+  line-height: 20px;
+  transition: transform 0.15s ease;
+
+  &.is-open { transform: rotate(180deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-chevron { transition: none; }
+}
+
+// The first element of an unfolded card, against the heading it belongs to.
+.section-head + * { margin-top: var(--es-space-3); }

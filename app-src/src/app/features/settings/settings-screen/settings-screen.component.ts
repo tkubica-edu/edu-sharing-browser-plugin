@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnDestroy, computed, inject, signal
 import { FormsModule } from '@angular/forms';
 
 import { APP_CONFIG } from '../../../config';
+import { IconDirective } from '../../../directives/icon.directive';
 import { AuthService } from '../../../services/auth.service';
 import { CollectionRecommendationService } from '../../../services/collection-recommendation.service';
 import { ContextRefreshService } from '../../../services/context-refresh.service';
@@ -13,7 +14,7 @@ import { CONTENT_JUDGE_AVAILABLE, QualityJudgeService } from '../../../services/
 // because the API library freezes its rootUrl at bootstrap (see AuthService).
 @Component({
   selector: 'es-settings-screen',
-  imports: [FormsModule],
+  imports: [FormsModule, IconDirective],
   templateUrl: './settings-screen.component.html',
   styleUrl: './settings-screen.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -38,6 +39,17 @@ export class SettingsScreenComponent implements OnDestroy {
 
   /** Set by every setting, so leaving without having changed anything costs no requests. */
   private changed = false;
+
+  /**
+   * Which of the folded sections is open, if any. The settings the panel is opened for are the ones at
+   * the top; what these two hold is tuning, and shown as a heading until it is asked for. One at a time,
+   * so the screen stays as short as it is when both are closed.
+   */
+  protected readonly openSection = signal<'recommendation' | 'quality' | null>(null);
+
+  protected toggleSection(section: 'recommendation' | 'quality'): void {
+    this.openSection.update((open) => (open === section ? null : section));
+  }
 
   /**
    * Leaving the settings re-runs the checks whose answers the changed settings may have invalidated — the menu the

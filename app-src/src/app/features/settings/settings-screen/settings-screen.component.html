@@ -69,68 +69,85 @@
   }
 </section>
 
-<!-- Woraus die Sammlung ermittelt wird, die „An Redaktionen weiterleiten“ vorschlägt. -->
+<!-- Woraus die Sammlung ermittelt wird, die „An Redaktionen weiterleiten“ vorschlägt. Eingeklappt:
+     Werte, die selten angefasst werden, sollen die Einstellungen nicht füllen. -->
 <section class="es-card">
-  <h2>Zugehörige Sammlungen empfehlen</h2>
+  <!-- Die ganze Zeile klappt auf, nicht nur der Pfeil — ein Ziel statt zweier, und die Überschrift
+       sagt ohnehin, was darunter liegt. -->
+  <button type="button" class="section-head" (click)="toggleSection('recommendation')"
+          [attr.aria-expanded]="openSection() === 'recommendation'">
+    <h2>Zugehörige Sammlungen empfehlen</h2>
+    <i class="section-chevron" [class.is-open]="openSection() === 'recommendation'"
+       esIcon="expand_more"></i>
+  </button>
 
-  <p class="desc">
-    Die Schlagworte des Inhalts werden gegen seinen Text bewertet; mit den besten davon wird der
-    Themen-Assistent befragt, und die passendste Sammlung wird vorgeschlagen und ausgewählt.
-  </p>
+  @if (openSection() === 'recommendation') {
+    <p class="desc">
+      Die Schlagworte des Inhalts werden gegen seinen Text bewertet; mit den besten davon wird der
+      Themen-Assistent befragt, und die passendste Sammlung wird vorgeschlagen und ausgewählt.
+    </p>
 
-  <label class="es-field-label" for="rec-keywords">Anzahl Schlagworte</label>
-  <input id="rec-keywords" type="number" class="es-input" min="1" step="1"
-         [ngModel]="recommendations.maxKeywords()"
-         (ngModelChange)="setRecommendationKeywords($event)" />
-  <p class="desc">
-    Höchstens so viele Schlagworte gehen in die Anfrage. Jedes weitere verbreitert die Antwort eher,
-    als sie zu schärfen — der Assistent gewichtet ein Thema danach, wie viele Schlagworte es treffen.
-  </p>
+    <label class="es-field-label" for="rec-keywords">Anzahl Schlagworte</label>
+    <input id="rec-keywords" type="number" class="es-input" min="1" step="1"
+           [ngModel]="recommendations.maxKeywords()"
+           (ngModelChange)="setRecommendationKeywords($event)" />
+    <p class="desc">
+      Höchstens so viele Schlagworte gehen in die Anfrage. Jedes weitere verbreitert die Antwort eher,
+      als sie zu schärfen — der Assistent gewichtet ein Thema danach, wie viele Schlagworte es treffen.
+    </p>
 
-  <label class="es-field-label" for="rec-score">Mindest-Score</label>
-  <input id="rec-score" type="number" class="es-input" min="0" max="1" step="0.05"
-         [ngModel]="recommendations.minScore()"
-         (ngModelChange)="setRecommendationMinScore($event)" />
-  <p class="desc">
-    Diesen Wert muss ein Schlagwort erreichen, um überhaupt gefragt zu werden — 0 bis 1, gemessen am
-    bestbewerteten Schlagwort des Inhalts. Erreicht keines ihn, wird keine Sammlung vorgeschlagen.
-    Ohne Text zum Bewerten (etwa bei einem Inhalt ohne erschlossenen Volltext) greift nur die Anzahl.
-  </p>
+    <label class="es-field-label" for="rec-score">Mindest-Score</label>
+    <input id="rec-score" type="number" class="es-input" min="0" max="1" step="0.05"
+           [ngModel]="recommendations.minScore()"
+           (ngModelChange)="setRecommendationMinScore($event)" />
+    <p class="desc">
+      Diesen Wert muss ein Schlagwort erreichen, um überhaupt gefragt zu werden — 0 bis 1, gemessen am
+      bestbewerteten Schlagwort des Inhalts. Erreicht keines ihn, wird keine Sammlung vorgeschlagen.
+      Ohne Text zum Bewerten (etwa bei einem Inhalt ohne erschlossenen Volltext) greift nur die Anzahl.
+    </p>
 
-  <div class="es-row">
-    <button class="es-btn es-btn--text" (click)="resetRecommendation()">
-      Auf Standard zurücksetzen
-    </button>
-  </div>
+    <div class="es-row">
+      <button class="es-btn es-btn--text" (click)="resetRecommendation()">
+        Auf Standard zurücksetzen
+      </button>
+    </div>
+  }
 </section>
 
-<!-- Welche Dienste die Qualitätsprüfung befragt. -->
+<!-- Welche Dienste die Qualitätsprüfung befragt; eingeklappt wie die Empfehlung darüber. -->
 <section class="es-card">
-  <h2>Qualitätsprüfung</h2>
+  <button type="button" class="section-head" (click)="toggleSection('quality')"
+          [attr.aria-expanded]="openSection() === 'quality'">
+    <h2>Qualitätsprüfung</h2>
+    <i class="section-chevron" [class.is-open]="openSection() === 'quality'"
+       esIcon="expand_more"></i>
+  </button>
 
-  <label class="check">
-    <input type="checkbox" [ngModel]="qualityJudge.metalookupEnabled()"
-           (ngModelChange)="setMetalookup($event)" />
-    <span>MetalookUp: Inhalt messen</span>
-  </label>
+  @if (openSection() === 'quality') {
+    <label class="check">
+      <input type="checkbox" [ngModel]="qualityJudge.metalookupEnabled()"
+             (ngModelChange)="setMetalookup($event)" />
+      <span>MetalookUp: Inhalt messen</span>
+    </label>
 
-  <p class="desc">
-    Ruft den Inhalt selbst ab und misst ihn — davon wird derzeit die Barrierefreiheit (AXE)
-    ausgewertet. Abgeschaltet bleibt das zugehörige Kriterium unbeantwortet.
-  </p>
+    <p class="desc">
+      Ruft den Inhalt selbst ab und misst ihn — davon wird derzeit die Barrierefreiheit (AXE)
+      ausgewertet. Abgeschaltet bleibt das zugehörige Kriterium unbeantwortet.
+    </p>
 
-  <label class="check">
-    <input type="checkbox" [ngModel]="qualityJudge.contentJudgeEnabled()"
-           (ngModelChange)="setContentJudge($event)"
-           [disabled]="!contentJudgeAvailable" />
-    <span>ContentJudge: Inhalt per LLM bewerten</span>
-  </label>
+    <label class="check">
+      <input type="checkbox" [ngModel]="qualityJudge.contentJudgeEnabled()"
+             (ngModelChange)="setContentJudge($event)"
+             [disabled]="!contentJudgeAvailable" />
+      <span>ContentJudge: Inhalt per LLM bewerten</span>
+    </label>
 
-  <p class="desc">
-    Beurteilt den Text des Inhalts gegen die Bewertungsschemata der Qualitätskriterien.
-    @if (!contentJudgeAvailable) {
-      Derzeit unabhängig von dieser Einstellung abgeschaltet: eine Bewertung kostet mehr, als die
-      Kriterien einbringen, die sie beantwortet.
-    }
-  </p>
+    <p class="desc">
+      Beurteilt den Text des Inhalts gegen die Bewertungsschemata der Qualitätskriterien.
+      @if (!contentJudgeAvailable) {
+        Derzeit unabhängig von dieser Einstellung abgeschaltet: eine Bewertung kostet mehr, als die
+        Kriterien einbringen, die sie beantwortet.
+      }
+    </p>
+  }
 </section>
