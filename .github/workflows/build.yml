@@ -1,0 +1,105 @@
+name: Build extension
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            app-src/package-lock.json
+
+      # Root deps (archiver, web-ext) and the Angular app deps are separate
+      # projects with their own lockfiles. The --prefix form also picks up
+      # app-src/.npmrc, which sets legacy-peer-deps for ngx-edu-sharing-api.
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install sidebar dependencies
+        run: npm ci --prefix app-src
+
+      # Called directly rather than via `npm run build`, which would re-run an
+      # unpinned `npm install` in app-src on top of the lockfile install above.
+      - name: Build all targets
+        run: node scripts/build.mjs --target=all
+
+      # The build script zips chrome and firefox but deliberately skips safari,
+      # since that target is meant to be fed to safari-web-extension-converter.
+      # Zipped from inside the directory so the contents sit at the archive
+      # root, matching the layout of the other two zips.
+      - name: Zip Safari build
+        run: cd dist/safari && zip -qr ../safari.zip .
+
+      - name: Lint Firefox build
+        run: npm run lint:firefox
+        continue-on-error: true
+
+      - name: Upload Chrome build
+        uses: actions/upload-artifact@v4
+        with:
+          name: edu-sharing-chrome
+          path: dist/chrome
+
+      - name: Upload Firefox build
+        uses: actions/upload-artifact@v4
+        with:
+          name: edu-sharing-firefox
+          path: dist/firefox
+
+      - name: Upload Safari build
+        uses: actions/upload-artifact@v4
+        with:
+          name: edu-sharing-safari
+          path: dist/safari
+
+      - name: Name release assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          manifest_version="$(jq -r .version manifest.base.json)"
+          if [ "$version" != "$manifest_version" ]; then
+            echo "::warning::Tag version $version does not match manifest.base.json version $manifest_version"
+          fi
+          mkdir -p release
+          for target in chrome firefox safari; do
+            cp "dist/$target.zip" "release/edu-sharing-$target-$version.zip"
+          done
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cat > release-notes.md <<'EOF'
+          ## Downloads
+
+          | File | Browser | Installation |
+          | --- | --- | --- |
+          | `edu-sharing-chrome-*.zip` | Chrome, Edge | Unzip, then `chrome://extensions` → enable *Developer mode* → *Load unpacked* → select the folder. |
+          | `edu-sharing-firefox-*.zip` | Firefox 128+ | Unzip, then `about:debugging` → *This Firefox* → *Load Temporary Add-on* → select `manifest.json`. |
+          | `edu-sharing-safari-*.zip` | Safari | Unzip, run `xcrun safari-web-extension-converter <folder>` on macOS, then build the generated Xcode project. |
+          EOF
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            release/*.zip

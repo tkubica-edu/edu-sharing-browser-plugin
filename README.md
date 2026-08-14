@@ -403,6 +403,14 @@ precedes every `/generate` rather than as a failed extraction a minute later.
 | Page content extraction | `scripting.executeScript` (background) | no cross-origin fetch |
 | Repository login | Angular `HttpClient` (library) | the library owns the call; relies on `host_permissions` bypassing CORS on Chrome/Edge/Firefox |
 
+## Prebuilt downloads
+
+Every push builds all three targets on CI (`.github/workflows/build.yml`); the runs
+under *Actions* carry the unpacked builds as artifacts. Tagged versions (`v*`) also
+publish a GitHub **Release** with `edu-sharing-{chrome,firefox,safari}-<version>.zip`
+attached — those need no login and are the ones to hand to testers. Loading them is
+the same as loading a local build, see [Load & test](#load--test).
+
 ## Build
 
 ```bash
