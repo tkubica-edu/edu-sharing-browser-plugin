@@ -207,16 +207,17 @@ export class EditorialGroupsService {
       console.log(`${LOG} proposal dropped, the group's collection was picked by hand`);
       return;
     }
-    // The group's own collection: there is nothing to pick inside it, so forwarding to it is the whole
-    // answer.
+    // The group's own collection: there is nothing to pick inside it, so the proposal says no more than
+    // what forwarding to the group says anyway — and forwarding is the user's to decide.
     if (group.collection.id === found.node.ref.id) {
-      this.toggle(group, true);
+      console.log(`${LOG} proposed collection is the group itself, nothing to preselect inside it`);
       return;
     }
     const offered = this.offer(group, found.node);
-    const folder = toCollection(found.node);
-    this.recommendedState.set({ groupId: offered.collection.id, folder });
-    this.chooseFolder(offered, folder);
+    // Held as the group's collection, not written as a forwarding: which collection inside a group the
+    // content would go into is answered here, whether the content is forwarded to that group at all is
+    // not. Ticking the group takes the proposal along (see toggle).
+    this.recommendedState.set({ groupId: offered.collection.id, folder: toCollection(found.node) });
   }
 
   /**
@@ -250,9 +251,19 @@ export class EditorialGroupsService {
     return !!this.targetOf(group);
   }
 
-  /** The collection picked inside this group, if any. */
+  /**
+   * The collection picked inside this group, if any — the proposed one while nothing else was picked,
+   * whether or not the group is forwarded to. What the content would go into is an answer of its own:
+   * it stands before the group is ticked and survives its being unticked again.
+   */
   folderOf(group: EditorialGroup): Collection | undefined {
-    return this.targetOf(group)?.folder;
+    return this.targetOf(group)?.folder ?? this.recommendationFor(group);
+  }
+
+  /** The collection proposed for this group, whatever became of it since. */
+  private recommendationFor(group: EditorialGroup): Collection | undefined {
+    const recommended = this.recommendedState();
+    return recommended?.groupId === group.collection.id ? recommended.folder : undefined;
   }
 
   /**
@@ -289,7 +300,10 @@ export class EditorialGroupsService {
   toggle(group: EditorialGroup, selected: boolean): void {
     // The picked collection goes with it: it was a choice about a forwarding that is no longer made.
     if (!selected) return this.write(this.others(group));
-    this.write([...this.others(group), { group: group.collection }]);
+    // The collection the group stands at goes along, so ticking a group forwards into the collection
+    // the row names rather than into the group itself — a proposal among them (see folderOf).
+    const folder = this.folderOf(group);
+    this.write([...this.others(group), { group: group.collection, ...(folder ? { folder } : {}) }]);
   }
 
   /**
