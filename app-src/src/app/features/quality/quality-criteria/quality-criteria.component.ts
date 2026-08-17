@@ -12,7 +12,7 @@ import type { ContentJudgeEvaluation } from '../../../services/content-judge.ser
 import type { MetalookupEvaluation } from '../../../services/metalookup.service';
 import { QualityJudgeService } from '../../../services/quality-judge.service';
 import {
-  CRITERION_MET, CRITERION_VIOLATED, autoMetValue, valueFor, widgetOf
+  CRITERION_MET, CRITERION_VIOLATED, EDITORIAL_CRITERIA_PROPERTY, autoMetValue, valueFor, widgetOf
 } from '../../../util/quality-criteria-values';
 import {
   CriterionJudgement, CriterionViolation, judgementsForCriteria
@@ -44,7 +44,7 @@ const KNOCKOUT_WIDGET = 'virtual:unmetLegalCriteria';
  * The editorial criteria: one multi-value property whose widget's values are the criteria. One is met
  * while its id is among the values — the opposite of the knock-out ones, where a value is the objection.
  */
-const EDITORIAL_PROPERTY = 'ccm:oeh_buffet_criteria';
+const EDITORIAL_PROPERTY = EDITORIAL_CRITERIA_PROPERTY;
 
 /** Coerce a property value of unknown shape to the `string[]` everything here works in. */
 function asList(value: unknown): string[] {

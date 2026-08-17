@@ -5,6 +5,7 @@ import { DevModeService } from './dev-mode.service';
 import { MetadataAgentApiService } from './metadata-agent-api.service';
 import { EXTRACT_FIELD_ANSWER } from '../util/dev-fixtures';
 import { errorMessage } from '../util/errors';
+import { withoutQualityCriteria } from '../util/quality-criteria-values';
 
 /** Reserved (non-metadata) top-level keys in the metadata-agent response. */
 const ENVELOPE_KEYS = new Set([
@@ -95,7 +96,14 @@ export class MetadataAgentService {
       );
       return this.remember(
         response.success
-          ? { ok: true, source: response.source, parsed: this.parse(response.result) }
+          ? {
+              ok: true,
+              source: response.source,
+              // Stripped as the answer comes in, which is the only place a generated payload enters the
+              // flow: everything downstream — the editors it seeds, the node the save writes, the
+              // quality criteria's boxes — then reads a payload that answers no criterion.
+              parsed: this.parse(withoutQualityCriteria(response.result ?? {}))
+            }
           : { ok: false, error: this.describeError(response.error) },
       );
     } catch (cause: unknown) {
@@ -127,7 +135,9 @@ export class MetadataAgentService {
   /**
    * Split a flat metadata payload into envelope info + sorted display fields. The agent's own field
    * names are kept — this answer also feeds the WLO canvas, which is the agent's own form; renaming
-   * them for the edu-sharing form is that form's business (`mapAgentFields`).
+   * them for the edu-sharing form is that form's business (`mapAgentFields`). Takes any flat payload —
+   * a run's answer, a node's properties, the flow's accumulated values — so it drops nothing of its
+   * own; what an agent answer may not state is stripped as it comes in (see {@link run}).
    */
   parse(raw: Record<string, unknown> | undefined): ParsedMetadata {
     const payload = raw ?? {};

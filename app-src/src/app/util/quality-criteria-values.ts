@@ -1,8 +1,47 @@
 // How a quality criterion's answer is written into a node property: which value of the criterion's widget
-// means met, violated, or "no machine findings". The mapping is the vocabulary's, not the view's, so it
-// lives here and QualityCriteriaComponent stays about the boxes the user clicks.
+// means met, violated, or "no machine findings", and which properties the criteria are answered in at all.
+// The mapping is the vocabulary's, not the view's, so it lives here and QualityCriteriaComponent stays
+// about the boxes the user clicks.
 
 import type { MdsValue, MdsWidget } from 'ngx-edu-sharing-api';
+
+/**
+ * The editorial criteria's property: one multi-value property whose widget's values are the criteria, so one
+ * of them is met while its id is among the property's values.
+ */
+export const EDITORIAL_CRITERIA_PROPERTY = 'ccm:oeh_buffet_criteria';
+
+/**
+ * Every node property a quality criterion is answered in: the knock-out criteria, each of which has one of
+ * its own, plus the property the editorial ones share. States what the metadata set lists — the values of
+ * `virtual:unmetLegalCriteria` — because it is read where no metadata set is at hand, so a criterion the set
+ * gains has to be named here as well.
+ */
+export const CRITERIA_PROPERTIES: readonly string[] = [
+  'ccm:oeh_quality_relevancy_for_education',
+  'ccm:oeh_quality_criminal_law',
+  'ccm:oeh_quality_protection_of_minors',
+  'ccm:oeh_quality_data_privacy',
+  'ccm:oeh_quality_copyright_law',
+  'ccm:oeh_quality_personal_law',
+  'ccm:oeh_quality_neutralness',
+  EDITORIAL_CRITERIA_PROPERTY
+];
+
+/**
+ * A metadata-agent payload without the quality criteria it answered itself. A criterion's box states what
+ * has been established about the content, and the flow's quality confirmation hangs off those boxes — an
+ * LLM's "keine Auffälligkeiten gefunden (Maschine)" establishes nothing, no machine having looked. Dropped
+ * from the payload rather than hidden from the boxes, because the payload also seeds the metadata editor:
+ * a value left in it would be written to the node by the next save, and the node would then claim what no
+ * box shows. What the criteria are rated by beside them (`ccm:oeh_quality_correctness` and the other
+ * scales) is left alone — those are ratings, not answers to a criterion.
+ */
+export function withoutQualityCriteria<T extends Record<string, unknown>>(payload: T): T {
+  return Object.fromEntries(
+    Object.entries(payload).filter(([key]) => !CRITERIA_PROPERTIES.includes(key))
+  ) as T;
+}
 
 /**
  * The quality vocabulary's ids, as a criterion's values carry them in `alternativeIds`
