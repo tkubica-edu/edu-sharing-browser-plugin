@@ -1,0 +1,125 @@
+# Embedded web components — the packaged bundles
+
+The panel renders the repository's own UI wherever it can, as **real custom elements in the sidebar
+document — no iframes**. Three prebuilt bundles ship with the extension:
+
+| Bundle | Source folder → packaged as | Elements it registers |
+|---|---|---|
+| edu | `scripts/edu/` → `edu/` | `edu-sharing-mds-editor-wrapper`, `edu-sharing-preview-sidebar`, `edu-sharing-nodes-selector`, `edu-sharing-add-with-connector`, `edu-sharing-search`, `edu-sharing-usages`, `edu-sharing-share-qr`, `edu-sharing-location-picker` |
+| wlo | `scripts/wlo/` → `wlo/` | `metadata-agent-canvas` (the optional WLO editor) |
+| boerdi | `scripts/boerdi/` → `boerdi/` | `boerdi-chat` (the KI assistant) |
+
+- [Loading a bundle](#loading-a-bundle)
+- [The optional WLO metadata editor](#the-optional-wlo-metadata-editor)
+- [Refreshing a bundle](#refreshing-a-bundle)
+
+Attributes and events of `metadata-agent-canvas` are documented in
+[WIDGET-REFERENZ.md](WIDGET-REFERENZ.md).
+
+---
+
+## Loading a bundle
+
+The edu bundle is built from the edu-sharing frontend (`npm run build:app-as-component` →
+`dist/web-components/app/`) and taken over as a whole.
+
+`WebComponentBundleService` owns the loading: it injects each bundle's stylesheet and scripts once,
+sets `window.__env.EDU_SHARING_API_URL` before the edu bundle boots (its HttpClient freezes the
+value), and loads a bundle's `polyfills` (zone.js) only if no other bundle brought a Zone already.
+Components declare what they need as a field:
+
+```ts
+protected readonly bundle = loadWebComponentBundle('edu', 'edu-sharing-preview-sidebar');
+```
+
+and gate the tag on `bundle.ready()` / show `bundle.error()`. Pass the tag when the element must be
+defined before it renders; omit it when the element is created imperatively or must carry its inputs
+as it upgrades (the nodes selector reads `option.optionConfig` on connect, so `NodesSelectorComponent`
+renders the tag immediately and only reports load errors).
+
+`MdsEditorComponent` is the one element created imperatively: the wrapper throws in its `ngOnInit`
+unless `embedded`/`currentValues` are already set, and Angular applies template bindings only *after*
+connect — so the element is built with every input assigned, then appended. In embedded mode it
+renders no buttons of its own; the footer's save action calls `commit()`, and edited values arrive
+via its `currentValuesChange` event.
+
+The elements' own repository calls (MDS definition, value rendering) reuse the login session cookie
+when the user is logged in; as guest they rely on public access.
+
+The `wlo/` bundle reads `window.__ENV.agentUrl` at bootstrap (falling back to its own hardcoded
+default), so `WebComponentBundleService` publishes the configured `APP_CONFIG.apiUrl` there before
+the scripts run — mirroring `window.__env.EDU_SHARING_API_URL` for the edu bundle. `wlo/`'s file
+names are content-hashed, so its entry points are read from its own `index.html`; `edu/` and
+`boerdi/` have stable names and are declared in the service.
+
+## The optional WLO metadata editor
+
+`BrowserExtensionCustomWebComponentService` watches the repository config for the boolean variable
+**`browserExtensionCustomWebComponent`**. While it is enabled, `WloCanvasComponent` —
+`<metadata-agent-canvas>` from the packaged `wlo/` bundle — takes over two screens:
+
+- **Metadaten editieren** (`mode="edit"`) instead of the edu-sharing MDS editor,
+- **Vorschau** (`mode="detail"`) instead of `edu-sharing-preview-sidebar`, showing the saved
+  properties read-only. Saving still lands there, so the preview follows the edit as before.
+
+It also reshapes the footer buttons: the flag adds `wlo-theme` to the document element, and
+`app-src/src/styles/_wlo-theme.scss` rounds them into pills, like the buttons of the bundle itself.
+Its colours are not adopted — that palette (surface `#fcf8fd`) tints the panel violet-grey and reads
+as washed out beside its own white surfaces, so `_embedded-material.scss` goes on holding the canvas
+to the panel's colours instead.
+
+The per-mode settings are the two presets the bundle's own `examples/canvas-parameter-demo.html`
+documents — "Plugin" and "Detail (readonly)" — kept verbatim in `CONFIGS` so they stay comparable
+with that reference.
+
+**It also switches the login off.** The variable marks a repository whose embedding host brings the
+session, so no credentials are asked for: `AuthService.authorized` (`loggedIn` **or** the variable)
+is what option visibility, the landing view, the screens' gates and the API-backed actions are
+behind, so the login option and the `es-login` gate never appear and every option is reachable
+without a panel login. `AuthService.loggedIn` stays the plain fact of a repository session, but
+nothing about a login is *reported* either: `AuthService.loginRequired` is false, so neither the
+login option nor the session bar's logged-out state appears. The variables are readable as guest, so
+the flag arrives while the panel is still logged out; the navigation guard then re-lands the boot's
+login view on the options menu.
+
+Nothing else changes: *Inhalt erschließen* still runs the metadata agent through the background
+worker, its result is loaded into the editor, and saving still creates or updates the repository node
+and records it in the Verlauf. Which route that save takes is decided by the session, not by this
+flag — see [ARCHITECTURE.md § Saving a content](ARCHITECTURE.md#saving-a-content).
+
+**Both editors implement the same `MetadataEditor` contract** (`ready` + `commit()`), so the footer
+owns "Speichern" either way and the metadata screen only picks which one to render. In
+`mode="detail"` the canvas is read-only and nothing is committed.
+
+Its save/upload buttons stay hidden in both modes (the footer saves) and page mode is off (*Inhalt
+erschließen* is the app's own extraction path). Seeding is direct: its `importJsonData` reads
+`metadata || <the payload>` plus `metadataset` / `_origins` / `_source_text` / `preview_image_url`,
+which is exactly the agent payload shape, so an analysis result and a node's stored properties both
+load as-is. Edits arrive continuously via `metadataChange`; on save the namespaced field values are
+kept and the envelope is dropped, since it is not node metadata.
+
+## Refreshing a bundle
+
+A bundle is replaced by overwriting `scripts/<name>/` with the new build — nothing else is generated
+from it. For the boerdi widget `scripts/fetch-widget.mjs` does that, pulling
+`<base>/widget/boerdi-widget.js` into `scripts/boerdi/boerdi-widget.js`:
+
+```bash
+# the deployed assistant backend — the same host the chat element talks to (CHAT_API_URL)
+node scripts/fetch-widget.mjs https://87.106.127.225.nip.io
+npm run build:chrome     # without this the new bundle never reaches dist/
+```
+
+Pass another base to fetch from elsewhere; the argument defaults to `http://localhost:8000` for a
+backend running locally. The script refuses an answer that is HTML rather than JavaScript — a
+mistyped base otherwise writes an error page into the bundle, which surfaces only later as a syntax
+error while the panel loads. It warns, but does not refuse, when the base is plain `http` on a host
+that is not `localhost`: whatever it writes runs with the extension's privileges afterwards, and
+there is no checksum to verify it against.
+
+Reload the extension after the build — a swapped bundle is not picked up on its own
+([TESTING.md](TESTING.md#load-the-extension)).
+
+Manifest V3 forbids remotely loaded code (`script-src 'self'` on extension pages), which is why the
+bundles are packaged rather than loaded from the backend. What reaches `dist/` and what is skipped is
+[BUILD.md § What goes into the package](BUILD.md#what-goes-into-the-package).

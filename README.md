@@ -1,605 +1,122 @@
 # Edu-Sharing — Browser-Extension
 
-Cross-browser (Chrome, Edge, Firefox, Safari) WebExtension. It opens a resizable
-sidebar whose start view is always the list of **Aktionen & Optionen** — only being logged out
-(→ the login gate) or an explicitly loaded node (→ its Vorschau) opens something else. No option
-opens itself from a page match: what the current page offers stays visible instead of being
-decided for the user.
+Cross-browser WebExtension (Chrome, Edge, Firefox, Safari) that docks an edu-sharing sidebar into any
+page: it reads the open page or the open OnlyOffice document, has the **metadata agent** generate
+metadata from it, and files the result as a node in an edu-sharing repository — with the
+repository's own UI embedded for editing, previewing, sharing and collecting.
 
-The app has no wizard and no fixed step order: every option is offered whenever its
-preconditions hold. `ConditionsService` collects those facts (login, OnlyOffice page,
-Edu-Sharing page, active node, editable metadata, edit mode) and each option in
-`model/options.ts` decides its own visibility from that snapshot. The list order is the
-registry's, with one context rule in `NavigationService.visibleOptions`: on an OnlyOffice page
-*Inhalt suchen* leads the menu. The two options that are not actions on content but
-always-available utilities — *Verlauf* and *Einstellungen* — are marked `topbar: true` and render
-as **icons in the topbar** next to the close button (`NavigationService.topbarOptions`); they are
-otherwise ordinary options, so visibility, guards and the view title work the same. The **status
-bar** shows the same facts as chips, so it is always visible why an option appears or disappears —
-and it can drop the active content again. The **back button** walks back through the steps the user
-came through (`NavigationService.back`) and reaches the menu at the end of the trail; switching sub
-steps within a section is not a step of its own. Stepping back to a view that does not need a
-content **releases a content the user picked** — going back into *Eigene Inhalte* from
-*Inhaltsoptionen* means picking again — while a *detected* one is kept, since it describes the open
-page (`CurationService.releaseChosenContent`). The trail is carried across a page change with the
-rest of the session state (`SessionResumeService`).
+- [At a glance](#at-a-glance)
+- [Quickstart](#quickstart)
+- [Documentation](#documentation)
+- [Project layout](#project-layout)
+- [Configuration](#configuration)
+- [Contributing](#contributing)
 
-**Picking a content takes the tab with it**: a node chosen in *Meine Inhalte* or im *Verlauf* opens
-its own page in the repository (`…/components/render/<id>`) and the panel comes back there on
-*Inhaltsoptionen*, working on that same node (`ContentFlowService.showContentOptions`). The page then
-shows the content the panel's steps act on. The panel cannot survive the load — it is an iframe in
-the page — so the state is written to storage first and restored on boot, exactly as for the
-*Bearbeitungsmodus*, which takes the tab to the connector the same way. The step is **not entered
-before the load**: it is carried across in that stored state (`NavigationService.stateFor`) and the
-panel stays on the screen the content was picked from, so the Inhaltsoptionen are not shown for the
-moment before the page replaces them. A tab already standing on that page is left alone — then there
-is no load, and the step is entered right away.
+---
 
-On an **OnlyOffice page the edited document is the active node from the start**: the sidebar asks
-the page-side plugin once on boot for its identity (`REQUEST_DOCUMENT_INFO` → `DOCUMENT_INFO`, see
-`content/CLAUDE.md`), loads that node and adopts it (`CurationService.adoptDetectedNode`). So
-*Vorschau*, *Metadaten editieren* and *Einsortieren in Sammlungen* are available immediately,
-without an erschließen run. It is best effort and silent: the plugin is optional and may never
-answer, and when the panel was opened logged out the node is adopted once the user logs in. No
-*Verlauf* entry is written — the user did not pick this node. An explicitly loaded node
-(`PREVIEW_NODE`, a history entry) always wins over it.
+## At a glance
 
-The footer (`ActionBarService`) contributes the current view's next steps: *Erschließung
-starten* on the analyze screen, *Speichern* on the metadata screen, and the choice between
-*Metadaten editieren* / *Sammlung zuordnen* on the preview. Screens that own their own action
-(the selectors, login, settings) get no footer.
-
-While a write is in flight the whole chrome is disabled — `BusyService.busy`
-(`CurationService.saving` ∨ `assigning`), read by the topbar icons, the close button, the back
-button, the tab bar, the session bar and every footer action, and enforced again in
-`NavigationService.go` / `back` / `goTab` so nothing routes around a disabled control. A save is more
-than the one request the button waits for: the node is created, then the confirmed quality, the
-picture and the forwarding are written onto it, so leaving mid-way (a logout takes the session those
-run under, closing tears the panel down) is what leaves a content half-written. It is deliberately
-*derived* from the services that write rather than a flag of its own, and deliberately **not** a
-condition of the navigation registry — a section that turns disabled is one the guard re-lands away
-from, which is the very thing this prevents. The editors are locked by
-`CurationService.metadataLocked` for the same span.
-
-The options:
-
-- **Login** — the shared `es-login` gate; shown while logged out and reused inline by the
-  screens that need a session.
-- **Inhalt erschließen** — reads the active tab, calls `POST {apiUrl}/generate` through the
-  background worker and advances to the metadata screen. It stays listed but is **disabled** on two
-  kinds of page, saying which in its tooltip: **on Edu-Sharing itself**, whose pages show what the
-  repository already holds and are never a source to read metadata off — so there for good, not only
-  where a node was recognised; and **while a content was detected for the page** (see *Inhalt
-  erkannt*), since curating it again would produce a second node for the same page.
-- **Inhalt erkannt** — a node that turned up on its own, offered as the prominent menu entry.
-  Two ways it does: the OnlyOffice plugin announcing the document it has open (`DOCUMENT_INFO`),
-  and — on every other page — `getWebsiteInformation` (`ClientutilsV1Service`, the lookup the
-  repository's own *Datei oder Link* dialog uses), whose `duplicateNodes` say the URL is already
-  in the repository. The first of them becomes the active node (`PageRecognitionService` →
-  `CurationService.adoptDetectedNode`). Nothing navigates for the user — the finding surfaces as
-  a menu entry, never as a jump.
-- **Metadaten anreichern** — only on an OnlyOffice page: the same erschließen flow, but the
-  content comes from the **edited document** instead of the page. The sidebar asks the page-side
-  plugin for the document content (`REQUEST_DOCUMENT_CONTENT` → `DOCUMENT_CONTENT`, correlated by
-  `requestId` and bounded by a timeout, see `content/CLAUDE.md`), sends the answer's `markdown`
-  through the background worker to `POST {apiUrl}/generate` and opens the result in the metadata
-  editor. The answer's `document` makes the edited document the **active node**, so **Speichern**
-  writes the enriched metadata onto that node (`editNodeMetadata`) rather than creating a new one
-  in the inbox — the node's name is kept, so the document is never renamed.
-- **Passende Inhalte finden** — only on an OnlyOffice page: searches the repository for content
-  matching the **edited document**. The query is not typed but derived — the same
-  `REQUEST_DOCUMENT_CONTENT` → `DOCUMENT_CONTENT` round trip as *Metadaten anreichern*, then
-  `POST {apiUrl}/extract-field` on the answer's `markdown` — the single-field endpoint, asked for
-  `field_id: cclom:general_keyword` out of the agent's `core.json`, because a full `/generate` would
-  extract a whole metadata set of which only the keywords are used here. The generated
-  `cclom:general_keyword` values (deduplicated, capped) become the
-  `initial-values` of **`edu-sharing-search`** — the embedded search that adds the metadata filters
-  of the search page to a node list. `initial-values` is a map of MDS widget id → values (here
-  `{"cclom:general_keyword": [...]}`), i.e. the keywords are used as a **filter**, not as the
-  `search-string`: `search-string` goes in as an extra `ngsearchword` criterion that is **AND**-ed
-  with the filters, so it only narrows further, while as filter values the keywords are matched
-  against the indexed keywords of the nodes. Re-setting them (*Neu aus Dokument*) makes the
-  element rebuild its filter editor, whose init re-runs the query.
-  Only the **first two** keywords are queried: all values of one widget land in a single criterion
-  whose join narrows the result set, so the full agent-generated list matches nothing while the two
-  most relevant ones still find content. Agent-invented keywords are often carried by no node at
-  all, so the screen watches the element's `totalResults`: an empty result widens the search once
-  (a single keyword), and if that is empty too, a notice offers *Ohne Schlagworte suchen* — the
-  filter is dropped entirely, which shows the repository's content (the user's call, since it is
-  everything). The chips show all derived keywords, struck through where they are not part of the
-  current query. Results are sorted by relevance
-  (`sort-properties="score"`, descending); vocabulary widgets would need valuespace keys instead of
-  labels, `cclom:general_keyword` is free text so the values go in verbatim. That run is deliberately *not* kept as the app's last
-  analysis (`ContentSuggestionsService`, not `MetadataAgentService.lastRun`), so it neither shows up
-  in the metadata editor nor counts as unsaved work. Opening the option starts the derivation;
-  *Neu aus Dokument* repeats it after edits. A double-clicked result (`nodeActivated`) is posted to
-  the host page for insertion, like the selector on *Inhalt suchen*.
-- **Metadaten editieren** — loads the metadata into `edu-sharing-mds-editor-wrapper`. Saving
-  creates a `ccm:io` node in the **inbox** the first time (`NodeService.createChild`) and
-  updates it in place thereafter (`editNodeMetadata`), then advances to the preview. Available
-  for an active node or a fresh result that was never saved. Extracted fields and the raw JSON
-  stay in collapsibles.
-- **Vorschau** — the node's name and link plus a live `edu-sharing-preview-sidebar`. Its `node`
-  input takes the full hydrated node, so the node is (re)loaded after a save. Above both sits the
-  share offer (`ShareTeaserComponent`): `edu-sharing-share-qr` in its `compact` variant — the code as
-  a thumbnail beside the link and its copy control.
-- **Inhalt teilen** — the same element in its `full` variant: the code above the link field, which
-  carries the copy button. The code can be laid enlarged over the panel (a second element with
-  `show-link="false"`), since the card's size is scanned from arm's length.
-
-  Both hand the address in as `link` instead of letting the element resolve one from `node-id`:
-  resolving loads the node, and a content written by the metadata agent is one the panel session may
-  not read (403) — the card then stayed empty although the address had been known since the save. The
-  flow holds it as `ActiveNode.link`, so nothing is requested at all. `mode` stays at `permalink` for
-  the same reason it always did: a share link would set an unlimited expiry as a side effect, which
-  sharing a view of the content must not do.
-- **Aufrufe & Nutzung** — the node's usage statistics, rendered by `edu-sharing-usages` (views,
-  downloads, plays, and the embeddings/collections the node is used in). Its `nodes` input is a
-  *selection*, so the hydrated node goes in as a single-element array; the element fetches the
-  numbers itself through the repository session. Shown for an active node, like the preview.
-- **An Redaktionen weiterleiten** / **Persönliche Ablage** — where the content is filed and handed
-  on: the flow runs *Inhalt erschließen* → Vorschau → **An Redaktionen weiterleiten** →
-  **Persönliche Ablage** → *Prüfprozess auswählen* → *Qualitätsprüfung* → *Inhaltsübersicht*. Two
-  steps of
-  their own, each offered only where it applies: the forwarding while the repository config enables
-  the browser extension custom web component, the *Persönliche Ablage* for a session of the user's
-  own. That step offers both of the user's own filing places: the folder, through the repository's
-  own Ablageort control (`edu-sharing-location-picker`, wrapped as `es-storage-location-picker`,
-  seeded with the user's `defaultInboxFolder` setting and otherwise with `-inbox-`), and — optionally
-  — a collection, through the same `es-collection-selector` the forwarding uses. The collection has
-  no confirmation of its own; the footer's *Weiter* takes the ticked one over as it leads on. Where
-  neither applies they fall away and the preview leads straight into the choice of process.
-
-  **The content is written early and edited from there on** (`CurationService.save`): the *Vorschau*
-  step creates the node with the picture and the title it confirmed and nothing else, and every step
-  behind it adds what *it* decided — the collections it picked, the criteria it recorded with the
-  quality workflow, and finally the whole of the generated metadata with the extended fields and the
-  handover for review. So each step's *Weiter* is a write (*Speichern…* on the button), it leads on
-  only once that write held, and a step that decided nothing is passed without a request
-  (`CurationService.saveCollected`). The footer's *Weiter* walks from each step to the next one that
-  applies.
-- **Prüfprozess auswählen** — the junction between the filing and the checking, entered from
-  whichever filing step was the last to apply. Two cards, each with the button that starts its
-  process: *Geführte Qualitätsprüfung*, which is the *Qualitätsprüfung* as it stands (criteria, then
-  metadata), and *Individuelle Qualitätsprüfung mit KI*, the analysis against the chosen
-  collection's requirements — its screen is still to be built. Clicking a
-  card marks it and the footer's *Weiter* starts the marked one, so the two ways on say the same
-  thing (`FlowChoiceScreenComponent`, which registers the choice as the footer's `ApplyHandler`).
-  - *An Redaktionen weiterleiten* lists the editorial groups the repository config names in
-    **`browserExtensionEditorialGroups`** (`['ID1', 'ID2']`, read once per session by
-    `EditorialGroupsService` → `CollectionService.getCollection`). Ticking a group forwards the
-    content to it; where the group's collection has child collections
-    (`NodeService.getChildren`, folders only) one of them can be picked instead — the group's row
-    leads into the **Sammlung auswählen** step for that, and the content then goes into the picked
-    collection *only*. A group without children says „Keine Sammlungsauswahl erforderlich". The
-    choice is held by the flow (`CurationService.editorialTargets`) and carried out by the write the
-    step's *Weiter* makes, together with the collections the *Persönliche Ablage* picked
-    (`CurationService.filedCollections`, each collection once however many steps reached it):
-    `CollectionServiceUnwrapped.addToCollection` per collection, and along the agent route (see
-    below) the IDs travel in `/nodes`' `collection_id` instead. Only collections the content is not
-    in yet, so a later write does not file it twice.
-  - **Sammlung auswählen** is a step of its own, entered from a group's row and returning to it. It
-    names the group it belongs to (`EditorialGroupsService.picking`) and what is recorded for it so
-    far, and shows the collection picker (`es-collection-selector`, `edu-sharing-nodes-selector` in
-    `collections` mode) underneath. The picker gets that one group's collection as
-    `collectionTree` — the group's collection node followed by the ones inside it, which is what
-    keeps the choice inside the group it is recorded for. Tree *data*, not a list of ids: the element
-    hands the value straight to its tree data source, which builds the hierarchy from each node's
-    `parent.id`, and shows it in place of the roots it would build itself. Its own apply bar is
-    hidden and the confirmation sits in the panel's action bar as **Sammlung übernehmen**: the screen
-    registers an `ApplyHandler` with `ActionBarService`, and the footer reads and clicks the
-    element's button through it (the element offers no API for confirming from outside).
-- **Neues OnlyOffice-Dokument** — mounts `edu-sharing-add-with-connector`, which opens the
-  OnlyOffice create dialog; the new node is hydrated into the flow and opens in the preview.
-- **Inhalt suchen** — only on an insert host (URL matches `/src/tools/onlyoffice`): the same
-  selector in search mode, posting the chosen nodes to the host page.
-- **Verlauf** *(topbar icon, with the entry count as a badge)* — the **saved nodes**, newest first. An entry is recorded only when a node is
-  actually saved, so every row carries a `nodeId` (legacy pre-node entries are dropped on load,
-  and re-saving a node moves its row to the top instead of duplicating). *In Vorschau öffnen*
-  fetches the live node by id (`CurationService.openFromHistory` → `RepositoryNodeService.get`)
-  and opens it; if there is unsaved work the shell confirms first, and a failed fetch is
-  surfaced via an alert.
-- **Einstellungen** *(topbar icon, dotted while a change waits to be applied)* — the
-  Repository-URL (used for login and every embedded element).
-- **WLO Metadaten-Agent** — only when the repository config enables it, see below.
-
-A node double-clicked in the OnlyOffice plugin arrives as a `PREVIEW_NODE` message (relayed by
-`content/panel-host.js`, or replayed from storage if the sidebar was closed) and opens in the
-preview; while logged out it is held until the login succeeds.
-
-Authentication against an edu-sharing repository uses the official
-[`ngx-edu-sharing-api`](https://www.npmjs.com/package/ngx-edu-sharing-api) library.
-The repository session is shared, so signing in on either primary tab unblocks both.
-
-**Session restore.** Login is cookie-based: Basic auth is sent only on the login
-request, the server sets a session cookie, and every later request carries it
-(`withCredentials`). That cookie outlives sidebar reloads, so on startup `AuthService.init`
-revalidates it (`observeLoginInfo()`, 8s timeout) and, if a valid non-guest session is
-still active, restores the logged-in state before the shell lands on a view — you don't
-re-enter credentials when reopening the panel or switching pages, and **no password is
-stored**. If the cookie is gone (browser restart, explicit logout, or Safari ITP blocking the third-party cookie)
-it resolves to guest and the login gate appears.
-
-**Sections a guest cannot be served by** (`AppSection.requiresSession`: *Inhalt hinzufügen*, *Meine
-Inhalte*, and — while the content is past the agent route's two-hour editing window, see below —
-*Qualitätsprüfung*, *An Redaktionen weiterleiten*, *Sammlung auswählen*) stay listed and enterable. What they show is the login instead of their screen —
-`LoginGateComponent` around the same `LoginComponent` the Login section renders, filling the screen's
-place like any other view. Its footer is the shared action bar with the way back on it, and the
-session bar and the assistant bar stay away for as long as the gate is up
-(`NavigationService.sessionGate`, read by the shell, `ActionBarService` and both bars). Nothing has to be re-entered once the session
-exists: the gate is a condition, not a step, so the screen behind it renders the moment the login
-succeeds. *Register* and *Passwort vergessen* are the repository's own forms
-(`/components/register`, `/components/register/request`) and open in the docked tab —
-`RepositoryPageService`, which saves the resume state first because the load tears the panel down.
-
-## Direct web-component embedding
-
-The pre-built edu-sharing bundle lives in `scripts/edu/` (packaged as `edu/` in the built
-extension). It is built from the edu-sharing frontend (`npm run build:app-as-component`
-→ `dist/web-components/app/`) and registers every element used here:
-`edu-sharing-mds-editor-wrapper`, `edu-sharing-preview-sidebar`,
-`edu-sharing-nodes-selector`, `edu-sharing-add-with-connector`, `edu-sharing-search`,
-`edu-sharing-usages`, `edu-sharing-share-qr`. A second bundle,
-`scripts/wlo/` → `wlo/`, provides the optional `metadata-agent-canvas` (see below).
-
-The elements are used as **real custom elements in the sidebar document — no iframes**.
-`WebComponentBundleService` owns that: it injects each bundle's stylesheet and scripts once,
-sets `window.__env.EDU_SHARING_API_URL` before the edu bundle boots (its HttpClient freezes
-the value), and loads a bundle's `polyfills` (zone.js) only if no other bundle brought a Zone
-already. Components declare what they need as a field:
-
-```ts
-protected readonly bundle = loadWebComponentBundle('edu', 'edu-sharing-preview-sidebar');
+```
+       toolbar click
+             │
+             ▼
+   ┌─────────────────────┐        ┌──────────────────────────┐
+   │ page (any https)    │        │ background worker        │
+   │  ├ panel-host.js ───┼───────►│  panel state per tab     │
+   │  │   docks iframe   │        │  page extraction         │
+   │  │                  │        │  POST /generate, /nodes ─┼──► Metadata-Agent
+   │  └ sidebar iframe   │◄──────►│                          │    (B-API proxy of
+   │      Angular app    │        └──────────────────────────┘     the repository)
+   │      + edu/wlo/     │
+   │        boerdi       │──────────────────────────────────────► edu-sharing
+   └─────────────────────┘   login · nodes · collections · MDS     repository
 ```
 
-and gate the tag on `bundle.ready()` / show `bundle.error()`. Pass the tag when the element
-must be defined before it renders; omit it when the element is created imperatively or must
-carry its inputs as it upgrades (the nodes selector reads `option.optionConfig` on connect,
-so `NodesSelectorComponent` renders the tag immediately and only reports load errors).
+**The flow.** *Inhalt erschließen* reads the tab → the agent generates metadata → the metadata editor
+opens → *Speichern* creates the node → preview, filing into collections and editorial groups,
+quality check. On an OnlyOffice page the edited document is the active node from the start, and
+*Metadaten anreichern* enriches it in place instead of creating anything.
 
-`MdsEditorComponent` is the one element created imperatively: the wrapper throws in its
-`ngOnInit` unless `embedded`/`currentValues` are already set, and Angular applies template
-bindings only *after* connect — so the element is built with every input assigned, then
-appended. In embedded mode it renders no buttons of its own; the footer's save action calls
-`commit()`, and edited values arrive via its `currentValuesChange` event.
+**Three things worth knowing before reading the code:**
 
-The elements' own repository calls (MDS definition, value rendering) reuse the login session
-cookie when the user is logged in; as guest they rely on public access.
+1. **There is no wizard.** Every option is offered whenever its preconditions hold
+   (`ConditionsService` + `model/options.ts`); nothing opens itself from a page match. See
+   [UI-SHELL.md](UI-SHELL.md).
+2. **The panel is an iframe in the page, so every navigation destroys it.** Being open is a property
+   of the *tab*, restored by the background worker, and what the panel was doing is written to
+   storage continuously (`SessionResumeService`).
+3. **The repository's UI is embedded as real custom elements** in the sidebar document — no iframes,
+   no remote code. The bundles are packaged with the extension; see
+   [WEB-COMPONENTS.md](WEB-COMPONENTS.md).
 
-## The optional WLO metadata editor
-
-`BrowserExtensionCustomWebComponentService` watches the repository config for the boolean variable
-**`browserExtensionCustomWebComponent`**. While it is enabled, `WloCanvasComponent` —
-`<metadata-agent-canvas>` from the packaged `wlo/` bundle — takes over two screens:
-
-- **Metadaten editieren** (`mode="edit"`) instead of the edu-sharing MDS editor,
-- **Vorschau** (`mode="detail"`) instead of `edu-sharing-preview-sidebar`, showing the saved
-  properties read-only. Saving still lands there, so the preview follows the edit as before.
-
-It also reshapes the footer buttons: the flag adds `wlo-theme` to the document element, and
-`app-src/src/styles/_wlo-theme.scss` rounds them into pills, like the buttons of the bundle itself.
-Its colours are not adopted — that palette (surface `#fcf8fd`) tints the panel violet-grey and reads
-as washed out beside its own white surfaces, so `_embedded-material.scss` goes on holding the canvas
-to the panel's colours instead.
-
-The per-mode settings are the two presets the bundle's own
-`examples/canvas-parameter-demo.html` documents — "Plugin" and "Detail (readonly)" — kept
-verbatim in `CONFIGS` so they stay comparable with that reference.
-
-It also switches the login off. The variable marks a repository whose embedding host brings the
-session, so no credentials are asked for: `AuthService.authorized` (`loggedIn` **or** the variable)
-is what option visibility, the landing view, the screens' gates and the API-backed actions are
-behind, so the login option and the `es-login` gate never appear and every option is reachable
-without a panel login. `AuthService.loggedIn` stays the plain fact of a repository session, but nothing
-about a login is *reported* either: `AuthService.loginRequired` is false, so neither the login
-option nor the session bar's logged-out state appears. The variables are readable as guest, so the flag
-arrives while the panel is still logged out; the navigation guard then re-lands the boot's login
-view on the options menu.
-
-Nothing else changes: *Inhalt erschließen* still runs the metadata agent through the background
-worker, its result is loaded into the editor, and saving still creates or updates the repository
-node and records it in the Verlauf.
-
-### Which route the save takes
-
-The session decides, not the flag (`CurationService.savesThroughAgent`):
-
-- **A signed-in user writes the node themselves**, with the web component enabled as without it
-  (`RepositoryNodeService.create`, `obeyMds=true`, in `-inbox-`). What the agent's `/nodes` pipeline
-  would do besides writing the metadata is then done in turn, in the same order: the **folder** the
-  *Persönliche Ablage* picked (`…/nodes/-home-/{parent}/children/_move`, a move because the content
-  already exists by then — see below), the WLO **extended fields** in a write of their own —
-  `POST …/nodes/-home-/{id}/metadata?versionComment=EXTENDED_DATA&obeyMds=false` with
-  `ccm:oeh_extendedType`, `ccm:oeh_lrt`, `ccm:oeh_extendedData` (the whole payload as JSON, in the
-  canvas' export shape) and `ccm:oeh_extendedText` (the raw text), because the metadata set defines
-  none of them and a write that obeys it drops them silently; a bulk write the repository refuses is
-  retried field by field (`RepositoryNodeService.writeExtendedData`) — then the **workflow steps**
-  (`200_tocheck`, addressed to `GROUP_ORG_WLO-Uploadmanager` in a WLO panel, then
-  `140_ELEMENT_LEGALLY_APPROVED`, each its own history entry), then the **collections**.
-- **A guest session** (the web component's own, brought by the embedding host) may not write a node
-  at all, so it saves through the agent's `POST /nodes`, which writes with the agent's privileges and
-  does all of the above in one request (`node_id`, `collection_id`, `write_extended_data`,
-  `start_quality_workflow`, `start_review_workflow`, `preview`; `NodeWriteService`). One thing cannot
-  be honoured along that route, because the node is the agent's rather than the panel session's: a
-  folder picked for the user's own storage — it always creates in the inbox the agent is configured
-  with. The repository also only lets that endpoint edit a node **within two hours of its creation**;
-  after that it answers 403 and the editorial interface takes over. The panel does not wait for that
-  refusal: `CurationService.agentEditWindowClosed` compares the node's `createdAt` against the window,
-  and the steps that write show the login in place of their screen (`AppSection.requiresSession`) —
-  signing in is what lifts the limit, since a signed-in user takes the route above. The age is read
-  when the content is taken up rather than from a running clock, so a flow that started inside the
-  window is carried through to its end. Where the node states no creation date the refusal still
-  arrives; it is then reported as what it is rather than in the repository's own words, which name
-  the node's id, its creation date and its age in hours (`CurationService.agentRefusalText`).
-
-The **picture** is a preview rather than a property, so neither route writes it with the metadata: it
-is uploaded to the node (`POST …/nodes/-home-/{id}/preview`). Writing the node itself, the panel does
-that upload (`RepositoryNodeService.setPreview`, a multipart `image`); along the agent's route the
-endpoint does it, and the picture travels as the body's `preview` — the address it should fetch, or
-the picture itself as a data URL for one the user picked in the widget
-(`CurationService.previewToSend`). Either way it goes with the *Vorschau* step's save, and is not
-sent again afterwards: the node then has a preview of its own. A picture that cannot be loaded or
-decoded leaves the content written, and the endpoint says so in `preview.error` alone.
-
-Both editors implement the same `MetadataEditor` contract (`ready` + `commit()`), so the footer
-owns "Speichern" either way and the metadata screen only picks which one to render. In
-`mode="detail"` the canvas is read-only and nothing is committed.
-
-Its save/upload buttons stay hidden in both modes (the footer saves) and page mode is off
-(*Inhalt erschließen* is the app's own extraction path). Seeding is direct: its `importJsonData`
-reads `metadata || <the payload>` plus `metadataset` / `_origins` / `_source_text` /
-`preview_image_url`, which is exactly the agent payload shape, so an analysis result and a node's
-stored properties both load as-is. Edits arrive continuously via `metadataChange`; on save the
-namespaced field values are kept and the envelope is dropped, since it is not node metadata.
-
-The bundle reads `window.__ENV.agentUrl` at bootstrap (falling back to its own hardcoded
-default), so `WebComponentBundleService` publishes the configured `APP_CONFIG.apiUrl` there
-before the scripts run — mirroring `window.__env.EDU_SHARING_API_URL` for the edu bundle.
-`wlo/`'s file names are content-hashed, so its entry points are read from its own `index.html`.
-
-## Architecture
-
-- **Sidebar UI** (`app-src/`) — an Angular 21 standalone app, built to `sidebar/`. Every component sits in
-  a folder of its own with its `.ts`, `.html` and `.scss`, grouped by domain: `template/` for the panel's
-  frame (topbar actions, tab bar, session and assistant bars, main menu), `features/<domain>/` for the
-  steps of the flow (`auth`, `content`, `curation`, `metadata`, `quality`, `filing`, `overview`,
-  `assistant`, `settings`), and `shared/components/` for what more than one domain renders. Services,
-  `model/` and `util/` are flat, as they carry no templates.
-- **Panel host** (`content/panel-host.js`) — injected on toolbar click; mounts the
-  sidebar as a docked, resizable `<iframe>` (drag the left edge; width persists).
-  This is the cross-browser replacement for the Chromium-only side-panel API.
-- **Background** (`background/background.js` via `sw.js`) — toggles the panel,
-  extracts the active tab's content (`content/content.js`), and **proxies the
-  `/generate` call** so it runs from the service worker (portable across browsers,
-  avoids page-CSP/CORS pitfalls).
-- **Auth** runs inside the Angular app (the library owns its HttpClient); it calls
-  `GET {repo}/edu-sharing/rest/authentication/v1/validateSession` with Basic auth.
-
-### The metadata agent's address
-Every agent call — `/health`, `/generate`, `/nodes`, `/extract-field` — goes to a repository's own
-B-API proxy, `{repo}/rest/bapi/api/v1/proxy/metadata-agent-canvas` (`MetadataAgentApiService`).
-
-Which repository is **pinned to the default one** for the moment
-(`APP_CONFIG.defaultRepositoryUrl`, staging: `https://repository.staging.openeduhub.net/edu-sharing`)
-— not taken from the repository URL in *Einstellungen*, so the agent stays reachable while that URL
-points somewhere without a B-API of its own. Following the configured repository again is one
-expression in that service. The two do have to agree, though: the proxy authorizes by repository
-session, so the pinned agent only answers while the panel's session is one *that* repository issued.
-
-This used to depend on `browserExtensionCustomWebComponent`, with every other repository served by
-the agent's public deployment. That flag answers which *editor* the metadata screen embeds, which is
-a different question from where the agent lives, so it no longer decides the address.
-
-The proxy **authorizes by repository session**, so every leg has to carry the session cookie
-explicitly (`credentials: 'include'`): a worker fetch and a cross-origin page fetch both send none by
-default. A base that is wrong, or a session the proxy refuses, is reported by the `GET /health` that
-precedes every `/generate` rather than as a failed extraction a minute later.
-
-### Network legs & CORS
-| Leg | Where it runs | Why |
-|-----|---------------|-----|
-| `POST /generate`, `POST /nodes` (Metadata-Agent) | background service worker | background fetch is gated by `host_permissions`, not CORS/page-CSP — portable everywhere (`analyze.run`: extract the tab, generate everything) |
-| `POST /extract-field` (Metadata-Agent) | sidebar document (`MetadataAgentService`) | same context the WLO canvas calls `/generate` from, so the request is visible in the panel's own DevTools and there is no worker build that can fall out of sync with the app. Relies on `host_permissions` for the cross-origin call, like the repository login |
-| Page content extraction | `scripting.executeScript` (background) | no cross-origin fetch |
-| Repository login | Angular `HttpClient` (library) | the library owns the call; relies on `host_permissions` bypassing CORS on Chrome/Edge/Firefox |
-
-## Prebuilt downloads
-
-Every push builds all three targets on CI (`.github/workflows/build.yml`); the runs
-under *Actions* carry the unpacked builds as artifacts. Tagged versions (`v*`) also
-publish a GitHub **Release** with `edu-sharing-{chrome,firefox,safari}-<version>.zip`
-attached — those need no login and are the ones to hand to testers. Loading them is
-the same as loading a local build, see [Load & test](#load--test).
-
-### Cutting a release
-
-A pushed `v*` tag is the whole trigger — CI builds, zips and publishes on its own.
-One-time prerequisite: *Settings → Actions → General → Workflow permissions* must be
-**Read and write**, otherwise `gh release create` fails with a 403.
-
-1. Raise `"version"` in **both** `package.json` and `manifest.base.json` — they are
-   maintained by hand and are not synced. The workflow only warns when the tag and
-   `manifest.base.json` disagree, it does not stop. Bumping the manifest matters:
-   Chrome and Firefox refuse to install an unchanged version number as an update.
-2. Commit the bump and push it.
-3. Tag and push the tag:
-   ```bash
-   git tag v0.2.0
-   git push origin v0.2.0
-   ```
-
-The build takes a few minutes and then a published release appears with
-`edu-sharing-{chrome,firefox,safari}-0.2.0.zip` attached.
-
-If a tagged run fails, delete tag and release before retrying — the workflow will not
-overwrite an existing release:
-```bash
-git push origin :v0.2.0 && git tag -d v0.2.0
-gh release delete v0.2.0
-```
-
-## Build
+## Quickstart
 
 ```bash
-cd edu-sharing-extension
 npm install            # build harness deps (archiver, web-ext, polyfill)
 npm run install:app    # Angular app deps (app-src/)
 npm run build          # ng build + assemble dist/{chrome,firefox,safari}
 ```
 
-Useful variants:
-- `npm run build:chrome` / `:firefox` / `:safari` — single target.
-- `npm run build:no-ng` — reuse the last Angular build (skip `ng build`).
-- `npm run lint:firefox` — `web-ext lint` on the Firefox build.
+Then load it:
 
-Output: `dist/chrome/`, `dist/firefox/`, `dist/safari/` (+ `.zip` for chrome/firefox).
-Edge uses the **Chrome** build (Chromium — no separate target).
+| Browser | How |
+|---|---|
+| Chrome / Edge | `chrome://extensions` → *Developer mode* → *Load unpacked* → `dist/chrome` |
+| Firefox | `npm run start:firefox`, or `about:debugging` → *Load Temporary Add-on* → `dist/firefox/manifest.json` |
+| Safari | `xcrun safari-web-extension-converter dist/safari`, then run the generated Xcode project |
 
-### What goes into the package
+Click the toolbar icon on any normal `https://` page. Prebuilt zips for testers hang off every
+tagged release — see [BUILD.md](BUILD.md#prebuilt-downloads).
 
-`scripts/edu/`, `scripts/wlo/` and `scripts/boerdi/` are prebuilt web-component bundles,
-copied verbatim to `dist/<target>/{edu,wlo,boerdi}/`. Their contents are not ours to shape —
-`scripts/edu/` is the output of an edu-sharing Frontend build and is taken over as a whole,
-third-party libraries and all.
+> Changes to the Angular app reach the loaded extension only through `npm run build:<target>` —
+> `ng build` inside `app-src/` alone does not refresh `sidebar/` or `dist/`.
 
-The one exception is `BUNDLE_EXCLUDES` in `scripts/build.mjs`, a per-bundle list of paths
-that are skipped while copying:
+## Documentation
 
-| Path | Size | Why it is left out |
-| --- | --- | --- |
-| `edu/assets/monaco` | 16 MB | The Monaco editor is pulled in by `chunk-BQCCT6S5.js` (`ngx-monaco-editor-v2`), which only the bundle's `admin-page` and `embed-page` lazy routes import. The extension loads the fixed entry points `styles.css`, `scripts.js`, `polyfills.js`, `main.js` and then mounts custom elements (`app-src/src/app/services/web-component-bundle.service.ts`) — it never starts the bundle's router, so neither route is reachable. Monaco's `ts.worker-*.js` is 6.7 MB, above the 5 MB addons-linter can parse, and made `web-ext lint` fail with `FILE_TOO_LARGE`. |
+| Document | Contents |
+|---|---|
+| [FEATURES.md](FEATURES.md) | What the panel offers, option by option — curating, filing, the OnlyOffice-only options |
+| [UI-SHELL.md](UI-SHELL.md) | Options and conditions, navigation and the back trail, busy state, login and the guest gate |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | The parts, the metadata agent's address, network legs & CORS, which route a save takes |
+| [WEB-COMPONENTS.md](WEB-COMPONENTS.md) | The packaged `edu` / `wlo` / `boerdi` bundles, and the optional WLO metadata editor |
+| [content/CLAUDE.md](content/CLAUDE.md) | The extension ↔ host-page event contract (`INSERT_NODE`, `PREVIEW_NODE`, `DOCUMENT_*`) |
+| [WIDGET-REFERENZ.md](WIDGET-REFERENZ.md) | `<metadata-agent-canvas>`: layouts, attributes, events |
+| [BUILD.md](BUILD.md) | Building, what goes into the package, CI artifacts, cutting a release |
+| [TESTING.md](TESTING.md) | Loading the extension, the OnlyOffice debug mode, the manual test checklist |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Known issues, permission quirks, bundle size, lint output |
 
-That leaves `scripts/edu/` at 66 MB in the repo and each `dist/<target>/` at 54 MB (16 MB
-zipped). Refreshing a bundle is still a plain overwrite of `scripts/<name>/` — the exclusion
-names a directory, so a new build's renamed chunks and workers are covered too.
+## Project layout
 
-## Load & test
-
-**Chrome / Edge**: `chrome://extensions` → enable *Developer mode* → *Load unpacked*
-→ select `dist/chrome`. Click the toolbar icon on any normal `https://` page.
-
-**Firefox**: `npm run start:firefox` (or `about:debugging` → *Load Temporary Add-on*
-→ `dist/firefox/manifest.json`).
-
-**Safari** (macOS + Xcode):
-```bash
-xcrun safari-web-extension-converter dist/safari
 ```
-Open the generated Xcode project and Run.
+app-src/            Angular 21 app (the sidebar UI) — built to sidebar/
+background/         background worker: panel state, page extraction, agent calls
+content/            panel-host.js (docks the panel, relays host events), content.js (extraction)
+scripts/            build.mjs, fetch-widget.mjs, and the prebuilt bundles edu/ wlo/ boerdi/
+sidebar/            build output of app-src/ (packaged as-is)
+manifest.*.json     manifest.base.json + one overlay per target
+dist/               assembled, loadable extensions (git-ignored)
+```
 
-### Debug mode (OnlyOffice without OnlyOffice)
+Inside `app-src/src/app/`: `template/` is the panel frame, `features/<domain>/` the screens,
+`shared/components/` what more than one domain renders, and `services/` · `model/` · `util/` are
+flat.
 
-*Einstellungen* → **Debug-Modus: OnlyOffice-Events simulieren**. With it on, the sidebar behaves
-as if it ran on an OnlyOffice page with the edu-sharing plugin active:
+## Configuration
 
-- every page counts as an insert host, so *Metadaten anreichern*, *Passende Inhalte finden* and
-  *Inhalt suchen* are reachable anywhere;
-- each `REQUEST_DOCUMENT_CONTENT` / `REQUEST_DOCUMENT_INFO` is answered immediately with a
-  hard-coded test document (`app-src/src/app/services/debug.service.ts`) instead of being
-  broadcast to a page that would never reply;
-- `PREVIEW_NODE` has no request to answer, so the settings offer a button that fires one;
-- the *Einstellungen* screen marks the state, and every simulated event is logged as
-  `[edu-sharing][debug]`.
+- **Repository URL** — set in *Einstellungen* (default:
+  `https://repository.staging.openeduhub.net/edu-sharing`). Used for login and every embedded
+  element; changing it reloads the sidebar.
+- **Metadata agent** — not that URL, but the default repository's B-API proxy; see
+  [ARCHITECTURE.md](ARCHITECTURE.md#the-metadata-agents-address).
+- **Repository config variables** — `browserExtensionCustomWebComponent` swaps in the WLO editor and
+  switches the panel login off; `browserExtensionEditorialGroups` names the editorial groups
+  contents can be forwarded to.
+- **Defaults and storage keys** live in `config.js` (worker) and `app-src/src/app/config.ts` (app).
 
-The answers are injected through the **real** inbound path (a window message carrying the
-plugin's source marker), so `requestId` correlation, identity handling and node hydration run
-exactly as in production. Only the inbound direction is faked — `INSERT_NODE` still goes to the
-host page as usual.
+## Contributing
 
-**Test-Node-ID** is what the simulated document reports as the edited node. The default is a fake
-id (the repository load fails silently and the UI falls back to that id); put a real node id in to
-exercise the whole flow including *Speichern*. The flag is persisted in `storage.local`, so it
-survives reloads inside the extension — in a plain `ng serve` there is no extension storage and it
-resets per session.
-
-### Manual test checklist
-1. Toolbar click → the sidebar docks on the right; drag its left edge to resize; the ✕ button
-   closes it — and the page must take the freed width back immediately (no empty strip), also
-   after a later window resize and after closing straight out of a drag. The start view is the
-   menu, which lists the options visible for the current page (on an OnlyOffice page *Inhalt
-   suchen* first, and nothing opens on its own), and the
-   topbar carries the *Verlauf* / *Einstellungen* icons.
-2. **Einstellungen** (topbar icon, reachable while logged out): the Repository-URL defaults to
-   `https://repository.staging.openeduhub.net/edu-sharing` and is required. Changing it shows an
-   *Übernehmen* button that reloads the sidebar so the library re-initializes against the new
-   repository (a dot marks the icon until applied).
-3. **Login**: required for everything except *Einstellungen*. Enter staging credentials → the
-   session bar flips to "Angemeldet: …" and the login option disappears while the rest appear.
-   If the repository URL was changed, login is blocked until it is applied in *Einstellungen*.
-4. **Erschließen + speichern**: *Inhalt erschließen* on a content page → the metadata screen
-   shows `fields_extracted / fields_total` and loads the MDS editor with the generated
-   metadata. Edit, then the footer's **Speichern** → a node is created in your inbox and the
-   preview opens, and the flow's steps become reachable for that content.
-5. **Metadaten anreichern** (OnlyOffice): open a document in the OnlyOffice editor with the
-   edu-sharing plugin active, open the panel → the option appears and names the detected document.
-   The footer's **Metadaten anreichern** reads the document and lands on the metadata screen with
-   the generated metadata, the menu naming the document under *Inhalt erkannt*. **Speichern**
-   must update **that** node — check in the repository that the document's metadata changed, that
-   its name/extension is unchanged, and that no new node appeared in the inbox. With the page-side
-   plugin switched off (*Plugins im Hintergrund*) the screen must report the timeout instead of
-   hanging.
-6. **Vorschau → Sammlungen**: from the preview, *Sammlung zuordnen* → pick a collection and
-   confirm with *In Sammlung einfügen*; the screen lists what was added.
-7. **Verlauf**: every *saved* node is listed (nothing is recorded until you save); entries
-   expand to show their fields and offer *In Vorschau öffnen*, which reloads the node from the
-   repository; *Leeren* clears the list.
-8. If an embedded element stays blank, check the sidebar frame's console for CSP or
-   repository-CORS errors — the elements run in this document, so their errors show up there.
-
-## Known issues / caveats
-- **Safari**: the `host_permissions` CORS bypass for extension pages is unreliable,
-  and ITP may block the repository session cookie in the injected-panel context.
-  Guest Erschließung (via the background worker) is unaffected; logged-in auth needs
-  verification on Safari and may require a background auth fallback.
-- **`ngx-edu-sharing-api`** (10.0.10) is Angular-only and declares a peer dep of Angular
-  >= 18, while the app runs Angular 21, so installing needs `legacy-peer-deps=true` (set in
-  `app-src/.npmrc`). It is used for login, node create/update/read, and adding collection
-  references; the last one goes through `CollectionServiceUnwrapped`, since the exported
-  `CollectionService` wrapper is read-only.
-- **Broad permissions** (`host_permissions: https://*/*`, `connect-src https:`) are
-  required because the repository URL is user-editable; expect stricter store review.
-  `connect-src` also allows `data:` and `blob:`, because the bundle reads a picture it was
-  handed as a URL of its own: the preview widget `fetch`es the picked node's inline
-  `preview.data` (a data URL) to turn it into a file, and the panel does the same with the
-  object URL of a picture picked in the widget (`CurationService`).
-- **Reading the clipboard** takes two grants, both for one option of the preview widget: it
-  offers *Aus der Zwischenablage einfügen* only while it can see an image on the clipboard,
-  which it answers with `navigator.permissions.query({name: 'clipboard-read'})` plus a
-  `clipboard.read()`. The extension declares `clipboardRead` (Chrome answers that query with
-  `denied` without it), and the panel's iframe is opened with `allow="clipboard-read;
-  clipboard-write"` (the permissions policy defaults to the top-level document, so the frame
-  is refused otherwise — see `content/panel-host.js`). Pasting itself needs neither: the
-  widget listens for the `paste` event as well, which is why Cmd+V worked all along.
-- The repository URL cannot be changed at runtime without reloading the sidebar —
-  the library freezes `rootUrl` at bootstrap and does not export its config classes.
-- **MDS editor rendering needs verification in a real browser.** Two things must hold:
-  (1) the vendored bundle boots under the extension CSP (`script-src 'self'` — its core has no
-  `eval`; only unused PDF/Cordova *assets* do), and (2) the editor can fetch the MDS
-  definition from the repository (CORS/auth). Load the unpacked extension and run an
-  Erschließung to confirm; the elements run in the sidebar document, so any failure shows up
-  in the sidebar frame's console.
-- **Bundle size**: `scripts/edu/` is 66 MB, of which 54 MB reach `dist/<target>/`
-  (see [What goes into the package](#what-goes-into-the-package)). The two remaining
-  heavyweights are reachable and stay:
-  - **pdf.js** (`assets/pdf.*`, `assets/viewer*`, `assets/locale`, `assets/cmaps`,
-    `assets/standard_fonts`, `assets/wasm`, ~21 MB). `chunk-OZPZMSZI.js` is the node
-    renderer that picks `rs-module-pdf` by mime type; `edu/main.js` imports it eagerly and
-    it sits behind `<edu-sharing-preview-sidebar>`, which the sidebar mounts in
-    `preview-node/preview-node.component.html`. Previewing a PDF node fetches these.
-    (`assets/locale` is 113 languages of pdf.js' `viewer.ftl`, not edu-sharing i18n.)
-  - **TinyMCE** (`assets/tinymce`, 13 MB). The core is bundled into `edu/scripts.js`;
-    skins, themes and plugins are fetched from the folder as soon as an `<editor>` renders.
-    Whether an MDS form has a rich-text widget is decided by the repository's metadata set,
-    so this is a config question, not one the import graph can answer.
-  - The lazy route modules (107 chunks, 4.3 MB, `pdf-metadata-page` alone 2.4 MB) are
-    dynamic imports of the bundle's router. The router runs inside the sidebar document,
-    so whether it ever navigates depends on the URL — dropping them risks a 404 on a
-    route chunk and needs a runtime check first.
-- **`web-ext lint` is error-free but noisy**: 0 errors, ~204 warnings, 1 notice.
-  Every warning comes from third-party libs inside the vendored bundles, not from this
-  extension's own code — `edu/assets/tinymce` (67), `edu/scripts.js` (17),
-  `edu/assets/viewer*` (37), `edu/assets/pdf.worker*` (19), `edu/assets/cordova` (7),
-  `boerdi/boerdi-widget.js` (6), `edu/index.html` (5, the bundle's own start page, which
-  the extension never opens). The notice is `MISSING_DATA_COLLECTION_PERMISSIONS`: AMO
-  will require `browser_specific_settings.gecko.data_collection_permissions` in future.
-  CI runs the lint with `continue-on-error: true`, so warnings never block a build.
+- Build after every change (`npm run build:chrome`) and reload the extension — the loaded package is
+  what runs, not the sources.
+- Comments and documentation are written in English; the UI is German.
+- Keep `package.json` and `manifest.base.json` versions in step when releasing
+  ([BUILD.md](BUILD.md#cutting-a-release)).

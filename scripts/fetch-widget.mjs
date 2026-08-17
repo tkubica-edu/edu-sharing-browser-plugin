@@ -7,7 +7,8 @@
  * bundle therefore has to sit in the folder. That is not a detour this example
  * takes, it is the rule — every real extension has to do it the same way.
  *
- *     node scripts/fetch-widget.mjs http://localhost:8000
+ *     node scripts/fetch-widget.mjs https://87.106.127.225.nip.io   # the deployed backend
+ *     node scripts/fetch-widget.mjs http://localhost:8000          # one running locally
  *
  * Afterwards `npm run build:chrome`, so the bundle reaches `dist/`, and then
  * "Reload" in `chrome://extensions` — Chrome does not notice a swapped bundle
