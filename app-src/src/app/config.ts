@@ -75,43 +75,52 @@ export const APP_CONFIG = {
    * It decides both halves of the exchange, like the MetalookUp rules below: what the request asks for, and what is
    * read of the answer.
    *
-   * Cut down to a single scheme for now, while the judgement is being put back into service — one LLM pass per
-   * content instead of ten. Every criterion's own scheme stands commented out beside it, so they come back one at a
-   * time; the gates among them are thorough but cost many passes, hence the single-pass alternative named with them.
+   * Only the cheap schemes are named, and cheap has an exact meaning here: one LLM pass, and every pass carries the
+   * whole content's text into its prompt again — so the number of passes *is* the price. One pass each is what the
+   * German base rubrics and the three collective gates cost. Their `_new` counterparts cost two (the second pass only
+   * summarises the reasoning), and the English `*_gate` families one pass per part scheme: 10 for a quality dimension,
+   * 11 to 68 for the legal ones. The expensive alternative stands commented out beside each criterion, with its price.
+   *
+   * Eight criteria, one scheme each, so eight passes per judgement — `schemesForCriteria` deduplicates them and caps
+   * the request at ten.
    */
   qualityCriterionSchemes: {
-    // 0–2, 2 = LEGAL, 1 = Prüfung erforderlich. single pass: strafrecht_gate.
-    // { scheme: 'criminal_law_gate', met: 'atLeast', threshold: 2 }
-    'ccm:oeh_quality_criminal_law': null,
-    // An age rating: 0/6/12/16/18, and 100 for jugendgefährdend — which is the one the criterion is
-    // about, so anything up to 18 passes it. single pass: jugendschutz_gate.
-    // { scheme: 'protection_of_minors_gate', met: 'atMost', threshold: 18 }
-    'ccm:oeh_quality_protection_of_minors': null,
-    // 0–3, 3 = COMPLIANT; 1 and 2 each fail one of the two halves (DSGVO, Transparenz).
-    // { scheme: 'data_privacy_gate', met: 'atLeast', threshold: 3 }
+    // PASS/FAIL over the whole indicator catalogue of German criminal law in one pass; a gate answers 1 for
+    // passed and 0 for failed, hence the threshold.
+    // { scheme: 'criminal_law_gate', met: 'atLeast', threshold: 2 } — 11 passes
+    'ccm:oeh_quality_criminal_law': { scheme: 'strafrecht_gate', met: 'atLeast', threshold: 1 },
+    // Likewise one pass over JMStV, JuSchG and the StGB paragraphs behind them. The English family answers an
+    // age rating instead, one pass per age group and aspect.
+    // { scheme: 'protection_of_minors_gate', met: 'atMost', threshold: 18 } — 68 passes, the catalogue's most
+    'ccm:oeh_quality_protection_of_minors': { scheme: 'jugendschutz_gate', met: 'atLeast', threshold: 1 },
+    // Unjudged: the only scheme that judges privacy on its own is the English family, and the cheap gate that
+    // would cover it is the personality-rights one below — whose single verdict would then answer two criteria,
+    // and report a violation of either under both.
+    // { scheme: 'data_privacy_gate', met: 'atLeast', threshold: 3 } — 20 passes
     'ccm:oeh_quality_data_privacy': null,
-    // 0–3, 3 = COMPLIANT. single pass: persoenlichkeitsrechte_gate.
-    // { scheme: 'personal_law_gate', met: 'atLeast', threshold: 3 }
-    'ccm:oeh_quality_personal_law': null,
-    // The one scheme currently asked for. `aktualitaet_new` is a weighted checklist over 0–5, where
-    // 3 is "Befriedigend" — it judges timeliness rather than neutrality, and sits here because this
-    // criterion is where its answer is to show up while the judgement is being tried out.
-    // { scheme: 'neutrality_gate', met: 'atLeast', threshold: 3 } — single pass: neutralitaetchec
-    'ccm:oeh_quality_neutralness': { scheme: 'aktualitaet_new', met: 'atLeast', threshold: 3 },
+    // { scheme: 'personal_law_gate', met: 'atLeast', threshold: 3 } — 21 passes
+    'ccm:oeh_quality_personal_law': { scheme: 'persoenlichkeitsrechte_gate', met: 'atLeast', threshold: 1 },
+    // 0–5, where 3 reads "ideologisch eingefärbt, aber transparent" and 4 "neutrale Formulierung".
+    // { scheme: 'neutrality_gate', met: 'atLeast', threshold: 3 } — 10 passes
+    'ccm:oeh_quality_neutralness': { scheme: 'neutralitaet', met: 'atLeast', threshold: 3 },
+    // Nothing in the catalogue judges copyright, and nothing judges the fit for the target group.
     'ccm:oeh_quality_copyright_law': null,
     'ccm:oeh_quality_relevancy_for_education': null,
-    // single pass: sachrichtigkeit
-    // { scheme: 'factual_accuracy_gate', met: 'atLeast', threshold: 3 }
-    content_valid: null,
-    // single pass: sprachliche_angemessenheit
-    // { scheme: 'linguistic_appropriateness_gate', met: 'atLeast', threshold: 3 }
-    speech_valid: null,
-    // single pass: medial_passend
-    // { scheme: 'media_appropriate_gate', met: 'atLeast', threshold: 3 }
-    medial_relevant: null,
-    // single pass: didaktik_methodik
-    // { scheme: 'didactics_gate', met: 'atLeast', threshold: 3 }
-    didactics_valid: null,
+    /*
+     * The four editorial dimensions, each a 0–5 rubric in one pass. Where 3 sits differs between them — from
+     * "stark vereinfacht" (Sachrichtigkeit) to "Medial passend" — so the threshold is the knob to turn if one of
+     * them passes too readily. Their schemes name a rating property of their own in `metadata_property`
+     * (`ccm:oeh_quality_correctness` and so on); keyed here is the criterion the panel actually shows.
+     */
+    // { scheme: 'factual_accuracy_gate', met: 'atLeast', threshold: 3 } — 10 passes
+    content_valid: { scheme: 'sachrichtigkeit', met: 'atLeast', threshold: 3 },
+    // { scheme: 'linguistic_appropriateness_gate', met: 'atLeast', threshold: 3 } — 10 passes
+    speech_valid: { scheme: 'sprachliche_angemessenheit', met: 'atLeast', threshold: 3 },
+    // { scheme: 'media_appropriate_gate', met: 'atLeast', threshold: 3 } — 10 passes
+    medial_relevant: { scheme: 'medial_passend', met: 'atLeast', threshold: 3 },
+    // { scheme: 'didactics_gate', met: 'atLeast', threshold: 3 } — 10 passes
+    didactics_valid: { scheme: 'didaktik_methodik', met: 'atLeast', threshold: 3 },
+    // Measured rather than judged — see `qualityMetalookupRules` below.
     accessible: null
   } as Record<string, CriterionScheme | null>,
   /**
