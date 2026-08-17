@@ -11,9 +11,16 @@
 
 // Holds the chat element, which is created imperatively and therefore sized inline by the component:
 // unencapsulated, this component's styles would not match it.
+//
+// `contain: layout` is what keeps the chat in this slot: it makes this the containing block for the
+// positioned boxes inside the widget, which draws its panel `position: fixed` below a viewport width of
+// 480px — a phone layout, and the panel is narrower than that at every width it can be dragged to. Against
+// the viewport that panel would cover the whole panel, topbar and navigation included; against this box it
+// fills the area the chat is meant to have. Nothing else in the widget is positioned against the viewport.
 .es-chat-host {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+  contain: layout;
 }
