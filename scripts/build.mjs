@@ -23,6 +23,14 @@ const SIDEBAR = path.join(ROOT, 'sidebar');
 //   scripts/boerdi → boerdi/ — chat widget of the KI assistant (boerdi-chat), loaded by its screen
 const BUNDLE_DIRS = ['edu', 'wlo', 'boerdi'];
 
+// Parts of those bundles that stay out of the package, keyed by bundle name and given as
+// POSIX paths relative to the bundle root. Excluding a directory drops its whole subtree.
+//   edu/assets/monaco — the Monaco editor is reachable only from the bundle's admin-page and
+//                       embed-page lazy routes; the extension mounts custom elements and never
+//                       starts that router. Its ts.worker is ~6.7 MB, above the 5 MB
+//                       addons-linter can parse, which fails `web-ext lint` with FILE_TOO_LARGE.
+const BUNDLE_EXCLUDES = { edu: ['assets/monaco'] };
+
 const TARGETS = ['chrome', 'firefox', 'safari'];
 
 // Shared source copied verbatim into every target build.
@@ -113,6 +121,13 @@ function buildAngular() {
   })();
 }
 
+// True when `relPath` (relative to a bundle root, platform separators) is one of the POSIX
+// `excludes` or sits below one. The bundle root itself comes through as '' and is never excluded.
+function isExcluded(relPath, excludes) {
+  const p = relPath.split(path.sep).join('/');
+  return excludes.some((e) => p === e || p.startsWith(e + '/'));
+}
+
 async function assembleTarget(target) {
   const outDir = path.join(DIST, target);
   await fs.rm(outDir, { recursive: true, force: true });
@@ -130,11 +145,16 @@ async function assembleTarget(target) {
   // Web-component bundles → outDir/<name>, keeping the folder name the app loads them by.
   for (const name of BUNDLE_DIRS) {
     const src = path.join(ROOT, 'scripts', name);
-    if (existsSync(src)) {
-      await fs.cp(src, path.join(outDir, name), { recursive: true });
-    } else {
+    if (!existsSync(src)) {
       log(`⚠ ${rel(src)} not found — the ${name} web components will not be packaged.`);
+      continue;
     }
+    const excludes = BUNDLE_EXCLUDES[name] ?? [];
+    await fs.cp(src, path.join(outDir, name), {
+      recursive: true,
+      filter: (from) => !isExcluded(path.relative(src, from), excludes)
+    });
+    if (excludes.length) log(`  ↳ ${name}: left out ${excludes.join(', ')}`);
   }
 
   const base = await readJson(path.join(ROOT, 'manifest.base.json'));

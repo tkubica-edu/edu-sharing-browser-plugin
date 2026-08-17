@@ -455,6 +455,24 @@ Useful variants:
 Output: `dist/chrome/`, `dist/firefox/`, `dist/safari/` (+ `.zip` for chrome/firefox).
 Edge uses the **Chrome** build (Chromium — no separate target).
 
+### What goes into the package
+
+`scripts/edu/`, `scripts/wlo/` and `scripts/boerdi/` are prebuilt web-component bundles,
+copied verbatim to `dist/<target>/{edu,wlo,boerdi}/`. Their contents are not ours to shape —
+`scripts/edu/` is the output of an edu-sharing Frontend build and is taken over as a whole,
+third-party libraries and all.
+
+The one exception is `BUNDLE_EXCLUDES` in `scripts/build.mjs`, a per-bundle list of paths
+that are skipped while copying:
+
+| Path | Size | Why it is left out |
+| --- | --- | --- |
+| `edu/assets/monaco` | 16 MB | The Monaco editor is pulled in by `chunk-BQCCT6S5.js` (`ngx-monaco-editor-v2`), which only the bundle's `admin-page` and `embed-page` lazy routes import. The extension loads the fixed entry points `styles.css`, `scripts.js`, `polyfills.js`, `main.js` and then mounts custom elements (`app-src/src/app/services/web-component-bundle.service.ts`) — it never starts the bundle's router, so neither route is reachable. Monaco's `ts.worker-*.js` is 6.7 MB, above the 5 MB addons-linter can parse, and made `web-ext lint` fail with `FILE_TOO_LARGE`. |
+
+That leaves `scripts/edu/` at 66 MB in the repo and each `dist/<target>/` at 54 MB (16 MB
+zipped). Refreshing a bundle is still a plain overwrite of `scripts/<name>/` — the exclusion
+names a directory, so a new build's renamed chunks and workers are covered too.
+
 ## Load & test
 
 **Chrome / Edge**: `chrome://extensions` → enable *Developer mode* → *Load unpacked*
@@ -556,14 +574,32 @@ resets per session.
   the library freezes `rootUrl` at bootstrap and does not export its config classes.
 - **MDS editor rendering needs verification in a real browser.** Two things must hold:
   (1) the vendored bundle boots under the extension CSP (`script-src 'self'` — its core has no
-  `eval`; only unused PDF/Monaco/Cordova *assets* do), and (2) the editor can fetch the MDS
+  `eval`; only unused PDF/Cordova *assets* do), and (2) the editor can fetch the MDS
   definition from the repository (CORS/auth). Load the unpacked extension and run an
   Erschließung to confirm; the elements run in the sidebar document, so any failure shows up
   in the sidebar frame's console.
-- **Bundle size**: `scripts/edu/` is ~22 MB (unpacked target ~77 MB) because
-  it includes unused lazy assets (`assets/monaco`, `assets/pdf.*`, `assets/cordova`)
-  and the `pdf-metadata-page` chunk. These are runtime-fetched only, so pruning them
-  would slim the package and clear the `FILE_TOO_LARGE` web-ext lint error — do this
-  once the editor is confirmed working. The remaining `web-ext lint` findings
-  (`UNSAFE_VAR_ASSIGNMENT` innerHTML) originate inside the vendored bundle's
-  third-party libs, not this extension's own code.
+- **Bundle size**: `scripts/edu/` is 66 MB, of which 54 MB reach `dist/<target>/`
+  (see [What goes into the package](#what-goes-into-the-package)). The two remaining
+  heavyweights are reachable and stay:
+  - **pdf.js** (`assets/pdf.*`, `assets/viewer*`, `assets/locale`, `assets/cmaps`,
+    `assets/standard_fonts`, `assets/wasm`, ~21 MB). `chunk-OZPZMSZI.js` is the node
+    renderer that picks `rs-module-pdf` by mime type; `edu/main.js` imports it eagerly and
+    it sits behind `<edu-sharing-preview-sidebar>`, which the sidebar mounts in
+    `preview-node/preview-node.component.html`. Previewing a PDF node fetches these.
+    (`assets/locale` is 113 languages of pdf.js' `viewer.ftl`, not edu-sharing i18n.)
+  - **TinyMCE** (`assets/tinymce`, 13 MB). The core is bundled into `edu/scripts.js`;
+    skins, themes and plugins are fetched from the folder as soon as an `<editor>` renders.
+    Whether an MDS form has a rich-text widget is decided by the repository's metadata set,
+    so this is a config question, not one the import graph can answer.
+  - The lazy route modules (107 chunks, 4.3 MB, `pdf-metadata-page` alone 2.4 MB) are
+    dynamic imports of the bundle's router. The router runs inside the sidebar document,
+    so whether it ever navigates depends on the URL — dropping them risks a 404 on a
+    route chunk and needs a runtime check first.
+- **`web-ext lint` is error-free but noisy**: 0 errors, ~204 warnings, 1 notice.
+  Every warning comes from third-party libs inside the vendored bundles, not from this
+  extension's own code — `edu/assets/tinymce` (67), `edu/scripts.js` (17),
+  `edu/assets/viewer*` (37), `edu/assets/pdf.worker*` (19), `edu/assets/cordova` (7),
+  `boerdi/boerdi-widget.js` (6), `edu/index.html` (5, the bundle's own start page, which
+  the extension never opens). The notice is `MISSING_DATA_COLLECTION_PERMISSIONS`: AMO
+  will require `browser_specific_settings.gecko.data_collection_permissions` in future.
+  CI runs the lint with `continue-on-error: true`, so warnings never block a build.
