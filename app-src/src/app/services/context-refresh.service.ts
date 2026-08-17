@@ -34,6 +34,7 @@ export class ContextRefreshService {
     // The page can have become another one while the settings were open (see AppComponent).
     const tab = await this.browserExtension.getActiveTab().catch(() => null);
     this.conditions.activeUrl.set(tab?.url ?? null);
+    this.conditions.activeTitle.set(tab?.title ?? null);
     this.webComponent.refresh();
     await this.auth.revalidate();
     await this.pageRecognition.recognize();

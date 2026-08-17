@@ -164,22 +164,27 @@ async function restorePanel(tabId) {
   }
 }
 
-browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
+browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   // Wait for the new document: injecting into a still-loading page would be torn down by it.
   if (changeInfo.status === 'complete') void restorePanel(tabId);
   // A URL change, which is NOT always a new document: edu-sharing routes in place (History API), so
   // the page becomes another one while the panel keeps running on the URL it booted with. This is
-  // the only party that sees that happen, so it says so.
-  if (changeInfo.url) void announceUrl(tabId, changeInfo.url);
+  // the only party that sees that happen, so it says so. The title is announced along with it, and on
+  // its own too: it usually arrives after the URL it belongs to, and a page in-place routing may
+  // change nothing else.
+  if (changeInfo.url || changeInfo.title) {
+    void announceUrl(tabId, changeInfo.url || tab?.url, tab?.title);
+  }
 });
 
 /**
- * Tell the sidebar the tab's URL changed. A broadcast to the extension's own pages, so it names the tab it is about
+ * Tell the sidebar what page the tab is on. A broadcast to the extension's own pages, so it names the tab it is about
  * and only the panel sitting there acts on it. Having no listener is not an error — a tab whose panel is closed has
  * nobody to tell.
  */
-function announceUrl(tabId, url) {
-  return browser.runtime.sendMessage({ action: 'tab.url', tabId, url }).catch(() => {});
+function announceUrl(tabId, url, title) {
+  if (!url) return Promise.resolve();
+  return browser.runtime.sendMessage({ action: 'tab.url', tabId, url, title }).catch(() => {});
 }
 
 // A closed tab's id tells us nothing anymore, and ids get reused — drop everything keyed by it.

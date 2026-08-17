@@ -142,10 +142,10 @@ export class AppComponent implements OnInit {
 
     // The tab's URL can change without this app being torn down: an edu-sharing page routes in place
     // (History API), so the panel keeps running while the page becomes another one. Take that page
-    // over — the background worker is what notices it (see BrowserExtensionService.announcedUrl).
+    // over — the background worker is what notices it (see BrowserExtensionService.announcedPage).
     effect(() => {
-      const url = this.browserExtension.announcedUrl();
-      if (url && this.booted()) untracked(() => this.pageChanged(url));
+      const page = this.browserExtension.announcedPage();
+      if (page && this.booted()) untracked(() => this.pageChanged(page.url, page.title));
     });
 
     // Make the document the host has open the active node, as soon as its node is loaded. An
@@ -179,6 +179,7 @@ export class AppComponent implements OnInit {
     await this.history.load();
     const tab = await this.browserExtension.getActiveTab().catch(() => null);
     this.conditions.activeUrl.set(tab?.url ?? null);
+    this.conditions.activeTitle.set(tab?.title ?? null);
 
     // The panel is reopened after every page change (see background.js), so this boot may be the
     // continuation of what the user was doing before the page changed. Pick that state back up
@@ -245,9 +246,14 @@ export class AppComponent implements OnInit {
    * the recognition of the new one. Order matters — the conditions first, because the recognition reads them, and the
    * release before that, since it refuses to adopt while a content is still held.
    */
-  private pageChanged(url: string): void {
+  private pageChanged(url: string, title: string | null = null): void {
+    // The title is taken even where the address stayed the same: a page routing in place is announced
+    // before it has renamed itself, so its title arrives as an announcement of its own.
+    if (title) this.conditions.activeTitle.set(title);
     if (url === this.conditions.activeUrl()) return;
     this.conditions.activeUrl.set(url);
+    // Cleared where the announcement brought none, so the previous page's title cannot describe this one.
+    if (!title) this.conditions.activeTitle.set(null);
     this.curation.releaseDetectedContent();
     void this.pageRecognition.recognize();
   }

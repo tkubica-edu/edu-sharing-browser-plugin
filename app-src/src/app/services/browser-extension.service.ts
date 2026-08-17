@@ -1,6 +1,12 @@
 import { Injectable, signal } from '@angular/core';
 import browser from 'webextension-polyfill';
 
+/** The page the background worker says the tab is on; the title is missing while the tab has none yet. */
+export interface AnnouncedPage {
+  url: string;
+  title: string | null;
+}
+
 /** The page an analysis was run against. */
 export interface PageSource {
   url: string;
@@ -83,11 +89,12 @@ export class BrowserExtensionService {
   readonly available = typeof browser !== 'undefined' && !!browser.runtime?.id;
 
   /**
-   * The URL the background worker last announced for this tab; null until one arrives. It announces every
+   * The page the background worker last announced for this tab; null until one arrives. It announces every
    * change including the ones a page makes in place — an edu-sharing page routes with the History API, and
-   * only the worker sees that happen, so this panel would otherwise keep working on its boot URL.
+   * only the worker sees that happen, so this panel would otherwise keep working on the page it booted with.
+   * URL and title together, so a reader sees one page rather than two halves of two.
    */
-  readonly announcedUrl = signal<string | null>(null);
+  readonly announcedPage = signal<AnnouncedPage | null>(null);
 
   /** This panel's tab, for telling its own announcements from another tab's; null while unknown. */
   private ownTabId: number | null = null;
@@ -99,10 +106,12 @@ export class BrowserExtensionService {
     // plain dev server — there is only one panel anyway, so every announcement is its own.
     void this.getOwnTabId().then((tabId) => (this.ownTabId = tabId));
     browser.runtime.onMessage.addListener((message: unknown) => {
-      const announcement = message as { action?: string; tabId?: number; url?: string } | null;
+      const announcement = message as
+        | { action?: string; tabId?: number; url?: string; title?: string }
+        | null;
       if (announcement?.action !== 'tab.url' || !announcement.url) return;
       if (this.ownTabId !== null && announcement.tabId !== this.ownTabId) return;
-      this.announcedUrl.set(announcement.url);
+      this.announcedPage.set({ url: announcement.url, title: announcement.title ?? null });
     });
   }
 

@@ -9,10 +9,11 @@
 
 :host > p { padding: var(--es-space-4); margin: 0; }
 
-boerdi-chat {
-  display: block;
+// Holds the chat element, which is created imperatively and therefore sized inline by the component:
+// unencapsulated, this component's styles would not match it.
+.es-chat-host {
+  display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
-  // A floor for the case where the panel cannot hand down a height of its own — a chat that
-  // collapses to nothing is unusable, a scrolling one is not.
-  min-height: 420px;
+  min-height: 0;
 }

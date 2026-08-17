@@ -4,15 +4,6 @@
   <p class="es-muted">Der KI-Assistent wird geladen…</p>
 }
 
-<!-- Rendered only once the bundle has defined the element, and configured through static attributes so it
-     carries all of them as it upgrades. The flags are the widget's own strings: it reads "true"/"false" as
-     well as booleans. -->
-@if (bundle.ready()) {
-  <boerdi-chat
-    api-url="https://87.106.127.225.nip.io"
-    embed-mode="frameless"
-    initial-state="expanded"
-    show-language-buttons="false"
-    show-debug-button="false"
-  ></boerdi-chat>
-}
+<!-- The chat element is created imperatively into this host (see the component): it reads its page context
+     while it connects, so every attribute has to be in place before it is inserted. -->
+<div #host class="es-chat-host"></div>

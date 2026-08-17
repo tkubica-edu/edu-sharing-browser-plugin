@@ -46,6 +46,12 @@ export class ConditionsService {
   readonly activeUrl = signal<string | null>(null);
 
   /**
+   * The active tab's title, as the browser reports it; null while it has none. The only thing the panel knows
+   * about what a page outside the repository is *about* — the KI assistant is told it (see PageContext).
+   */
+  readonly activeTitle = signal<string | null>(null);
+
+  /**
    * Whether it is still open what the active page's content is. True to begin with: on boot nothing has answered
    * yet, and only once this is false does the absence of a content mean there is none.
    */
