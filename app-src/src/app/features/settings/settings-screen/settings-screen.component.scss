@@ -28,9 +28,42 @@
   padding-left: var(--es-space-4);
 }
 
-// A second switch in the same card sits under whatever ended the first one's description, not against it.
+// A second switch or field in the same card sits under whatever ended the first one's description,
+// not against it.
 .desc + .check,
-.desc-list + .check { margin-top: var(--es-space-3); }
+.desc-list + .check,
+.desc + .es-field-label,
+.desc-list + .es-field-label { margin-top: var(--es-space-3); }
+
+// A field whose value is masked, with the eye that shows it inside it — so the row stays one control to
+// the eye. A credential typed into a docked panel is typed blind, and reading it back saves the retry.
+.reveal-field {
+  position: relative;
+
+  .es-input { padding-right: 42px; margin-bottom: 0; }
+}
+
+.reveal {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--es-blue);
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+
+  &:hover { background: var(--es-hint-bg); }
+
+  i { font-size: 20px; }
+}
 
 // The heading of a folded card, as the control that unfolds it: the whole width, so the target is the
 // row and not the chevron at its end.

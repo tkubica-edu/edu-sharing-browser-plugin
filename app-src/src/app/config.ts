@@ -59,7 +59,8 @@ export const APP_CONFIG = {
   /**
    * `user:password` for the Basic auth that guards the ContentJudge deployment. It guards the whole
    * host, the API's own docs included; the API itself asks for nothing. Empty leaves the header off,
-   * and the answer is then the `401` of that guard.
+   * and the answer is then the `401` of that guard. Only the fallback for what the settings hold —
+   * the credential belongs to whoever runs the extension, not into the checked-in configuration.
    */
   contentJudgeBasicAuth: '',
   /**
@@ -70,35 +71,47 @@ export const APP_CONFIG = {
   contentJudgeCrawlerMethod: 'simple' as 'simple' | 'browser',
   /**
    * Which ContentJudge scheme judges which quality criterion and how its answer is read, keyed by the criterion's id as
-   * the metadata set states it; `null` marks a criterion the deployment has no scheme for, which is then reported as
-   * unjudged. Every scheme here is a master gate — thorough but many LLM passes, so a single-pass one is named beside it.
+   * the metadata set states it; `null` marks a criterion no scheme is asked for, which is then reported as unjudged.
+   * It decides both halves of the exchange, like the MetalookUp rules below: what the request asks for, and what is
+   * read of the answer.
+   *
+   * Cut down to a single scheme for now, while the judgement is being put back into service — one LLM pass per
+   * content instead of ten. Every criterion's own scheme stands commented out beside it, so they come back one at a
+   * time; the gates among them are thorough but cost many passes, hence the single-pass alternative named with them.
    */
   qualityCriterionSchemes: {
-    // single pass: strafrecht_gate. 0–2, 2 = LEGAL, 1 = Prüfung erforderlich.
-    'ccm:oeh_quality_criminal_law': { scheme: 'criminal_law_gate', met: 'atLeast', threshold: 2 },
-    // single pass: jugendschutz_gate. An age rating: 0/6/12/16/18, and 100 for jugendgefährdend —
-    // which is the one the criterion is about, so anything up to 18 passes it.
-    'ccm:oeh_quality_protection_of_minors': {
-      scheme: 'protection_of_minors_gate',
-      met: 'atMost',
-      threshold: 18
-    },
+    // 0–2, 2 = LEGAL, 1 = Prüfung erforderlich. single pass: strafrecht_gate.
+    // { scheme: 'criminal_law_gate', met: 'atLeast', threshold: 2 }
+    'ccm:oeh_quality_criminal_law': null,
+    // An age rating: 0/6/12/16/18, and 100 for jugendgefährdend — which is the one the criterion is
+    // about, so anything up to 18 passes it. single pass: jugendschutz_gate.
+    // { scheme: 'protection_of_minors_gate', met: 'atMost', threshold: 18 }
+    'ccm:oeh_quality_protection_of_minors': null,
     // 0–3, 3 = COMPLIANT; 1 and 2 each fail one of the two halves (DSGVO, Transparenz).
-    'ccm:oeh_quality_data_privacy': { scheme: 'data_privacy_gate', met: 'atLeast', threshold: 3 },
-    // single pass: persoenlichkeitsrechte_gate. 0–3, 3 = COMPLIANT.
-    'ccm:oeh_quality_personal_law': { scheme: 'personal_law_gate', met: 'atLeast', threshold: 3 },
-    // single pass: neutralitaet
-    'ccm:oeh_quality_neutralness': { scheme: 'neutrality_gate', met: 'atLeast', threshold: 3 },
+    // { scheme: 'data_privacy_gate', met: 'atLeast', threshold: 3 }
+    'ccm:oeh_quality_data_privacy': null,
+    // 0–3, 3 = COMPLIANT. single pass: persoenlichkeitsrechte_gate.
+    // { scheme: 'personal_law_gate', met: 'atLeast', threshold: 3 }
+    'ccm:oeh_quality_personal_law': null,
+    // The one scheme currently asked for. `aktualitaet_new` is a weighted checklist over 0–5, where
+    // 3 is "Befriedigend" — it judges timeliness rather than neutrality, and sits here because this
+    // criterion is where its answer is to show up while the judgement is being tried out.
+    // { scheme: 'neutrality_gate', met: 'atLeast', threshold: 3 } — single pass: neutralitaetchec
+    'ccm:oeh_quality_neutralness': { scheme: 'aktualitaet_new', met: 'atLeast', threshold: 3 },
     'ccm:oeh_quality_copyright_law': null,
     'ccm:oeh_quality_relevancy_for_education': null,
     // single pass: sachrichtigkeit
-    content_valid: { scheme: 'factual_accuracy_gate', met: 'atLeast', threshold: 3 },
+    // { scheme: 'factual_accuracy_gate', met: 'atLeast', threshold: 3 }
+    content_valid: null,
     // single pass: sprachliche_angemessenheit
-    speech_valid: { scheme: 'linguistic_appropriateness_gate', met: 'atLeast', threshold: 3 },
+    // { scheme: 'linguistic_appropriateness_gate', met: 'atLeast', threshold: 3 }
+    speech_valid: null,
     // single pass: medial_passend
-    medial_relevant: { scheme: 'media_appropriate_gate', met: 'atLeast', threshold: 3 },
+    // { scheme: 'media_appropriate_gate', met: 'atLeast', threshold: 3 }
+    medial_relevant: null,
     // single pass: didaktik_methodik
-    didactics_valid: { scheme: 'didactics_gate', met: 'atLeast', threshold: 3 },
+    // { scheme: 'didactics_gate', met: 'atLeast', threshold: 3 }
+    didactics_valid: null,
     accessible: null
   } as Record<string, CriterionScheme | null>,
   /**
@@ -140,6 +153,11 @@ export const APP_CONFIG = {
     qualityMetalookup: 'eduSharingQualityMetalookup',
     /** Whether ContentJudge judges it. */
     qualityContentJudge: 'eduSharingQualityContentJudge',
+    /**
+     * The `user:password` ContentJudge's guard is answered with — see ContentJudgeService. Without one
+     * the judgement is not offered at all, so this is what makes the switch above operable.
+     */
+    contentJudgeBasicAuth: 'eduSharingContentJudgeBasicAuth',
     /**
      * The dev mode's switch (see DevModeService). Also read by the background worker, which fakes the
      * metadata agent's answers under the same flag — the literal there has to stay in step with this

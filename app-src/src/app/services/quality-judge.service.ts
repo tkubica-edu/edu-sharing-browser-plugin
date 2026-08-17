@@ -22,23 +22,17 @@ const LOG_METALOOKUP = '[edu-sharing][metalookup]';
 const LOG_CONTENT_JUDGE = '[edu-sharing][contentjudge]';
 
 /**
- * Whether ContentJudge may be asked at all. It may not: one judgement costs far more than the criteria
- * it answers are worth. This outranks the setting, which is therefore shown but not operable — everything
- * the judge needs is in place, so it is asked again as soon as this says so.
- */
-export const CONTENT_JUDGE_AVAILABLE = false;
-
-/**
  * MetalookUp measures every content unless the settings say otherwise: the measurement is what answers
  * Barrierearmut, and it is cheap enough to run unasked.
  */
 const DEFAULT_METALOOKUP_ENABLED = true;
 
 /**
- * ContentJudge likewise — stated for itself rather than shared with the measurement, since the two are
- * worth very different amounts of a service's work and their defaults have no reason to move together.
+ * ContentJudge, on the other hand, is asked only where it was asked for: one judgement is an LLM pass per
+ * scheme and costs far more than the measurement beside it, so it stays off until the settings say
+ * otherwise — and it takes a credential to switch on at all (see {@link contentJudgeEnabled}).
  */
-const DEFAULT_CONTENT_JUDGE_ENABLED = true;
+const DEFAULT_CONTENT_JUDGE_ENABLED = false;
 
 /**
  * How far one judge got with this content. `skipped` means it was never asked, because the content holds
@@ -99,17 +93,23 @@ export class QualityJudgeService {
 
   private readonly contentJudgeEnabledState = signal(DEFAULT_CONTENT_JUDGE_ENABLED);
 
-  /** Whether ContentJudge judges the content: what the setting says, and what the build allows. */
+  /**
+   * Whether ContentJudge judges the content: what the setting says, and whether there is a credential to
+   * reach the guarded deployment with. A credential taken back out therefore switches the judge off,
+   * without the setting having to be touched as well.
+   */
   readonly contentJudgeEnabled = computed(
-    () => CONTENT_JUDGE_AVAILABLE && this.contentJudgeEnabledState(),
+    () => this.contentJudgeEnabledState() && this.contentJudge.credentialSet(),
   );
 
   /**
-   * Load the persisted switches. Before anything is judged, so a content is judged the way the settings
-   * say — a judgement takes a minute of a service's work, which is not something to spend against them.
+   * Load the persisted switches and the credential they depend on. Before anything is judged, so a content
+   * is judged the way the settings say — a judgement takes a minute of a service's work, which is not
+   * something to spend against them.
    */
   async load(): Promise<void> {
     const keys = APP_CONFIG.storageKeys;
+    await this.contentJudge.loadCredential();
     this.metalookupEnabledState.set(
       await this.browserExtension.storageGet(keys.qualityMetalookup, DEFAULT_METALOOKUP_ENABLED),
     );
@@ -211,9 +211,9 @@ export class QualityJudgeService {
     schemes: readonly string[]
   ): Promise<void> {
     if (!this.contentJudgeEnabled()) {
-      const detail = CONTENT_JUDGE_AVAILABLE
+      const detail = this.contentJudge.credentialSet()
         ? 'Die LLM-Bewertung ist in den Einstellungen abgeschaltet.'
-        : 'Die LLM-Bewertung ist derzeit abgeschaltet.';
+        : 'Für die LLM-Bewertung ist in den Einstellungen kein Zugang hinterlegt.';
       this.contentJudgeStatus.set({ judge: 'ContentJudge', state: 'skipped', detail });
       console.log(`${LOG_CONTENT_JUDGE} skipped — ${detail}`);
       return;
@@ -252,16 +252,43 @@ export class QualityJudgeService {
   }
 
   /**
-   * How this content is handed to ContentJudge, which follows from what it is: an address means a web page the
-   * service fetches whole, a node id alone means a file in its own configured repository, and neither leaves the
-   * text read off the open page. Null when even that yields nothing.
+   * How this content is handed to ContentJudge. The text of the open page comes first wherever that page is the
+   * content being judged: it has been read already, so the judgement neither waits for the text extraction
+   * ContentJudge would run for an address (a service of its own, behind its `CRAWLER_URL`) nor fails where that
+   * one yields nothing. The open tab is emphatically not the content otherwise — one from the Verlauf has nothing
+   * to do with what the browser shows — hence the comparison, and hence the two identifiers behind it: an address
+   * the service fetches whole, or a node id it reads from its own configured repository. Null when nothing is left.
    */
   private async contentJudgeInput(
     resource: MetalookupResource
   ): Promise<ContentJudgeInput | null> {
+    const page = await this.browserExtension.extractPageData();
+    const text = judgeableText(page);
+    if (text && (!resource.url || sameAddress(page?.url, resource.url))) {
+      return { source: 'text', text };
+    }
     if (resource.url) return { source: 'url', url: resource.url };
     if (resource.nodeId) return { source: 'nodeid', nodeId: resource.nodeId };
-    const text = judgeableText(await this.browserExtension.extractPageData());
-    return text ? { source: 'text', text } : null;
+    return null;
+  }
+}
+
+/**
+ * Whether two addresses name the same page, as far as that matters for judging it: a fragment is a position
+ * within the page and a trailing slash the same path, so neither tells two of them apart.
+ */
+function sameAddress(one: string | null | undefined, other: string | null | undefined): boolean {
+  return !!one && !!other && normalizeAddress(one) === normalizeAddress(other);
+}
+
+function normalizeAddress(address: string): string {
+  try {
+    const url = new URL(address);
+    url.hash = '';
+    url.pathname = url.pathname.replace(/\/+$/, '');
+    return url.toString();
+  } catch {
+    // Not an address the URL parser takes; compared as the text it is, minus the same two parts.
+    return address.trim().replace(/#.*$/, '').replace(/\/+$/, '');
   }
 }

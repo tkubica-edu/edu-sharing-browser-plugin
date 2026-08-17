@@ -142,19 +142,45 @@
       }
     </ul>
 
+    <!-- Der Zugang steht über dem Schalter, den er freigibt: ohne ihn ließe der sich nie setzen. -->
+    <label class="es-field-label" for="cj-auth">ContentJudge: Zugang</label>
+    <div class="reveal-field">
+      <input id="cj-auth" class="es-input" [type]="basicAuthVisible() ? 'text' : 'password'"
+             placeholder="Benutzer:Passwort" autocomplete="off"
+             [ngModel]="contentJudge.basicAuth()" (ngModelChange)="setContentJudgeAuth($event)" />
+      <button class="reveal" type="button" (click)="toggleBasicAuthVisible()"
+              [attr.aria-pressed]="basicAuthVisible()"
+              [title]="basicAuthVisible() ? 'Zugang verbergen' : 'Zugang anzeigen'"
+              [attr.aria-label]="basicAuthVisible() ? 'Zugang verbergen' : 'Zugang anzeigen'">
+        <i [esIcon]="basicAuthVisible() ? 'visibility_off' : 'visibility'"></i>
+      </button>
+    </div>
+
+    <p class="desc">
+      Zugangsdaten der Basic-Authentifizierung, die den Dienst absichert, als
+      <code>Benutzer:Passwort</code>. Sie werden nur lokal im Browser gespeichert; ohne sie lässt sich
+      die Bewertung nicht einschalten.
+    </p>
+
     <label class="check">
       <input type="checkbox" [ngModel]="qualityJudge.contentJudgeEnabled()"
              (ngModelChange)="setContentJudge($event)"
-             [disabled]="!contentJudgeAvailable" />
+             [disabled]="!contentJudge.credentialSet()" />
       <span>ContentJudge: Inhalt per LLM bewerten</span>
     </label>
 
     <p class="desc">
-      Beurteilt den Text des Inhalts gegen die Bewertungsschemata der Qualitätskriterien.
-      @if (!contentJudgeAvailable) {
-        Derzeit unabhängig von dieser Einstellung abgeschaltet: eine Bewertung kostet mehr, als die
-        Kriterien einbringen, die sie beantwortet.
-      }
+      Beurteilt den Text des Inhalts gegen die Bewertungsschemata der Qualitätskriterien. Standardmäßig
+      aus: jedes Schema ist ein eigener LLM-Durchgang und dauert entsprechend. Angefragt werden nur
+      diese Schemata:
     </p>
+
+    <ul class="desc-list">
+      @for (scheme of contentJudgeSchemes; track scheme) {
+        <li><code>{{ scheme }}</code></li>
+      } @empty {
+        <li>keines — kein Kriterium verweist derzeit auf ein Schema</li>
+      }
+    </ul>
   }
 </section>

@@ -1,7 +1,7 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 
 import { APP_CONFIG } from '../config';
-import { PageData } from './browser-extension.service';
+import { BrowserExtensionService, PageData } from './browser-extension.service';
 import { DevModeService } from './dev-mode.service';
 import { CONTENT_JUDGE_HEALTH, contentJudgeEvaluateRejection } from '../util/dev-fixtures';
 import { errorMessage } from '../util/errors';
@@ -218,6 +218,25 @@ export function judgeableText(page: PageData | null): string | null {
 }
 
 /**
+ * A stored credential as the `Basic` scheme carries it: the base64 of `user:password`. What is stored may
+ * already be that token — that is what one copies out of a working request — and is then passed through
+ * rather than encoded twice; a `Basic ` in front of it is a paste of the whole header value. Empty for a
+ * credential that is not one, so no header is sent at all.
+ *
+ * Encoded over the credential's UTF-8 bytes, since `btoa` alone rejects every character outside Latin-1 —
+ * a password with an umlaut would otherwise not fail the request but throw before it is even sent.
+ */
+function basicCredential(stored: string): string {
+  const credential = stored.trim().replace(/^Basic\s+/i, '').trim();
+  // Nothing, or nothing but the scheme's own name, is no credential.
+  if (!credential || /^Basic$/i.test(credential)) return '';
+  // Only `user:password` holds a colon — the base64 alphabet has none, so this tells the two apart.
+  if (!credential.includes(':')) return credential;
+  const bytes = new TextEncoder().encode(credential);
+  return btoa(String.fromCharCode(...bytes));
+}
+
+/**
  * ContentJudge's evaluation of a content: an LLM's verdict per evaluation scheme (`POST /evaluate/` — the
  * trailing slash is the route). Nothing is written anywhere, every judgement is preceded by `GET /health/`,
  * and the deployment's Basic auth guards the whole host.
@@ -225,6 +244,18 @@ export function judgeableText(page: PageData | null): string | null {
 @Injectable({ providedIn: 'root' })
 export class ContentJudgeService {
   private readonly devMode = inject(DevModeService);
+  private readonly browserExtension = inject(BrowserExtensionService);
+
+  private readonly basicAuthState = signal(APP_CONFIG.contentJudgeBasicAuth);
+
+  /** The `user:password` the guard is answered with, as the settings hold it. Persisted. */
+  readonly basicAuth = this.basicAuthState.asReadonly();
+
+  /**
+   * Whether a credential is on hand at all. The judgement is not offered without one: the guard sits in
+   * front of the whole host, so an unauthenticated request cannot reach the service to begin with.
+   */
+  readonly credentialSet = computed(() => !!basicCredential(this.basicAuth()));
 
   /** True while a judgement is in flight. */
   readonly running = signal(false);
@@ -238,6 +269,26 @@ export class ContentJudgeService {
   readonly lastHealth = signal<ContentJudgeHealth | null>(null);
   /** Why the last judgement produced no answer; null when it did. */
   readonly error = signal<string | null>(null);
+
+  /**
+   * Load the stored credential. Awaited before anything is judged (see QualityJudgeService.load), since
+   * whether one exists decides whether the judgement runs at all.
+   */
+  async loadCredential(): Promise<void> {
+    this.basicAuthState.set(
+      await this.browserExtension.storageGet(
+        APP_CONFIG.storageKeys.contentJudgeBasicAuth,
+        APP_CONFIG.contentJudgeBasicAuth
+      )
+    );
+  }
+
+  /** Keep the credential, as `user:password`. Emptying it takes the judgement out of service again. */
+  async setBasicAuth(credential: string): Promise<void> {
+    const trimmed = credential.trim();
+    this.basicAuthState.set(trimmed);
+    await this.browserExtension.storageSet(APP_CONFIG.storageKeys.contentJudgeBasicAuth, trimmed);
+  }
 
   /**
    * The request as it goes out — the API's own field names, and only the ones the chosen source needs
@@ -288,6 +339,8 @@ export class ContentJudgeService {
           service: 'ContentJudge',
           url: `${APP_CONFIG.contentJudgeApiUrl}/health/`,
           headers: this.authHeader(),
+          // The header is the whole of this request's authentication — see postEvaluation.
+          credentials: 'omit',
           timeoutMs: HEALTH_TIMEOUT_MS,
         });
     this.lastHealth.set(health);
@@ -307,12 +360,13 @@ export class ContentJudgeService {
   }
 
   /**
-   * The Basic auth the deployment's guard demands, where a credential is configured. Left off
-   * altogether otherwise: an absent header is what makes the demand visible, as the guard's `401`.
+   * The Basic auth the deployment's guard demands, from the credential the settings hold. Left off
+   * altogether where there is none: an absent header is what makes the demand visible, as the guard's `401`.
    */
   private authHeader(): Record<string, string> {
-    if (!APP_CONFIG.contentJudgeBasicAuth) return {};
-    return { Authorization: `Basic ${btoa(APP_CONFIG.contentJudgeBasicAuth)}` };
+    const credential = basicCredential(this.basicAuth());
+    if (!credential) return {};
+    return { Authorization: `Basic ${credential}` };
   }
 
   private postEvaluation(body: Record<string, unknown>): Promise<ContentJudgeEvaluation> {
@@ -324,6 +378,14 @@ export class ContentJudgeService {
       url: `${APP_CONFIG.contentJudgeApiUrl}/evaluate/`,
       method: 'POST',
       headers: this.authHeader(),
+      /*
+       * The configured credential is the only one this request carries, and deliberately: with any other
+       * credentials mode the browser answers the guard's `401` itself, by asking the user for a user and
+       * password in a dialog of its own — over a panel where that question makes no sense, and with the
+       * rejection never reaching the code that could report it. `omit` leaves the whole exchange to the
+       * header above, so a wrong credential comes back as this service's own error message.
+       */
+      credentials: 'omit',
       body,
       timeoutMs: JUDGE_TIMEOUT_MS,
     });

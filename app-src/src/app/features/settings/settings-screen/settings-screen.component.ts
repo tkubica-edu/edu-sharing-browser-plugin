@@ -8,7 +8,9 @@ import { CollectionRecommendationService } from '../../../services/collection-re
 import { ContextRefreshService } from '../../../services/context-refresh.service';
 import { DebugService } from '../../../services/debug.service';
 import { DevModeService } from '../../../services/dev-mode.service';
-import { CONTENT_JUDGE_AVAILABLE, QualityJudgeService } from '../../../services/quality-judge.service';
+import { ContentJudgeService } from '../../../services/content-judge.service';
+import { QualityJudgeService } from '../../../services/quality-judge.service';
+import { configuredSchemes } from '../../../util/quality-schemes';
 
 // Repository configuration plus the two development switches. Changing the URL requires a reload,
 // because the API library freezes its rootUrl at bootstrap (see AuthService).
@@ -25,9 +27,16 @@ export class SettingsScreenComponent implements OnDestroy {
   protected readonly devMode = inject(DevModeService);
   protected readonly recommendations = inject(CollectionRecommendationService);
   protected readonly qualityJudge = inject(QualityJudgeService);
+  protected readonly contentJudge = inject(ContentJudgeService);
 
-  /** Whether ContentJudge may be asked at all — its switch is shown either way, see the template. */
-  protected readonly contentJudgeAvailable = CONTENT_JUDGE_AVAILABLE;
+  /** Whether the credential is legible on screen; masked until it is asked for. */
+  protected readonly basicAuthVisible = signal(false);
+
+  /**
+   * The schemes a judgement asks for, as its description lists them — read from the same derivation the
+   * request itself uses, so the listing cannot state something the judge is not doing.
+   */
+  protected readonly contentJudgeSchemes = configuredSchemes().schemes;
 
   /**
    * The checks the measurement is asked for, as its description lists them. Read from the rules rather than
@@ -113,6 +122,14 @@ export class SettingsScreenComponent implements OnDestroy {
 
   protected setContentJudge(enabled: boolean): void {
     void this.qualityJudge.setContentJudgeEnabled(enabled);
+  }
+
+  protected setContentJudgeAuth(credential: string): void {
+    void this.contentJudge.setBasicAuth(credential);
+  }
+
+  protected toggleBasicAuthVisible(): void {
+    this.basicAuthVisible.update((visible) => !visible);
   }
 
   // ---- Debug mode ---------------------------------------------------------
