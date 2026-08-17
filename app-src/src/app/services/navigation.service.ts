@@ -210,6 +210,20 @@ export class NavigationService {
     this.openMenu();
   }
 
+  /**
+   * Enter a section, or leave it again where it is the one already open. For the topbar icons, which stay
+   * on screen while their own section is shown: a second click on the icon that opened it reads as closing
+   * it, rather than as doing nothing. Leaving is {@link back}, so it lands where the section was entered
+   * from and not blindly on the menu.
+   */
+  toggle(id: SectionId): void {
+    if (this.section() === id) {
+      this.back();
+      return;
+    }
+    this.go(id);
+  }
+
   /** Select one of the open section's sub steps, if it can be opened right now. */
   goTab(id: ScreenId): void {
     if (this.busy.busy()) return;

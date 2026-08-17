@@ -3,12 +3,15 @@
   <span class="spacer"></span>
 
   <!-- The utility sections (Einstellungen): always reachable, so they sit here as icons next to
-       the close button instead of in the main menu. -->
+       the close button instead of in the main menu. The icon that opened one also closes it again —
+       it stays on screen while its section is shown, so it is the obvious way back out. -->
   @for (section of navigation.topbarSections(); track section.id) {
     <button class="topbar-btn" [class.is-active]="navigation.section() === section.id"
-            [disabled]="busy.busy()" [title]="busy.hint() ?? section.label"
+            [disabled]="busy.busy()"
+            [title]="busy.hint() ?? (navigation.section() === section.id ? 'Schließen' : section.label)"
             [attr.aria-label]="section.label"
-            (click)="navigation.go(section.id)">
+            [attr.aria-pressed]="navigation.section() === section.id"
+            (click)="navigation.toggle(section.id)">
       <!-- Every section that reaches the topbar is named in OptionIconService.material; a new one has
            to be added there to carry an icon here. -->
       @if (icons.material(section.id); as glyph) {
