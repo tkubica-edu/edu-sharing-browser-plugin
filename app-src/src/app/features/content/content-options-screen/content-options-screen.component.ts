@@ -66,7 +66,7 @@ export class ContentOptionsScreenComponent {
 
   /**
    * The ways on that apply right now, in the order they are offered: looking at the content, working on it, passing
-   * it on. Three lead to a *tab* of the Inhaltsübersicht, because those are separate errands. Editing waits for the
+   * it on. Four lead to a *tab* of the Inhaltsübersicht, because those are separate errands. Editing waits for the
    * connector answer. Each option is checked against its target section, so none offers a refused step.
    */
   protected readonly options = computed<readonly ContentOption[]>(() => {
@@ -126,6 +126,13 @@ export class ContentOptionsScreenComponent {
         label: 'Inhalt teilen',
         description: 'Link oder QR-Code erstellen und weitergeben',
         run: () => this.flow.showShare()
+      },
+      {
+        section: 'overview',
+        icon: 'forum',
+        label: 'Interaktionen anzeigen',
+        description: 'Rückmeldungen und Beiträge zum Inhalt ansehen',
+        run: () => this.flow.showInteractions()
       }
     );
     return options.filter((option) => this.navigation.isVisible(option.section, conditions));

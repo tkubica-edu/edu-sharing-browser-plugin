@@ -46,6 +46,7 @@ import { EditorialForwardScreenComponent } from './features/filing/editorial-for
 import { PersonalStorageScreenComponent } from './features/filing/personal-storage-screen/personal-storage-screen.component';
 import { SelectCollectionScreenComponent } from './features/filing/select-collection-screen/select-collection-screen.component';
 import { MetadataScreenComponent } from './features/metadata/metadata-screen/metadata-screen.component';
+import { InteractionsScreenComponent } from './features/overview/interactions-screen/interactions-screen.component';
 import { PreviewScreenComponent } from './features/overview/preview-screen/preview-screen.component';
 import { ShareScreenComponent } from './features/overview/share-screen/share-screen.component';
 import { UsagesScreenComponent } from './features/overview/usages-screen/usages-screen.component';
@@ -73,7 +74,7 @@ const DISCARD_PROMPT =
     QualityCheckScreenComponent, MetadataScreenComponent, PreviewScreenComponent,
     EditorialForwardScreenComponent, PersonalStorageScreenComponent, SelectCollectionScreenComponent,
     FlowChoiceScreenComponent, AiQualityScreenComponent,
-    UsagesScreenComponent, ShareScreenComponent
+    UsagesScreenComponent, ShareScreenComponent, InteractionsScreenComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',

@@ -113,6 +113,11 @@ export class ContentFlowService {
     this.navigation.go('overview', { tab: 'share' });
   }
 
+  /** "Interaktionen": the interactions tab of the Inhaltsübersicht, offered as a step of its own. */
+  showInteractions(): void {
+    this.navigation.go('overview', { tab: 'interactions' });
+  }
+
   /**
    * Take the current tab to where the content is edited: the connector's URL, or the node's page in
    * the repository (`…/components/render/<id>`) when there is none — *unless the editing is already

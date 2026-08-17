@@ -48,6 +48,8 @@ const MATERIAL_ICONS: Partial<Record<IconId, string>> = {
   preview: 'visibility',
   usages: 'bar_chart',
   share: 'share',
+  // The comments and answers a content collected — a speech bubble.
+  interactions: 'forum',
   // The entries whose glyph draws what the SVG drew: three lines, a door with an arrow, a framed
   // picture, a page with a plus, an arrow into a tray, a magnifier, a shield with a tick, a folder
   // with a person, a path splitting in two, an "i" in a circle, a bubble with a spark, a gear.
