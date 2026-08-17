@@ -10,6 +10,7 @@ import {
 } from './metalookup.service';
 import { JudgementSource, configuredSchemes, metalookupFeatures } from '../util/quality-schemes';
 import { errorMessage } from '../util/errors';
+import { sameAddress } from '../util/page-address';
 
 /** A judge nobody has asked yet. */
 function idle(judge: JudgementSource): JudgeStatus {
@@ -270,25 +271,5 @@ export class QualityJudgeService {
     if (resource.url) return { source: 'url', url: resource.url };
     if (resource.nodeId) return { source: 'nodeid', nodeId: resource.nodeId };
     return null;
-  }
-}
-
-/**
- * Whether two addresses name the same page, as far as that matters for judging it: a fragment is a position
- * within the page and a trailing slash the same path, so neither tells two of them apart.
- */
-function sameAddress(one: string | null | undefined, other: string | null | undefined): boolean {
-  return !!one && !!other && normalizeAddress(one) === normalizeAddress(other);
-}
-
-function normalizeAddress(address: string): string {
-  try {
-    const url = new URL(address);
-    url.hash = '';
-    url.pathname = url.pathname.replace(/\/+$/, '');
-    return url.toString();
-  } catch {
-    // Not an address the URL parser takes; compared as the text it is, minus the same two parts.
-    return address.trim().replace(/#.*$/, '').replace(/\/+$/, '');
   }
 }

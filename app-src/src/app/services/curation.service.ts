@@ -493,11 +493,19 @@ export class CurationService {
 
   /**
    * Write the content as the preview step confirmed it — the first save, and the one that creates the
-   * node. Picture and title only: the agent's findings stay a proposal until the user has seen them.
+   * node. Picture, title and the page the content was read off: the agent's other findings stay a
+   * proposal until the user has seen them.
    */
   createContent(): Promise<boolean> {
     const title = this.contentTitle();
-    return this.save(title ? { 'cclom:title': [title] } : {});
+    const url = this.contentUrl();
+    const values: MdsValues = {};
+    if (title) values['cclom:title'] = [title];
+    // From the very first write, although the metadata step writes it again: the repository answers
+    // "this page is already in here" by this property, so a node that carries it is recognisable as
+    // this page's content long before it is described (see PageRecognitionService).
+    if (url) values['ccm:wwwurl'] = [url];
+    return this.save(values);
   }
 
   /**
@@ -686,23 +694,37 @@ export class CurationService {
 
   /**
    * Open a saved node from the history: load the live node and seed the active-node state
-   * (preview + editable metadata). Navigation is driven by the caller. Throws if the node
-   * cannot be fetched, leaving the state untouched.
+   * (preview + editable metadata). Navigation is driven by the caller. `source` is how the content
+   * arrived — picked from the list, or recognised for the page that is open (see
+   * {@link adoptRememberedNode}).
    */
-  async openFromHistory(entry: HistoryEntry): Promise<void> {
+  async openFromHistory(entry: HistoryEntry, source: NodeSource = 'chosen'): Promise<void> {
     // The live node is a bonus, not a requirement. An entry can point at a node THIS session may not
     // read: the metadata agent creates the content with its own privileges, so a guest ends up with
     // history entries the repository answers 403 for. The entry itself holds the metadata that was
     // saved, so it stands in for the node (see {@link applyStoredEntry}).
     const node = await this.loadNode(entry.nodeId);
-    if (!node) this.applyStoredEntry(entry);
-    else this.applyLoadedNode(entry.nodeId, node, node.name ?? entry.title, 'chosen');
+    if (!node) this.applyStoredEntry(entry, source);
+    else this.applyLoadedNode(entry.nodeId, node, node.name ?? entry.title, source);
     // Keep the stored parsed result so the raw/field views and the source line show.
     this.metadataAgent.restore({
       ok: true,
       parsed: entry.parsed,
       source: { url: entry.url, title: entry.title, favIconUrl: entry.favIconUrl }
     });
+  }
+
+  /**
+   * Adopt the content the history holds for the open page, answering whether it became the content:
+   * the recognition's counterpart of {@link adoptDetectedNodeId}, for a page this panel erschlossen
+   * itself. It goes through the stored entry rather than through the node id alone, because the node
+   * is often one this session may not read — the metadata agent writes with its own privileges — and
+   * an entry that cannot be read is still an account of the content.
+   */
+  async adoptRememberedNode(entry: HistoryEntry): Promise<boolean> {
+    if (this.activeNode() || this.hasUnsavedWork()) return false;
+    await this.openFromHistory(entry, 'detected');
+    return this.activeNode()?.nodeId === entry.nodeId;
   }
 
   /**
@@ -996,11 +1018,11 @@ export class CurationService {
    * (see {@link openFromHistory}). The entry's parsed metadata is what was saved to that node, so it
    * serves as its properties — the same substitution {@link applyUploadedNode} makes.
    */
-  private applyStoredEntry(entry: HistoryEntry): void {
+  private applyStoredEntry(entry: HistoryEntry, source: NodeSource = 'chosen'): void {
     const values = (entry.parsed?.raw ?? {}) as MdsValues;
     this.resetNodeState();
     this.setActiveNode(entry.nodeId, entry.title || null);
-    this.nodeSource.set('chosen');
+    this.nodeSource.set(source);
     this.nodeMetadata.set(values);
     this.previewNode.set(
       toPartialNode(

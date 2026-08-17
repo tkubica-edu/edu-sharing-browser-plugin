@@ -2,15 +2,18 @@ import { Injectable, inject } from '@angular/core';
 import { ClientutilsV1Service } from 'ngx-edu-sharing-api';
 import { firstValueFrom } from 'rxjs';
 
+import { sameAddress } from '../util/page-address';
 import { nodeIdFromRepositoryUrl } from '../util/repository-links';
 import { AuthService } from './auth.service';
 import { ConditionsService } from './conditions.service';
 import { CurationService } from './curation.service';
+import { HistoryService } from './history.service';
 
 /**
  * Recognises what the open page is about, so content arrives on its own — the counterpart, for every other page, of
- * the plugin announcing its document. A repository page names its node in its own URL; every other page is looked up
- * by URL, where a hit means it has been erschlossen before. Not on an insert host, where the plugin speaks.
+ * the plugin announcing its document. A repository page names its node in its own URL; every other page is answered
+ * from the history first and otherwise looked up by URL, where a hit means it has been erschlossen before. Not on an
+ * insert host, where the plugin speaks.
  */
 @Injectable({ providedIn: 'root' })
 export class PageRecognitionService {
@@ -18,6 +21,7 @@ export class PageRecognitionService {
   private readonly auth = inject(AuthService);
   private readonly conditions = inject(ConditionsService);
   private readonly curation = inject(CurationService);
+  private readonly history = inject(HistoryService);
 
   /** The last recognition's answer no longer describes the open page, so it has to be asked again. */
   private stale = false;
@@ -65,6 +69,12 @@ export class PageRecognitionService {
       if (this.conditions.onEduSharing()) return false;
       const lookupUrl = httpUrl(url);
       if (!lookupUrl) return false;
+      // What this panel erschlossen itself, taken from the history before the repository is asked: the entries hold
+      // the page's own address, so the entry for this one names the node the page already became. Nothing but the
+      // address decides it, and the entry stands in for a node this session may not read — which is exactly the
+      // case the repository's lookup cannot answer either.
+      const remembered = this.history.entries().find((entry) => sameAddress(entry.url, lookupUrl));
+      if (remembered && (await this.curation.adoptRememberedNode(remembered))) return true;
       const information = await firstValueFrom(
         this.clientUtils.getWebsiteInformation({ url: lookupUrl }),
       );
