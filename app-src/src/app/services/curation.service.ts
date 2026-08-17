@@ -1031,14 +1031,20 @@ export class CurationService {
     this.setActiveNode(entry.nodeId, entry.title || null);
     this.nodeSource.set(source);
     this.nodeMetadata.set(values);
-    this.previewNode.set(
-      toPartialNode(
+    this.previewNode.set({
+      ...toPartialNode(
         entry.nodeId,
         { nodeId: entry.nodeId, title: entry.title },
         values,
         this.browserExtensionCustomWebComponent.metadataSet(),
       ),
-    );
+      // When the content was written, which the stand-in node itself states nowhere: the entry was
+      // recorded by the save that created the node, so its age is the node's. It is what decides
+      // whether a guest session may still write this content (see {@link agentEditWindowClosed}),
+      // and without it every reopened content would count as editable. Saved properties that name a
+      // creation date win over it.
+      createdAt: firstString(values['cm:created']) ?? String(entry.timestamp),
+    } as Node);
   }
 
   /** Load a node for display purposes; `null` when the repository will not hand it back. */
