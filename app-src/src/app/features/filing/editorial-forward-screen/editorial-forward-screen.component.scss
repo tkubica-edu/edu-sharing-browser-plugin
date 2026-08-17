@@ -109,5 +109,10 @@
   .chevron { flex: 0 0 auto; width: 14px; height: 14px; font-size: 14px; line-height: 14px; }
 }
 
+// The collection's name, set off from the label that introduces it — the two read as one sentence,
+// and the extra room is what lets the name be picked out of it at a glance. A margin rather than a
+// flex gap, so the row still wraps like the text it is where the panel is narrow.
+.folder-label strong { margin-left: var(--es-space-1); }
+
 .folder-none { @include m.muted; }
 
