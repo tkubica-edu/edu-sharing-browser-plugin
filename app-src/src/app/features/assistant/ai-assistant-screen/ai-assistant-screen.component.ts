@@ -15,6 +15,16 @@ const LOG = '[edu-sharing][boerdi]';
 /** The API the chat widget serves its conversations from. */
 const CHAT_API_URL = 'https://87.106.127.225.nip.io';
 
+/** Where the widget keeps the session it resumes; a stored id means the chat comes back mid-conversation. */
+const SESSION_KEY = 'boerdi_session_id';
+
+/** The element the widget renders the conversation in — the one behind its context methods. */
+const SHELL_TAG = 'boerdi-chat-shell';
+
+/** How long to wait for that element, and how often to look for it, before giving up on the hand-over. */
+const SHELL_TIMEOUT_MS = 10_000;
+const SHELL_POLL_MS = 50;
+
 /**
  * The <boerdi-chat> element, typed for what we use of it. The context methods exist on the element only once it
  * has been upgraded, hence the optional signatures — see {@link AiAssistantScreenComponent.mount}.
@@ -38,7 +48,10 @@ const NO_CONTEXT: PageContext = { page_kind: 'other' };
 // panel that is the extension rather than the page — so `auto-context` is off, its URL watcher never fires
 // (the panel's own address never changes while the tab it shows does), and the initial `page-context`
 // attribute is read once as the element connects. Every later page is therefore passed through the element's
-// own context methods; see {@link AiAssistantScreenComponent.follow}.
+// own context methods; see {@link AiAssistantScreenComponent.follow}. That attribute reaches a conversation
+// starting here and no other: a session resumed from local storage keeps the context it was last given, so a
+// widget mounting onto one is handed the page explicitly; see
+// {@link AiAssistantScreenComponent.handOverToResumedSession}.
 @Component({
   selector: 'es-ai-assistant-screen',
   templateUrl: './ai-assistant-screen.component.html',
@@ -57,6 +70,9 @@ export class AiAssistantScreenComponent implements OnDestroy {
 
   /** The context the widget currently holds, to tell an actual page change from a mere re-read. */
   private current: PageContext = NO_CONTEXT;
+
+  /** The timer waiting for the conversation to be on screen, while one is running. */
+  private shellWait: number | null = null;
 
   constructor() {
     // Mount in the write phase, once the bundle defined the tag: this writes to the DOM and needs the
@@ -79,6 +95,7 @@ export class AiAssistantScreenComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.stopWaitingForShell();
     this.element?.remove();
     this.element = null;
   }
@@ -103,6 +120,63 @@ export class AiAssistantScreenComponent implements OnDestroy {
     console.log(`${LOG} mounting <${CHAT_TAG}>`, { apiUrl: CHAT_API_URL, pageContext: this.current });
     this.host().nativeElement.appendChild(element);
     this.element = element;
+    this.handOverToResumedSession();
+  }
+
+  /**
+   * Hand the page over to a conversation that came back with the panel. The panel is reloaded on every page
+   * change, so the widget is created anew each time while its session outlives it in local storage: a resumed
+   * conversation keeps the context it was last given, and the `page-context` attribute is only read into a
+   * conversation that starts here. Replacing rather than merging is what the page change is — the previous
+   * page's ids leave the context and the new page is greeted.
+   *
+   * Deferred until the conversation is on screen: the element's context methods reach the widget through the
+   * component it renders, and a call made before that one exists is dropped without a trace.
+   */
+  private handOverToResumedSession(): void {
+    if (!this.element || !storedSession()) return;
+    this.handOverWhenRendered('resumed session');
+  }
+
+  /**
+   * Replace the context with the page as it stands once the conversation is on screen — not as it stood when the
+   * wait began, since every page change arriving in between is dropped for the same reason this wait exists.
+   */
+  private handOverWhenRendered(reason: string): void {
+    const element = this.element;
+    if (!element) return;
+    console.log(`${LOG} ${reason}: page is handed over once the chat is on screen`);
+    this.whenShellRendered(element, (rendered) => {
+      if (!rendered) {
+        console.warn(`${LOG} <${SHELL_TAG}> never rendered — the chat kept its previous page (${reason})`);
+        return;
+      }
+      console.log(`${LOG} replaceContext (${reason})`, this.current);
+      element.replaceContext?.(this.current);
+    });
+  }
+
+  /** Call `then` with whether the conversation element appeared, once it did or once waiting for it timed out. */
+  private whenShellRendered(element: ChatElement, then: (rendered: boolean) => void): void {
+    this.stopWaitingForShell();
+    if (shellRendered(element)) {
+      then(true);
+      return;
+    }
+    let waited = 0;
+    this.shellWait = window.setInterval(() => {
+      waited += SHELL_POLL_MS;
+      const rendered = shellRendered(element);
+      if (!rendered && waited < SHELL_TIMEOUT_MS) return;
+      this.stopWaitingForShell();
+      then(rendered);
+    }, SHELL_POLL_MS);
+  }
+
+  private stopWaitingForShell(): void {
+    if (this.shellWait === null) return;
+    clearInterval(this.shellWait);
+    this.shellWait = null;
   }
 
   /**
@@ -120,6 +194,12 @@ export class AiAssistantScreenComponent implements OnDestroy {
     const previous = this.current;
     if (JSON.stringify(previous) === JSON.stringify(context)) return;
     this.current = context;
+    if (!shellRendered(element)) {
+      // The context methods reach the widget through the component it renders; calling them before it exists
+      // would lose the page silently, so the hand-over waits for it and then takes the page from `current`.
+      this.handOverWhenRendered('page changed before the chat was on screen');
+      return;
+    }
     const merge = sameSubject(previous, context);
     console.log(`${LOG} context ${merge ? 'updateContext (merge)' : 'replaceContext (new page)'}`, {
       previous,
@@ -132,5 +212,23 @@ export class AiAssistantScreenComponent implements OnDestroy {
     if (!element.updateContext || !element.replaceContext) {
       console.warn(`${LOG} <${CHAT_TAG}> exposes no context methods — the page change was not applied`);
     }
+  }
+}
+
+/**
+ * Whether the widget has the conversation on screen. The chat element renders its view into a shadow root, so
+ * the conversation is not among its children; the light DOM is looked at as well, for a bundle that stops
+ * encapsulating it.
+ */
+function shellRendered(element: HTMLElement): boolean {
+  return !!(element.shadowRoot?.querySelector(SHELL_TAG) ?? element.querySelector(SHELL_TAG));
+}
+
+/** The session the widget would resume, if it stored one. Storage can be denied, which is simply no session. */
+function storedSession(): string | null {
+  try {
+    return localStorage.getItem(SESSION_KEY);
+  } catch {
+    return null;
   }
 }
