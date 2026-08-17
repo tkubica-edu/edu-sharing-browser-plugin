@@ -3,7 +3,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { BrowserExtensionService } from './browser-extension.service';
 import { ConditionsService } from './conditions.service';
 import { CurationService } from './curation.service';
-import { NavState, NavigationService } from './navigation.service';
+import { NavState, NavStep, NavigationService } from './navigation.service';
 import { NodeConnectorService } from './node-connector.service';
 import { OnlyOfficeDocumentService } from './onlyoffice-document.service';
 import { SessionResumeService } from './session-resume.service';
@@ -59,19 +59,24 @@ export class ContentFlowService {
   /**
    * "Inhaltsoptionen" for a content the user picked themselves, on that content's own page: picking is choosing
    * what to work on, so the tab follows. The step is carried across in the stored state rather than entered
-   * first, so the panel stays where the user is until the page is there.
+   * first, so the panel stays where the user is until the page is there. Answers whether the tab was sent
+   * anywhere — this panel does not outlive that, so what is still to be done for the content waits for the one
+   * that comes back (see CurationService.pendingExtraction).
+   *
+   * `left` is the step the content was last worked on, where one is known: it is continued there instead of at
+   * the junction, and the junction stands in wherever that step cannot be re-entered.
    */
-  async showContentOptions(): Promise<void> {
+  async showContentOptions(left?: NavStep | null): Promise<boolean> {
     const target = this.curation.activeNode()?.link;
-    const ahead = target && target !== this.conditions.activeUrl()
-      ? this.navigation.stateFor('content-options')
-      : null;
+    const state = this.navigation.resumableStep(left) ?? this.navigation.stateFor('content-options');
+    const ahead = target && target !== this.conditions.activeUrl() ? state : null;
     if (!target || !ahead) {
-      this.navigation.go('content-options');
-      return;
+      this.navigation.go(state?.section ?? 'content-options', { tab: state?.tab ?? undefined });
+      return false;
     }
     try {
       await this.openPage(target, ahead);
+      return true;
     } catch (cause: unknown) {
       // The page stayed, so the step has to be entered here after all — nothing will restore it.
       this.navigation.go('content-options');

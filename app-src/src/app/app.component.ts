@@ -226,15 +226,22 @@ export class AppComponent implements OnInit {
   }
 
   /**
-   * Open a saved node from the history (requested by the history screen). A picked node is handled
-   * exactly like a detected one: the *Inhaltsoptionen* screen offers the two ways on — and the tab
-   * follows the pick to that content's own page, see ContentFlowService.showContentOptions.
+   * Open a saved node from the history (requested by the history screen). The content is taken up where it was
+   * left — the step the entry remembers, and the *Inhaltsoptionen* junction for one that cannot be re-entered —
+   * and the tab follows the pick to that content's own page, see ContentFlowService.showContentOptions.
    */
   protected async openFromHistory(entry: HistoryEntry): Promise<void> {
     if (!this.confirmDiscardUnsaved()) return;
     await this.openNode(
       () => this.curation.openFromHistory(entry),
-      () => this.contentFlow.showContentOptions(),
+      async () => {
+        // Only for an entry that carries no run of its own, and only where this panel stays: a tab that
+        // follows the pick tears it down, and the panel that comes back on the new page picks the
+        // Erschließung up from the stored state (CurationService.runPendingExtraction).
+        if (!(await this.contentFlow.showContentOptions(entry.step))) {
+          void this.curation.runPendingExtraction();
+        }
+      },
     );
   }
 

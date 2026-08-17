@@ -17,6 +17,12 @@ interface ResumeState {
   nodeSource: NodeSource | null;
   /** The page the state belongs to — the current one, or the one it is being carried to. */
   url: string | null;
+  /**
+   * The page the restored content is still to be erschlossen from, where one is outstanding: opening a
+   * content from the Verlauf takes the tab to that content, so its Erschließung has to survive the
+   * load that follows — see CurationService.pendingExtraction.
+   */
+  extractUrl?: string | null;
   at: number;
 }
 
@@ -82,6 +88,7 @@ export class SessionResumeService {
       nodeId: this.curation.activeNode()?.nodeId ?? null,
       nodeSource: this.curation.nodeSourceOf() ?? null,
       url: this.conditions.activeUrl(),
+      extractUrl: this.curation.pendingExtraction(),
       at: Date.now()
     };
   }
@@ -100,6 +107,11 @@ export class SessionResumeService {
     // The node first: the section the user was in is often only reachable *because* of it.
     if (state.nodeId && this.nodeStillApplies(state)) {
       await this.curation.resumeNode(state.nodeId, state.nodeSource ?? 'detected');
+      // The Erschließung the content still owes, on the page this load landed on: not awaited, since
+      // it takes about a minute and the steps it feeds are ahead of the user (see the interface).
+      if (state.extractUrl && this.curation.activeNode()) {
+        void this.curation.resumePendingExtraction(state.extractUrl);
+      }
     }
     // The whole way the user came, not just where they stood: a step that does not apply on this
     // page (an OnlyOffice-only one, or one that needs a node that could not be loaded) hands over to

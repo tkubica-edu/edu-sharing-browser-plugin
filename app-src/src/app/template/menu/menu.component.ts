@@ -101,6 +101,20 @@ export class MenuComponent {
     return this.newContent(section) ? 'Inhalt jetzt erschließen' : '';
   }
 
+  /**
+   * Open what the card stands for: an Erschließung that was left unfinished continues at the step it was left
+   * on, since that is what the card offers ({@link cardNote}) — and every other content goes where
+   * {@link cardTarget} says. The remembered step is only taken where it can be opened again: one that no
+   * longer applies, or that would start something rather than show it, hands over to the target as well.
+   */
+  protected activateCard(section: SectionView): void {
+    const left = this.curation.curationUnfinished()
+      ? this.navigation.resumableStep(this.curation.leftAtStep())
+      : null;
+    if (left) this.navigation.go(left.section, { tab: left.tab ?? undefined });
+    else this.navigation.go(this.cardTarget(section));
+  }
+
   /** The sign for adding a content, in place of the kind of content there is none of yet. */
   protected cardIcon(section: SectionView): string {
     return this.newContent(section) ? 'add_circle' : '';
@@ -116,12 +130,19 @@ export class MenuComponent {
 
   /**
    * What the card says under the title where it has something to say about itself: whether the content is one
-   * the repository holds or one that exists only here, and that the recognition is running. Null leaves the
-   * line to {@link entryDescription}, whose reason is the more useful text then.
+   * the repository holds or one that exists only here, whether its Erschließung is still to be carried to its
+   * end, and that the recognition is running. Null leaves the line to {@link entryDescription}, whose reason
+   * is the more useful text then.
    */
   protected cardNote(section: SectionView): string | null {
     if (this.unsaved()) return 'Neuer Inhalt';
-    if (this.contentTitle()) return 'Bestehender Inhalt';
+    if (this.contentTitle()) {
+      // Only where the panel knows this content was left unfinished — see
+      // CurationService.curationUnfinished; for every other one the plain statement stands.
+      return this.curation.curationUnfinished()
+        ? 'Bestehender Inhalt – Erschließung fortfahren'
+        : 'Bestehender Inhalt';
+    }
     return section.loading ? this.entryDescription(section) : null;
   }
 }

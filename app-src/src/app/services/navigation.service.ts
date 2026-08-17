@@ -6,6 +6,7 @@ import {
 import { BusyService } from './busy.service';
 import { ConditionsService } from './conditions.service';
 import { CurationService } from './curation.service';
+import { HistoryService } from './history.service';
 import { PageRecognitionService } from './page-recognition.service';
 
 /** A section's sub step as the tab bar renders it: its definition plus whether it can be opened. */
@@ -53,6 +54,8 @@ export class NavigationService {
   private readonly busy = inject(BusyService);
   // To ask again on the menu what the open page's content is, where a write has changed the answer.
   private readonly pageRecognition = inject(PageRecognitionService);
+  // An entry says where its content was left, and this is what knows it — see HistoryService.noteStep.
+  private readonly history = inject(HistoryService);
 
   readonly section = signal<SectionId>('menu');
 
@@ -151,6 +154,10 @@ export class NavigationService {
   });
 
   constructor() {
+    // Where the user stands, told to the history: an entry written from here says which step its
+    // content was left on, so taking it up again continues there (see HistoryService.noteStep).
+    effect(() => this.history.noteStep({ section: this.section(), tab: this.screen() }));
+
     // Guard: if the open section becomes invisible (logout, node cleared, page change) or disabled
     // (a content was detected for this page while "Inhalt erschließen" was open), don't strand the
     // user on a dead screen — re-land on a valid view.
@@ -169,6 +176,17 @@ export class NavigationService {
    */
   isVisible(id: SectionId, conditions = this.conditions.snapshot()): boolean {
     return this.sectionOf(id)?.visible(conditions) ?? false;
+  }
+
+  /**
+   * A remembered step as it can be opened again, else null: it still applies, and re-entering it is a
+   * return rather than a restart (see AppSection.oneWay) — the same test {@link back} makes for the
+   * steps behind the open one. For a content taken up again with a step to continue at.
+   */
+  resumableStep(step: NavStep | null | undefined): NavState | null {
+    const section = step?.section ? this.sectionOf(step.section) : undefined;
+    if (!step || !section || !this.canReturnTo(section)) return null;
+    return this.stateFor(step.section, { tab: step.tab ?? undefined });
   }
 
   /**

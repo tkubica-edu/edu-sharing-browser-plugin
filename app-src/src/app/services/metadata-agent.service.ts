@@ -119,6 +119,36 @@ export class MetadataAgentService {
   }
 
   /**
+   * Run the agent on a page named by its address — for a content whose page is known but not open, so it is
+   * erschlossen where it lives instead of wherever the browser happens to be. Same outcome as {@link run} and
+   * stored as the same last run, since it is the same statement about the same kind of thing.
+   */
+  async runForUrl(url: string, title?: string | null): Promise<AnalyzeOutcome> {
+    this.running.set(true);
+    try {
+      const response = await this.browserExtension.analyzeUrl(
+        url,
+        LANGUAGE,
+        title,
+        this.agentApi.baseUrl(),
+      );
+      return this.remember(
+        response.success
+          ? {
+              ok: true,
+              source: response.source,
+              parsed: this.parse(withoutQualityCriteria(response.result ?? {}))
+            }
+          : { ok: false, error: this.describeError(response.error) },
+      );
+    } catch (cause: unknown) {
+      return this.remember({ ok: false, error: errorMessage(cause) });
+    } finally {
+      this.running.set(false);
+    }
+  }
+
+  /**
    * Generate one field from text the caller already holds and return its values. Deliberately not a full
    * {@link run}: the other fields would be paid for and thrown away. The outcome is not stored as
    * {@link lastRun}, so it neither opens in the metadata editor nor counts as unsaved work.

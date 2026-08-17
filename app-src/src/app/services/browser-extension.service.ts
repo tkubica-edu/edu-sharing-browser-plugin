@@ -162,6 +162,22 @@ export class BrowserExtensionService {
   }
 
   /**
+   * Ask the background worker to run the metadata agent on a page named by its address, rather than on
+   * the tab that is open — for a content whose page the browser is not showing. The agent fetches the
+   * page itself, so no tab is involved at all.
+   */
+  async analyzeUrl(url: string, language: string, title?: string | null, apiUrl?: string): Promise<AnalyzeResponse> {
+    const response = (await browser.runtime.sendMessage({
+      action: 'analyze.url',
+      url,
+      title,
+      language,
+      apiUrl,
+    })) as AnalyzeResponse | null;
+    return response ?? { success: false, error: 'NO_RESPONSE' };
+  }
+
+  /**
    * Ask the background worker to POST a node body to the metadata agent's `/nodes`, which writes the
    * curated content into the repository itself. The reply carries the endpoint's answer verbatim.
    */

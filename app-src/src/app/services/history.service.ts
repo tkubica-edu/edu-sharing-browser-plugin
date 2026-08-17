@@ -4,6 +4,7 @@ import { APP_CONFIG } from '../config';
 import { AuthService } from './auth.service';
 import { BrowserExtensionService } from './browser-extension.service';
 import { ParsedMetadata } from './metadata-agent.service';
+import type { NavStep } from './navigation.service';
 
 export interface HistoryEntry {
   id: string;
@@ -17,12 +18,40 @@ export interface HistoryEntry {
   timestamp: number;
   fieldsExtracted: number | null;
   fieldsTotal: number | null;
-  /** Full parsed metadata, so a past entry can be re-displayed. */
+  /** What the node holds, so a past entry can be re-displayed and stand in for it. */
   parsed: ParsedMetadata;
+  /**
+   * The metadata-agent result this content was erschlossen with, kept beside what was written: it is
+   * what the flow's steps work from — the proposals for the fields the node leaves empty, the marks
+   * saying which are the agent's, the text it was all read from — and keeping it is what spares the
+   * content a second run of the agent when it is taken up again. Absent for an entry written before
+   * it was kept, and for a content that never went through the agent.
+   */
+  run?: ParsedMetadata | null;
+  /**
+   * Where the flow stood when this was written, so taking the content up again continues there rather
+   * than at the junction. Only ever *offered*: a step that no longer applies is passed over — see
+   * NavigationService.resumableStep.
+   */
+  step?: NavStep | null;
+  /**
+   * How far the Qualitätsprüfung had got with this content. Kept because it is what the steps behind
+   * it are unlocked by — the Metadaten view opens once the criteria are answered — and the panel holds
+   * it as state of the flow rather than reading it back off the node.
+   */
+  quality?: { criteriaMet: boolean; confirmed: boolean } | null;
+  /**
+   * Whether the Erschließung was carried to its end — the handover to the editorial queue, which is the
+   * last thing the flow does. Absent for an entry written before this was kept, which is not the same
+   * statement as `false`: nothing is known about those, see CurationService.curationUnfinished.
+   */
+  finished?: boolean;
 }
 
-/** What a caller supplies; id, timestamp and repository are assigned here. */
-export type NewHistoryEntry = Omit<HistoryEntry, 'id' | 'timestamp' | 'repositoryUrl'>;
+/** What a caller supplies; id, timestamp, repository and the open step are assigned here. */
+export type NewHistoryEntry = Omit<HistoryEntry, 'id' | 'timestamp' | 'repositoryUrl' | 'step'>;
+
+const LOG = '[edu-sharing][history]';
 
 /** Compare repository bases regardless of trailing slash and casing. */
 function sameRepository(a: string, b: string): boolean {
@@ -46,6 +75,18 @@ export class HistoryService {
   /** Every stored entry, across all repositories. */
   private readonly allEntries = signal<readonly HistoryEntry[]>([]);
 
+  /**
+   * The step the panel is on, kept here so an entry can say where its content was left — reported by
+   * whoever owns the navigation (see NavigationService), since the history is written from the flow
+   * and not from the screen the user stands on.
+   */
+  private readonly openStep = signal<NavStep | null>(null);
+
+  /** Take over which step is open; see {@link openStep}. */
+  noteStep(step: NavStep | null): void {
+    this.openStep.set(step);
+  }
+
   /** The entries of the configured repository, newest first. */
   readonly entries = computed(() =>
     this.allEntries().filter((entry) => sameRepository(entry.repositoryUrl, this.auth.repositoryUrl())),
@@ -65,6 +106,10 @@ export class HistoryService {
       entry.repositoryUrl ? entry : { ...entry, repositoryUrl: this.auth.repositoryUrl() },
     );
     this.allEntries.set(repaired);
+    console.log(
+      `${LOG} ⬅ read from storage: ${repaired.length} entries, ${this.entries().length} of them this repository's`,
+      { dropped: list.length - valid.length, repository: this.auth.repositoryUrl() },
+    );
     if (valid.length !== list.length || repaired.some((entry, index) => entry !== valid[index])) {
       await this.persist();
     }
@@ -75,6 +120,7 @@ export class HistoryService {
     const added: HistoryEntry = {
       ...entry,
       repositoryUrl,
+      step: this.openStep(),
       id: crypto.randomUUID(),
       timestamp: Date.now(),
     };
@@ -86,21 +132,37 @@ export class HistoryService {
       (existing) =>
         sameRepository(existing.repositoryUrl, repositoryUrl) && existing.nodeId !== added.nodeId,
     );
+    // Whether this node was in the history already, read before the list is replaced below.
+    const known = this.entries().some((existing) => existing.nodeId === added.nodeId);
     // The cap counts per repository, so one repository's history cannot crowd out another's.
     this.allEntries.set([...[added, ...own].slice(0, APP_CONFIG.maxHistory), ...foreign]);
+    console.log(`${LOG} ➡ writing entry for ${added.nodeId}`, {
+      url: added.url,
+      title: added.title,
+      // What the entry carries beyond the node's own fields, since that is what a reopening stands on.
+      step: added.step,
+      quality: added.quality,
+      run: added.run ? `${added.run.fields.length} fields` : 'none',
+      storedFields: added.parsed?.fields?.length ?? 0,
+      replacesPrevious: known
+    });
     await this.persist();
   }
 
   /** Drop the configured repository's entries; the other repositories' histories are untouched. */
   async clear(): Promise<void> {
     const current = this.auth.repositoryUrl();
+    const dropped = this.entries().length;
     this.allEntries.update((entries) =>
       entries.filter((entry) => !sameRepository(entry.repositoryUrl, current)),
     );
+    console.log(`${LOG} ✖ cleared ${dropped} entries of ${current}`);
     await this.persist();
   }
 
   private persist(): Promise<void> {
-    return this.browserExtension.storageSet(APP_CONFIG.storageKeys.history, this.allEntries());
+    const entries = this.allEntries();
+    console.log(`${LOG} ➡ storing ${entries.length} entries under ${APP_CONFIG.storageKeys.history}`);
+    return this.browserExtension.storageSet(APP_CONFIG.storageKeys.history, entries);
   }
 }

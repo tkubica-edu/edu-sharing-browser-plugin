@@ -9,6 +9,9 @@ import { ConditionsService } from './conditions.service';
 import { CurationService } from './curation.service';
 import { HistoryService } from './history.service';
 
+/** Same tag as the history's own log lines: the lookup below is a read of it. */
+const LOG = '[edu-sharing][history]';
+
 /**
  * Recognises what the open page is about, so content arrives on its own — the counterpart, for every other page, of
  * the plugin announcing its document. A repository page names its node in its own URL; every other page is answered
@@ -74,6 +77,10 @@ export class PageRecognitionService {
       // address decides it, and the entry stands in for a node this session may not read — which is exactly the
       // case the repository's lookup cannot answer either.
       const remembered = this.history.entries().find((entry) => sameAddress(entry.url, lookupUrl));
+      console.log(
+        `${LOG} ⬅ looking ${lookupUrl} up in the history (${this.history.entries().length} entries):`,
+        remembered ? `held as ${remembered.nodeId}` : 'not held — asking the repository',
+      );
       if (remembered && (await this.curation.adoptRememberedNode(remembered))) return true;
       const information = await firstValueFrom(
         this.clientUtils.getWebsiteInformation({ url: lookupUrl }),

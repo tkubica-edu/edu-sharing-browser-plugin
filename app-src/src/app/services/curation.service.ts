@@ -19,6 +19,7 @@ import { AuthService } from './auth.service';
 import { SavedNode } from './browser-extension.service';
 import { HistoryEntry, HistoryService } from './history.service';
 import { MetadataAgentService } from './metadata-agent.service';
+import type { NavStep } from './navigation.service';
 import { NodeWriteService } from './node-write.service';
 import { NodeSummary, RepositoryNodeService } from './repository-node.service';
 import { QualityJudgeService } from './quality-judge.service';
@@ -94,6 +95,9 @@ export interface ActiveNode {
  */
 const AGENT_EDIT_WINDOW_MS = 2 * 60 * 60 * 1000;
 
+/** Same tag as the history's own log lines, so reading and writing it read as one story. */
+const LOG_HISTORY = '[edu-sharing][history]';
+
 /**
  * What is said in place of the repository's own refusal once that window has closed: it answers with
  * the node's id, its creation date and its age in hours, none of which names the one thing that
@@ -151,6 +155,40 @@ export class CurationService {
     const url = this.extractionUrl();
     if (url) this.extractionUrl.set(null);
     return url ?? '';
+  }
+
+  /**
+   * The page a content taken up from the Verlauf is still to be erschlossen from. Held until the run
+   * has answered and carried across a page change (SessionResumeService), because opening such a
+   * content takes the tab to it — see {@link runPendingExtraction}.
+   */
+  private readonly pendingExtractionState = signal<string | null>(null);
+  readonly pendingExtraction = this.pendingExtractionState.asReadonly();
+
+  /** Take the mark up again on the page the flow moved to, and act on it. */
+  resumePendingExtraction(url: string): Promise<void> {
+    this.pendingExtractionState.set(url);
+    return this.runPendingExtraction();
+  }
+
+  /**
+   * Erschließe the page the taken-up content names, so the steps behind it work on a run of their own
+   * as they do in the flow that first produced this content: the entry holds what was written to the
+   * node and nothing else (see {@link recordSaved}), so what the agent proposes for the fields the
+   * node leaves empty, the marks that say which of them are the agent's, and the text it all was read
+   * from are what this brings back. The node's own values win over all of it ({@link editorMetadata}),
+   * so nothing that was saved is overwritten by a proposal.
+   */
+  async runPendingExtraction(): Promise<void> {
+    const url = this.pendingExtractionState();
+    if (!url || !this.auth.authorized() || this.metadataAgent.running()) return;
+    const outcome = await this.metadataAgent.runForUrl(url, this.contentTitle());
+    if (!outcome.ok) return;
+    // Only once it has answered: a run cut short by the page change is picked up again on the next one.
+    this.pendingExtractionState.set(null);
+    // As the flow does behind its own run — the judgement is then ready by the time the step that
+    // shows it is reached, and it can read the page's text off this result.
+    this.judgeQuality();
   }
 
   /**
@@ -265,6 +303,28 @@ export class CurationService {
    */
   private readonly quality = signal(false);
   readonly qualityConfirmed = this.quality.asReadonly();
+
+  /**
+   * Whether the Erschließung of the active content reached its end — the handover to the editorial queue.
+   * `null` where nothing is known about it, which is every content this panel did not erschließen itself:
+   * one the repository merely holds for the open page says nothing about who described it, or how far.
+   */
+  private readonly curationFinished = signal<boolean | null>(null);
+
+  /**
+   * The active content is one whose Erschließung was left unfinished — offered as the way to take it
+   * back up (see the main menu's card). Deliberately not the negation of {@link curationFinished}: an
+   * unknown state is not an unfinished one.
+   */
+  readonly curationUnfinished = computed(() => this.curationFinished() === false);
+
+  /**
+   * The step the active content was last worked on, as its history entry remembers it; null for a content
+   * with no such record. What continues an unfinished Erschließung goes there rather than to the junction
+   * — see HistoryEntry.step, and NavigationService.resumableStep for whether it can still be opened.
+   */
+  private readonly leftAtStepState = signal<NavStep | null>(null);
+  readonly leftAtStep = this.leftAtStepState.asReadonly();
 
   /** Why a confirmation could not be recorded; null while none failed. */
   readonly qualityError = signal<string | null>(null);
@@ -679,6 +739,9 @@ export class CurationService {
     const outcome = await this.metadataAgent.run();
     const ok = outcome.ok && !!outcome.parsed && !!outcome.source;
     this.resultPending.set(ok);
+    // A content that is being erschlossen right now is not one that was erschlossen: from here it counts
+    // as unfinished until the flow hands it over (see {@link curationFinished}).
+    if (ok) this.curationFinished.set(false);
     if (ok) this.judgeQuality();
     return ok;
   }
@@ -713,29 +776,37 @@ export class CurationService {
     // refused. The entry holds the metadata that was saved and stands in for the node in that case
     // (see {@link applyStoredEntry}).
     const node = this.auth.loggedIn() ? await this.loadNode(entry.nodeId) : null;
+    console.log(
+      `${LOG_HISTORY} ⬅ opening ${entry.nodeId} from the history as ${source} content`,
+      node ? 'on the live node' : 'on the stored entry — the repository will not hand the node back',
+    );
     if (!node) this.applyStoredEntry(entry, source);
     else this.applyLoadedNode(entry.nodeId, node, node.name ?? entry.title, source);
+    this.applyStoredFlow(entry);
+    // Only for an entry that carries no run: the page is erschlossen once more so the content has one.
+    // Marked here and run where the panel is settled, since opening a content this way takes the tab
+    // to it (see {@link runPendingExtraction}).
+    this.pendingExtractionState.set(entry.run ? null : entry.url || null);
+    if (!entry.run) {
+      console.log(`${LOG_HISTORY} … the entry carries no run, so ${entry.url} is erschlossen again for it`);
+    }
     // Keep the stored parsed result so the raw/field views and the source line show.
     this.restoreStoredMetadata(entry);
-  }
-
-  /**
-   * Take a content over from its stored entry alone — node state, editable metadata and the
-   * Erschließung the entry holds, so the raw and field views and the source line show. The whole of
-   * what the panel knows about a node it may not read.
-   */
-  private adoptStoredEntry(entry: HistoryEntry, source: NodeSource): void {
-    this.applyStoredEntry(entry, source);
-    this.restoreStoredMetadata(entry);
-  }
-
-  /** The Erschließung a stored entry holds, as the metadata agent's own last result. */
-  private restoreStoredMetadata(entry: HistoryEntry): void {
     this.metadataAgent.restore({
       ok: true,
-      parsed: entry.parsed,
+      // An entry written before runs were kept has none; its own fields stand in for the display.
+      parsed: entry.run ?? entry.parsed,
       source: { url: entry.url, title: entry.title, favIconUrl: entry.favIconUrl }
     });
+    // The Qualität view reports its own reading as soon as it renders, which is the same statement —
+    // this is what holds until then, and what the Metadaten view is opened by.
+    this.criteriaSatisfied.set(entry.quality?.criteriaMet ?? false);
+    this.quality.set(entry.quality?.confirmed ?? false);
+    // An entry written before this was kept says nothing about it, and that is left as it stands: an
+    // unknown state must not read as an unfinished one (see {@link curationFinished}).
+    this.curationFinished.set(entry.finished ?? null);
+    // Where it was left, for whatever takes the content further (see {@link leftAtStep}).
+    this.leftAtStepState.set(entry.step ?? null);
   }
 
   /** The history's account of a node, for a node whose own properties are out of reach; else null. */
@@ -753,7 +824,11 @@ export class CurationService {
   async adoptRememberedNode(entry: HistoryEntry): Promise<boolean> {
     if (this.activeNode() || this.hasUnsavedWork()) return false;
     await this.openFromHistory(entry, 'detected');
-    return this.activeNode()?.nodeId === entry.nodeId;
+    const adopted = this.activeNode()?.nodeId === entry.nodeId;
+    // Nothing takes the tab anywhere here — the page this content is about is the one that is open —
+    // so the Erschließung the entry asks for is started right away.
+    if (adopted) void this.runPendingExtraction();
+    return adopted;
   }
 
   /**
@@ -769,6 +844,9 @@ export class CurationService {
     // view is derived from the node's own properties instead.
     this.metadataAgent.reset();
     const parsed = this.metadataAgent.parse(node.properties as Record<string, unknown>);
+    console.log(
+      `${LOG_HISTORY} ➡ recording the received node ${nodeId} in the history (no Erschließung behind it)`,
+    );
     await this.history.add({
       nodeId,
       url: this.activeNode()?.link ?? '',
@@ -789,13 +867,25 @@ export class CurationService {
     // for a node a session that does not read nodes itself would only be refused.
     const entry = this.storedEntryFor(nodeId);
     const node = entry && !this.auth.loggedIn() ? null : await this.loadNode(nodeId);
+    console.log(
+      `${LOG_HISTORY} ⬅ resuming ${nodeId} after the page change;`,
+      entry ? 'the history holds this content' : 'not in the history — it comes back as a bare node',
+    );
     if (node) {
       this.applyLoadedNode(nodeId, node, node.name ?? nodeId, source);
-      this.metadataAgent.reset();
+      if (entry) this.applyStoredFlow(entry);
+      else this.metadataAgent.reset();
       return;
     }
     if (!entry) return;
-    this.adoptStoredEntry(entry, source);
+    this.applyStoredEntry(entry);
+    this.nodeSource.set(source);
+    this.metadataAgent.restore({
+      ok: true,
+      parsed: entry.parsed,
+      source: { url: entry.url, title: entry.title, favIconUrl: entry.favIconUrl }
+    });
+    this.applyStoredFlow(entry);
   }
 
   /**
@@ -923,6 +1013,9 @@ export class CurationService {
     this.recordedValues.set({});
     if (steps.metadata) await this.writeExtendedData(saved.nodeId, values, payload);
     await this.writeWorkflowSteps(saved.nodeId, steps);
+    // The handover is the flow's last act, so it is what says the Erschließung is done — and a handover
+    // that did not get through leaves it undone (see {@link curationFinished}).
+    if (steps.review) this.curationFinished.set(!this.workflowError());
     // Before the reload below, so the node comes back already carrying it.
     await this.writePendingPreview(saved.nodeId);
     // The filing, now that there is a node to file: a collection takes a node, so this could not
@@ -971,6 +1064,9 @@ export class CurationService {
       return false;
     }
     this.workflowError.set(this.agentRefusalText(outcome.workflowError));
+    // As on the other route: the handover is what ends the Erschließung, and one that was refused
+    // leaves it unfinished (see {@link curationFinished}).
+    if (steps.review) this.curationFinished.set(!this.workflowError());
     // The filing travelled with the request, so its outcome is read from the same answer — the
     // route's counterpart of what assignToCollections reports on the other one.
     this.assignError.set(outcome.collectionError ?? null);
@@ -1129,7 +1225,13 @@ export class CurationService {
   private async recordSaved(saved: NodeSummary): Promise<void> {
     const lastRun = this.metadataAgent.lastRun();
     const run = lastRun?.parsed;
-    if (!run) return;
+    if (!run) {
+      console.log(
+        `${LOG_HISTORY} … ${saved.nodeId} saved but not recorded: no Erschließung stands behind it`,
+      );
+      return;
+    }
+    console.log(`${LOG_HISTORY} ➡ recording the save of ${saved.nodeId} in the history`);
     const parsed = this.metadataAgent.parse({
       ...toEnvelope(run.raw),
       ...storedProperties(this.previewNode())
@@ -1143,7 +1245,15 @@ export class CurationService {
       // properties say nothing about.
       fieldsExtracted: run.fieldsExtracted,
       fieldsTotal: run.fieldsTotal,
-      parsed
+      parsed,
+      // Beside what was written, the run it was written from: taking this content up again then
+      // starts where the flow left it instead of erschließend its page a second time.
+      run,
+      // How far the check had got, for the same reason: it is what the steps behind it are unlocked by.
+      quality: { criteriaMet: this.criteriaSatisfied(), confirmed: this.quality() },
+      // Whether this save was the one that ended the flow, so the content can be offered to be taken
+      // further where it was not (see {@link curationUnfinished}).
+      finished: this.curationFinished() === true
     });
   }
 
@@ -1241,6 +1351,10 @@ export class CurationService {
     this.qualityJudge.reset();
     // The criteria belong to the content that is going: the next one's view reports its own.
     this.criteriaSatisfied.set(false);
+    // Nothing is known about the next content's Erschließung until it says so itself, and it was left
+    // nowhere yet.
+    this.curationFinished.set(null);
+    this.leftAtStepState.set(null);
     this.pendingPreview.set(null);
     this.saved.set(false);
     this.activeNode.set(null);
@@ -1256,17 +1370,20 @@ export class CurationService {
     this.storageParentState.set(null);
     this.personalCollectionsState.set([]);
     this.extractionUrl.set(null);
+    // The page to erschließen belongs to the content that is going; the next one names its own.
+    this.pendingExtractionState.set(null);
   }
 }
 
 /**
- * A saved node's properties as the history keeps them: everything the repository holds, minus the WLO
- * field that carries the whole payload as JSON. That one only repeats what stands beside it, and an
- * entry holding it would carry a second copy of the content it already describes (see
- * {@link toExtendedFields}).
+ * A saved node's properties as the history keeps them: everything the repository holds, minus the two
+ * WLO fields that only repeat what the entry carries anyway — the whole payload as JSON and the page's
+ * raw text, both of which are in the run stored beside them (see {@link toExtendedFields} and
+ * {@link HistoryEntry.run}). Without this an entry would hold the content twice over.
  */
 function storedProperties(node: Node | null): Record<string, unknown> {
   const properties = { ...((node?.properties ?? {}) as Record<string, unknown>) };
   delete properties[EXTENDED_DATA_FIELD];
+  delete properties[EXTENDED_TEXT_FIELD];
   return properties;
 }

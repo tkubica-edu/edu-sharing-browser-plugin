@@ -413,15 +413,23 @@ function buildGenerateBody(pageData, language) {
       enable_geocoding: true
     };
   }
+  return buildUrlGenerateBody(pageData?.url || '', lang);
+}
+
+/**
+ * The /generate body for a page named by its address alone — the agent fetches and reads it itself. For a content
+ * whose page is not the one the browser shows: it is erschlossen where it lives, not where the user happens to be.
+ */
+function buildUrlGenerateBody(url, language) {
   return {
     input_source: 'url',
     text: '',
-    source_url: pageData?.url || '',
+    source_url: url,
     extraction_method: 'browser',
     context: 'default',
     version: 'latest',
     schema_file: GENERATE_SCHEMA_FILE,
-    language: lang,
+    language: language || 'de',
     include_core: true,
     enable_geocoding: true,
     normalize: true
@@ -589,6 +597,16 @@ browser.runtime.onMessage.addListener((message, sender) => {
               screenshot: screenshot ?? undefined
             }
           };
+        }
+
+        // POST a named page to /generate, for a content whose page the browser is not on: the agent
+        // fetches and reads it itself, so nothing here depends on the active tab (see analyze.run).
+        case 'analyze.url': {
+          const url = typeof message.url === 'string' ? message.url : '';
+          if (!/^https?:\/\//i.test(url)) return { success: false, error: 'UNSUPPORTED_PAGE' };
+          const result = await callGenerate(buildUrlGenerateBody(url, message.language), agentBaseOf(message));
+          // No screenshot: the page is not on screen, and its own picture is all there is to go by.
+          return { success: true, result, source: { url, title: message.title || url } };
         }
 
         // POST a node body assembled by the sidebar to /nodes — the metadata agent's own way of
