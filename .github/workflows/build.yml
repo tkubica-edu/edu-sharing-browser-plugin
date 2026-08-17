@@ -19,9 +19,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -55,19 +55,19 @@ jobs:
         continue-on-error: true
 
       - name: Upload Chrome build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: edu-sharing-chrome
           path: dist/chrome
 
       - name: Upload Firefox build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: edu-sharing-firefox
           path: dist/firefox
 
       - name: Upload Safari build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: edu-sharing-safari
           path: dist/safari
