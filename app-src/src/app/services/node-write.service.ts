@@ -2,7 +2,12 @@ import { Injectable, inject } from '@angular/core';
 
 import { MdsValues } from '../util/mds-values';
 import { SOURCE_TEXT_KEY, toEnvelope, toPayloadFields } from '../util/agent-payload';
-import { BrowserExtensionService, SavedNode } from './browser-extension.service';
+import {
+  BrowserExtensionService,
+  SavedNode,
+  WORKER_UNREACHABLE,
+  WORKER_UNREACHABLE_TEXT
+} from './browser-extension.service';
 import { MetadataAgentApiService } from './metadata-agent-api.service';
 import { errorMessage } from '../util/errors';
 
@@ -107,7 +112,15 @@ export class NodeWriteService {
 
     try {
       const response = await this.browserExtension.saveNode(body, this.agentApi.baseUrl());
-      if (!response.success) return { ok: false, error: response.error ?? 'Speichern fehlgeschlagen.' };
+      if (!response.success) {
+        // The transport's own verdict, in words: a message that reached no worker says nothing about
+        // the write, and what helps is rebuilding the panel rather than trying the save again.
+        const error =
+          response.error === WORKER_UNREACHABLE
+            ? WORKER_UNREACHABLE_TEXT
+            : response.error ?? 'Speichern fehlgeschlagen.';
+        return { ok: false, error };
+      }
       const written = response.result ?? {};
       const ok = written.success === true;
       return {

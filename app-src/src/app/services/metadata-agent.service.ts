@@ -1,6 +1,11 @@
 import { Injectable, inject, signal } from '@angular/core';
 
-import { BrowserExtensionService, PageSource } from './browser-extension.service';
+import {
+  BrowserExtensionService,
+  PageSource,
+  WORKER_UNREACHABLE,
+  WORKER_UNREACHABLE_TEXT
+} from './browser-extension.service';
 import { DevModeService } from './dev-mode.service';
 import { MetadataAgentApiService } from './metadata-agent-api.service';
 import { EXTRACT_FIELD_ANSWER } from '../util/dev-fixtures';
@@ -252,6 +257,10 @@ export class MetadataAgentService {
       // script until the extension itself is reloaded.
       case 'NO_RESPONSE':
         return 'Der Hintergrunddienst der Extension hat nicht geantwortet. Bitte die Extension neu laden (nicht nur die Seite neu laden).';
+      // The message found no receiver at all, in none of its attempts — the panel's connection to the
+      // worker did not come back after the page change it was rebuilt by.
+      case WORKER_UNREACHABLE:
+        return WORKER_UNREACHABLE_TEXT;
       case 'UNSUPPORTED_PAGE':
         return 'Diese Seite kann nicht erschlossen werden (interne Browser-Seite). Bitte eine normale Webseite öffnen.';
       case 'NO_ACTIVE_TAB':

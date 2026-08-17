@@ -77,6 +77,15 @@ precedes every `/generate` rather than as a failed extraction a minute later.
 | Page content extraction | `scripting.executeScript` (background) | no cross-origin fetch |
 | Repository login | Angular `HttpClient` (library) | the library owns the call; relies on `host_permissions` bypassing CORS on Chrome/Edge/Firefox |
 
+Every message to the worker goes through one send path (`BrowserExtensionService.ask`). A rejection
+saying the message found **no receiver** is retried a few times with a short backoff instead of being
+reported: the panel is an iframe the page's navigation destroys and the worker puts back, so its
+messaging connection can still be settling while the panel is on screen and able to ask. Once the
+attempts are used up the caller gets `WORKER_UNREACHABLE` — a state of its own, distinct from the
+worker answering with a failure — and the user is told to reopen the panel. Every other rejection is
+the worker's own and is passed on unchanged. See
+[TROUBLESHOOTING.md § Browser-specific](TROUBLESHOOTING.md#browser-specific).
+
 ## Saving a content
 
 The session decides which route a save takes, not the WLO flag (`CurationService.savesThroughAgent`):

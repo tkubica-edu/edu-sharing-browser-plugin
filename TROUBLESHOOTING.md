@@ -16,6 +16,15 @@ What is known not to work, known to be unverified, or known to look wrong at fir
   the repository session cookie in the injected-panel context. Guest Erschließung (via the background
   worker) is unaffected; logged-in auth needs verification on Safari and may require a background
   auth fallback.
+- **Firefox: „Could not establish connection. Receiving end does not exist."** The panel's message
+  to the background worker occasionally finds no receiver, most often on a page the panel was
+  restored onto after a navigation. It is not the event page having been suspended — it happens with
+  a DevTools toolbox attached, which Firefox keeps the page alive for. The send path retries such a
+  rejection (`BrowserExtensionService.ask`), which covers it in practice; when the retries are used
+  up the panel logs `[edu-sharing][worker] «<action>» not delivered in N attempts` and asks the user
+  to reopen the panel. A run that reaches that line is the case still to be explained. Only wordings
+  that mean the message never ran are retried — a port that closed mid-answer is reported, since the
+  action behind it may have written something.
 - **MDS editor rendering needs verification in a real browser.** Two things must hold: (1) the
   vendored bundle boots under the extension CSP (`script-src 'self'` — its core has no `eval`; only
   unused PDF/Cordova *assets* do), and (2) the editor can fetch the MDS definition from the

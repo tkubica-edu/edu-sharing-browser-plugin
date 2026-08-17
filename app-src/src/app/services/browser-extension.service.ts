@@ -1,6 +1,41 @@
 import { Injectable, signal } from '@angular/core';
 import browser from 'webextension-polyfill';
 
+import { errorMessage } from '../util/errors';
+
+/** Log prefix, as everywhere else in the extension (`[edu-sharing][<station>]`). */
+const LOG = '[edu-sharing][worker]';
+
+/**
+ * A rejection saying the message was never delivered, rather than that the action failed. The panel
+ * is an iframe the page's navigation destroys and the worker puts back, so its messaging connection
+ * is re-established while the panel is already on screen and able to ask — a moment during which the
+ * browser answers that there is nobody there.
+ *
+ * Only wordings that mean *nothing ran*, because a repeated send repeats the action: „message port
+ * closed before a response was received" is deliberately absent, since it also covers a listener
+ * that died half way through a write, and that write may well have happened.
+ */
+const NOT_DELIVERED = /receiving end does not exist|could not establish connection/i;
+
+/** How often an undelivered send is repeated, and how long after the previous attempt. */
+const SEND_ATTEMPTS = 4;
+const SEND_RETRY_MS = 150;
+
+/** The error a caller gets when every attempt went undelivered — see {@link NOT_DELIVERED}. */
+export const WORKER_UNREACHABLE = 'WORKER_UNREACHABLE';
+
+/**
+ * How that reads where a user sees it. Rebuilding the panel is what re-establishes the connection,
+ * and reloading the extension is the way out where even that does not — in that order.
+ */
+export const WORKER_UNREACHABLE_TEXT =
+  'Der Hintergrunddienst der Extension war nicht erreichbar. Bitte das Panel schließen und erneut ' +
+  'öffnen; hilft das nicht, die Extension neu laden.';
+
+/** What a send answers with when it was never delivered, as opposed to an answer of `null`. */
+const UNREACHABLE = Symbol('worker unreachable');
+
 /** The page the background worker says the tab is on; the title is missing while the tab has none yet. */
 export interface AnnouncedPage {
   url: string;
@@ -121,11 +156,8 @@ export class BrowserExtensionService {
    * back to the agent's public deployment.
    */
   async analyzeActiveTab(language: string, apiUrl?: string): Promise<AnalyzeResponse> {
-    const response = (await browser.runtime.sendMessage({
-      action: 'analyze.run',
-      language,
-      apiUrl,
-    })) as AnalyzeResponse | null;
+    const response = await this.ask<AnalyzeResponse>({ action: 'analyze.run', language, apiUrl });
+    if (response === UNREACHABLE) return { success: false, error: WORKER_UNREACHABLE };
     return response ?? { success: false, error: 'NO_RESPONSE' };
   }
 
@@ -134,12 +166,39 @@ export class BrowserExtensionService {
    * curated content into the repository itself. The reply carries the endpoint's answer verbatim.
    */
   async saveNode(body: Record<string, unknown>, apiUrl?: string): Promise<SaveNodeResponse> {
-    const response = (await browser.runtime.sendMessage({
-      action: 'metadata.saveNode',
-      body,
-      apiUrl,
-    })) as SaveNodeResponse | null;
+    const response = await this.ask<SaveNodeResponse>({ action: 'metadata.saveNode', body, apiUrl });
+    if (response === UNREACHABLE) return { success: false, error: WORKER_UNREACHABLE };
     return response ?? { success: false, error: 'NO_RESPONSE' };
+  }
+
+  /**
+   * Hand a message to the background worker and answer what it replies. A send that was never delivered
+   * is repeated ({@link NOT_DELIVERED}), since that is the panel's connection settling rather than a
+   * refusal, and answered with {@link UNREACHABLE} once the attempts are used up. Every other
+   * rejection is the worker's own and is passed on to the caller.
+   */
+  private async ask<T>(message: Record<string, unknown>): Promise<T | null | typeof UNREACHABLE> {
+    if (!this.available) return UNREACHABLE;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return ((await browser.runtime.sendMessage(message)) ?? null) as T | null;
+      } catch (cause: unknown) {
+        const reason = errorMessage(cause);
+        if (!NOT_DELIVERED.test(reason)) throw cause;
+        if (attempt >= SEND_ATTEMPTS) {
+          console.warn(`${LOG} «${message['action']}» not delivered in ${attempt} attempts:`, reason);
+          return UNREACHABLE;
+        }
+        console.warn(`${LOG} «${message['action']}» not delivered (attempt ${attempt}), retrying:`, reason);
+        await new Promise((resolve) => setTimeout(resolve, SEND_RETRY_MS * attempt));
+      }
+    }
+  }
+
+  /** Same, for a caller to which an unreachable worker and an answer of `null` are the same thing. */
+  private async askOrNull<T>(message: Record<string, unknown>): Promise<T | null> {
+    const answer = await this.ask<T>(message).catch(() => null);
+    return answer === UNREACHABLE ? null : answer;
   }
 
 
@@ -149,16 +208,14 @@ export class BrowserExtensionService {
    * per-tab state has to be kept apart (see SessionResumeService).
    */
   async getOwnTabId(): Promise<number | null> {
-    const response = (await browser.runtime
-      .sendMessage({ action: 'tabs.self' })
-      .catch(() => null)) as { tabId?: number | null } | null;
+    const response = await this.askOrNull<{ tabId?: number | null }>({ action: 'tabs.self' });
     return typeof response?.tabId === 'number' ? response.tabId : null;
   }
 
   async getActiveTab(): Promise<PageSource | null> {
-    const response = (await browser.runtime.sendMessage({ action: 'tabs.getActive' })) as
-      | { success?: boolean; tab?: PageSource }
-      | null;
+    const response = await this.askOrNull<{ success?: boolean; tab?: PageSource }>({
+      action: 'tabs.getActive',
+    });
     return response?.success ? response.tab ?? null : null;
   }
 
@@ -168,9 +225,9 @@ export class BrowserExtensionService {
    * possible outcome rather than an error: what needs the page's text says so itself.
    */
   async extractPageData(): Promise<PageData | null> {
-    const response = (await browser.runtime
-      .sendMessage({ action: 'tabs.extractPageData' })
-      .catch(() => null)) as { success?: boolean; data?: PageData } | null;
+    const response = await this.askOrNull<{ success?: boolean; data?: PageData }>({
+      action: 'tabs.extractPageData',
+    });
     return response?.success ? response.data ?? null : null;
   }
 
@@ -210,7 +267,11 @@ export class BrowserExtensionService {
    * the load. What it was doing is restored separately (SessionResumeService).
    */
   async navigateTab(url: string): Promise<void> {
-    await browser.runtime.sendMessage({ action: 'tabs.navigate', url });
+    // Reported rather than swallowed: the caller saved its state for a load that would then never
+    // happen, and the panel would sit on a screen waiting for a page that never comes.
+    if ((await this.ask({ action: 'tabs.navigate', url })) === UNREACHABLE) {
+      throw new Error(WORKER_UNREACHABLE);
+    }
   }
 
   /** Tell the host page the sidebar has booted, so it can replay a buffered inbound event. */
