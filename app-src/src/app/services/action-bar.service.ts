@@ -239,8 +239,9 @@ export class ActionBarService {
         ];
       }
 
-      // "Individuelle Qualitätsprüfung mit KI": nothing to work through yet, so the way back is all
-      // this step offers (see AiQualityScreenComponent).
+      // "Individuelle Qualitätsprüfung mit KI": the dialogue with the assistant IS the step, and it is
+      // over when the user is done with it — so the way back is all this step offers (see
+      // AiQualityScreenComponent).
       case 'ai-quality':
         return [this.backAction()];
 

@@ -63,6 +63,13 @@ const QUERY_MAX = 200;
 const TEXT_MAX = 300;
 
 /**
+ * Cap on the text of a content handed over to be checked. Far above {@link TEXT_MAX}, because this text IS the
+ * subject of the dialogue rather than a hint about it — but bounded all the same: what is passed on travels in
+ * the assistant's prompt.
+ */
+const CONTENT_TEXT_MAX = 8000;
+
+/**
  * What the page is about, or `null` for an address that is none — `about:`, a blank tab, nothing at all. The title
  * is the tab's, as the browser reports it; passing it on is what gives the assistant a subject for a page whose
  * address says nothing about one.
@@ -85,6 +92,61 @@ export function pageContextOf(
     ...(subjectOf(parsed) ?? { page_kind: 'other' }),
     ...pageText(title)
   };
+}
+
+/** A content the panel curates, as the fields the assistant is told about it. */
+export interface CuratedContent {
+  /** What the content is called. */
+  title?: string | null;
+  /** What the content says — the text its metadata was read from. */
+  text?: string | null;
+  /** The page the content was erschlossen from, if one is known. */
+  url?: string | null;
+  /** The collection the content was filed in — what the assistant looks its skill up by. */
+  collectionId?: string | null;
+}
+
+/**
+ * A content the panel curates, as a context for the assistant: what it is called, what it says, and the
+ * collection it was filed in. The collection is the whole point of such a context — the assistant retrieves the
+ * skill it checks the content with by it — so the context is *about* the collection wherever one is known, and
+ * about nothing in particular where none is: then there are no requirements to measure the content against and
+ * the text is all the dialogue has.
+ */
+export function contentContextOf(content: CuratedContent): PageContext {
+  const collection = content.collectionId?.trim();
+  return {
+    page_kind: collection ? 'collection' : 'other',
+    ...addressOf(content.url),
+    ...(collection ? { collection_id: collection } : {}),
+    ...contentText(content.title, content.text),
+    detection_source: 'panel:content'
+  };
+}
+
+/** The address fields every http(s) page carries; nothing for an address that is none. */
+function addressOf(url: string | null | undefined): Pick<PageContext, 'page_url' | 'page_host'> {
+  if (!url) return {};
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return {};
+    return { page_url: parsed.href, page_host: parsed.hostname };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * A content as the assistant reads it: what it is called, then what it says. The title leads, so it survives
+ * where the text is cut off at {@link CONTENT_TEXT_MAX}.
+ */
+function contentText(
+  title: string | null | undefined,
+  text: string | null | undefined,
+): { page_text?: string } {
+  const stated = [title?.trim(), text?.trim()].filter((part): part is string => !!part);
+  const joined = stated.join('\n\n').slice(0, CONTENT_TEXT_MAX);
+  return joined ? { page_text: joined } : {};
 }
 
 /** The title as the page's text, if it is one; nothing to add for a tab that reports none. */

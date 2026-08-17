@@ -1,6 +1,6 @@
 import {
   afterRenderEffect, ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, ElementRef,
-  OnDestroy, effect, inject, viewChild
+  OnDestroy, computed, effect, inject, input, viewChild
 } from '@angular/core';
 
 import { ConditionsService } from '../../../services/conditions.service';
@@ -42,7 +42,8 @@ const NO_CONTEXT: PageContext = { page_kind: 'other' };
 // "Boerdi - KI-Assistent", entered from the offer above the session bar (AiAssistantBarComponent): the
 // assistant's own chat widget, embedded as the real custom element its bundle defines. It fills the screen
 // on its own — frameless, so it draws no floating button of its own, and expanded, since being here is
-// already the request to chat.
+// already the request to chat. Other screens embed the same chat about a subject of their own; see
+// {@link AiAssistantScreenComponent.context}.
 //
 // The page the chat is about has to be handed over: the widget reads its own location for this, and in the
 // panel that is the extension rather than the page — so `auto-context` is off, its URL watcher never fires
@@ -63,6 +64,21 @@ export class AiAssistantScreenComponent implements OnDestroy {
   private readonly conditions = inject(ConditionsService);
 
   private readonly host = viewChild.required<ElementRef<HTMLElement>>('host');
+
+  /**
+   * What the chat is to be about, for a screen that embeds it about something other than the open tab — the KI
+   * quality check hands over the content it has the assistant analyse. Unset, which is how the assistant's own
+   * screen uses it, the chat follows the tab the panel is open on.
+   */
+  readonly context = input<PageContext | null>(null);
+
+  /** The context the chat is handed: what the embedding screen states, else the open page. */
+  private readonly subject = computed(
+    () =>
+      this.context() ??
+      pageContextOf(this.conditions.activeUrl(), this.conditions.activeTitle()) ??
+      NO_CONTEXT,
+  );
 
   protected readonly bundle = loadWebComponentBundle('boerdi', CHAT_TAG);
 
@@ -89,9 +105,10 @@ export class AiAssistantScreenComponent implements OnDestroy {
       const error = this.bundle.error();
       if (error) console.warn(`${LOG} bundle failed to load:`, error);
     });
-    // Follow the active tab for as long as the screen is open. Reads the active page, so it re-runs on
-    // every page change the panel is told about — including a title that only arrives afterwards.
-    effect(() => this.follow(pageContextOf(this.conditions.activeUrl(), this.conditions.activeTitle()) ?? NO_CONTEXT));
+    // Follow what the chat is about for as long as the screen is open: it re-runs on every page change
+    // the panel is told about — including a title that only arrives afterwards — and on every change to
+    // a context an embedding screen states.
+    effect(() => this.follow(this.subject()));
   }
 
   ngOnDestroy(): void {
@@ -112,7 +129,7 @@ export class AiAssistantScreenComponent implements OnDestroy {
     // The panel is not the page: the widget's own detection would contribute the extension's address
     // instead of the tab's, so what we hand over stands alone.
     element.setAttribute('auto-context', 'false');
-    this.current = pageContextOf(this.conditions.activeUrl(), this.conditions.activeTitle()) ?? NO_CONTEXT;
+    this.current = this.subject();
     element.setAttribute('page-context', JSON.stringify(this.current));
     // Sized inline, not via the stylesheet: an imperatively created element carries no view
     // encapsulation attribute, so this component's styles would not match it.

@@ -402,7 +402,8 @@ export const SECTIONS: readonly AppSection[] = [
     label: 'Individuelle Qualitätsprüfung mit KI',
     description: 'Den Inhalt von der KI gegen die Anforderungen der Sammlung prüfen lassen',
     // One of the two processes the choice above leads into; the other is the Qualitätsprüfung below,
-    // which is the guided walk through criteria and metadata.
+    // which is the guided walk through criteria and metadata. This one is a dialogue with the
+    // assistant about the content and the collection it was filed in — see AiQualityScreenComponent.
     visible: requiresLogin((c) => c.hasEditableMetadata),
     tabs: [{ id: 'ai-quality', label: 'KI-Analyse' }]
   },
