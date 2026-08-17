@@ -275,6 +275,13 @@ export class CurationService {
   private readonly criteriaSatisfied = signal(false);
   readonly qualityCriteriaMet = this.criteriaSatisfied.asReadonly();
 
+  /**
+   * Whether a machine check on this content is still out. Exposed for the confirmation, which waits for it: the
+   * checks tick criteria of their own, so a confirmation given while one is running would record an answer the
+   * user never saw.
+   */
+  readonly qualityChecksRunning = this.qualityJudge.running;
+
   /** Reads the preview step's picture while that step is open; see {@link registerDraftPreviewSource}. */
   private draftPreviewSource: DraftPreviewSource | null = null;
 

@@ -152,7 +152,12 @@ export class ActionBarService {
             this.backAction(),
             {
               label: this.curation.saving() ? 'Speichern…' : 'Weiter',
-              disabled: !this.curation.qualityCriteriaMet() || this.curation.saving(),
+              // While a check is still running its criteria are not answered yet, and the confirmation
+              // records what is on screen: given now it would state a quality nobody has seen.
+              disabled:
+                !this.curation.qualityCriteriaMet() ||
+                this.curation.qualityChecksRunning() ||
+                this.curation.saving(),
               run: async () => {
                 // The confirmation is a write: the criteria go onto the content and the quality
                 // workflow is started with them (CurationService.confirmQuality).

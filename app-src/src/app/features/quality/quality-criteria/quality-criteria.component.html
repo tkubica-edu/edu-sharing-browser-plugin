@@ -21,7 +21,8 @@
     <p class="note">Das Metadatenset hält für diesen Inhalt keine Qualitätskriterien bereit.</p>
   } @else {
     <!-- Two lists side by side while there is room; under each other once there is not. They are
-         judged independently — only the left one gates the confirmation. -->
+         judged independently — only the left one gates the confirmation. Read-only once the
+         confirmation was given: it was given for exactly these answers. -->
     <div class="criteria-group">
       <div class="criteria-column">
         <h3>Such-Veröffentlichung</h3>
@@ -30,7 +31,7 @@
             <li>
               <label class="check">
                 <input type="checkbox" [checked]="isMet(criterion)"
-                       [class.is-ai]="isAiAnswered(criterion)"
+                       [class.is-ai]="isAiAnswered(criterion)" [disabled]="confirmed()"
                        (change)="setCriterion(criterion, $any($event.target).checked)" />
                 <span class="label" [class.is-ai]="isAiAnswered(criterion)"
                       [class.is-violated]="isViolated(criterion)">
@@ -59,7 +60,7 @@
             <li>
               <label class="check">
                 <input type="checkbox" [checked]="isEditorialMet(criterion)"
-                       [class.is-ai]="isAiAnswered(criterion)"
+                       [class.is-ai]="isAiAnswered(criterion)" [disabled]="confirmed()"
                        (change)="setEditorialCriterion(criterion, $any($event.target).checked)" />
                 <span class="label" [class.is-ai]="isAiAnswered(criterion)"
                       [class.is-violated]="isViolated(criterion)">
@@ -78,21 +79,23 @@
     </div>
 
     <!-- The three ways to fulfil a whole list at once. Each is disabled once its list is complete —
-         it is a shortcut to a state, not a toggle, so there is nothing left for it to do then. -->
+         it is a shortcut to a state, not a toggle, so there is nothing left for it to do then — and
+         all of them once the confirmation was given. -->
     <div class="criteria-bulk">
       <label class="check">
         <input type="checkbox" [checked]="allKnockoutMet()"
-               [disabled]="allKnockoutMet()" (change)="setAllKnockout()" />
+               [disabled]="allKnockoutMet() || confirmed()" (change)="setAllKnockout()" />
         <span class="label">alle Suchkriterien</span>
       </label>
       <label class="check">
         <input type="checkbox" [checked]="allEditorialMet()"
-               [disabled]="allEditorialMet()" (change)="setAllEditorial()" />
+               [disabled]="allEditorialMet() || confirmed()" (change)="setAllEditorial()" />
         <span class="label">alle redaktionellen</span>
       </label>
       <label class="check">
         <input type="checkbox" [checked]="allKnockoutMet() && allEditorialMet()"
-               [disabled]="allKnockoutMet() && allEditorialMet()" (change)="setAll()" />
+               [disabled]="(allKnockoutMet() && allEditorialMet()) || confirmed()"
+               (change)="setAll()" />
         <span class="label">alle auswählen</span>
       </label>
     </div>

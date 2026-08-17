@@ -309,6 +309,7 @@ export class QualityCriteriaComponent {
    * criterion then stays unanswered too.
    */
   protected setCriterion(criterion: MdsValue, met: boolean): void {
+    if (this.confirmed()) return;
     const value = this.valueFor(criterion.id, met ? CRITERION_MET : CRITERION_VIOLATED);
     if (!value) {
       // The vocabulary does not offer the value this click means. Saying so beats recording
@@ -323,6 +324,7 @@ export class QualityCriteriaComponent {
 
   /** Record an editorial criterion by adding it to the property's values, or taking it out. */
   protected setEditorialCriterion(criterion: MdsValue, met: boolean): void {
+    if (this.confirmed()) return;
     const current = this.valueOfProperty(EDITORIAL_PROPERTY);
     this.takeOver([criterion.id]);
     this.report({
@@ -335,6 +337,7 @@ export class QualityCriteriaComponent {
 
   /** Fulfil every knock-out criterion at once. */
   protected setAllKnockout(): void {
+    if (this.confirmed()) return;
     const met: CriteriaProperties = {};
     for (const criterion of this.knockoutCriteria()) {
       const value = this.valueFor(criterion.id, CRITERION_MET);
@@ -347,6 +350,7 @@ export class QualityCriteriaComponent {
 
   /** Fulfil every editorial criterion at once: the property holds all of their ids. */
   protected setAllEditorial(): void {
+    if (this.confirmed()) return;
     const criteria = this.editorialCriteria().map((criterion) => criterion.id);
     this.takeOver(criteria);
     this.report({ [EDITORIAL_PROPERTY]: criteria });

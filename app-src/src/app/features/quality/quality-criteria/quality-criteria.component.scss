@@ -126,8 +126,9 @@ input[type='checkbox'] {
     &:checked { background: var(--qc-ai); }
   }
 
-  // A shortcut that has nothing left to do, and a box locked while a write runs: still legible as
-  // checked, clearly not something to press.
+  // A box with nothing left to do: a shortcut whose list is complete, a box locked while a write
+  // runs, every box of a record the confirmation closed. Still legible as checked, clearly not
+  // something to press.
   &:disabled {
     border-color: #b6c6d8;
     &:checked { background: #b6c6d8; }
