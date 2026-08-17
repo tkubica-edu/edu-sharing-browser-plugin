@@ -228,10 +228,13 @@ export class EditorialGroupsService {
       return;
     }
     const offered = this.offer(group, found.node);
-    // Held as the group's collection, not written as a forwarding: which collection inside a group the
-    // content would go into is answered here, whether the content is forwarded to that group at all is
-    // not. Ticking the group takes the proposal along (see toggle).
-    this.recommendedState.set({ groupId: offered.collection.id, folder: toCollection(found.node) });
+    const folder = toCollection(found.node);
+    // Both halves of the proposal are taken over: the collection inside the group the content goes into,
+    // and the group it sits in as one to forward to — a collection picked inside a group that is not
+    // forwarded to would take no effect. Held as the proposal as well, so the choice is still named as
+    // one where it is shown and can be undone as a whole (see isRecommended, toggle).
+    this.recommendedState.set({ groupId: offered.collection.id, folder });
+    this.chooseFolder(offered, folder);
   }
 
   /**
