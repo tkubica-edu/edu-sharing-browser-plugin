@@ -6,6 +6,7 @@ import {
 import { BusyService } from './busy.service';
 import { ConditionsService } from './conditions.service';
 import { CurationService } from './curation.service';
+import { PageRecognitionService } from './page-recognition.service';
 
 /** A section's sub step as the tab bar renders it: its definition plus whether it can be opened. */
 export interface TabView extends SectionTab {
@@ -50,6 +51,8 @@ export class NavigationService {
   private readonly curation = inject(CurationService);
   // A write in flight refuses every *user-driven* move; see BusyService and the guards below.
   private readonly busy = inject(BusyService);
+  // To ask again on the menu what the open page's content is, where a write has changed the answer.
+  private readonly pageRecognition = inject(PageRecognitionService);
 
   readonly section = signal<SectionId>('menu');
 
@@ -245,6 +248,10 @@ export class NavigationService {
     this.trail.set([]);
     this.open('menu', null);
     this.curation.releaseChosenContent();
+    // After the release, since the recognition refuses to adopt while a content is still held: a page
+    // that was erschlossen during the flow is now one the repository holds, and the menu offers it as
+    // *Inhalt erkannt* only once the lookup has been asked again.
+    void this.pageRecognition.recognizeIfStale();
   }
 
   /**

@@ -3,6 +3,7 @@ import { Injectable, Signal, computed, inject, signal } from '@angular/core';
 import { SectionId } from '../model/navigation';
 import { CurationService } from './curation.service';
 import { NavigationService } from './navigation.service';
+import { PageRecognitionService } from './page-recognition.service';
 
 /**
  * What the metadata screen hands to the footer: how to save, and whether saving is possible right now.
@@ -49,6 +50,8 @@ export interface FooterAction {
 export class ActionBarService {
   private readonly curation = inject(CurationService);
   private readonly navigation = inject(NavigationService);
+  // The last write of the flow makes the open page one the repository holds — see {@link finishAction}.
+  private readonly pageRecognition = inject(PageRecognitionService);
 
   // The metadata screen registers its save handler (→ mdsEditor.commit()) while mounted, so the
   // footer can drive a save without referencing the editor.
@@ -306,6 +309,10 @@ export class ActionBarService {
           ? () => handler.save()
           : () => this.curation.saveCollected({ metadata: true, review: true });
         if (saves && !(await save())) return;
+        // The page has been erschlossen: the repository now answers the URL lookup with this content,
+        // so the recognition's earlier "no content" no longer holds and is asked again on the way back
+        // to the menu (see NavigationService.openMenu).
+        this.pageRecognition.invalidate();
         this.navigation.go('overview');
       }
     };

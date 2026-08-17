@@ -19,6 +19,24 @@ export class PageRecognitionService {
   private readonly conditions = inject(ConditionsService);
   private readonly curation = inject(CurationService);
 
+  /** The last recognition's answer no longer describes the open page, so it has to be asked again. */
+  private stale = false;
+
+  /** Mark the recognition as outdated: what the repository holds for the open page has changed. */
+  invalidate(): void {
+    this.stale = true;
+  }
+
+  /**
+   * Recognise again where something has invalidated the last answer ({@link invalidate}), and only then — the lookup
+   * costs a request, and every other way onto a page already triggers one of its own.
+   */
+  async recognizeIfStale(): Promise<boolean> {
+    if (!this.stale) return false;
+    this.stale = false;
+    return await this.recognize();
+  }
+
   /**
    * Recognise the open page's content and adopt it; answers whether one was found. Reports being under way through
    * `ConditionsService.recognizingContent` and clears it on every way out, since a flag left set would leave the panel
