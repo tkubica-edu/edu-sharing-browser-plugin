@@ -708,19 +708,39 @@ export class CurationService {
    * {@link adoptRememberedNode}).
    */
   async openFromHistory(entry: HistoryEntry, source: NodeSource = 'chosen'): Promise<void> {
-    // The live node is a bonus, not a requirement. An entry can point at a node THIS session may not
-    // read: the metadata agent creates the content with its own privileges, so a guest ends up with
-    // history entries the repository answers 403 for. The entry itself holds the metadata that was
-    // saved, so it stands in for the node (see {@link applyStoredEntry}).
-    const node = await this.loadNode(entry.nodeId);
+    // The live node is a bonus, not a requirement, and it is only asked for where this session may
+    // read it: the metadata agent creates the content with its own privileges, so a guest's read is
+    // refused. The entry holds the metadata that was saved and stands in for the node in that case
+    // (see {@link applyStoredEntry}).
+    const node = this.auth.loggedIn() ? await this.loadNode(entry.nodeId) : null;
     if (!node) this.applyStoredEntry(entry, source);
     else this.applyLoadedNode(entry.nodeId, node, node.name ?? entry.title, source);
     // Keep the stored parsed result so the raw/field views and the source line show.
+    this.restoreStoredMetadata(entry);
+  }
+
+  /**
+   * Take a content over from its stored entry alone — node state, editable metadata and the
+   * Erschließung the entry holds, so the raw and field views and the source line show. The whole of
+   * what the panel knows about a node it may not read.
+   */
+  private adoptStoredEntry(entry: HistoryEntry, source: NodeSource): void {
+    this.applyStoredEntry(entry, source);
+    this.restoreStoredMetadata(entry);
+  }
+
+  /** The Erschließung a stored entry holds, as the metadata agent's own last result. */
+  private restoreStoredMetadata(entry: HistoryEntry): void {
     this.metadataAgent.restore({
       ok: true,
       parsed: entry.parsed,
       source: { url: entry.url, title: entry.title, favIconUrl: entry.favIconUrl }
     });
+  }
+
+  /** The history's account of a node, for a node whose own properties are out of reach; else null. */
+  private storedEntryFor(nodeId: string): HistoryEntry | null {
+    return this.history.entries().find((entry) => entry.nodeId === nodeId) ?? null;
   }
 
   /**
@@ -765,21 +785,17 @@ export class CurationService {
    * the stored entry stands in.
    */
   async resumeNode(nodeId: string, source: NodeSource): Promise<void> {
-    const node = await this.loadNode(nodeId);
+    // The stored entry stands in wherever the node itself is out of reach, and is taken without asking
+    // for a node a session that does not read nodes itself would only be refused.
+    const entry = this.storedEntryFor(nodeId);
+    const node = entry && !this.auth.loggedIn() ? null : await this.loadNode(nodeId);
     if (node) {
       this.applyLoadedNode(nodeId, node, node.name ?? nodeId, source);
       this.metadataAgent.reset();
       return;
     }
-    const entry = this.history.entries().find((candidate) => candidate.nodeId === nodeId);
     if (!entry) return;
-    this.applyStoredEntry(entry);
-    this.nodeSource.set(source);
-    this.metadataAgent.restore({
-      ok: true,
-      parsed: entry.parsed,
-      source: { url: entry.url, title: entry.title, favIconUrl: entry.favIconUrl }
-    });
+    this.adoptStoredEntry(entry, source);
   }
 
   /**
@@ -789,15 +805,24 @@ export class CurationService {
    */
   adoptDetectedNode(node: Node): void {
     if (this.activeNode() || this.hasUnsavedWork()) return;
+    const nodeId = node.ref.id;
+    // A node that arrives as part of *another* answer can come without its properties (the duplicate
+    // list of getWebsiteInformation), and the metadata editor needs values. What this panel saved for
+    // that node is the account of it that costs no request and is there for a node this session may
+    // not read — which is the case for everything the metadata agent wrote with its own privileges.
+    const remembered = node.properties ? null : this.storedEntryFor(nodeId);
+    if (remembered) {
+      this.adoptStoredEntry(remembered, 'detected');
+      return;
+    }
     // Name only when really known, never the node id as a stand-in — see {@link ActiveNode}.
-    this.applyLoadedNode(node.ref.id, node, node.name ?? null, 'detected');
+    this.applyLoadedNode(nodeId, node, node.name ?? null, 'detected');
     // No agent result for a node we merely found open; its parsed view comes from the node's own
     // properties instead.
     this.metadataAgent.reset();
-    // A node that arrives as part of *another* answer can come without its properties (the
-    // duplicate list of getWebsiteInformation). Then it is loaded once, so the metadata editor
-    // opens on the stored values instead of on nothing.
-    if (!node.properties) void this.hydrateActiveNode(node.ref.id);
+    // Nothing remembered and nothing stated: the node is loaded once so the editor opens on its
+    // stored values instead of on nothing. Only where this session reads nodes itself.
+    if (!node.properties && this.auth.loggedIn()) void this.hydrateActiveNode(nodeId);
   }
 
   /**
@@ -807,6 +832,14 @@ export class CurationService {
    */
   async adoptDetectedNodeId(nodeId: string): Promise<boolean> {
     if (this.activeNode() || this.hasUnsavedWork()) return false;
+    // For a session that does not read nodes itself the stored entry comes first: it is an account of
+    // the content that needs no read permission, so a node this panel wrote as a guest is adopted
+    // instead of being refused. A session of the user's own works on the live node.
+    const remembered = this.auth.loggedIn() ? null : this.storedEntryFor(nodeId);
+    if (remembered) {
+      this.adoptStoredEntry(remembered, 'detected');
+      return true;
+    }
     const node = await this.loadNode(nodeId);
     if (!node) return false;
     this.adoptDetectedNode(node);
