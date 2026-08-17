@@ -10,3 +10,15 @@ edu-sharing-usages {
   min-height: 320px;
   background: var(--es-surface);
 }
+
+// Bleeds the bundle's full-bleed footer by the card's own padding, so it ends on the card's edges.
+// ::ng-deep and the tag: the element's view is light DOM under the bundle's encapsulation attributes.
+:host ::ng-deep edu-sharing-usages .usages__footer {
+  margin-inline: calc(-1 * var(--es-space-4));
+  margin-bottom: calc(-1 * var(--es-space-4));
+  padding-inline: var(--es-space-4);
+  border-bottom-left-radius: var(--es-radius);
+  border-bottom-right-radius: var(--es-radius);
+  // The bundle's surface variable is unset outside its themes, which would leave the bar transparent.
+  background: var(--roundedContainerBackground, var(--es-surface));
+}
