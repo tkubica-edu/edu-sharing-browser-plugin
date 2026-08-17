@@ -88,6 +88,15 @@ export class ContentFlowService {
     this.navigation.go('quality', { tab: 'quality-check' });
   }
 
+  /**
+   * The Metadaten view of that same step, for describing a content rather than walking the check: the
+   * step's other view, offered as an errand of its own. Where the criteria still gate it, the section
+   * opens on the Qualität view instead — the one that unlocks it (see NavigationService.screen).
+   */
+  showMetadata(): void {
+    this.navigation.go('quality', { tab: 'metadata' });
+  }
+
   /** "An Redaktionen weiterleiten": handing the content on, ahead of the Qualitätsprüfung. */
   showEditorialForward(): void {
     this.navigation.go('editorial-forward');

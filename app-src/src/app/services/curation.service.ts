@@ -9,7 +9,9 @@ import {
 } from '../util/curation-node';
 import { MdsValues, firstString, stringValues, toMdsEditorValues } from '../util/mds-values';
 import { withAgentLicense } from '../util/agent-fields';
-import { EXTENDED_TEXT_FIELD, SOURCE_TEXT_KEY, toExtendedFields } from '../util/agent-payload';
+import {
+  EXTENDED_DATA_FIELD, EXTENDED_TEXT_FIELD, SOURCE_TEXT_KEY, toEnvelope, toExtendedFields
+} from '../util/agent-payload';
 import { errorMessage } from '../util/errors';
 import { renderLink } from '../util/repository-links';
 import { BrowserExtensionCustomWebComponentService } from './browser-extension-custom-web-component.service';
@@ -1083,18 +1085,31 @@ export class CurationService {
     }
   }
 
-  /** Record a saved node in the history (only saved nodes are kept there). */
+  /**
+   * Record a saved node in the history (only saved nodes are kept there). The entry describes the
+   * *node*: the properties the repository holds after the write, never the agent's proposal — a
+   * generated field the flow did not write is not part of this content, and the entry stands in for
+   * the node wherever this session may not read it back (see {@link applyStoredEntry}). The payload's
+   * envelope travels along, since node properties carry none and an editor seeded from the entry
+   * resolves its schema from it.
+   */
   private async recordSaved(saved: NodeSummary): Promise<void> {
     const lastRun = this.metadataAgent.lastRun();
-    const parsed = lastRun?.parsed;
-    if (!parsed) return;
+    const run = lastRun?.parsed;
+    if (!run) return;
+    const parsed = this.metadataAgent.parse({
+      ...toEnvelope(run.raw),
+      ...storedProperties(this.previewNode())
+    });
     await this.history.add({
       nodeId: saved.nodeId,
       url: lastRun?.source?.url ?? '',
       title: lastRun?.source?.title ?? saved.name,
       favIconUrl: lastRun?.source?.favIconUrl,
-      fieldsExtracted: parsed.fieldsExtracted,
-      fieldsTotal: parsed.fieldsTotal,
+      // The Erschließung's own count: it is about the run this content came out of, which the saved
+      // properties say nothing about.
+      fieldsExtracted: run.fieldsExtracted,
+      fieldsTotal: run.fieldsTotal,
       parsed
     });
   }
@@ -1209,4 +1224,16 @@ export class CurationService {
     this.personalCollectionsState.set([]);
     this.extractionUrl.set(null);
   }
+}
+
+/**
+ * A saved node's properties as the history keeps them: everything the repository holds, minus the WLO
+ * field that carries the whole payload as JSON. That one only repeats what stands beside it, and an
+ * entry holding it would carry a second copy of the content it already describes (see
+ * {@link toExtendedFields}).
+ */
+function storedProperties(node: Node | null): Record<string, unknown> {
+  const properties = { ...((node?.properties ?? {}) as Record<string, unknown>) };
+  delete properties[EXTENDED_DATA_FIELD];
+  return properties;
 }

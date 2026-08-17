@@ -172,6 +172,17 @@ export class NavigationService {
   }
 
   /**
+   * Whether one of a section's sub steps is locked right now, for the screens that offer a *tab* as an
+   * errand of its own (see the Inhaltsoptionen). Read from the registry rather than restated by the
+   * caller, so such a row and the tab it leads to are gated by the same statement. A tab that does not
+   * exist counts as open — there is nothing to gate.
+   */
+  isTabDisabled(id: SectionId, tab: ScreenId, conditions = this.conditions.snapshot()): boolean {
+    const step = this.sectionOf(id)?.tabs.find((candidate) => candidate.id === tab);
+    return !(step?.enabled?.(conditions) ?? true);
+  }
+
+  /**
    * Navigate to a section if it can be entered right now, optionally straight to one of its tabs. A
    * disabled section is refused as firmly as an invisible one, so no caller can route around the
    * disabled menu row — and so is every move while a write is in flight (see {@link BusyService}).

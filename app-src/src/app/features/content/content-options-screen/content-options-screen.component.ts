@@ -21,6 +21,13 @@ interface ContentOption {
   label: string;
   description: string;
   run: () => void | Promise<void>;
+  /**
+   * The step is offered but cannot be taken yet — an earlier one unlocks it. Offered all the same, so
+   * the set of ways on does not change under the user; {@link ContentOption.hint} says what is missing.
+   */
+  disabled?: boolean;
+  /** Why the row cannot be taken, shown in place of its description while it is disabled. */
+  hint?: string;
 }
 
 // "Inhaltsoptionen": the junction for a node the app already has, whether detected on the page or picked from the
@@ -71,6 +78,8 @@ export class ContentOptionsScreenComponent {
    */
   protected readonly options = computed<readonly ContentOption[]>(() => {
     const conditions = this.conditions.snapshot();
+    // The metadata are a view of the Qualitätsprüfung, and that step decides when it opens.
+    const metadataLocked = this.navigation.isTabDisabled('quality', 'metadata', conditions);
     const options: ContentOption[] = [
       {
         section: 'overview',
@@ -112,6 +121,20 @@ export class ContentOptionsScreenComponent {
         label: 'Qualität prüfen',
         description: 'Qualitätskriterien kontrollieren und bestätigen',
         run: () => this.flow.showQuality()
+      },
+      // The other view of that same step, for a content that only needs describing — the walk through
+      // the criteria is an errand of its own, and so is this. It carries the tab's own gate: where the
+      // criteria decide whether the content may be published, they are answered before it is described.
+      {
+        section: 'quality',
+        icon: 'sell',
+        label: 'Metadaten bearbeiten',
+        description: 'Beschreibung des Inhalts ansehen und ändern',
+        run: () => this.flow.showMetadata(),
+        disabled: metadataLocked,
+        // Named from where this row stands: from here the way to the metadata leads through the
+        // Qualitätsprüfung. Which criteria that step asks for is its own business, and its tab says so.
+        hint: metadataLocked ? 'Zuerst die Qualitätsprüfung durchführen.' : undefined
       },
       {
         section: 'overview',

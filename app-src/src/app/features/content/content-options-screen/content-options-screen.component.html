@@ -5,15 +5,18 @@
     <es-details-link></es-details-link>
   </es-content-card>
 
-  <!-- The same rows as the main menu: these are a choice of next step, not form buttons. -->
+  <!-- The same rows as the main menu: these are a choice of next step, not form buttons. A step that a
+       later state unlocks stays listed and disabled, and its line says what is missing — the same way
+       the main menu treats a section that does not apply yet. -->
   <ul class="option-list">
     @for (option of options(); track option.label) {
       <li>
-        <button class="menu-item" [disabled]="flow.deciding()" (click)="option.run()">
+        <button class="menu-item" [disabled]="flow.deciding() || !!option.disabled"
+                (click)="option.run()">
           <i class="mi-icon" [esIcon]="option.icon"></i>
           <span class="mi-main">
             <span class="mi-title">{{ option.label }}</span>
-            <span class="mi-desc">{{ option.description }}</span>
+            <span class="mi-desc">{{ option.hint ?? option.description }}</span>
           </span>
           <i class="chevron" esIcon="chevron_right"></i>
         </button>
