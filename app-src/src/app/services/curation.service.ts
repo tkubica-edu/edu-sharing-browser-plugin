@@ -790,8 +790,29 @@ export class CurationService {
     if (!entry.run) {
       console.log(`${LOG_HISTORY} … the entry carries no run, so ${entry.url} is erschlossen again for it`);
     }
-    // Keep the stored parsed result so the raw/field views and the source line show.
-    this.restoreStoredMetadata(entry);
+  }
+
+  /** Take a content up from the entry alone, for a node whose own properties are out of reach. */
+  private adoptStoredEntry(entry: HistoryEntry, source: NodeSource): void {
+    this.applyStoredEntry(entry, source);
+    this.applyStoredFlow(entry);
+  }
+
+  /**
+   * Put the flow back as the entry left it, for a content taken up again: the Erschließung it was
+   * written from — its proposals for the fields the node leaves empty, the marks saying which are the
+   * agent's, the text it was all read from — and how far the Qualitätsprüfung had got with it, which is
+   * what the steps behind it are unlocked by. Without this a content comes back as a bare node, and
+   * every step that stands on the Erschließung asks to be done a second time.
+   */
+  private applyStoredFlow(entry: HistoryEntry): void {
+    console.log(`${LOG_HISTORY} ⬅ taking the flow from the history entry for ${entry.nodeId}`, {
+      url: entry.url,
+      savedAt: new Date(entry.timestamp).toISOString(),
+      run: entry.run ? `${entry.run.fields.length} fields` : "none — the node's own fields stand in",
+      quality: entry.quality ?? 'unknown',
+      step: entry.step ?? 'none'
+    });
     this.metadataAgent.restore({
       ok: true,
       // An entry written before runs were kept has none; its own fields stand in for the display.
@@ -878,14 +899,7 @@ export class CurationService {
       return;
     }
     if (!entry) return;
-    this.applyStoredEntry(entry);
-    this.nodeSource.set(source);
-    this.metadataAgent.restore({
-      ok: true,
-      parsed: entry.parsed,
-      source: { url: entry.url, title: entry.title, favIconUrl: entry.favIconUrl }
-    });
-    this.applyStoredFlow(entry);
+    this.adoptStoredEntry(entry, source);
   }
 
   /**
