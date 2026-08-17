@@ -333,6 +333,62 @@ function hasPreviewImage(result) {
   return typeof named === 'string' && named.trim().length > 0;
 }
 
+/** The fields an agent result states the content's picture by, as an address of one. */
+const PICTURE_ADDRESS_FIELDS = ['preview_image_url', 'preview:url'];
+
+/** The picture addresses a page states about itself, in the order the extraction reads them. */
+function pageImageUrls(pageData) {
+  const images = pageData?.images ?? {};
+  return [images.ogImage?.url, images.heroImage?.url, images.twitterImage?.url].filter(
+    (url) => typeof url === 'string' && url.trim().length > 0
+  );
+}
+
+/** The file a picture address ends in — the part of it that says WHICH picture it is. */
+function pictureFileOf(url) {
+  try {
+    const path = new URL(url).pathname;
+    return decodeURIComponent(path.slice(path.lastIndexOf('/') + 1)).toLowerCase();
+  } catch (error) {
+    return '';
+  }
+}
+
+/**
+ * A picture address as the page itself states it: the agent's result carries an address it read out of
+ * the page text, and such a transcription can come back altered — an address whose path never existed
+ * answers with an error where the page's own loads. The pictures are matched by their file, so which
+ * one the agent chose stands; an address matching none of the page's is kept as it is.
+ */
+function pageStatedPicture(named, pageData) {
+  if (named.startsWith('data:')) return named;
+  const file = pictureFileOf(named);
+  if (!file) return named;
+  return pageImageUrls(pageData).find((url) => pictureFileOf(url) === file) ?? named;
+}
+
+/**
+ * The agent's result with every picture address it names corrected against the page's own — see
+ * {@link pageStatedPicture}. The field keeps the shape it arrived in: the agent states an address as a
+ * bare string or as a single-valued list, and the panel reads both.
+ */
+function withPageStatedPictures(result, pageData) {
+  let corrected = result;
+  for (const field of PICTURE_ADDRESS_FIELDS) {
+    const stated = corrected?.[field];
+    const named = Array.isArray(stated) ? stated[0] : stated;
+    if (typeof named !== 'string' || !named.trim()) continue;
+    const fromPage = pageStatedPicture(named.trim(), pageData);
+    if (fromPage === named.trim()) continue;
+    console.log('🖼️ picture address corrected to the one the page states:', field, fromPage);
+    corrected = {
+      ...corrected,
+      [field]: Array.isArray(stated) ? [fromPage, ...stated.slice(1)] : fromPage
+    };
+  }
+  return corrected;
+}
+
 // /generate PROXY
 
 /**
@@ -514,7 +570,12 @@ browser.runtime.onMessage.addListener((message, sender) => {
           }
           const pageData = await extractPageDataFromTab(tab.id);
           const body = buildGenerateBody(pageData, message.language);
-          const result = await callGenerate(body, agentBaseOf(message));
+          // The page states the addresses of its own pictures; the result only transcribes them, so
+          // what it names is read back against the page (see {@link withPageStatedPictures}).
+          const result = withPageStatedPictures(
+            await callGenerate(body, agentBaseOf(message)),
+            pageData
+          );
           // Only for a page that names no picture of its own: what a page states about itself
           // describes it better than a photograph of how it happens to be rendered right now.
           const screenshot = hasPreviewImage(result) ? null : await captureVisiblePage(tab);
