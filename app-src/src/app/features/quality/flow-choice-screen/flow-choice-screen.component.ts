@@ -32,7 +32,7 @@ export class FlowChoiceScreenComponent implements OnDestroy {
   private readonly allOptions: readonly FlowOption[] = [
     {
       section: 'quality',
-      label: 'Geführte Qualitätsprüfung',
+      label: 'Strukturierte Qualitätsprüfung',
       description:
         'Prüfe Qualitätskriterien und Metadaten Schritt für Schritt. KI unterstützt dich mit Vorschlägen.'
     },
