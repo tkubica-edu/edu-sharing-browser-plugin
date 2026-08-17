@@ -5,7 +5,12 @@ app-src/dist/
 app-src/.angular/
 *.log
 .DS_Store
-.claude
+# Claude's local state stays out; what the project shares — its skills and the permissions
+# everyone works under — is tracked. Re-including needs the /* form: a file inside an ignored
+# directory cannot be brought back.
+.claude/*
+!.claude/skills/
+!.claude/settings.json
 .agents
 .idea
 
