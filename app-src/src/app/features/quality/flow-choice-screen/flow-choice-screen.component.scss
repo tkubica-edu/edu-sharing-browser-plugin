@@ -8,9 +8,9 @@
 
   display: flex;
   flex-direction: column;
-  // The two cards are the whole content of the step, so they stand well apart — the gap is what
-  // reads them as two separate processes rather than one block.
-  gap: 24px;
+  // Enough to read the cards as two separate processes, no more: their own border and background do
+  // that work, and a wider gap only pushed the second process towards the fold.
+  gap: var(--es-space-4);
 }
 
 // A card per process. Selected it carries the panel's blue, like the forwarding's group cards do —
@@ -54,7 +54,9 @@
   overflow-wrap: anywhere;
 }
 
+// The description is what the choice is actually made on — the two labels differ by a word — so it is
+// read at the size of the menu's own description lines rather than at fine-print size.
 .choice-description {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.45;
 }
