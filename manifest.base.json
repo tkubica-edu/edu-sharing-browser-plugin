@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "edu-sharing",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Liest den Inhalt der aktuellen Seite aus und erzeugt daraus Metadaten über die edu-sharing Metadata-Agent-API.",
   "homepage_url": "https://edu-sharing.com/",
 
