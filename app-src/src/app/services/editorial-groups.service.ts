@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { errorMessage } from '../util/errors';
 import { CollectionRecommendationService, RecommendedCollection } from './collection-recommendation.service';
+import { DevModeService } from './dev-mode.service';
 import { Collection, CurationService, EditorialTarget } from './curation.service';
 
 /**
@@ -74,6 +75,7 @@ export class EditorialGroupsService {
   // Where the choices this service's views make are recorded — the flow carries them to the save.
   private readonly curation = inject(CurationService);
   private readonly recommendations = inject(CollectionRecommendationService);
+  private readonly devMode = inject(DevModeService);
 
   private readonly groupsState = signal<readonly EditorialGroup[]>([]);
   /** The groups that could be loaded, in the order the config names them. */
@@ -208,9 +210,9 @@ export class EditorialGroupsService {
    * dropped — the content would land somewhere no editorial team was picked for.
    */
   private applyRecommendation(found: RecommendedCollection): void {
-    const group = this.groupsState().find((candidate) =>
-      found.ancestry.includes(candidate.collection.id),
-    );
+    const group =
+      this.groupsState().find((candidate) => found.ancestry.includes(candidate.collection.id)) ??
+      this.hostGroupForTest(found);
     if (!group) {
       console.log(`${LOG} proposed collection belongs to no editorial group:`, found.ancestry);
       return;
@@ -235,6 +237,23 @@ export class EditorialGroupsService {
     // one where it is shown and can be undone as a whole (see isRecommended, toggle).
     this.recommendedState.set({ groupId: offered.collection.id, folder });
     this.chooseFolder(offered, folder);
+  }
+
+  /**
+   * The group a collection named in the settings is shown under, for the dev mode's proposal alone: a
+   * test collection sits wherever it sits, usually under none of the configured groups, and the row of
+   * the first group is where a proposal can be seen and worked with at all. Null for every other
+   * proposal — belonging to a group is what makes a real one usable (see {@link applyRecommendation}).
+   */
+  private hostGroupForTest(found: RecommendedCollection): EditorialGroup | undefined {
+    if (this.devMode.fakedCollectionId() !== found.node.ref.id) return undefined;
+    const group = this.groupsState()[0];
+    if (group) {
+      console.log(
+        `${LOG} dev mode: the collection from the settings is offered under ${group.collection.name}`,
+      );
+    }
+    return group;
   }
 
   /**

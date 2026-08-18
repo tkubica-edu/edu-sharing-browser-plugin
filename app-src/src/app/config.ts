@@ -172,7 +172,19 @@ export const APP_CONFIG = {
      * metadata agent's answers under the same flag — the literal there has to stay in step with this
      * one (`DEV_MODE_STORAGE_KEY` in background/background.js).
      */
-    devMode: 'eduSharingDevMode'
+    devMode: 'eduSharingDevMode',
+    /**
+     * The collection a faked run is checked against, and whether the flow's writes are made at all —
+     * both only in effect while the dev mode is on (see DevModeService).
+     */
+    devModeCollectionId: 'eduSharingDevModeCollectionId',
+    devModeSkipWrites: 'eduSharingDevModeSkipWrites',
+    /**
+     * Which faked erschlossener Inhalt a run answers with. Read by the background worker, which owns those
+     * fixtures — the literal there has to stay in step with this one
+     * (`DEV_MODE_GENERATE_STORAGE_KEY` in background/background.js).
+     */
+    devModeGenerate: 'eduSharingDevModeGenerate'
   },
   maxHistory: 200
 };

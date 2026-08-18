@@ -264,8 +264,7 @@ export class ActionBarService {
               if (!this.curation.qualityConfirmed()) return;
               // The content has been erschlossen and judged, so the recognition's earlier answer about
               // this page no longer holds — asked again on the way back to the menu.
-              this.pageRecognition.invalidate();
-              this.navigation.go('overview');
+              this.leaveFlow();
             }
           }
         ];
@@ -344,9 +343,18 @@ export class ActionBarService {
         // The page has been erschlossen: the repository now answers the URL lookup with this content,
         // so the recognition's earlier "no content" no longer holds and is asked again on the way back
         // to the menu (see NavigationService.openMenu).
-        this.pageRecognition.invalidate();
-        this.navigation.go('overview');
+        this.leaveFlow();
       }
     };
+  }
+
+  /**
+   * The way out of the flow: the Inhaltsübersicht, which is about the node the flow wrote — and the menu
+   * where there is no node for it to be about, so a run that wrote none ends somewhere rather than on a
+   * step whose way on leads nowhere.
+   */
+  private leaveFlow(): void {
+    this.pageRecognition.invalidate();
+    this.navigation.go(this.navigation.isVisible('overview') ? 'overview' : 'menu');
   }
 }

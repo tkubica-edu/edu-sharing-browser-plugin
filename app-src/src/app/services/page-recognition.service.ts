@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, effect, inject } from '@angular/core';
 import { ClientutilsV1Service } from 'ngx-edu-sharing-api';
 import { firstValueFrom } from 'rxjs';
 
@@ -7,6 +7,7 @@ import { nodeIdFromRepositoryUrl } from '../util/repository-links';
 import { AuthService } from './auth.service';
 import { ConditionsService } from './conditions.service';
 import { CurationService } from './curation.service';
+import { DevModeService } from './dev-mode.service';
 import { HistoryService } from './history.service';
 
 /** Same tag as the history's own log lines: the lookup below is a read of it. */
@@ -24,10 +25,27 @@ export class PageRecognitionService {
   private readonly auth = inject(AuthService);
   private readonly conditions = inject(ConditionsService);
   private readonly curation = inject(CurationService);
+  private readonly devMode = inject(DevModeService);
   private readonly history = inject(HistoryService);
 
   /** The last recognition's answer no longer describes the open page, so it has to be asked again. */
   private stale = false;
+
+  constructor() {
+    // The skip below applies to what was recognised *before* the dev mode was switched on as well: a
+    // content adopted a moment ago would otherwise go on standing for the page, which takes the
+    // Erschließung away from the very page the mode is there to run through again. Only a content that
+    // arrived on its own is let go of, and unsaved work outranks it — see releaseDetectedContent.
+    //
+    // Not on an insert host, on the same grounds the lookup itself is not made there: what stands for the
+    // page is then the document the plugin announced, which is no duplicate finding to drop.
+    effect(() => {
+      if (!this.devMode.enabled() || this.conditions.onlyOfficePresent()) return;
+      if (!this.curation.hasDetectedNode()) return;
+      console.log(`${LOG} dev mode: the recognised content is released again`);
+      this.curation.releaseDetectedContent();
+    });
+  }
 
   /** Mark the recognition as outdated: what the repository holds for the open page has changed. */
   invalidate(): void {
@@ -72,6 +90,13 @@ export class PageRecognitionService {
       if (this.conditions.onEduSharing()) return false;
       const lookupUrl = httpUrl(url);
       if (!lookupUrl) return false;
+      // Nothing this page became before counts while the answers are faked: the dev mode is for running
+      // the same page through the flow again and again, and a content found for it would take the
+      // Erschließung away — *Inhalt erschließen* is disabled for a page that already has one.
+      if (this.devMode.enabled()) {
+        console.log(`${LOG} dev mode: ${lookupUrl} is not looked up, so the page stays erschließbar`);
+        return false;
+      }
       // What this panel erschlossen itself, taken from the history before the repository is asked: the entries hold
       // the page's own address, so the entry for this one names the node the page already became. Nothing but the
       // address decides it, and the entry stands in for a node this session may not read — which is exactly the

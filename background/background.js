@@ -25,6 +25,13 @@ const DEV_MODE_STORAGE_KEY = 'eduSharingDevMode';
 const DEV_MODE_DEFAULT = false;
 
 /**
+ * Which of the faked `/generate` answers a run is answered with (`EDU_SHARING_DEV_FIXTURES.agentGenerate`). The
+ * sidebar writes the key, this reads it; an unknown or unset one falls back to the first fixture, so a stored
+ * value naming a content that has since been removed still answers.
+ */
+const DEV_MODE_GENERATE_STORAGE_KEY = 'eduSharingDevModeGenerate';
+
+/**
  * Delay before a faked answer arrives, so a caller sees the same asynchronous behaviour — spinner,
  * in-flight guard — as with the real agent. Small, since saving the wait is the point.
  */
@@ -41,6 +48,23 @@ async function devModeEnabled() {
   } catch {
     return DEV_MODE_DEFAULT;
   }
+}
+
+/**
+ * The faked erschlossener Inhalt a run answers with: the one the dev mode names, else the first there is.
+ * Named rather than positional, so the sidebar's select and the fixtures agree by key.
+ */
+async function devModeGenerate() {
+  const fixtures = EDU_SHARING_DEV_FIXTURES.agentGenerate;
+  let picked = null;
+  try {
+    const items = await browser.storage.local.get({ [DEV_MODE_GENERATE_STORAGE_KEY]: '' });
+    picked = items[DEV_MODE_GENERATE_STORAGE_KEY];
+  } catch {
+    // No storage to read: the first fixture is as good an answer as any.
+  }
+  const key = picked && fixtures[picked] ? picked : Object.keys(fixtures)[0];
+  return { key, fixture: fixtures[key] };
 }
 
 /**
@@ -463,7 +487,8 @@ async function callGenerate(body, apiUrl) {
   // First health, then generate: no point sending an extraction to a base that is not answering.
   await callHealth(apiUrl);
   if (await devModeEnabled()) {
-    return fakeAnswer('POST /generate', EDU_SHARING_DEV_FIXTURES.agentGenerate);
+    const { key, fixture } = await devModeGenerate();
+    return fakeAnswer(`POST /generate (${key})`, fixture);
   }
   const response = await fetchWithTimeout(
     `${apiUrl}/generate`,

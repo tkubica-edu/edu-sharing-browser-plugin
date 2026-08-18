@@ -36,6 +36,42 @@
     und beantwortet <code>/evaluate</code> mit <code>422</code>. Standardmäßig aus — nur zum
     Entwickeln einschalten, sonst antworten die echten Dienste.
   </p>
+
+  @if (devMode.enabled()) {
+    <label class="es-field-label" for="dev-generate">Gefakter Inhalt</label>
+    <select id="dev-generate" class="es-input"
+            [ngModel]="devMode.generate()" (ngModelChange)="setDevGenerate($event)">
+      @for (fixture of devMode.generateFixtures; track fixture.id) {
+        <option [value]="fixture.id">{{ fixture.label }}</option>
+      }
+    </select>
+    <p class="desc">
+      Welche fertige Erschließung <code>/generate</code> zurückgibt. „Optik“ enthält absichtlich
+      fachliche Fehler im Text — damit hat eine Qualitätsprüfung etwas zu finden.
+    </p>
+
+    <label class="es-field-label" for="dev-collection">Test-Sammlungs-ID</label>
+    <input id="dev-collection" type="text" class="es-input" placeholder="Sammlungs-ID"
+           [ngModel]="devMode.collectionId()" (ngModelChange)="setDevCollectionId($event)" />
+    <p class="desc">
+      Sammlung, in der der Inhalt als einsortiert gilt — ohne die Einsortier-Schritte durchlaufen zu
+      müssen. Die „Individuelle Qualitätsprüfung mit KI“ prüft gegen diese Sammlung, weil die KI ihre
+      Prüf-Anweisung darüber lädt. Der Inhalt wird nicht in sie einsortiert: sie ist der Prüfgegenstand,
+      keine Ablage-Entscheidung.
+    </p>
+
+    <label class="check">
+      <input type="checkbox" [ngModel]="devMode.skipWrites()"
+             (ngModelChange)="setDevSkipWrites($event)" />
+      <span>Nichts ins Repositorium schreiben</span>
+    </label>
+
+    <p class="desc">
+      „Weiter“ führt weiter, ohne zu speichern — es wird kein Node angelegt und keiner geändert. So
+      lässt sich eine Prüfung beliebig oft wiederholen, ohne bei jedem Durchlauf einen Node
+      zurückzulassen. Zum Testen des Speicherns ausgeschaltet lassen.
+    </p>
+  }
 </section>
 
 <!-- Entwicklung: ersetzt das OnlyOffice-Plugin durch simulierte Events. -->

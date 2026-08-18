@@ -5,6 +5,7 @@ import { APP_CONFIG, toTopicAssistantUrl } from '../config';
 import { fetchJson } from '../util/json-api';
 import { AuthService } from './auth.service';
 import { BrowserExtensionService } from './browser-extension.service';
+import { DevModeService } from './dev-mode.service';
 import { KeywordRankingService, RankedKeyword } from './keyword-ranking.service';
 import { RepositoryNodeService } from './repository-node.service';
 
@@ -109,6 +110,7 @@ export class CollectionRecommendationService {
   private readonly auth = inject(AuthService);
   private readonly browserExtension = inject(BrowserExtensionService);
   private readonly ranking = inject(KeywordRankingService);
+  private readonly devMode = inject(DevModeService);
   private readonly repositoryNodes = inject(RepositoryNodeService);
 
   private readonly maxKeywordsState = signal(DEFAULT_MAX_KEYWORDS);
@@ -169,6 +171,20 @@ export class CollectionRecommendationService {
     keywords: readonly string[],
     text = '',
   ): Promise<RecommendedCollection | null> {
+    // The dev mode's collection is the proposal, and the topic assistant is not asked at all: what a
+    // step behind this one is being tested against is then the collection named in the settings rather
+    // than whatever the keywords of the moment lead to (see DevModeService). The collection itself is
+    // read from the repository like any other proposal, so what follows works on a real node.
+    const faked = this.devMode.fakedCollectionId();
+    if (faked) {
+      const found = await this.resolve(faked);
+      console.log(
+        `${LOG} ➡ dev mode: proposing the collection from the settings`,
+        found ? { id: faked, title: found.node.title ?? found.node.name, ancestry: found.ancestry } : { id: faked },
+      );
+      if (!found) console.warn(`${LOG} ${faked} is no collection this session can read`);
+      return found;
+    }
     const ranked = this.ranking.rank(keywords, text);
     // The score is only a statement where there was a text to rank against: without one every keyword
     // scores 0, and the threshold would reject the whole list rather than its weak part. The keywords

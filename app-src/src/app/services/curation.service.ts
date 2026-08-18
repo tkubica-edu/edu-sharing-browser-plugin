@@ -16,6 +16,7 @@ import { errorMessage } from '../util/errors';
 import { renderLink } from '../util/repository-links';
 import { BrowserExtensionCustomWebComponentService } from './browser-extension-custom-web-component.service';
 import { AuthService } from './auth.service';
+import { DevModeService } from './dev-mode.service';
 import { SavedNode } from './browser-extension.service';
 import { HistoryEntry, HistoryService } from './history.service';
 import { MetadataAgentService } from './metadata-agent.service';
@@ -116,6 +117,7 @@ const EDIT_WINDOW_CLOSED_TEXT =
 export class CurationService {
   private readonly auth = inject(AuthService);
   private readonly metadataAgent = inject(MetadataAgentService);
+  private readonly devMode = inject(DevModeService);
   private readonly nodeWrite = inject(NodeWriteService);
   private readonly browserExtensionCustomWebComponent = inject(BrowserExtensionCustomWebComponentService);
   private readonly repositoryNodes = inject(RepositoryNodeService);
@@ -252,10 +254,24 @@ export class CurationService {
    * own. The same collection can be reached from both, and a content belongs in it once.
    */
   readonly filedCollections = computed<readonly Collection[]>(() => {
-    const collections = [...this.editorialCollections(), ...this.personalCollectionsState()];
+    const collections = [
+      ...this.editorialCollections(),
+      ...this.personalCollectionsState(),
+      ...this.devModeCollection()
+    ];
     return collections.filter(
       (collection, index) => collections.findIndex((other) => other.id === collection.id) === index,
     );
+  });
+
+  /**
+   * The collection the dev mode names, as one the content counts as filed in — what lets a step that
+   * works off a collection be entered without walking the filing steps first (see DevModeService).
+   * Empty list rather than null, so it joins the filed ones by spreading.
+   */
+  private readonly devModeCollection = computed<readonly Collection[]>(() => {
+    const id = this.devMode.fakedCollectionId();
+    return id ? [{ id, name: `Test-Sammlung ${id}` }] : [];
   });
 
   /**
@@ -265,8 +281,12 @@ export class CurationService {
    */
   private readonly pendingCollections = computed<readonly Collection[]>(() => {
     const assigned = this.assignedCollections();
+    // The dev mode's collection is a subject to check against, not a filing decision — a write that
+    // put the content into it would file a test run's content in a real collection.
+    const faked = this.devMode.fakedCollectionId();
     return this.filedCollections().filter(
-      (collection) => !assigned.some((done) => done.id === collection.id),
+      (collection) =>
+        collection.id !== faked && !assigned.some((done) => done.id === collection.id),
     );
   });
 
@@ -1009,6 +1029,7 @@ export class CurationService {
     steps: SaveSteps = {},
   ): Promise<boolean> {
     if (!this.auth.authorized()) return false;
+    if (this.devMode.writesSkipped()) return this.leaveUnwritten(values, steps);
     // What other steps recorded goes underneath, so a property the editor carries too is the
     // editor's: it is the metadata's own authority, and it was seeded with the recorded values
     // anyway (see editorMetadata). A property it does not carry survives from where it was set.
@@ -1056,6 +1077,32 @@ export class CurationService {
     } finally {
       this.saving.set(false);
     }
+  }
+
+  /**
+   * Answer a write as if it had gone through, without making one — the dev mode's way of walking the
+   * flow without leaving a node behind for every run (see DevModeService). Nothing is invented: no node
+   * is created, so the steps behind this one keep working off the result the run produced, and what the
+   * steps recorded stays recorded, since there is nothing carrying it yet.
+   */
+  private leaveUnwritten(values: MdsValues, steps: SaveSteps): boolean {
+    console.log(`${LOG_WRITE} ⏭ dev mode: ${Object.keys(values).length} properties left unwritten`, {
+      nodeId: this.activeNode()?.nodeId ?? null,
+      steps,
+      values,
+      collections: this.filedCollections().map((collection) => collection.name)
+    });
+    this.saveError.set(null);
+    this.workflowError.set(null);
+    this.assignError.set(null);
+    // The run is no longer unsaved work: nothing is going to be written, so nothing is pending, and the
+    // panel must not ask about losing it at every step.
+    this.resultPending.set(false);
+    this.saved.set(true);
+    // The step that hands the content over is the flow's last act either way, so the Erschließung counts
+    // as done — the steps behind it read this to know the flow ran to its end.
+    if (steps.review) this.curationFinished.set(true);
+    return true;
   }
 
   /**

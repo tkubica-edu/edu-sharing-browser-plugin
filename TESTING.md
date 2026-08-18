@@ -1,6 +1,7 @@
 # Load & test
 
 - [Load the extension](#load-the-extension)
+- [Dev mode (faked KI answers)](#dev-mode-faked-ki-answers)
 - [Debug mode (OnlyOffice without OnlyOffice)](#debug-mode-onlyoffice-without-onlyoffice)
 - [Manual test checklist](#manual-test-checklist)
 - [Where errors show up](#where-errors-show-up)
@@ -27,6 +28,58 @@ Open the generated Xcode project and Run.
 
 A rebuilt bundle or manifest needs an explicit *Reload* in the browser's extension page — neither
 browser picks up a changed package on its own.
+
+## Dev mode (faked KI answers)
+
+*Einstellungen* → **Dev-Modus: KI-Antworten faken** (`DevModeService`). The slow, paid services answer
+from fixtures instead of being asked: the metadata agent's `/health`, `/generate` (in the background
+worker, `background/dev-fixtures.js`) and `/extract-field`, and ContentJudge's `/health` and
+`/evaluate`. The assistant's own chat is **not** faked — a check it runs is the thing under test.
+
+While the mode is on, a page is also never recognised as one that has been erschlossen before: the
+history and the repository's URL lookup (`duplicateNodes`) are both skipped
+(`PageRecognitionService`), so *Inhalt erschließen* stays offered for a page a test run already put
+into the repository. Switching the mode on also lets go of a content that was recognised before it was
+switched on — otherwise that finding would go on standing for the page. Neither applies on an insert
+host, where the announced document stands for the page rather than a lookup, and neither throws away
+unsaved work.
+
+Three further settings appear while the mode is on, and hold only while it is:
+
+- **Gefakter Inhalt** — which erschlossener Inhalt `/generate` answers with. `dresden` is a sound
+  content; `optik` carries factual errors in its text on purpose, so a quality check has something to
+  find. The payloads live in `background/dev-fixtures.js` (the worker answers that call); the select's
+  ids come from `GENERATE_FIXTURES` in `dev-mode.service.ts` and have to stay in step with that
+  object's keys.
+- **Test-Sammlungs-ID** — the collection every step that works off one is to work off. It takes three
+  places at once, so no step has to be walked for it:
+  - it joins `CurationService.filedCollections`, which is what the KI check reads its collection from;
+  - it *is* the „Empfohlene Sammlung" — `CollectionRecommendationService.recommend` answers with it
+    and the topic assistant is not asked at all, so the proposal is the collection under test rather
+    than whatever the keywords of the moment lead to;
+  - where it belongs to none of the configured editorial groups, the forwarding step shows it under
+    the first of them (`EditorialGroupsService.hostGroupForTest`) — a test collection sits wherever it
+    sits, and a proposal outside every group would otherwise be dropped unseen.
+
+  The content is never put into it: it is the subject a check works off, not a filing decision, so it
+  is kept out of what a save writes.
+- **Nichts ins Repositorium schreiben** — every step's *Weiter* leads on without writing
+  (`CurationService.leaveUnwritten`). No node is created and none is updated, so a step behind the
+  first save can be repeated without leaving a node behind each time. Off by default, because the
+  saving is itself worth testing.
+
+### Reaching „Individuelle Qualitätsprüfung mit KI" quickly
+
+1. Switch the dev mode on, put a real collection id into **Test-Sammlungs-ID**, tick **Nichts ins
+   Repositorium schreiben**.
+2. *Inhalt erschließen* on any page → the faked run answers at once.
+3. *Weiter* through Vorschau and whichever filing steps apply — none of them writes now.
+4. *Prüfprozess auswählen* → **Individuelle Qualitätsprüfung mit KI** → the dialogue runs against the
+   collection from the settings.
+
+The check needs no node of its own (the section asks for `hasEditableMetadata`, which the faked run
+satisfies), so the run ends on the menu rather than the Inhaltsübersicht — that step is about a node,
+and this run wrote none. To test the writing instead, untick the checkbox and walk the same path.
 
 ## Debug mode (OnlyOffice without OnlyOffice)
 
