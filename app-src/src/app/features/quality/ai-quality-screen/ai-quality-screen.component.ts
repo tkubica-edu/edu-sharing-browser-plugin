@@ -115,6 +115,13 @@ export class AiQualityScreenComponent {
   private readonly summary = signal('');
 
   /**
+   * Whether the assistant holds the content fit for use in education — its judgement over all criteria
+   * together. Kept because it is the only place a collection's own requirements can land where we hold no
+   * field for them: what an instruction checks beyond our criteria has nowhere else to go.
+   */
+  private readonly suitable = signal<boolean | null>(null);
+
+  /**
    * What the assistant answered per criterion; empty until it has. Not on screen: the dialogue itself is what
    * the person reads, and a second rendering of the same answer beside it would compete with it. It is held
    * because a later turn is laid over it, and it goes to the console for whoever is following the check.
@@ -209,7 +216,7 @@ export class AiQualityScreenComponent {
       this.takeEnrichment(answer);
       return;
     }
-    const { verdicts, summary } = verdictsOf(answer.result, this.criteria());
+    const { verdicts, summary, suitable } = verdictsOf(answer.result, this.criteria());
     if (!verdicts.length) {
       console.log(`${LOG_QUALITY} ← the turn submitted no verdicts`, {
         stopReason: answer.stopReason,
@@ -231,6 +238,7 @@ export class AiQualityScreenComponent {
       collection: this.collection(),
       thisTurn: verdicts.map(({ criterion, met, reason }) => ({ criterion: criterion.caption, met, reason })),
       standing: judged.map(({ criterion, met }) => `${met ? '✓' : '✗'} ${criterion.caption}`),
+      suitableForEducation: suitable,
       summary,
       recorded: properties,
       knockoutSatisfied: satisfied,
@@ -249,6 +257,7 @@ export class AiQualityScreenComponent {
     // Only now: the enrichment is a run of its own, and it starts from a content whose quality is
     // established. Flipping the step re-states task and schema, which the chat then puts as a further turn.
     this.summary.set(summary);
+    if (suitable !== null) this.suitable.set(suitable);
     this.step.set('enrichment');
   }
 
@@ -288,6 +297,7 @@ export class AiQualityScreenComponent {
           reason
         })),
         summary: this.summary(),
+        suitableForEducation: this.suitable(),
         knockoutSatisfied: this.curation.qualityCriteriaMet(),
         recorded: this.curation.editorMetadata()
       },

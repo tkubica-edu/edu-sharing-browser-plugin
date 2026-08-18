@@ -61,6 +61,13 @@ export interface QualityCheckResult {
   verdicts: readonly CriterionVerdict[];
   /** Its summary over all criteria, empty where it gave none. */
   summary: string;
+  /**
+   * Whether it holds the content fit for use in education — its judgement over all criteria together, and
+   * the one place where what a collection's instruction checks beyond them can be stated at all. `null`
+   * where the turn did not say: a criteria list we do not hold a field for is what this answers, so a
+   * missing one must not read as "unfit".
+   */
+  suitable: boolean | null;
 }
 
 /** The criteria of a metadata set, knock-out ones first, in the order the set lists them. */
@@ -111,12 +118,21 @@ export function resultSchemaOf(criteria: readonly QualityCriterion[]): Record<st
         properties,
         required: criteria.map((item) => item.key)
       },
+      geeignet: {
+        type: 'boolean',
+        description:
+          'Dein Gesamturteil: true, wenn der Inhalt für den Einsatz in Bildung geeignet ist. Über alle ' +
+          'Kriterien hinweg und einschließlich dessen, was die Anleitungen der Sammlung sonst noch prüfen ' +
+          'und wofür es hier kein eigenes Kriterium gibt.'
+      },
       zusammenfassung: {
         type: 'string',
-        description: 'Zwei bis drei Sätze: Was steht der Freigabe im Weg, und was wäre als Nächstes zu tun?'
+        description:
+          'Zwei bis drei Sätze: Was steht der Freigabe im Weg, und was wäre als Nächstes zu tun? Nenne ' +
+          'hier auch, was eine Anleitung geprüft hat, wofür es kein eigenes Kriterium gibt.'
       }
     },
-    required: ['kriterien']
+    required: ['kriterien', 'geeignet']
   };
 }
 
@@ -148,6 +164,7 @@ export interface VocabularyValue {
 export interface CheckOutcome {
   verdicts: readonly CriterionVerdict[];
   summary: string;
+  suitable: boolean | null;
   metadata: EnrichedMetadata | null;
 }
 
@@ -359,8 +376,11 @@ export interface CheckSubject {
  * **How to get the rest**: the address, where the text is missing or had to be cut. Reading it is something
  * the assistant can do, and doing it beats declaring twelve criteria unprovable.
  *
- * **What to judge it by**: the collection's released instruction, fetched outright, because the prompt carries
- * the titles of a collection's skills but no ids and an unspecific task lets the model answer from memory.
+ * **What to judge it by**: every quality-assurance skill the collection has released, fetched outright and by
+ * dimension. The prompt carries the titles of a collection's skills but no ids, and an unspecific task lets
+ * the model answer from memory, so the criteria are named as *our* dimensions and the assistant is asked to
+ * fetch the instructions that speak to them. What a skill checks beyond them has nowhere to go as a criterion
+ * — we hold no field for it — so it is asked for as part of the one overall verdict instead.
  *
  * **Where it is read**: in the chat as well as in the schema. Nothing can put a message into that conversation
  * from outside, so the assistant is asked to write the result there itself — the person sees only the chat.
@@ -385,19 +405,28 @@ export function qualityInstructionOf(
       'Sammlung als Ganzes.',
     'Das ist der erste von zwei Schritten; der zweite ist das Anreichern der Metadaten. Der Schritt ist ' +
       'fertig, wenn die Person deine Bewertung durchgegangen ist und sie bestätigt hat.',
-    collection
-      ? 'Hol dir dazu zuerst die für die Sammlung freigegebene Anleitung (get_skill_registry, dann ' +
-        'get_skill) und halte dich an sie, falls eine dabei ist.'
-      : '',
     '',
-    'Beurteile jedes dieser Kriterien einzeln:',
+    'Das sind unsere Prüfdimensionen. Beurteile jede einzeln:',
     criteria.map((item) => `${item.key}: ${item.caption}`).join('\n'),
+    collection
+      ? 'Nutze dafür alle zur Sammlung verfügbaren Qualitätssicherungsskills und ihre Prüfdimensionen: hol ' +
+        'dir mit get_skill_registry die Liste und mit get_skill jede Anleitung, die zu einer dieser ' +
+        'Dimensionen etwas sagt, und urteile danach.'
+      : '',
+    collection
+      ? 'Prüft eine Anleitung etwas, wofür es oben keine Dimension gibt, dann ordne es der nächstliegenden ' +
+        'zu, wenn es dorthin gehört. Gehört es nirgends hin, lass es in dein Gesamturteil (geeignet) ' +
+        'einfließen und sag es in der Zusammenfassung — als eigenes Kriterium können wir es nicht führen.'
+      : '',
     'Rate nicht: wo der Inhalt nichts hergibt, ist das Kriterium nicht erfüllt, und die Begründung sagt ' +
       'ausdrücklich, dass es nicht prüfbar war.',
+    'Sag am Ende außerdem, ob der Inhalt für den Einsatz in Bildung geeignet ist — dein Gesamturteil über ' +
+      'alle Dimensionen und alles, was die Anleitungen sonst noch prüfen.',
     '',
     'Schreib dein Urteil zuerst in den Chat: je Kriterium eine Zeile mit ✓ oder ✗, dem Namen des Kriteriums ' +
-      'und dem Grund in einem Satz, darunter ein kurzes Fazit, was einer Freigabe im Weg steht. Die Person ' +
-      'sieht nur den Chat — was dort nicht steht, erfährt sie nicht.',
+      'und dem Grund in einem Satz, darunter dein Gesamturteil, ob der Inhalt für Bildung geeignet ist, und ' +
+      'ein kurzes Fazit, was einer Freigabe im Weg steht. Die Person sieht nur den Chat — was dort nicht ' +
+      'steht, erfährt sie nicht.',
     'Bitte sie danach ausdrücklich, dein Urteil durchzugehen und zu bestätigen oder zu korrigieren. Führe sie ' +
       'zu dieser Bestätigung: frag direkt, ob es so stehen bleiben soll, und geh auf ihre Einwände ein.',
     'Rufe submit_result ERST auf, wenn sie bestätigt hat — vorher nicht, auch wenn dein Urteil längst fertig ' +
@@ -469,7 +498,12 @@ export function verdictsOf(
     verdicts.push({ criterion, met, reason: typeof reason === 'string' ? reason.trim() : '' });
   }
   const summary = answer?.['zusammenfassung'];
-  return { verdicts, summary: typeof summary === 'string' ? summary.trim() : '' };
+  const suitable = answer?.['geeignet'];
+  return {
+    verdicts,
+    summary: typeof summary === 'string' ? summary.trim() : '',
+    suitable: typeof suitable === 'boolean' ? suitable : null
+  };
 }
 
 /**

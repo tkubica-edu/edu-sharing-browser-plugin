@@ -337,9 +337,14 @@ for.
 **The check is two tasks, one after the other**, and the second is not put until the first has
 answered:
 
-1. **Qualität bewerten** (`qualityInstructionOf()`) — the criteria, listed by key and caption, judged
-   against the collection's released instruction, which the assistant is told to fetch outright
-   (`get_skill_registry`, then `get_skill`). This task **quotes the content's own text in full**.
+1. **Qualität bewerten** (`qualityInstructionOf()`) — the criteria, listed by key and caption and named
+   as *our check dimensions*, judged against **every** quality-assurance skill the collection has
+   released: the assistant is told to fetch the registry (`get_skill_registry`) and then each
+   instruction that speaks to one of those dimensions (`get_skill`). Naming the dimensions is what lets
+   it pick — asked for "the collection's instruction" it fetches one, or none. What a skill checks that
+   we hold no criterion for is not dropped and not invented as one either: it goes into the single
+   overall verdict, `geeignet`, and is named in the summary. This task **quotes the content's own text
+   in full**.
 2. **Metadaten anreichern** (`enrichmentInstructionOf()`) — subject, education level and resource
    type, each looked up in its WLO vocabulary (`lookup_wlo_vocabulary` with `discipline`,
    `educationalContext`, `lrt`) and answered **with the URI**, plus five to ten keywords. A guessed
@@ -420,7 +425,10 @@ erschließen itself — the address takes its place, with the instruction to fet
 before judging; a check made on a title alone is worthless.
 
 **The shape** (`resultSchemaOf()`) is an object with one entry per criterion, each `{erfuellt,
-begruendung}`, and every key required. An object rather than a list, because a list invites an answer
+begruendung}`, every key required, plus `geeignet` — one boolean over the whole content — and a
+summary. `geeignet` is required too, and it is the only place a collection's own requirements can land
+where the metadata set holds no field for them: the criteria are what the repository can record, and
+*für Bildung geeignet / ungeeignet* is what is left to say about everything else. An object rather than a list, because a list invites an answer
 about the criteria that were easy to judge — and a check that quietly skipped half of them reads
 exactly like a complete one. It stays far below the backend's limit of 10 000 characters; ten criteria
 measure about 5 500. `schemaFits()` is what says so, since beyond the limit the backend refuses the
