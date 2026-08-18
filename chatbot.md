@@ -234,13 +234,39 @@ from a host list rather than sent from here.
   `/fachportal/<slug>`, `/components/search` and a bare `?q`.
 - `sameSubject()` is what decides merge against replace.
 - `contentContextOf()` builds the context of a curated content instead of a tab, with
-  `detection_source: 'panel:content'` and `page_kind` `'collection'` where a collection is known,
-  `'other'` otherwise.
+  `detection_source: 'panel:content'` and `page_kind` `'content'` where the content has a node,
+  `'other'` where it does not.
 - Title and text travel together in **`page_text`**, joined by a blank line with the title first so
   it survives the cut.
 - Two limits bound what a page can put in front of the model: `TEXT_MAX` of 300 characters for a tab
   title, `CONTENT_TEXT_MAX` of 8000 for a curated content — that text *is* the subject of the
   dialogue.
+
+### Which id is sent decides what gets judged
+
+The most expensive thing to get wrong in this whole integration, because it fails quietly and
+plausibly. The backend resolves whichever id the context carries as "the current page"
+(`target_id = node_id or collection_id`, `services/page_context.py`) and renders a block from what it
+finds. Handed a collection, that block is the *collection*: its title, its editorial compendium text,
+how many materials it holds, and its id offered up for `get_collection_contents`. And the content's
+own title and text — the `page_text` this panel took such care over — are then **never put in front of
+the model at all**: `render_raw_for_prompt()`, the block that carries them, runs only where nothing
+could be resolved (`block or render_raw_for_prompt(page_context)`).
+
+Measured against the deployed backend with a text about the *Astronomische Einheit* and the collection
+*Geometrische Optik*, one task, two contexts:
+
+| context | tools the assistant called | what it judged |
+|---|---|---|
+| `page_kind: 'collection'` + `collection_id` | `search_wlo_content`, `get_wlo_content_text`, `get_node_details` | "der **gefundene** Inhalt" — some material it looked up, its reasoning citing a source that appears nowhere in the text handed over |
+| `page_kind: 'other'`, no ids | `search_wlo_collections`, `get_skill` | "der **sichtbare Seiteninhalt**" — the text handed over |
+
+So the node leads. With a `node_id` the context is that content — the backend resolves it with
+`includeTextContent` and the collection travels beside it as the id the skill is fetched by. Without
+one, no id is sent at all: the title and text then reach the model as the page's own text, and the
+collection is named in the task rather than in the context. The instruction says the same thing once
+more in words ("Gemeint ist genau dieser eine Inhalt … Beurteile NICHT die übrigen Inhalte der
+Sammlung"), because saying it twice costs nothing and this is what goes wrong.
 
 ## Where it appears in the UI
 
@@ -275,11 +301,8 @@ protected readonly context = computed<PageContext>(() => contentContextOf({
   text: this.curation.contentText(),
   url: this.curation.contentUrl(),
   collectionId: this.collection()?.id ?? null,
+  nodeId: this.curation.activeNode()?.nodeId ?? null,
 }));
-```
-
-```html
-<es-ai-assistant-screen class="chat" [context]="context()"></es-ai-assistant-screen>
 ```
 
 The hand-over is a plain Angular signal input — `readonly context = input<PageContext | null>(null)`
@@ -311,10 +334,28 @@ Each becomes a `QualityCriterion` with a short key, `k1`, `k2`, …: their own i
 and vocabulary URIs, and as schema keys they would spend the budget on addresses the model has no use
 for.
 
-**The task** (`instructionOf()`) names the collection, lists the criteria by key and caption, and asks
-for the released instruction outright — `get_skill_registry`, then `get_skill`. The prompt carries
-only the *titles* of a collection's skills, so the assistant has to fetch the one it checks against
-itself, and an unspecific task lets it answer from memory instead.
+**The task** (`instructionOf()`) names the collection, lists the criteria by key and caption, asks for
+the released instruction outright — `get_skill_registry`, then `get_skill` — and **quotes the
+content's own text in full**. The prompt carries only the *titles* of a collection's skills, so the
+assistant has to fetch the one it checks against itself, and an unspecific task lets it answer from
+memory instead.
+
+Quoting the text is not redundant with `page_text`, and leaving it out is the second way this check
+fails quietly. The backend renders the page context from whatever it resolved about the node, and the
+block carrying the panel's own `page_text` is read **only where nothing resolved at all** — so the
+better the node resolves, the more surely the text is dropped. What comes back then is a check that
+knows the content's title, licence and thumbnail and answers every single criterion with "der
+vollständige Text war nicht abrufbar". Measured on one content, three criteria, the same task:
+
+| | verdicts |
+|---|---|
+| task without the text | all `false` — "der zugängliche Text enthält mehrere unvollständige bzw. abgebrochene Sätze" |
+| task with the text quoted | all `true`, reasoned against the collection's compendium text |
+
+The request is the one channel that always reaches the model, so the content travels in it, cut to fit
+the 10 000 characters a message may hold. Where the panel holds no text at all — a node it did not
+erschließen itself — the address takes its place, with the instruction to fetch it (`get_url_text`)
+before judging; a check made on a title alone is worthless.
 
 **The shape** (`resultSchemaOf()`) is an object with one entry per criterion, each `{erfuellt,
 begruendung}`, and every key required. An object rather than a list, because a list invites an answer
@@ -342,9 +383,70 @@ this.curation.recordValues(properties);
 this.curation.reportQualityCriteria(knockoutSatisfied(judged, this.criteria()));
 ```
 
-So the footer offers the same *Qualität bestätigen* on the same condition, and the confirmation is the
-same write either way (`CurationService.confirmQuality`). Above the chat the verdicts are listed with
-their reasons, the ones found wanting counted first.
+So the footer offers the same *Qualität bestätigen*, and the confirmation is the same write either
+way (`CurationService.confirmQuality`): the recorded criteria and the workflow status
+`ELEMENT_LEGALLY_APPROVED` travel to the node in one save.
+
+**What it waits for is different, though.** The structured check opens its confirmation once the
+knock-out criteria are met, because there the ticked boxes *are* the person's decision. Here the
+assistant answers every criterion, including the ones it found wanting, and its answer is a proposal —
+so the button opens as soon as an answer is in (`qualityCriteriaJudged`), and confirming or declining
+it is the person's call. `qualityCriteriaMet` is still reported truthfully beside it, since the
+structured flow hangs its own Metadaten sub step off that.
+
+**The result is shown in the chat, by the assistant itself.** Nothing can inject a message into that
+conversation from outside — so the task asks for it: a line per criterion with ✓ or ✗, the criterion
+and the reason, then a short verdict on what stands in the way of a release. The person sees only the
+chat, so what is not written there is not known. The panel draws nothing beside it; a second rendering
+of the same answer would only compete with the first. What the panel keeps goes to the console.
+
+### Following a check in the console
+
+Everything about this integration is asynchronous — the bundle, the widget's own boot, the answers —
+and when a chat stays empty the only question worth asking is which of them happened before which. So
+both components trace, and the two prefixes read as one sequence:
+
+- `[edu-sharing][boerdi]` — the conversation. Every line carries `+<ms>` since the screen opened, `→`
+  for what goes to the widget, `←` for what comes back. Every attribute is logged as it is set, whole
+  and unabbreviated: each is read once as the element connects and never again, so they are what the
+  conversation runs on for as long as it lasts.
+- `[edu-sharing][quality]` — the check. What it is about, how many criteria were read and under which
+  keys, the schema with its character count, the task verbatim, and every answer.
+- `[edu-sharing][write]` — what reaches the node. Every property by name and value, the node it goes
+  to, whether it is created or updated, which route (`agent` or `repository`), the workflow steps that
+  travel with it, each workflow status as it is written and to whom, and how the write ended. A
+  confirmation logs first what it stands on: the recorded criteria, whether the knock-out gate is
+  satisfied, and whether an assistant judged them.
+
+A check that goes to plan reads roughly like this:
+
+```
+[edu-sharing][quality] the check is about {title, nodeId, collection, url, textLength, context}
+[edu-sharing][quality] reading the criteria from mds_oeh
+[edu-sharing][quality] 10 criteria read {knockout: […], editorial: […], keys: {k1: 'ccm:oeh_quality_…'}}
+[edu-sharing][quality] the answer is asked for in this shape {criteria: 10, characters: 5558, schema}
+[edu-sharing][quality] the assistant will be asked this
+  Prüfe den Inhalt „…" anhand der Anforderungen der Sammlung „…". …
+[edu-sharing][boerdi] +0ms screen opened {apiUrl, hasTask: true, hasResultSchema: true}
+[edu-sharing][boerdi] +1ms bundle ready, <boerdi-chat> defined
+[edu-sharing][boerdi] +2ms → api-url = https://87.106.127.225.nip.io
+[edu-sharing][boerdi] +2ms → result-schema = {"type":"object",…}
+[edu-sharing][boerdi] +2ms → engine = agent
+[edu-sharing][boerdi] +2ms page-context left unset — the page follows with the task
+[edu-sharing][boerdi] +3ms → <boerdi-chat> appended, the widget now boots
+[edu-sharing][boerdi] +3ms waiting for the conversation before opening it {reason: 'the screen states a task'}
+[edu-sharing][boerdi] +154ms <boerdi-chat-shell> on screen after 150ms
+[edu-sharing][boerdi] +154ms → replaceContext (opening) {page_kind: 'content', node_id, collection_id, …}
+[edu-sharing][boerdi] +155ms → startTask (612 characters)
+  Prüfe den Inhalt …
+[edu-sharing][boerdi] +30512ms ← agent-result (turn 1) after 30357ms {stopReason: 'submit', submitted: true, result}
+[edu-sharing][quality] ← the assistant judged 10 criteria this turn {thisTurn, standing, recorded, knockoutSatisfied}
+```
+
+What each of the three failure modes looks like in that trace: a task that never went out ends after
+`→ <boerdi-chat> appended` with a warning that `<boerdi-chat-shell>` never rendered; a schema that did
+not take shows `← agent-result` never arriving at all; a run cut off by a cap shows it arriving with
+`stopReason` other than `submit` and `submitted: false`.
 
 Three details that are easy to get wrong:
 
@@ -505,7 +607,9 @@ One trap: the script defaults to `http://localhost:8000`, while the backend's de
 6. **Only the first collection is handed over**, deliberately, since one skill is what the assistant
    works with. A content filed in several collections shows the chat only one of them, and there is no
    UI in which to choose which.
-7. **No `node_id` in the content context**, although the node usually exists by then.
+7. **An unsaved content is checked without its collection.** No node means no id in the context at
+   all, or the collection would become the subject — so the assistant has to find the collection by
+   the name in the task, and may find the wrong one or none.
 8. **The return channel carries one thing.** `boerdi:agent-result` is read; the other four events are
    not. `boerdi:page-action` and `boerdi:query-meta` are dispatched on every turn and would say what
    the assistant looked at, which is the evidence point 5 is missing.
@@ -534,17 +638,12 @@ itself and is capped at `CONTENT_TEXT_MAX`, and a judgement is not part of what 
 send what is actually `done` — a digest that reports a `failed` judge as a finding is worse than no
 digest.
 
-### 2. Hand over the node and let the user pick the collection
+### 2. Let the user pick the collection
 
-Two small corrections to the context:
-
-- **`node_id`.** The node normally exists by the time the check runs (`CurationService.activeNode()`
-  carries its `nodeId`), and `CuratedContent` simply has no field for it. With it the assistant's own
-  tools can look the node up in the repository instead of working from the text alone.
-- **The collection.** `filedCollections()[0]` wins silently today. Where the list holds more than one,
-  the screen should let the user choose which collection's requirements apply, in the place the
-  "no collection" warning already occupies. One collection stays the rule — one skill is what the
-  assistant works with — but which one is a decision, not an array index.
+`filedCollections()[0]` wins silently today. Where the list holds more than one, the screen should let
+the user choose which collection's requirements apply, in the place the "no collection" warning
+already occupies. One collection stays the rule — one skill is what the assistant works with — but
+which one is a decision, not an array index.
 
 ### 3. Show what the check actually did
 

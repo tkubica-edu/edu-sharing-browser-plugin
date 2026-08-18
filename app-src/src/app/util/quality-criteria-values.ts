@@ -12,6 +12,12 @@ import type { MdsValue, MdsWidget } from 'ngx-edu-sharing-api';
 export const EDITORIAL_CRITERIA_PROPERTY = 'ccm:oeh_buffet_criteria';
 
 /**
+ * The widget listing the knock-out criteria — a table of contents rather than a property of its own: its
+ * values are the criteria, and each value's id is the node property that criterion is recorded in.
+ */
+export const KNOCKOUT_CRITERIA_WIDGET = 'virtual:unmetLegalCriteria';
+
+/**
  * Every node property a quality criterion is answered in: the knock-out criteria, each of which has one of
  * its own, plus the property the editorial ones share. States what the metadata set lists — the values of
  * `virtual:unmetLegalCriteria` — because it is read where no metadata set is at hand, so a criterion the set

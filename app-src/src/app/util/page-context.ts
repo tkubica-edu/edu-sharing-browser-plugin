@@ -104,21 +104,33 @@ export interface CuratedContent {
   url?: string | null;
   /** The collection the content was filed in — what the assistant looks its skill up by. */
   collectionId?: string | null;
+  /** The content's own node, where it already has one — what makes the content the subject. */
+  nodeId?: string | null;
 }
 
 /**
- * A content the panel curates, as a context for the assistant: what it is called, what it says, and the
- * collection it was filed in. The collection is the whole point of such a context — the assistant retrieves the
- * skill it checks the content with by it — so the context is *about* the collection wherever one is known, and
- * about nothing in particular where none is: then there are no requirements to measure the content against and
- * the text is all the dialogue has.
+ * A content the panel curates, as a context for the assistant: what it is called, what it says, the node it was
+ * saved as, and the collection it was filed in.
+ *
+ * **The subject is the content, and saying so takes care.** The assistant's backend resolves whichever id it is
+ * handed as "the current page" — and handed a collection it describes the collection: its editorial compendium
+ * text, how many materials it holds, an invitation to list its contents. The content's own title and text are
+ * then never put in front of the model at all, since they are read only where nothing could be resolved. A
+ * context that names the collection as the page therefore produces a check of the collection, however plainly
+ * the task asks about this one content.
+ *
+ * So the node leads. With one, the context is that content and the collection travels beside it, which is what
+ * the assistant looks the skill up by. Without one — a content not yet saved — nothing is named at all: the
+ * title and text then reach the model as the page's own text, and the collection is named in the task instead.
  */
 export function contentContextOf(content: CuratedContent): PageContext {
   const collection = content.collectionId?.trim();
+  const node = content.nodeId?.trim();
   return {
-    page_kind: collection ? 'collection' : 'other',
+    page_kind: node ? 'content' : 'other',
     ...addressOf(content.url),
-    ...(collection ? { collection_id: collection } : {}),
+    ...(node ? { node_id: node } : {}),
+    ...(node && collection ? { collection_id: collection } : {}),
     ...contentText(content.title, content.text),
     detection_source: 'panel:content'
   };

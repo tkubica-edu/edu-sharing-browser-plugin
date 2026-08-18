@@ -1,6 +1,6 @@
 import {
   afterRenderEffect, ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, ElementRef,
-  OnDestroy, computed, effect, inject, input, viewChild
+  OnDestroy, computed, effect, inject, input, output, viewChild
 } from '@angular/core';
 
 import { ConditionsService } from '../../../services/conditions.service';
@@ -26,14 +26,45 @@ const SHELL_TIMEOUT_MS = 10_000;
 const SHELL_POLL_MS = 50;
 
 /**
- * The <boerdi-chat> element, typed for what we use of it. The context methods exist on the element only once it
- * has been upgraded, hence the optional signatures — see {@link AiAssistantScreenComponent.mount}.
+ * The engine a structured result needs. The widget's default one answers from its patterns, and a schema then
+ * takes no effect at all — no result, no event, and nothing to see in the browser: the backend notes the
+ * mismatch in its own log. Both or neither, so the two are set together.
+ */
+const AGENT_ENGINE = 'agent';
+
+/**
+ * Where a structured result arrives. Every event the widget fires is dispatched twice — under this name first
+ * and then under `badboerdi:…`, which is its indulgence towards the predecessor system. Listening to both
+ * would process every answer twice.
+ */
+const RESULT_EVENT = 'boerdi:agent-result';
+
+/**
+ * The <boerdi-chat> element, typed for what we use of it. The methods exist on the element only once it has
+ * been upgraded, hence the optional signatures — see {@link AiAssistantScreenComponent.mount}.
  */
 interface ChatElement extends HTMLElement {
   /** Merge into the current context: no greeting, and what is not named stays as it was. */
   updateContext?(context: PageContext): void;
   /** Replace the current context, as a navigation would: stale ids are dropped and the new page is greeted. */
   replaceContext?(context: PageContext): void;
+  /**
+   * Put a task to the assistant straight away, shown as the page's own request rather than as something the
+   * person typed. It takes the context as it stands at that moment, so the page goes first.
+   */
+  startTask?(text: string): void;
+}
+
+/**
+ * What the assistant submitted at the end of a turn, as the widget reports it. Both fields are the other
+ * project's: `result` follows whatever schema was asked for, and is `null` for every turn that produced none —
+ * a plain "thank you" among them. `stopReason` says why, and only `submit` means an answer was actually filled
+ * in; the four caps (`deadline`, `token_budget`, `max_iterations`, `no_progress`) mean the run was cut off,
+ * which is a different thing from having nothing to say.
+ */
+export interface AgentResult {
+  result: unknown;
+  stopReason: string;
 }
 
 /** The context of a tab that is about nothing the assistant can use — enough to clear the previous page's. */
@@ -52,7 +83,16 @@ const NO_CONTEXT: PageContext = { page_kind: 'other' };
 // own context methods; see {@link AiAssistantScreenComponent.follow}. That attribute reaches a conversation
 // starting here and no other: a session resumed from local storage keeps the context it was last given, so a
 // widget mounting onto one is handed the page explicitly; see
-// {@link AiAssistantScreenComponent.handOverToResumedSession}.
+// {@link AiAssistantScreenComponent.openConversation}.
+//
+// A screen may also state what is to be done and in which shape it wants the answer — see
+// {@link AiAssistantScreenComponent.task} and {@link AiAssistantScreenComponent.resultSchema}. The chat is
+// then still a chat, with the person able to carry on in it; what the screen gains is that the dialogue ends
+// in something it can record. Such a screen gives the `page-context` attribute up and has the page handed
+// over right in front of its task, for reasons that decide whether the task arrives at all.
+//
+// Both are read once, as the element mounts. A screen whose task is not settled by then is better off not
+// rendering this component yet — mounting happens once, and a task that arrives afterwards is never put.
 @Component({
   selector: 'es-ai-assistant-screen',
   templateUrl: './ai-assistant-screen.component.html',
@@ -72,6 +112,26 @@ export class AiAssistantScreenComponent implements OnDestroy {
    */
   readonly context = input<PageContext | null>(null);
 
+  /**
+   * What the assistant is asked to do as the conversation opens, for a screen that embeds the chat to have
+   * something done rather than to be talked to — the KI quality check has it measure the content against the
+   * criteria. Put once, as the conversation appears; the person then carries on in their own words.
+   */
+  readonly task = input<string | null>(null);
+
+  /**
+   * The shape an answer is expected in, as a JSON schema. Stated, every turn of the conversation ends in a
+   * further model pass that fills it in and reports it through {@link AiAssistantScreenComponent.agentResult}
+   * — which is what turns a dialogue into a result the panel can record. Unstated, the chat stays a chat.
+   */
+  readonly resultSchema = input<Record<string, unknown> | null>(null);
+
+  /**
+   * What the assistant submitted, one per turn — including the turns that submitted nothing, so that a run cut
+   * off by a cap is not indistinguishable from one that had nothing to add.
+   */
+  readonly agentResult = output<AgentResult>();
+
   /** The context the chat is handed: what the embedding screen states, else the open page. */
   private readonly subject = computed(
     () =>
@@ -90,6 +150,32 @@ export class AiAssistantScreenComponent implements OnDestroy {
   /** The timer waiting for the conversation to be on screen, while one is running. */
   private shellWait: number | null = null;
 
+  /** When this screen opened, so every line of the trace can say how far into the conversation it happened. */
+  private readonly opened = performance.now();
+
+  /** When the last thing went out, so the answer can be timed. Null while nothing is outstanding. */
+  private sent: number | null = null;
+
+  /** How many answers have come back, to number the turns in the trace. */
+  private turns = 0;
+
+  /** Reports a submitted result while the screen is open; the widget fires it on `window`. */
+  private readonly onResult = (event: Event) => {
+    const detail = (event as CustomEvent).detail as { result?: unknown; stop_reason?: unknown } | null;
+    const stopReason = typeof detail?.stop_reason === 'string' ? detail.stop_reason : 'unknown';
+    const result = detail?.result ?? null;
+    this.turns += 1;
+    // A turn the person typed has no `sent` of ours in front of it — then the time is left out rather
+    // than measured from something unrelated.
+    this.trace(`← agent-result (turn ${this.turns})${this.answeredIn()}`, {
+      stopReason,
+      submitted: result !== null,
+      result
+    });
+    this.sent = null;
+    this.agentResult.emit({ result, stopReason });
+  };
+
   constructor() {
     // Mount in the write phase, once the bundle defined the tag: this writes to the DOM and needs the
     // #host element, which a plain effect would run before.
@@ -98,10 +184,15 @@ export class AiAssistantScreenComponent implements OnDestroy {
         if (this.bundle.ready()) this.mount();
       }
     });
+    this.trace('screen opened', {
+      apiUrl: CHAT_API_URL,
+      hasTask: !!this.task(),
+      hasResultSchema: !!this.resultSchema()
+    });
     // Logged, not just rendered: whether the widget ever arrived is the first question about a chat
     // that stays empty, and the bundle loads outside this screen's own lifecycle.
     effect(() => {
-      if (this.bundle.ready()) console.log(`${LOG} bundle ready, <${CHAT_TAG}> defined`);
+      if (this.bundle.ready()) this.trace(`bundle ready, <${CHAT_TAG}> defined`);
       const error = this.bundle.error();
       if (error) console.warn(`${LOG} bundle failed to load:`, error);
     });
@@ -109,50 +200,111 @@ export class AiAssistantScreenComponent implements OnDestroy {
     // the panel is told about — including a title that only arrives afterwards — and on every change to
     // a context an embedding screen states.
     effect(() => this.follow(this.subject()));
+    // Registered for as long as the screen is open, not only once a schema is stated: the widget dispatches
+    // on `window` because its own view sits in a shadow root, and the listener has to be there before the
+    // task goes out — the first turn is the one that answers it.
+    window.addEventListener(RESULT_EVENT, this.onResult);
   }
 
   ngOnDestroy(): void {
+    window.removeEventListener(RESULT_EVENT, this.onResult);
     this.stopWaitingForShell();
     this.element?.remove();
     this.element = null;
+    this.trace(`screen closed after ${this.turns} answered turn(s)`);
   }
 
   /** Create the element with its context already set, THEN append — it resolves the context as it connects. */
   private mount(): void {
     if (this.element) return;
     const element = document.createElement(CHAT_TAG) as ChatElement;
-    element.setAttribute('api-url', CHAT_API_URL);
-    element.setAttribute('embed-mode', 'frameless');
-    element.setAttribute('initial-state', 'expanded');
-    element.setAttribute('show-language-buttons', 'false');
-    element.setAttribute('show-debug-button', 'false');
-    // The panel is not the page: the widget's own detection would contribute the extension's address
-    // instead of the tab's, so what we hand over stands alone.
-    element.setAttribute('auto-context', 'false');
     this.current = this.subject();
-    element.setAttribute('page-context', JSON.stringify(this.current));
+    const schema = this.resultSchema();
+    const attributes: Record<string, string> = {
+      'api-url': CHAT_API_URL,
+      'embed-mode': 'frameless',
+      'initial-state': 'expanded',
+      'show-language-buttons': 'false',
+      'show-debug-button': 'false',
+      // The panel is not the page: the widget's own detection would contribute the extension's address
+      // instead of the tab's, so what we hand over stands alone.
+      'auto-context': 'false',
+      // A context set here is one the widget greets as the element connects, and it is still answering that
+      // greeting when the conversation appears — which is exactly when a task would be put, and a task put
+      // while the widget is busy is dropped without a word. A screen with a task therefore hands the page
+      // over itself, in front of the task; see {@link AiAssistantScreenComponent.openConversation}.
+      ...(this.task() ? {} : { 'page-context': JSON.stringify(this.current) }),
+      ...(schema ? { 'result-schema': JSON.stringify(schema), engine: AGENT_ENGINE } : {})
+    };
+    // One line per attribute, and the values whole rather than abbreviated: every one of them is read once
+    // as the element connects and never again, so what stands here is what this conversation runs on for as
+    // long as it lasts. Cut short, the one that was wrong would be the one that was cut.
+    for (const [name, value] of Object.entries(attributes)) {
+      element.setAttribute(name, value);
+      this.trace(`→ ${name} = ${value}`);
+    }
+    if (this.task()) this.trace('page-context left unset — the page follows with the task');
     // Sized inline, not via the stylesheet: an imperatively created element carries no view
     // encapsulation attribute, so this component's styles would not match it.
     element.style.cssText = 'display:block;flex:1 1 auto;min-height:420px';
-    console.log(`${LOG} mounting <${CHAT_TAG}>`, { apiUrl: CHAT_API_URL, pageContext: this.current });
     this.host().nativeElement.appendChild(element);
     this.element = element;
-    this.handOverToResumedSession();
+    this.trace(`→ <${CHAT_TAG}> appended, the widget now boots`);
+    this.openConversation();
   }
 
   /**
-   * Hand the page over to a conversation that came back with the panel. The panel is reloaded on every page
-   * change, so the widget is created anew each time while its session outlives it in local storage: a resumed
+   * Open the conversation: hand the page over, then put the screen's task to it. Both in one wait, and the
+   * two calls in that order and without anything in between — the widget takes the context as it stands the
+   * moment the task goes out, so a task sent first is answered about the previous page.
+   *
+   * **The order is also what gets the task through at all.** Handing the page over makes the widget offer to
+   * greet the new page, and it drops any message put to it while it is busy answering — silently, since a
+   * refused task looks exactly like one nobody sent. Putting the task in the same turn of the event loop wins
+   * that race: the task is the turn that runs, and the greeting is the one that gives way.
+   *
+   * Without a task the hand-over is only for a resumed session. The panel is reloaded on every page change, so
+   * the widget is created anew each time while its session outlives it in local storage: a resumed
    * conversation keeps the context it was last given, and the `page-context` attribute is only read into a
    * conversation that starts here. Replacing rather than merging is what the page change is — the previous
    * page's ids leave the context and the new page is greeted.
    *
-   * Deferred until the conversation is on screen: the element's context methods reach the widget through the
+   * All of it deferred until the conversation is on screen: the element's methods reach the widget through the
    * component it renders, and a call made before that one exists is dropped without a trace.
    */
-  private handOverToResumedSession(): void {
-    if (!this.element || !storedSession()) return;
-    this.handOverWhenRendered('resumed session');
+  private openConversation(): void {
+    const element = this.element;
+    if (!element) return;
+    const task = this.task();
+    const session = storedSession();
+    if (!task && !session) {
+      this.trace('nothing to open with — no task, and no session to hand the page to');
+      return;
+    }
+    this.trace('waiting for the conversation before opening it', {
+      reason: task ? 'the screen states a task' : 'a session was resumed',
+      resumedSession: session
+    });
+    this.whenShellRendered(element, (rendered) => {
+      if (!rendered) {
+        console.warn(`${LOG} <${SHELL_TAG}> never rendered — neither page nor task reached the chat`);
+        return;
+      }
+      this.trace('→ replaceContext (opening)', this.current);
+      element.replaceContext?.(this.current);
+      if (!task) return;
+      if (!element.startTask) {
+        // Without it the screen shows a chat that was never asked anything, and the person is left to word
+        // the task the panel meant to put — worth a line, since nothing else would show.
+        console.warn(`${LOG} <${CHAT_TAG}> exposes no startTask — the screen's task was not put`);
+        return;
+      }
+      // Whole, and on its own line: this text is the request the whole check hangs on, and reading it back
+      // is the only way to tell a task that was worded badly from one that never went out.
+      this.trace(`→ startTask (${task.length} characters)\n${task}`);
+      this.sent = performance.now();
+      element.startTask(task);
+    });
   }
 
   /**
@@ -162,13 +314,13 @@ export class AiAssistantScreenComponent implements OnDestroy {
   private handOverWhenRendered(reason: string): void {
     const element = this.element;
     if (!element) return;
-    console.log(`${LOG} ${reason}: page is handed over once the chat is on screen`);
+    this.trace(`${reason}: the page is handed over once the chat is on screen`);
     this.whenShellRendered(element, (rendered) => {
       if (!rendered) {
         console.warn(`${LOG} <${SHELL_TAG}> never rendered — the chat kept its previous page (${reason})`);
         return;
       }
-      console.log(`${LOG} replaceContext (${reason})`, this.current);
+      this.trace(`→ replaceContext (${reason})`, this.current);
       element.replaceContext?.(this.current);
     });
   }
@@ -177,6 +329,7 @@ export class AiAssistantScreenComponent implements OnDestroy {
   private whenShellRendered(element: ChatElement, then: (rendered: boolean) => void): void {
     this.stopWaitingForShell();
     if (shellRendered(element)) {
+      this.trace(`<${SHELL_TAG}> already on screen`);
       then(true);
       return;
     }
@@ -186,6 +339,9 @@ export class AiAssistantScreenComponent implements OnDestroy {
       const rendered = shellRendered(element);
       if (!rendered && waited < SHELL_TIMEOUT_MS) return;
       this.stopWaitingForShell();
+      // How long it took is worth having: it is the widget's own boot, and a conversation that takes
+      // seconds to appear is the difference between a slow chat and one that never got its task.
+      this.trace(rendered ? `<${SHELL_TAG}> on screen after ${waited}ms` : `gave up after ${waited}ms`);
       then(rendered);
     }, SHELL_POLL_MS);
   }
@@ -205,11 +361,14 @@ export class AiAssistantScreenComponent implements OnDestroy {
     const element = this.element;
     if (!element) {
       // Not lost: the page is read again as the element mounts, which is what this is waiting for.
-      console.log(`${LOG} page seen before the chat was mounted, not handed over yet:`, context);
+      this.trace('page seen before the chat was mounted, not handed over yet', context);
       return;
     }
     const previous = this.current;
-    if (JSON.stringify(previous) === JSON.stringify(context)) return;
+    if (JSON.stringify(previous) === JSON.stringify(context)) {
+      this.trace('page re-read, unchanged — nothing sent', context);
+      return;
+    }
     this.current = context;
     if (!shellRendered(element)) {
       // The context methods reach the widget through the component it renders; calling them before it exists
@@ -218,7 +377,7 @@ export class AiAssistantScreenComponent implements OnDestroy {
       return;
     }
     const merge = sameSubject(previous, context);
-    console.log(`${LOG} context ${merge ? 'updateContext (merge)' : 'replaceContext (new page)'}`, {
+    this.trace(`→ ${merge ? 'updateContext (same subject, merged)' : 'replaceContext (new page)'}`, {
       previous,
       context
     });
@@ -229,6 +388,25 @@ export class AiAssistantScreenComponent implements OnDestroy {
     if (!element.updateContext || !element.replaceContext) {
       console.warn(`${LOG} <${CHAT_TAG}> exposes no context methods — the page change was not applied`);
     }
+  }
+
+  /**
+   * One line of this conversation's trace, stamped with how long the screen has been open. The stamp is what
+   * makes the log readable as a sequence: everything here is asynchronous — the bundle, the widget's own boot,
+   * the answers — and which of them happened before which is the whole question when a chat stays empty.
+   *
+   * `→` is what goes to the widget, `←` what comes back from it. A turn the person typed shows only as `←`;
+   * their message never passes through this component.
+   */
+  private trace(message: string, detail?: unknown): void {
+    const stamp = `${LOG} +${Math.round(performance.now() - this.opened)}ms`;
+    if (detail === undefined) console.log(`${stamp} ${message}`);
+    else console.log(`${stamp} ${message}`, detail);
+  }
+
+  /** How long the answer took, where it answers something this component sent; nothing where it does not. */
+  private answeredIn(): string {
+    return this.sent === null ? '' : ` after ${Math.round(performance.now() - this.sent)}ms`;
   }
 }
 

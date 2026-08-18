@@ -12,7 +12,8 @@ import type { ContentJudgeEvaluation } from '../../../services/content-judge.ser
 import type { MetalookupEvaluation } from '../../../services/metalookup.service';
 import { QualityJudgeService } from '../../../services/quality-judge.service';
 import {
-  CRITERION_MET, CRITERION_VIOLATED, EDITORIAL_CRITERIA_PROPERTY, autoMetValue, valueFor, widgetOf
+  CRITERION_MET, CRITERION_VIOLATED, EDITORIAL_CRITERIA_PROPERTY, KNOCKOUT_CRITERIA_WIDGET, autoMetValue,
+  valueFor, widgetOf
 } from '../../../util/quality-criteria-values';
 import {
   CriterionJudgement, CriterionViolation, judgementsForCriteria
@@ -33,12 +34,6 @@ export type ViolationDecision = 'confirmed' | 'dismissed';
 
 /** Log prefix for what this view finds out about the content, as everywhere else in the extension. */
 const LOG_QUALITY = '[edu-sharing][quality]';
-
-/**
- * The widget listing the knock-out criteria — a table of contents, not a property of its own: its values
- * are the criteria, and each value's id is the node property that criterion is recorded in.
- */
-const KNOCKOUT_WIDGET = 'virtual:unmetLegalCriteria';
 
 /**
  * The editorial criteria: one multi-value property whose widget's values are the criteria. One is met
@@ -171,7 +166,7 @@ export class QualityCriteriaComponent {
 
   /** The knock-out criteria, in the order the metadata set lists them. */
   protected readonly knockoutCriteria = computed<readonly MdsValue[]>(
-    () => this.widget(KNOCKOUT_WIDGET)?.values ?? []
+    () => this.widget(KNOCKOUT_CRITERIA_WIDGET)?.values ?? []
   );
 
   /** The editorial criteria, likewise. */

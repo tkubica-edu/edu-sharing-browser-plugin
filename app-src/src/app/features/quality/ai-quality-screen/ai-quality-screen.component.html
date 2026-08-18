@@ -7,5 +7,24 @@
   </p>
 }
 
-<!-- The assistant's chat, about the content instead of about the open tab (see the component). -->
-<es-ai-assistant-screen class="chat" [context]="context()"></es-ai-assistant-screen>
+@if (problem()) {
+  <p class="es-error problem">{{ problem() }}</p>
+}
+
+<!-- The assistant's chat, about the content instead of about the open tab, with the criteria as its task and
+     as the shape of its answer (see the component). Held back until the criteria are settled: the chat reads
+     both as it mounts, and it mounts once.
+
+     What it answers is not drawn a second time beside it — the dialogue is what the person reads. The verdicts
+     go to the console and into the record; see AiQualityScreenComponent.take. -->
+@if (settled()) {
+  <es-ai-assistant-screen
+    class="chat"
+    [context]="context()"
+    [task]="task()"
+    [resultSchema]="resultSchema()"
+    (agentResult)="take($event)"
+  ></es-ai-assistant-screen>
+} @else {
+  <p class="es-muted no-collection">Die Qualitätskriterien werden geladen …</p>
+}

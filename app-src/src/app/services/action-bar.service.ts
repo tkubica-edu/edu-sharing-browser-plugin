@@ -239,11 +239,25 @@ export class ActionBarService {
         ];
       }
 
-      // "Individuelle Qualitätsprüfung mit KI": the dialogue with the assistant IS the step, and it is
-      // over when the user is done with it — so the way back is all this step offers (see
-      // AiQualityScreenComponent).
-      case 'ai-quality':
-        return [this.backAction()];
+      // "Individuelle Qualitätsprüfung mit KI": the dialogue with the assistant IS the step, and it ends
+      // in the same record the structured check produces — so it offers the same confirmation and the
+      // same write (see AiQualityScreenComponent). What it waits for is an answer, not a good one: the
+      // assistant judges every criterion and the person decides what to do with that, which is the
+      // difference from the structured check, where the ticked boxes ARE the decision. Until an answer
+      // is in, the way back is all there is.
+      case 'ai-quality': {
+        if (this.curation.qualityConfirmed()) return [this.backAction()];
+        return [
+          this.backAction(),
+          {
+            label: this.curation.saving() ? 'Speichern…' : 'Qualität bestätigen',
+            disabled: !this.curation.qualityCriteriaJudged() || this.curation.saving(),
+            // The same write as in the structured check: the criteria go onto the content and the
+            // quality workflow is started with them (CurationService.confirmQuality).
+            run: () => this.curation.confirmQuality()
+          }
+        ];
+      }
 
       // "Sammlung auswählen": the confirmation belongs to the embedded selector, which the screen
       // registers here while it is mounted (see {@link ApplyHandler}) — so this step's controls are

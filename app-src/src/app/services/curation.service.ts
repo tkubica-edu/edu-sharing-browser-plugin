@@ -98,6 +98,9 @@ const AGENT_EDIT_WINDOW_MS = 2 * 60 * 60 * 1000;
 /** Same tag as the history's own log lines, so reading and writing it read as one story. */
 const LOG_HISTORY = '[edu-sharing][history]';
 
+/** Log prefix for what actually reaches the node — the values, the steps, and how the write ended. */
+const LOG_WRITE = '[edu-sharing][write]';
+
 /**
  * What is said in place of the repository's own refusal once that window has closed: it answers with
  * the node's id, its creation date and its age in hours, none of which names the one thing that
@@ -336,6 +339,17 @@ export class CurationService {
    */
   private readonly criteriaSatisfied = signal(false);
   readonly qualityCriteriaMet = this.criteriaSatisfied.asReadonly();
+
+  /**
+   * Whether the KI check has a judgement of the criteria on the table. What the confirmation of *that* route
+   * waits for, and deliberately not the same question as {@link qualityCriteriaMet}: the structured check
+   * gates its confirmation on the criteria being met, because the person ticking the boxes is the one deciding
+   * them. The KI answers every criterion including the ones it found wanting, and its answer is a proposal —
+   * so what the confirmation waits for there is that an answer exists at all, and the person confirms or
+   * declines it.
+   */
+  private readonly criteriaJudged = signal(false);
+  readonly qualityCriteriaJudged = this.criteriaJudged.asReadonly();
 
   /**
    * Whether a machine check on this content is still out. Exposed for the confirmation, which waits for it: the
@@ -593,6 +607,11 @@ export class CurationService {
     this.criteriaSatisfied.set(satisfied);
   }
 
+  /** Take over that the KI check answered the criteria — see {@link qualityCriteriaJudged}. */
+  reportQualityJudged(): void {
+    this.criteriaJudged.set(true);
+  }
+
   /**
    * Confirm the content's quality: the recorded criteria and the workflow status travel in one save,
    * so a node never carries the judgement without what supports it. The confirmation holds only where
@@ -600,6 +619,14 @@ export class CurationService {
    */
   async confirmQuality(): Promise<void> {
     this.qualityError.set(null);
+    // What the confirmation stands on, before it is given: the criteria as they were recorded, and by
+    // which route they were answered. A confirmation is a claim about a content's quality — this is the
+    // line that says which answers it was made on.
+    console.log(`${LOG_WRITE} confirming the quality of ${this.activeNode()?.nodeId ?? '(no node yet)'}`, {
+      criteria: this.recordedValues(),
+      knockoutSatisfied: this.criteriaSatisfied(),
+      judgedByAssistant: this.criteriaJudged()
+    });
     const written = await this.save({}, null, { quality: true });
     const problem = written ? this.workflowError() : this.saveError();
     this.quality.set(!problem);
@@ -982,16 +1009,35 @@ export class CurationService {
     this.saving.set(true);
     this.saveError.set(null);
     this.workflowError.set(null);
+    // Every property that goes out, by name and value, with the node it goes to and the workflow steps
+    // that travel with it. Written here rather than in the two routes below because this is where the
+    // values are final: what a step recorded and what its editor reported are one record by now.
+    console.log(`${LOG_WRITE} → writing ${Object.keys(values).length} properties`, {
+      nodeId: this.activeNode()?.nodeId ?? null,
+      creating: !this.activeNode(),
+      route: this.savesThroughAgent() ? 'agent' : 'repository',
+      steps,
+      values,
+      collections: this.pendingCollections().map((collection) => collection.name)
+    });
     try {
       // Only a session that is not the user's own goes through the agent: it writes with the agent's
       // privileges, which is the one way a guest session gets a content into the repository at all
       // (see {@link writeThroughAgent}). A signed-in user writes the node themselves — as their own,
       // in the folder they picked for it — even with the browser extension custom web component
       // enabled.
-      return this.savesThroughAgent()
+      const written = this.savesThroughAgent()
         ? await this.writeThroughAgent(values, payload, steps)
         : await this.writeToRepository(values, payload, steps);
+      console.log(`${LOG_WRITE} ← the write ${written ? 'went through' : 'was refused'}`, {
+        nodeId: this.activeNode()?.nodeId ?? null,
+        saveError: this.saveError(),
+        workflowError: this.workflowError(),
+        assignError: this.assignError()
+      });
+      return written;
     } catch (cause: unknown) {
+      console.warn(`${LOG_WRITE} the write failed:`, cause);
       this.saveError.set(errorMessage(cause));
       return false;
     } finally {
@@ -1333,8 +1379,12 @@ export class CurationService {
     if (steps.review) wanted.push(WorkflowStatus.TO_CHECK);
     if (steps.quality) wanted.push(WorkflowStatus.ELEMENT_LEGALLY_APPROVED);
     for (const status of wanted) {
+      const receiver = this.receiverFor(status);
+      // Named, not counted: the workflow status is the statement the node carries afterwards, and which
+      // one was written — and to whom — is not visible anywhere else.
+      console.log(`${LOG_WRITE} → workflow status ${status} on ${nodeId}`, { receiver });
       try {
-        await this.repositoryNodes.addWorkflowStatus(nodeId, status, '', this.receiverFor(status));
+        await this.repositoryNodes.addWorkflowStatus(nodeId, status, '', receiver);
       } catch (cause: unknown) {
         this.workflowError.set(`${status}: ${errorMessage(cause)}`);
         return;
@@ -1365,6 +1415,7 @@ export class CurationService {
     this.qualityJudge.reset();
     // The criteria belong to the content that is going: the next one's view reports its own.
     this.criteriaSatisfied.set(false);
+    this.criteriaJudged.set(false);
     // Nothing is known about the next content's Erschließung until it says so itself, and it was left
     // nowhere yet.
     this.curationFinished.set(null);
