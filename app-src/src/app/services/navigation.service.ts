@@ -33,6 +33,13 @@ export interface NavStep {
   tab: ScreenId | null;
 }
 
+/**
+ * Asked before the open step is left by a back button; `false` keeps the user where they are. For a step that
+ * holds something the walk back would destroy — the KI check's dialogue, which lives in the chat widget and
+ * ends with the screen that renders it.
+ */
+export type LeaveGuard = () => boolean;
+
 /** A step together with the steps behind it — a whole navigation state, as a resume carries it. */
 export interface NavState extends NavStep {
   trail: readonly NavStep[];
@@ -58,6 +65,9 @@ export class NavigationService {
   private readonly history = inject(HistoryService);
 
   readonly section = signal<SectionId>('menu');
+
+  /** The open step's guard, while one is registered — see {@link LeaveGuard} and {@link back}. */
+  private readonly leaveGuard = signal<LeaveGuard | null>(null);
 
   /** The tab the user picked; `null` (and after a section change) means "the section's first". */
   private readonly requestedTab = signal<ScreenId | null>(null);
@@ -171,6 +181,18 @@ export class NavigationService {
   }
 
   /**
+   * Register what to ask before the open step is walked back out of. Held for as long as the screen that set it
+   * is mounted; a screen registering one clears it again on the way out (see {@link LeaveGuard}).
+   */
+  registerLeaveGuard(guard: LeaveGuard): void {
+    this.leaveGuard.set(guard);
+  }
+
+  clearLeaveGuard(guard: LeaveGuard): void {
+    this.leaveGuard.update((current) => (current === guard ? null : current));
+  }
+
+  /**
    * Whether a section applies right now. For the screens that offer a *choice of sections* (see
    * the add-content screen), so they never offer a target that {@link go} would refuse.
    */
@@ -227,6 +249,9 @@ export class NavigationService {
    */
   back(): void {
     if (this.busy.busy()) return;
+    // The one place both back buttons meet — the topbar's and every footer's — so a step that has something to
+    // lose is asked about once, wherever the walk back was started from.
+    if (this.leaveGuard()?.() === false) return;
     let trail = this.trail();
     while (trail.length) {
       const target = trail[trail.length - 1];

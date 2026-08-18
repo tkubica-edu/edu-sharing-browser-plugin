@@ -77,15 +77,17 @@ entirely through element attributes, unlike `edu` (`window.__env.EDU_SHARING_API
 ## The contract surface
 
 `app-src/src/app/features/assistant/ai-assistant-screen/ai-assistant-screen.component.ts` is the
-**only** place in this codebase that knows the chatbot. Everything it depends on is a name from the
-other project, held in a constant at the top of that file:
+**only** place in this codebase that knows the chatbot — apart from `app-src/src/app/util/chat-session.ts`,
+which holds the two storage keys of a conversation so a screen can end one. Everything either of them
+depends on is a name from the other project, held in a constant at the top of the file:
 
 | Constant | Value | What it is |
 |---|---|---|
 | `CHAT_TAG` | `boerdi-chat` | the custom element |
 | `LOG` | `[edu-sharing][boerdi]` | prefix of every chat diagnosis in the console |
 | `CHAT_API_URL` | `https://87.106.127.225.nip.io` | the backend, hardcoded |
-| `SESSION_KEY` | `boerdi_session_id` | where the widget keeps the session it resumes |
+| `SESSION_KEY` | `boerdi_session_id` | where the widget keeps the session it resumes (`util/chat-session.ts`) |
+| `HINT_KEY` | `boerdi_owl_hint_session` | which session the widget last showed its intro hint for (`util/chat-session.ts`) |
 | `SHELL_TAG` | `boerdi-chat-shell` | the element the conversation renders in, looked for in the shadow root |
 | `SHELL_TIMEOUT_MS` / `SHELL_POLL_MS` | 10 000 / 50 ms | how long, and how often, that element is waited for |
 
@@ -326,9 +328,20 @@ empty; `contentUrl` is the metadata agent's last run — the page that was curat
 open; `filedCollections` are the editorial and personal collections the content was filed in,
 deduplicated, as `{ id, name }`.
 
-**Both screens share one conversation.** The session lives in `localStorage['boerdi_session_id']`, so
-someone who chatted from the bar and then enters the KI check continues the same conversation — with
-a `replaceContext` rather than a fresh start.
+**Both screens share one conversation** — the session lives in local storage, so a chat resumes wherever the
+widget is mounted next, with a `replaceContext` rather than a fresh start. Which is why the KI check ends it
+at both its edges (`util/chat-session.ts`, `resetChatSession()`):
+
+- **On entry**, in `FlowChoiceScreenComponent.open()` — where the check is *started*, not in the step itself:
+  the panel is rebuilt on every page change and the step is re-entered with it, so a dialogue under way has to
+  survive that. Without this the previous conversation — the bar's, or an earlier check's — is still on screen
+  when the check opens.
+- **On the way out**, both ways. Walking back asks first: `AiQualityScreenComponent` registers a
+  `LeaveGuard` with `NavigationService`, which `back()` consults — one guard for both back buttons, the
+  topbar's and the footer's, since both make the same walk. Confirmed, the session is ended with it. Finishing
+  the check ends it too, in the `ai-quality` footer action once `confirmQuality()` held.
+
+Nothing is asked before the widget has a session of its own: there is no dialogue to lose yet.
 
 #### The check as a task
 
@@ -792,10 +805,11 @@ One trap: the script defaults to `http://localhost:8000`, while the backend's de
    [WEB-COMPONENTS.md](WEB-COMPONENTS.md)).
 2. **No integrity check** when the bundle is pulled, and it runs unsandboxed in the sidebar document
    afterwards.
-3. **Three untyped foreign names** hold the integration together: the tag `boerdi-chat`, the inner
-   tag `boerdi-chat-shell` looked for by `querySelector`, and the storage key `boerdi_session_id`. A
-   missing context method is at least logged; a renamed shell tag surfaces only as a ten-second
-   timeout.
+3. **Four untyped foreign names** hold the integration together: the tag `boerdi-chat`, the inner
+   tag `boerdi-chat-shell` looked for by `querySelector`, and the storage keys `boerdi_session_id`
+   and `boerdi_owl_hint_session`. A missing context method is at least logged; a renamed shell tag
+   surfaces only as a ten-second timeout, and a renamed storage key as a check that opens on the
+   previous conversation.
 4. **The visibility flag belongs to another bundle.** Both entry points hang off
    `browserExtensionCustomWebComponent`, the WLO canvas's flag, because the assistant ships with that
    bundle — `model/navigation.ts` says so explicitly.

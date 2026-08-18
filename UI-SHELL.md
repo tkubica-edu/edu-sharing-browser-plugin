@@ -43,6 +43,11 @@ The **back button** walks back through the steps the user came through (`Navigat
 reaches the menu at the end of the trail; switching sub steps within a section is not a step of its
 own.
 
+A step that holds something the walk back would destroy **asks first**: it registers a `LeaveGuard` with
+`NavigationService`, which `back()` consults before it moves, so one confirmation covers both back buttons —
+the topbar's and the footer's, which make the same walk. The KI-Qualitätsprüfung is the one step that does,
+because its dialogue lives in the chat widget and ends with the screen (see [chatbot.md](chatbot.md)).
+
 Stepping back to a view that does not need a content **releases a content the user picked** — going
 back into *Eigene Inhalte* from *Inhaltsoptionen* means picking again — while a *detected* one is
 kept, since it describes the open page (`CurationService.releaseChosenContent`). The trail is carried

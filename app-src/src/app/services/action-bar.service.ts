@@ -1,6 +1,7 @@
 import { Injectable, Signal, computed, inject, signal } from '@angular/core';
 
 import { SectionId } from '../model/navigation';
+import { resetChatSession } from '../util/chat-session';
 import { CurationService } from './curation.service';
 import { NavigationService } from './navigation.service';
 import { PageRecognitionService } from './page-recognition.service';
@@ -262,6 +263,10 @@ export class ActionBarService {
               // Only on the back of a confirmation that held; one the repository refused is reported in
               // the view (CurationService.qualityError), and the step stays open for it.
               if (!this.curation.qualityConfirmed()) return;
+              // The dialogue was about this check, and the check is over: left in local storage the
+              // conversation would be resumed by the next chat that opens — the assistant's own screen, or
+              // the next content's check greeted by the previous one's messages.
+              resetChatSession('the KI-Qualitätsprüfung was completed');
               // The content has been erschlossen and judged, so the recognition's earlier answer about
               // this page no longer holds — asked again on the way back to the menu.
               this.leaveFlow();

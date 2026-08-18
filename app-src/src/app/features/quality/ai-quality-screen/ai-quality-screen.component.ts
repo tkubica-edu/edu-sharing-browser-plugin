@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy, Component, OnDestroy, computed, effect, inject, signal
+} from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { HOME_REPOSITORY, MdsDefinition, MdsService } from 'ngx-edu-sharing-api';
 
@@ -6,6 +8,8 @@ import { APP_CONFIG } from '../../../config';
 import { AuthorityNamePipe } from '../../../pipes/authority-name.pipe';
 import { AuthService } from '../../../services/auth.service';
 import { CurationService } from '../../../services/curation.service';
+import { LeaveGuard, NavigationService } from '../../../services/navigation.service';
+import { chatSession, resetChatSession } from '../../../util/chat-session';
 import { firstString } from '../../../util/mds-values';
 import { PageContext, contentContextOf } from '../../../util/page-context';
 import {
@@ -36,6 +40,14 @@ const STEP_MESSAGE: Record<Exclude<CheckStep, 'done'>, string> = {
   quality: 'Qualität prüfen',
   enrichment: 'Metadaten anreichern'
 };
+
+/**
+ * Asked before the step is walked back out of: the dialogue lives in the chat widget, which is destroyed with
+ * this screen, and the check cannot be picked up halfway — the next entry opens a new conversation.
+ */
+const LEAVE_PROMPT =
+  'Wenn du diesen Schritt verlässt, wird der Dialog mit der KI beendet und der Gesprächsverlauf gelöscht. ' +
+  'Trotzdem zurück?';
 
 /** What each way a run can end means for the person, where it ended without an answer. */
 const STOPPED: Record<string, string> = {
@@ -73,11 +85,19 @@ const STOPPED: Record<string, string> = {
   providers: [AuthorityNamePipe],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class AiQualityScreenComponent {
+export class AiQualityScreenComponent implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly authorityName = inject(AuthorityNamePipe);
   private readonly curation = inject(CurationService);
   private readonly mdsService = inject(MdsService);
+  private readonly navigation = inject(NavigationService);
+
+  /**
+   * What both back buttons ask before they walk out of this step — the topbar's and the footer's alike, since
+   * the walk itself is one (NavigationService.back). Held as a field so the same function can be taken back
+   * again when the screen goes.
+   */
+  private readonly leaveGuard: LeaveGuard = () => this.mayLeave();
 
   /**
    * The collection the check is against: the first the filing steps put the content in. One collection, because
@@ -265,6 +285,26 @@ export class AiQualityScreenComponent {
       }),
     );
     effect(() => void this.load());
+    this.navigation.registerLeaveGuard(this.leaveGuard);
+  }
+
+  ngOnDestroy(): void {
+    this.navigation.clearLeaveGuard(this.leaveGuard);
+  }
+
+  /**
+   * Whether the step may be left by a back button: the dialogue is what the check consists of and it does not
+   * survive the screen, so the person is told before it goes rather than after. Confirmed, the conversation is
+   * ended here and now — left in local storage it would be resumed by the next chat, which is how the previous
+   * check's messages end up greeting the next one.
+   *
+   * Nothing to lose before the chat has a session of its own, and then nothing is asked.
+   */
+  private mayLeave(): boolean {
+    if (!chatSession()) return true;
+    if (!confirm(LEAVE_PROMPT)) return false;
+    resetChatSession('the KI-Qualitätsprüfung was left');
+    return true;
   }
 
   /**

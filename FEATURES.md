@@ -135,10 +135,13 @@ from outside).
 The junction between the filing and the checking, entered from whichever filing step was the last to
 apply. Two cards, each with the button that starts its process: *Geführte Qualitätsprüfung*, which
 is the *Qualitätsprüfung* as it stands (criteria, then metadata), and *Individuelle
-Qualitätsprüfung mit KI*, the analysis against the chosen collection's requirements — its screen is
-still to be built. Clicking a card marks it and the footer's *Weiter* starts the marked one, so the
-two ways on say the same thing (`FlowChoiceScreenComponent`, which registers the choice as the
-footer's `ApplyHandler`).
+Qualitätsprüfung mit KI*, the analysis against the chosen collection's requirements as a dialogue with
+the assistant (see [chatbot.md](chatbot.md)). Clicking a card marks it and the footer's *Weiter* starts
+the marked one, so the two ways on say the same thing (`FlowChoiceScreenComponent`, which registers the
+choice as the footer's `ApplyHandler`).
+
+Starting the KI check **ends whatever chat conversation is stored**, so it opens on an empty dialogue
+instead of on the previous one; walking back out of it asks before that dialogue is lost.
 
 ---
 

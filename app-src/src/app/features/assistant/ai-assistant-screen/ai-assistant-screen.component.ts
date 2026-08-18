@@ -5,6 +5,7 @@ import {
 
 import { ConditionsService } from '../../../services/conditions.service';
 import { loadWebComponentBundle } from '../../../services/web-component-bundle.service';
+import { chatSession } from '../../../util/chat-session';
 import { PageContext, pageContextOf, sameSubject } from '../../../util/page-context';
 
 /** The chat element the boerdi bundle defines. */
@@ -14,9 +15,6 @@ const LOG = '[edu-sharing][boerdi]';
 
 /** The API the chat widget serves its conversations from. */
 const CHAT_API_URL = 'https://87.106.127.225.nip.io';
-
-/** Where the widget keeps the session it resumes; a stored id means the chat comes back mid-conversation. */
-const SESSION_KEY = 'boerdi_session_id';
 
 /** The element the widget renders the conversation in — the one behind its context methods. */
 const SHELL_TAG = 'boerdi-chat-shell';
@@ -346,7 +344,7 @@ export class AiAssistantScreenComponent implements OnDestroy {
     const element = this.element;
     if (!element) return;
     const task = this.task();
-    const session = storedSession();
+    const session = chatSession();
     if (!task && !session) {
       this.trace('nothing to open with — no task, and no session to hand the page to');
       return;
@@ -526,13 +524,4 @@ export class AiAssistantScreenComponent implements OnDestroy {
  */
 function shellRendered(element: HTMLElement): boolean {
   return !!(element.shadowRoot?.querySelector(SHELL_TAG) ?? element.querySelector(SHELL_TAG));
-}
-
-/** The session the widget would resume, if it stored one. Storage can be denied, which is simply no session. */
-function storedSession(): string | null {
-  try {
-    return localStorage.getItem(SESSION_KEY);
-  } catch {
-    return null;
-  }
 }

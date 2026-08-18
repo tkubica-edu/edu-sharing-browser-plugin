@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, OnDestroy, computed, inject, signal
 import { SectionId } from '../../../model/navigation';
 import { ActionBarService, ApplyHandler } from '../../../services/action-bar.service';
 import { NavigationService } from '../../../services/navigation.service';
+import { resetChatSession } from '../../../util/chat-session';
 
 /** One of the ways the content can be checked, as the screen offers it. */
 interface FlowOption {
@@ -81,5 +82,13 @@ export class FlowChoiceScreenComponent implements OnDestroy {
     // The Qualitätsprüfung is entered on its first view, which is what its own step does too — the
     // criteria are what it is entered for, and the metadata are worked on off the back of them.
     this.navigation.go(section, section === 'quality' ? { tab: 'quality-check' } : undefined);
+    // The KI check is a dialogue about this content, and the chat resumes whatever conversation local storage
+    // still holds — the assistant's own screen's, or an earlier check's — which would still be on screen when
+    // this one opens. Ended here, where the check is started, rather than in the step itself: the panel is
+    // rebuilt on every page change and the step is re-entered with it, so a dialogue under way has to survive
+    // that. Read off the step that actually opened, since the move is refused while a write is in flight.
+    if (this.navigation.section() === 'ai-quality') {
+      resetChatSession('the KI-Qualitätsprüfung is being started');
+    }
   }
 }
