@@ -20,7 +20,8 @@ one of the three packaged bundles that talks to a backend of its own.
 - [What is still open in the KI check](#what-is-still-open-in-the-ki-check)
 
 **Keeping this file current.** It describes `app-src/src/app/features/assistant/`,
-`app-src/src/app/features/quality/ai-quality-screen/`, `app-src/src/app/util/page-context.ts`, the
+`app-src/src/app/features/quality/ai-quality-screen/`, `app-src/src/app/util/page-context.ts`,
+`app-src/src/app/util/quality-check-request.ts`, the
 `boerdi` branch of `app-src/src/app/services/web-component-bundle.service.ts`, `scripts/boerdi/` and
 `scripts/fetch-widget.mjs`. A change to any of those belongs here as well. Where
 [FEATURES.md](FEATURES.md) and this file disagree about the assistant, this file is the newer one —
@@ -119,12 +120,16 @@ carries no view-encapsulation attribute, so this component's styles would not ma
 fills 100 % of its container in both directions, which means a container without a height leaves it
 silently 0 px tall — hence `min-height`.
 
-Three more are set only where a screen states a `ChatOpening` — `session-key`, `greeting` and
-`start-replies`, see [the offer in the KI check](#the-ki-quality-check--about-the-curated-content).
+Two more are set where a screen wants an answer it can record — `result-schema` and, with it,
+`engine="agent"`. They belong together: under the default engine a schema takes no effect at all, and
+the KI check is the one screen that states them, see
+[the check as a task](#the-ki-quality-check--about-the-curated-content). With a task stated,
+`page-context` is *not* set here at all; the page is handed over afterwards instead, and the reason
+is below.
 
-Attributes the widget also understands and this app does not set: `engine` (`pattern` or `agent`),
-`result-schema`, `ticket`, `size`, `position`, `theme`, `show-cards`, `primary-color`,
-`show-welcome`, `language`, `trusted-domains`, `persist-session`, `session-cookie-domain`,
+Attributes the widget also understands and this app does not set: `ticket`, `size`, `position`,
+`theme`, `show-cards`, `primary-color`, `greeting`, `start-replies`, `show-welcome`, `language`,
+`trusted-domains`, `persist-session`, `session-key`, `session-cookie-domain`,
 `session-cookie-max-age`, `intercept-edu-sharing-links`, `emit-guide-suggestion`,
 `emit-routing-debug`, `inline-result-grouping`.
 
@@ -148,14 +153,14 @@ exists is dropped without a trace. `whenShellRendered()` therefore polls for `<b
 before handing anything over, in the shadow root **and** in the light DOM, for up to ten seconds.
 Three situations need it:
 
-- **A screen that states how the chat opens.** Its context is deliberately not set as an attribute,
-  so it has to arrive right after the element is appended — see
-  [the offer in the KI check](#the-offer-the-chat-opens-with).
+- **A screen that states a task.** Its context is deliberately not set as an attribute, so it has to
+  arrive right after the element is appended, and the task immediately behind it — see
+  [the check as a task](#the-check-as-a-task).
 
 - **A resumed session.** The panel is torn down and rebuilt on every page change, so the widget is
   created anew each time while its session outlives it in local storage. A resumed conversation keeps
   the context it was last given, and `page-context` is only read into a conversation that starts
-  here — so `handOverToResumedSession()` replaces the context explicitly whenever
+  here — so `openConversation()` replaces the context explicitly whenever
   `localStorage['boerdi_session_id']` holds a session.
 - **A page change arriving before the conversation is on screen.** `follow()` records the new page in
   `current` and defers, then hands over the page *as it stands* when the shell appears.
@@ -163,17 +168,27 @@ Three situations need it:
 The element is mounted exactly once (`if (this.element) return;`); every later page goes through
 those methods.
 
-### What the widget offers and this app does not use
+### The third method: putting a task
 
-The widget forwards `openChatbot`, `closeChatbot`, `toggleChatbot`, `isChatbotOpen`, `resetSession`,
-`updateContext`, `replaceContext` and **`startTask(text)`**. Before the element is upgraded they are
+`startTask(text)` sends an instruction straight away, shown as its own dashed "Auftrag der Seite"
+bubble rather than as something the person said. The KI check uses it; the assistant's own screen
+does not.
+
+**It is dropped without a word while the widget is busy.** The widget refuses any message put to it
+during a turn (`if (!msg || ctx.isLoading()) return`), and a chat that opens on a page it can address
+*is* busy: it greets that page over the network. A task put the moment the conversation appears
+therefore never happens, and nothing says so — no error, no log, just a chat that answers a greeting
+nobody reads and never the task. What gets it through is doing without the `page-context` attribute,
+handing the page over with `replaceContext()` once the shell is there, and calling `startTask()`
+**in the same turn of the event loop**: the task is then the turn that runs, and the greeting is the
+one that gives way. This was measured against the packaged bundle, not reasoned about.
+
+The other methods the widget forwards — `openChatbot`, `closeChatbot`, `toggleChatbot`,
+`isChatbotOpen`, `resetSession` — are unused here. Before the element is upgraded all of them are
 no-ops rather than exceptions. There is no `sendMessage`.
 
-`startTask('…')` sends an instruction straight away, shown as its own dashed "Auftrag der Seite"
-bubble, and is held until the shell is mounted. Nothing here calls it.
-
 The widget also reports back, as `window` CustomEvents with `bubbles: true, composed: true` — needed
-because it renders into a shadow root. None of them is listened to here:
+because it renders into a shadow root. Only the last of them is listened to here:
 
 | Event | When | Payload |
 |---|---|---|
@@ -183,8 +198,14 @@ because it renders into a shadow root. None of them is listened to here:
 | `boerdi:routing-debug` | `emit-routing-debug` | `{message, pattern, intent, state, persona, tools_called[], …}` |
 | `boerdi:agent-result` | `result-schema` **and** `engine="agent"` | `{result, stop_reason}` |
 
-Whoever picks these up needs to know that **every one is dispatched twice** — first `boerdi:…`, then
-`badboerdi:…` for the predecessor system. Listening to both processes everything twice.
+**Every one is dispatched twice** — first `boerdi:…`, then `badboerdi:…` for the predecessor system.
+`AiAssistantScreenComponent` listens to the first name only; listening to both would process every
+answer twice.
+
+`boerdi:agent-result` is what a stated schema is for. It arrives on **every** turn once a schema is
+set, including the turns that submitted nothing, so that a run cut off by a cap is distinguishable
+from one that had nothing to add — `stop_reason` says which. The component passes it on as the
+`agentResult` output, translated into `{result, stopReason}`.
 
 The only `postMessage` anywhere in the chatbot's code is its own OAuth PKCE popup channel for the MCP
 login. It is not a bridge to the extension. The panel's own `postMessage` traffic — the panel host's
@@ -267,62 +288,74 @@ which is how the assistant's own screen uses it, and an `effect` feeds every cha
 The screen warns above the chat when no collection is picked, because the collection is what the
 assistant looks its skill up by.
 
-Its footer holds nothing but *Zurück* (`ActionBarService`): the dialogue with the assistant *is* the
-step. Nothing is written to the node and no result object comes back.
-
-#### The offer the chat opens with
-
-The check has to be asked for in so many words. The backend puts the titles of a collection's
-released skills into the prompt but no `nodeId`s, so the model has to walk `get_skill_registry` →
-`get_skill` itself — and a question that does not ask for the collection's requirements is answered
-without them. Leaving the wording to the person turns the check into a general chat about a text.
-
-So the screen states a `ChatOpening` and the chat opens with the check on offer:
-
-```ts
-protected readonly opening = computed<ChatOpening>(() => { … });
-```
-
-```html
-<es-ai-assistant-screen class="chat" [context]="context()" [opening]="opening()"></es-ai-assistant-screen>
-```
-
-`ChatOpening` is three things, and each is there for a reason:
-
-- **`greeting`** — the chat's first message, naming the content and the collection it is measured
-  against, in place of the assistant's general greeting.
-- **`offers`** — the chips under that message, mapped to `start-replies`. A chip *is* the message:
-  clicking one sends its label verbatim, so each is a whole request rather than a label for a step.
-  The first asks for the collection's instruction outright, which is what makes `get_skill` happen.
-  Without a collection there is nothing to ask for and the offers fall back to a general judgement.
-- **`sessionKey`** — one conversation per content (`boerdi_quality_session_<nodeId>`), apart from the
-  assistant's own. Two reasons: a resumed conversation would open on the previous content's findings,
-  and it would open without the offer at all, since a conversation that comes back comes back with
-  its history instead of a first message.
-
-**One ordering trap makes or breaks this.** A `page-context` that is already set when the element
-connects has the widget greet the *page* **instead of** showing its first message — the widget holds
-the static message back until the context ping has answered, so that the person sees one opening
-rather than two, and the offers ride on the message that is being held back. `mount()` therefore
-leaves the `page-context` attribute off whenever an opening is stated and hands the context over with
-`replaceContext()` as soon as the shell is on screen. The offer comes first, the greeting for the
-content after it.
-
-The attributes have to be on the element **before** it is appended: `greeting` and `start-replies`
-are read at the first open, and frameless there is no gate that would delay it. `start-replies` is a
-JSON array, not a comma-separated list — the labels are whole sentences and regularly contain commas;
-broken JSON is discarded with a line in the console and the editorial default applies instead.
-
 The values come from `CurationService`: `contentTitle` is `cclom:title`, else the preview node's
 title, else the active node's name; `contentText` is `_source_text`, else `ccm:oeh_extendedText`, else
 empty; `contentUrl` is the metadata agent's last run — the page that was curated, not the tab that is
 open; `filedCollections` are the editorial and personal collections the content was filed in,
 deduplicated, as `{ id, name }`.
 
-**The two screens no longer share a conversation.** The assistant's own chat lives in
-`localStorage['boerdi_session_id']`, the check in `boerdi_quality_session_<nodeId>` — so entering the
-check does not drag a chat about some open tab along, and leaving it does not lose the check. Both
-keys are the widget's to write; the panel only names them.
+**Both screens share one conversation.** The session lives in `localStorage['boerdi_session_id']`, so
+someone who chatted from the bar and then enters the KI check continues the same conversation — with
+a `replaceContext` rather than a fresh start.
+
+#### The check as a task
+
+The dialogue ends in the same record the structured check produces. That is what the criteria of the
+metadata set are read for, and they travel to the assistant twice over: as the task, so it knows what
+it is judging, and as the shape of its answer, so what comes back can be recorded rather than read.
+`util/quality-check-request.ts` is the whole of that translation.
+
+**The criteria.** `criteriaOf()` takes them from the same two widgets the structured check uses —
+`virtual:unmetLegalCriteria` for the knock-out ones, `ccm:oeh_buffet_criteria` for the editorial ones.
+Each becomes a `QualityCriterion` with a short key, `k1`, `k2`, …: their own ids are node properties
+and vocabulary URIs, and as schema keys they would spend the budget on addresses the model has no use
+for.
+
+**The task** (`instructionOf()`) names the collection, lists the criteria by key and caption, and asks
+for the released instruction outright — `get_skill_registry`, then `get_skill`. The prompt carries
+only the *titles* of a collection's skills, so the assistant has to fetch the one it checks against
+itself, and an unspecific task lets it answer from memory instead.
+
+**The shape** (`resultSchemaOf()`) is an object with one entry per criterion, each `{erfuellt,
+begruendung}`, and every key required. An object rather than a list, because a list invites an answer
+about the criteria that were easy to judge — and a check that quietly skipped half of them reads
+exactly like a complete one. It stays far below the backend's limit of 10 000 characters; ten criteria
+measure about 5 500. `schemaFits()` is what says so, since beyond the limit the backend refuses the
+request outright rather than applying half a schema.
+
+The schema's `description` texts are **prompt, not documentation**: they travel verbatim into the
+parameters of the assistant's `submit_result` tool and are read by the model as instructions. They are
+written as such — and the criteria captions in them come from the repository's own metadata set, which
+is also what the check is supposed to measure against.
+
+**The answer back.** `verdictsOf()` reads the result defensively: it comes from another project
+through a schema that constrains but does not guarantee, and an entry without a boolean verdict is
+dropped rather than read as "not met". `criteriaPropertiesOf()` then turns the verdicts into the very
+properties the structured check writes — a met knock-out criterion as the machine's all-clear where
+its valuespace states one, exactly as a judge's finding is recorded, because the assistant *is* a
+machine and a box claiming a person's confirmation would say more than happened.
+
+What the screen does with it is the same pair of statements the structured check's view makes:
+
+```ts
+this.curation.recordValues(properties);
+this.curation.reportQualityCriteria(knockoutSatisfied(judged, this.criteria()));
+```
+
+So the footer offers the same *Qualität bestätigen* on the same condition, and the confirmation is the
+same write either way (`CurationService.confirmQuality`). Above the chat the verdicts are listed with
+their reasons, the ones found wanting counted first.
+
+Three details that are easy to get wrong:
+
+- **Every turn reports**, so the verdicts of a later turn are laid *over* the standing ones rather
+  than replacing them. A follow-up question is usually about one criterion, and taking that answer as
+  the whole result would drop every other criterion from the record and close the confirmation again.
+- **A turn without verdicts changes nothing** but the note above the chat — someone thanking the
+  assistant must not clear a judgement that stands.
+- **The chat waits for the criteria.** Task and schema are read as the element mounts, and it mounts
+  once; a chat started before the metadata set answered would stay a plain chat for good. Hence the
+  `@if (settled())` around it.
 
 ### One layout rule worth keeping
 
@@ -336,7 +369,7 @@ that containing block the chat covers the whole panel.
 |---|---|---|
 | **Strukturierte Qualitätsprüfung** (`quality`) | fixed steps: work through the criteria, confirm, then metadata; writes the quality workflow onto the node; KI only proposes | `features/quality/quality-check-screen/`, `features/quality/quality-criteria/` |
 | The machine judges underneath | no chat at all, plain HTTP scoring: MetaLookUp measures (on by default), ContentJudge runs an LLM pass per scheme (off by default, needs a credential); started right after the content was analysed and read steps later | `services/quality-judge.service.ts`, `metalookup.service.ts`, `content-judge.service.ts`, `util/quality-schemes.ts` |
-| **Individuelle Qualitätsprüfung mit KI** (`ai-quality`) | a free dialogue with the assistant about the content and its collection; no fixed steps, no writing, no result object | `features/quality/ai-quality-screen/` |
+| **Individuelle Qualitätsprüfung mit KI** (`ai-quality`) | a dialogue with the assistant about the content and its collection, opened with the criteria as its task and answered in a schema built from them; no fixed steps, but the same record and the same confirmation as the structured check | `features/quality/ai-quality-screen/`, `util/quality-check-request.ts` |
 
 What separates the first from the last is exactly that it runs through fixed steps — which is why it
 is called the structured one rather than the guided one.
@@ -465,25 +498,29 @@ One trap: the script defaults to `http://localhost:8000`, while the backend's de
 4. **The visibility flag belongs to another bundle.** Both entry points hang off
    `browserExtensionCustomWebComponent`, the WLO canvas's flag, because the assistant ships with that
    bundle — `model/navigation.ts` says so explicitly.
-5. **Nothing checks that the check ran against the skill.** The KI check offers the right request and
-   the person can still type their own, and whether the model then fetched the collection's
-   instruction shows only in `tools_called` — which nothing here reads.
+5. **Nothing checks that the check ran against the skill.** The task asks for the collection's
+   instruction outright, but whether the model actually fetched it shows only in `tools_called`, and
+   that needs `emit-routing-debug` — which is not set and not read. A check that answered from memory
+   is indistinguishable here from one that followed the editorial instruction.
 6. **Only the first collection is handed over**, deliberately, since one skill is what the assistant
    works with. A content filed in several collections shows the chat only one of them, and there is no
    UI in which to choose which.
 7. **No `node_id` in the content context**, although the node usually exists by then.
-8. **No return channel.** None of the `boerdi:*` events is listened to, so the panel learns nothing
-   from the dialogue's outcome.
-9. **[FEATURES.md](FEATURES.md) lags behind** in three places: it still calls the structured check
-   the *geführte* one, still describes the KI screen as "still to be built", and still presents the
-   assistant as a chat about the open tab only, without the `context` input this file documents.
+8. **The return channel carries one thing.** `boerdi:agent-result` is read; the other four events are
+   not. `boerdi:page-action` and `boerdi:query-meta` are dispatched on every turn and would say what
+   the assistant looked at, which is the evidence point 5 is missing.
+9. **Every turn costs an extra model pass** once a schema is stated — measured at 2 to 9 seconds, and
+   30 for a ten-criterion schema. It is charged to "Danke!" as much as to the check itself, because
+   the schema belongs to the embedding rather than to the message.
+10. **[FEATURES.md](FEATURES.md) lags behind** in three places: it still calls the structured check
+    the *geführte* one, still describes the KI screen as "still to be built", and still presents the
+    assistant as a chat about the open tab only, without the `context` input this file documents.
 
 ## What is still open in the KI check
 
-The opening offer is built — [see above](#the-offer-the-chat-opens-with). What follows are the three
-steps it does not cover, all of the same gap: the check hands over a subject and then lets go of it.
-**None of them is implemented.** They are ordered by what they return for the work they cost, and
-each stands on its own.
+The check runs and its result is recorded — [see above](#the-check-as-a-task). What follows are three
+steps that are **not** implemented, ordered by what they return for the work they cost. Each stands on
+its own.
 
 ### 1. Give the dialogue the judges' findings
 
@@ -491,7 +528,7 @@ MetaLookUp has usually measured the content by the time this screen opens — `j
 right after the analysis, and `QualityJudgeService.measured()` / `evaluation()` hold the result. That
 is measured fact the model currently cannot see, so it re-derives worse versions of it in prose.
 
-Folding a short digest of the finished judgements into the opening greeting costs one injected
+Folding a short digest of the finished judgements into the task costs one injected
 service and a formatter. It belongs there rather than in `page_text`: `page_text` is the content
 itself and is capped at `CONTENT_TEXT_MAX`, and a judgement is not part of what is being judged. Only
 send what is actually `done` — a digest that reports a `failed` judge as a finding is worse than no
@@ -509,21 +546,13 @@ Two small corrections to the context:
   "no collection" warning already occupies. One collection stays the rule — one skill is what the
   assistant works with — but which one is a decision, not an array index.
 
-### 3. Take a result back out of the dialogue
+### 3. Show what the check actually did
 
-The panel currently learns nothing from the check: no event is listened to, and the footer holds only
-*Zurück*. The cheapest useful step is `boerdi:query-meta` and `boerdi:page-action`, which are always
-dispatched — enough to see whether the skill was fetched at all. The full step is `result-schema`
-together with `engine="agent"`, which makes the widget emit `boerdi:agent-result` with a structured
-verdict the panel can show, or carry into the structured check as a set of pre-filled criteria.
-
-Three things to get right when listening:
-
-- **Every event fires twice**, `boerdi:…` and then `badboerdi:…`. Listen to the first only.
-- **`stop_reason` must be `submit`** — on `deadline`, `token_budget`, `max_iterations` or
-  `no_progress` the `result` is not dependable and must be discarded rather than displayed.
-- **A verdict is not a confirmation.** Whatever comes back is a proposal; writing the quality workflow
-  onto the node stays the structured check's business, which is what its fixed steps exist for.
+The verdicts are recorded, but nothing shows what they rest on. `boerdi:query-meta` and
+`boerdi:page-action` are dispatched on every turn without any opt-in, and `emit-routing-debug` adds
+`tools_called` — which is the one thing that says whether the collection's instruction was fetched at
+all. Listening costs a handler apiece; every event fires twice (`boerdi:…`, then `badboerdi:…`), so
+only the first name is heard.
 
 ### What not to do
 
