@@ -582,7 +582,10 @@ export interface CheckSubject {
   title: string | null;
   /** What it says — the text the panel holds for it; empty where it holds none. */
   text: string;
-  /** Where it came from, so the assistant can read the rest itself. */
+  /**
+   * Where it came from. Not stated in the task — the page context and the quoted text both carry it — but it
+   * decides whether reading the page is worth asking for at all; see {@link contentBlock}.
+   */
   url: string | null;
   /** The collection whose requirements it is measured against. */
   collection: string | null;
@@ -686,37 +689,38 @@ export function qualityInstructionOf(
 }
 
 /**
- * The content itself, appended to the task and cut to what is left of the request's length. Where there is no
- * text — a node this session did not erschließen states none — the address stands in its place, since the
- * assistant can read it and a check made on a title alone is worthless.
+ * The content itself, appended to the task and cut to what is left of the request's length.
+ *
+ * The page's address is deliberately NOT stated here: the assistant is given it in the page context, and the
+ * text quoted below carries it in its own header (the extraction opens with `URL:` and `Canonical URL:`). A
+ * third copy in the task only spends the budget the text needs. `url` therefore decides what is worth
+ * ASKING for — reading the page is only an instruction where there is a page to read.
  */
 function contentBlock(text: string, url: string | null, room: number): string {
-  const source = url ? `\nDie Seite dazu: ${url}` : '';
   if (!text) {
     return (
       '\nDer Volltext dieses Inhalts liegt hier nicht vor.' +
-      source +
       (url
-        ? '\nHol ihn dir mit get_url_text von dieser Adresse, bevor du urteilst. Erst wenn auch das nichts ' +
-          'hergibt, gilt ein Kriterium mangels Text als nicht prüfbar.'
+        ? '\nHol ihn dir mit get_url_text von der Adresse der Seite, bevor du urteilst. Erst wenn auch das ' +
+          'nichts hergibt, gilt ein Kriterium mangels Text als nicht prüfbar.'
         : '\nBeurteile, was der Seitenkontext hergibt, und sag bei jedem Kriterium ausdrücklich, wenn es ' +
           'mangels Text nicht prüfbar war.')
     );
   }
   const opening = '\nHier ist der Inhalt im Wortlaut:\n---\n';
+  // The closing fence only where something follows it — it is there to say where the quoted text ends, and
+  // where the text runs to the end of the task there is nothing for it to separate.
   const closing = '\n---';
-  const budget = room - opening.length - closing.length - source.length - 200;
+  const budget = room - opening.length - closing.length - 200;
   const fits = text.length <= budget;
   const quoted = fits ? text : text.slice(0, Math.max(budget, 0));
+  if (fits) return opening + quoted;
   return (
     opening +
     quoted +
     closing +
-    source +
-    (fits
-      ? ''
-      : '\nDieser Wortlaut ist abgeschnitten.' +
-        (url ? ' Den vollständigen Text bekommst du mit get_url_text von der Adresse oben.' : ''))
+    '\nDieser Wortlaut ist abgeschnitten.' +
+    (url ? ' Den vollständigen Text bekommst du mit get_url_text von der Adresse der Seite.' : '')
   );
 }
 
