@@ -388,9 +388,13 @@ has answered:
    we hold no criterion for is not dropped and not invented as one either: it goes into the single
    overall verdict, `geeignet`, and is named in the summary. This task **quotes the content's own text
    in full**.
-4. **Metadaten anreichern** (`enrichmentInstructionOf()`) — subject, education level and resource
-   type, each looked up in its WLO vocabulary (`lookup_wlo_vocabulary` with `discipline`,
-   `educationalContext`, `lrt`) and answered **with the URI**, plus five to ten keywords. A guessed
+4. **Metadaten anreichern** (`enrichmentInstructionOf()`) — subject, education level, resource type
+   and intended target groups, each looked up in its WLO vocabulary (`lookup_wlo_vocabulary` with
+   `discipline`, `educationalContext`, `lrt`, `intendedEndUserRole`) and answered **with the URI**,
+   plus five to ten keywords. Each field is answered under the name of its own vocabulary, and each of
+   them is a **list** — the properties they are recorded in hold one, and a content can be about two
+   subjects, fit two education levels, be an Arbeitsblatt and a Video at once, and be meant for
+   teachers and learners together. Asked for a single value, the rest is lost before it is written. A guessed
    URI does not fail; it quietly matches nothing, which is why the schema says a value that cannot be
    looked up is left empty rather than formed. It asks for a released skill for this step too, and
    softly: there may not be one yet, and a skill that does not exist must not read as a step that
@@ -545,15 +549,18 @@ the confirming save. The person went through these values in the chat and confir
 what makes them the content's rather than a proposal about it.
 
 Which property a value goes to is decided by **the vocabulary its URI came out of**, not by the field
-it was answered under — each of these properties holds the values of exactly one vocabulary:
+it was answered under — each of these properties holds the values of exactly one vocabulary, which is
+why one answered field can feed two of them (every field is a list, and the values are handed out by
+where they came from):
 
 | answered | vocabulary | property |
 |---|---|---|
-| `fach` | `discipline` | `ccm:taxonid` |
-| `bildungsstufe` | `educationalContext` | `ccm:educationalcontext` |
-| `materialtyp` | `new_lrt` | `ccm:oeh_lrt` |
-| `materialtyp` | `new_lrt_aggregated` | `ccm:oeh_extendedType` |
-| `schlagworte` | — | `cclom:general_keyword` |
+| `discipline` | `discipline` | `ccm:taxonid` |
+| `educationalContext` | `educationalContext` | `ccm:educationalcontext` |
+| `lrt` | `new_lrt` | `ccm:oeh_lrt` |
+| `lrt` | `new_lrt_aggregated` | `ccm:oeh_extendedType` |
+| `intendedEndUserRole` | `intendedEndUserRole` | `ccm:educationalintendedenduserrole` |
+| `keywords` | — | `cclom:general_keyword` |
 
 *Materialtyp* is why it has to work that way. Asked for `lrt`, `lookup_wlo_vocabulary` answers out of
 either vocabulary — measured, it came back

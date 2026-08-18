@@ -403,21 +403,51 @@ export function proofreadOf(result: unknown): ProofreadResult | null {
 }
 
 /**
- * The three vocabularies a value is looked up in, by what they classify. Named in the task and in the schema
- * alike: a value formed from memory does not fail loudly — a guessed URI simply matches nothing.
+ * The vocabulary-valued fields of the enrichment: each is named after the vocabulary it is looked up in — the
+ * name `lookup_wlo_vocabulary` is asked with — and carries the German the task and the schema describe it in.
+ * Naming the vocabulary in both is what a value has to be looked up for: one formed from memory does not fail
+ * loudly, a guessed URI simply matches nothing.
+ *
+ * Every one of them is a **list**, because every property they are recorded in holds one: a content can be
+ * about two subjects, fit two education levels, be an Arbeitsblatt and a Video at once, and be meant for
+ * teachers and learners together. `many` is what says so in the field's own terms — asked for one value, a
+ * model answers one and the rest is lost before it is ever written.
  */
-const VOCABULARIES = {
-  fach: 'discipline',
-  bildungsstufe: 'educationalContext',
-  materialtyp: 'lrt'
+const VOCABULARY_FIELDS = {
+  discipline: {
+    what: 'Die Schulfächer, um die es im Inhalt geht',
+    many: 'Oft eines, mehrere wo der Inhalt fächerübergreifend ist.'
+  },
+  educationalContext: {
+    what: 'Die Bildungsstufen, für die der Inhalt gedacht ist',
+    many: 'Mehrere, wo er über eine Stufe hinaus passt.'
+  },
+  lrt: {
+    what: 'Die Materialtypen, die der Inhalt hat',
+    many: 'Mehrere, wo er mehreres davon ist — etwa Arbeitsblatt und Video.'
+  },
+  intendedEndUserRole: {
+    what: 'Die Zielgruppen, für die der Inhalt gedacht ist',
+    many: 'Meist mehrere — etwa Lehrende und Lernende zugleich.'
+  }
 } as const;
 
-/** What the enrichment answered; every field empty where the content did not give it. */
+/** A field the enrichment answers vocabulary values under; the field name is the vocabulary's own. */
+type VocabularyField = keyof typeof VOCABULARY_FIELDS;
+
+/** The vocabulary-valued fields, for the passes that treat all of them alike. */
+const VOCABULARY_FIELD_NAMES = Object.keys(VOCABULARY_FIELDS) as readonly VocabularyField[];
+
+/**
+ * What the enrichment answered; every list empty where the content did not give it. The fields carry the names
+ * of the vocabularies and of the node properties they end up in, not the German of the task.
+ */
 export interface EnrichedMetadata {
-  fach: VocabularyValue;
-  bildungsstufe: VocabularyValue;
-  materialtyp: VocabularyValue;
-  schlagworte: readonly string[];
+  discipline: readonly VocabularyValue[];
+  educationalContext: readonly VocabularyValue[];
+  lrt: readonly VocabularyValue[];
+  intendedEndUserRole: readonly VocabularyValue[];
+  keywords: readonly string[];
 }
 
 /** One value from a WLO vocabulary: what it is called, and the URI that is the actual filter value. */
@@ -438,17 +468,18 @@ export interface CheckOutcome {
 }
 
 /**
- * The shape the enrichment is answered in. Every field required, none of them allowed to be invented: a
- * field the content does not give is answered empty, which is a statement, while a missing field would be
- * indistinguishable from one the assistant forgot.
+ * The shape the enrichment is answered in: a list per vocabulary, and the keywords. Every field required, none
+ * of them allowed to be invented — a field the content does not give is answered as an empty list, which is a
+ * statement, while a missing field would be indistinguishable from one the assistant forgot.
  */
 export function enrichmentSchemaOf(): Record<string, unknown> {
-  const value = (what: string, vocabulary: string) => ({
+  // One entry of a vocabulary list: what it is called, and the URI that is the value itself.
+  const entry = (vocabulary: string) => ({
     type: 'object',
-    description: `${what}, aus dem Vokabular „${vocabulary}“.`,
+    description: `Ein Eintrag aus dem Vokabular „${vocabulary}“.`,
     properties: {
-      label: { type: 'string', description: `Die Bezeichnung, wie sie im Vokabular steht. Leer, wenn der Inhalt ${what.toLowerCase()} nicht hergibt.` },
-      uri: { type: 'string', description: 'Die vollständige URI des Eintrags, wie lookup_wlo_vocabulary sie zurückgibt. Niemals selbst gebildet — leer, wenn keine nachgeschlagen wurde.' }
+      label: { type: 'string', description: 'Die Bezeichnung, wie sie im Vokabular steht.' },
+      uri: { type: 'string', description: 'Die vollständige URI des Eintrags, wie lookup_wlo_vocabulary sie zurückgibt. Niemals selbst gebildet.' }
     },
     required: ['label', 'uri']
   });
@@ -456,16 +487,25 @@ export function enrichmentSchemaOf(): Record<string, unknown> {
     type: 'object',
     description: 'Die angereicherten Metadaten des Inhalts, jeder Wert aus dem vorgegebenen Vokabular.',
     properties: {
-      fach: value('Das Schulfach', VOCABULARIES.fach),
-      bildungsstufe: value('Die Bildungsstufe', VOCABULARIES.bildungsstufe),
-      materialtyp: value('Der Materialtyp', VOCABULARIES.materialtyp),
-      schlagworte: {
+      ...Object.fromEntries(
+        Object.entries(VOCABULARY_FIELDS).map(([field, { what, many }]) => [
+          field,
+          {
+            type: 'array',
+            description:
+              `${what}, aus dem Vokabular „${field}“. ${many} ` +
+              'Leere Liste, wenn der Inhalt nichts davon hergibt.',
+            items: entry(field)
+          }
+        ])
+      ),
+      keywords: {
         type: 'array',
         description: 'Schlagworte, mit denen der Inhalt gefunden werden soll. Fünf bis zehn, aus dem Inhalt selbst.',
         items: { type: 'string' }
       }
     },
-    required: ['fach', 'bildungsstufe', 'materialtyp', 'schlagworte']
+    required: [...VOCABULARY_FIELD_NAMES, 'keywords']
   };
 }
 
@@ -474,8 +514,8 @@ export function enrichmentSchemaOf(): Record<string, unknown> {
  * judged — *Metadaten anreichern*, the step's name in the editorial process this panel serves.
  *
  * A task of its own rather than a second half of the first, because the two ask different things of the run.
- * The judgement reads the content and the collection's instruction; the enrichment looks values up in three
- * vocabularies. Asked together they compete for the same iteration and token caps, and the answer that
+ * The judgement reads the content and the collection's instruction; the enrichment looks values up in the
+ * WLO vocabularies. Asked together they compete for the same iteration and token caps, and the answer that
  * suffers is whichever the model reaches last. Asked in turn, each gets its own run, its own schema, and the
  * enrichment starts from a content whose quality is already established.
  *
@@ -504,11 +544,13 @@ export function enrichmentInstructionOf(subject: CheckSubject): string {
             'den folgenden Vorgaben an.'
         ]
       : []),
-    `Hol dir Fach, Bildungsstufe und Materialtyp aus den vorgegebenen Vokabularen: lookup_wlo_vocabulary mit ` +
-      `vocabulary="${VOCABULARIES.fach}", "${VOCABULARIES.bildungsstufe}" und "${VOCABULARIES.materialtyp}". ` +
+    'Hol dir Fach, Bildungsstufe, Materialtyp und Zielgruppe aus den vorgegebenen Vokabularen: ' +
+      `lookup_wlo_vocabulary mit vocabulary=${askedVocabularies()}. ` +
       'Gib zu jedem Wert die Bezeichnung UND die vollständige URI an, wie das Vokabular sie zurückgibt.',
-    'Bilde keine URI selbst — eine geratene trifft still nichts. Gibt der Inhalt einen Wert nicht her, lass ' +
-      'ihn leer, statt zu raten.',
+    'Jedes dieser vier Felder ist eine Liste: nenne alle zutreffenden Werte, nicht nur den ersten. Ein Fach ' +
+      'ist es oft, eine Zielgruppe meist mehrere — etwa Lehrende und Lernende zugleich.',
+    'Bilde keine URI selbst — eine geratene trifft still nichts. Gibt der Inhalt zu einem Feld nichts her, ' +
+      'lass die Liste leer, statt zu raten.',
     'Nenne dazu fünf bis zehn Schlagworte aus dem Inhalt selbst.',
     '',
     'Nenne die Werte zuerst im Chat, je Wert eine Zeile mit Bezeichnung und URI, darunter die Schlagworte. ' +
@@ -527,33 +569,43 @@ export function enrichmentInstructionOf(subject: CheckSubject): string {
     .join('\n');
 }
 
+/** The vocabularies to look up, quoted and enumerated for the task's sentence. */
+function askedVocabularies(): string {
+  const quoted = VOCABULARY_FIELD_NAMES.map((vocabulary) => `"${vocabulary}"`);
+  return [quoted.slice(0, -1).join(', '), quoted[quoted.length - 1]].join(' und ');
+}
+
 /** What the enrichment answered; null where the turn submitted nothing usable. */
 export function enrichmentOf(result: unknown): EnrichedMetadata | null {
   const answer = asRecord(result);
   if (!answer) return null;
-  const value = (key: string): VocabularyValue => {
-    const entry = asRecord(answer[key]);
+  const valueOf = (raw: unknown): VocabularyValue => {
+    const entry = asRecord(raw);
     return {
       label: typeof entry?.['label'] === 'string' ? entry['label'].trim() : '',
       uri: typeof entry?.['uri'] === 'string' ? entry['uri'].trim() : ''
     };
   };
-  const keywords = Array.isArray(answer['schlagworte'])
-    ? answer['schlagworte'].filter((entry): entry is string => typeof entry === 'string' && !!entry.trim())
+  // An entry that states neither a name nor a URI says nothing and is dropped, so an empty one does not
+  // read as a value the content was given.
+  const list = (field: VocabularyField): VocabularyValue[] => {
+    const stated = answer[field];
+    return Array.isArray(stated) ? stated.map(valueOf).filter((value) => value.label || value.uri) : [];
+  };
+  const keywords = Array.isArray(answer['keywords'])
+    ? answer['keywords'].filter((entry): entry is string => typeof entry === 'string' && !!entry.trim())
     : [];
   const metadata: EnrichedMetadata = {
-    fach: value('fach'),
-    bildungsstufe: value('bildungsstufe'),
-    materialtyp: value('materialtyp'),
-    schlagworte: keywords.map((entry) => entry.trim())
+    discipline: list('discipline'),
+    educationalContext: list('educationalContext'),
+    lrt: list('lrt'),
+    intendedEndUserRole: list('intendedEndUserRole'),
+    keywords: keywords.map((entry) => entry.trim())
   };
   // Nothing at all is not an enrichment: an answer about a different question would otherwise be recorded
   // as one whose every field happened to be empty.
   const stated =
-    metadata.fach.label ||
-    metadata.bildungsstufe.label ||
-    metadata.materialtyp.label ||
-    metadata.schlagworte.length;
+    VOCABULARY_FIELD_NAMES.some((field) => metadata[field].length) || metadata.keywords.length;
   return stated ? metadata : null;
 }
 
@@ -566,17 +618,23 @@ const KEYWORD_PROPERTY = 'cclom:general_keyword';
  * — not the field it was answered under. *Materialtyp* is the case that makes the difference: asked for `lrt`,
  * `lookup_wlo_vocabulary` answers out of `new_lrt` or out of the aggregated `new_lrt_aggregated`, and on the
  * node those are two separate fields. A URI from any other vocabulary is not recorded at all: it would sit in
- * a field whose valuespace does not contain it, where the editor shows a blank and no search finds it.
+ * a field whose valuespace does not contain it, where the editor shows a blank and no search finds it. That
+ * split is why one answered field can feed two properties: the values are handed out by where they came from.
  */
 const ENRICHED_PROPERTIES: readonly {
-  field: 'fach' | 'bildungsstufe' | 'materialtyp';
+  field: VocabularyField;
   vocabulary: string;
   property: string;
 }[] = [
-  { field: 'fach', vocabulary: 'discipline', property: 'ccm:taxonid' },
-  { field: 'bildungsstufe', vocabulary: 'educationalContext', property: 'ccm:educationalcontext' },
-  { field: 'materialtyp', vocabulary: 'new_lrt', property: LRT_FIELD },
-  { field: 'materialtyp', vocabulary: 'new_lrt_aggregated', property: EXTENDED_TYPE_FIELD }
+  { field: 'discipline', vocabulary: 'discipline', property: 'ccm:taxonid' },
+  { field: 'educationalContext', vocabulary: 'educationalContext', property: 'ccm:educationalcontext' },
+  { field: 'lrt', vocabulary: 'new_lrt', property: LRT_FIELD },
+  { field: 'lrt', vocabulary: 'new_lrt_aggregated', property: EXTENDED_TYPE_FIELD },
+  {
+    field: 'intendedEndUserRole',
+    vocabulary: 'intendedEndUserRole',
+    property: 'ccm:educationalintendedenduserrole'
+  }
 ];
 
 /**
@@ -598,12 +656,15 @@ export function enrichmentPropertiesOf(
 ): MdsValues {
   const properties: MdsValues = {};
   for (const { field, vocabulary, property } of ENRICHED_PROPERTIES) {
-    const uri = metadata[field].uri;
-    if (uri.includes(`/vocabs/${vocabulary}/`)) properties[property] = [uri];
+    // A Set, because a repeated lookup can answer the same entry twice and a property holds a value once.
+    const uris = new Set(
+      metadata[field].map((value) => value.uri).filter((uri) => uri.includes(`/vocabs/${vocabulary}/`))
+    );
+    if (uris.size) properties[property] = [...uris];
   }
   const kept = new Map<string, string>();
   // Standing first, so a keyword both lists hold stays in the spelling the content already carries.
-  for (const keyword of [...asList(recorded?.[KEYWORD_PROPERTY]), ...metadata.schlagworte]) {
+  for (const keyword of [...asList(recorded?.[KEYWORD_PROPERTY]), ...metadata.keywords]) {
     const word = keyword.trim();
     if (word && !kept.has(word.toLowerCase())) kept.set(word.toLowerCase(), word);
   }
