@@ -23,6 +23,11 @@
   // Verlauf's count badge, its "öffnen" button.
   --es-blue-tint: #e6edf6;
 
+  // The lift of a card that is the centre of its screen rather than one thing among several — two
+  // layers, because one soft shadow alone reads as a blur: a tight one draws the card's edge, the
+  // wider one is the light around it. Same ink as the text, so it tints rather than greys.
+  --es-shadow-card: 0 1px 2px rgba(28, 39, 51, 0.10), 0 4px 12px rgba(28, 39, 51, 0.08);
+
   // Radius + spacing scale — the paddings and corner radius shared across the components
   --es-radius: 8px;
   // The corner of the wide footer buttons (`fbtn`), which a theme may round into a pill.

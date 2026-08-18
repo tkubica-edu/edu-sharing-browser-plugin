@@ -3,12 +3,12 @@
 
   <!-- The same card either way — a way on is a button, a statement is not. -->
   @if (interactive()) {
-    <button class="focus-card" (click)="activate.emit()" [disabled]="disabled()"
-            [attr.title]="contentTitle()">
+    <button class="focus-card" [class.is-elevated]="elevated()" (click)="activate.emit()"
+            [disabled]="disabled()" [attr.title]="contentTitle()">
       <ng-container [ngTemplateOutlet]="body" />
     </button>
   } @else {
-    <div class="focus-card is-static" [attr.title]="contentTitle()">
+    <div class="focus-card is-static" [class.is-elevated]="elevated()" [attr.title]="contentTitle()">
       <ng-container [ngTemplateOutlet]="body" />
     </div>
   }

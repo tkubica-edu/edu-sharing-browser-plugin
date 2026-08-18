@@ -37,6 +37,10 @@
 
   // The card that only names the content it is about — nothing to press, so nothing to invite it.
   &.is-static { cursor: default; }
+
+  // Lifted where the card is the screen's centre — see ContentCardComponent.elevated. The border
+  // stays: the shadow gives the card its depth, the hairline its edge on a surface as light as this.
+  &.is-elevated { box-shadow: var(--es-shadow-card); }
 }
 
 // The type icon's place — and the spinner's while the recognition runs, so the card keeps its shape

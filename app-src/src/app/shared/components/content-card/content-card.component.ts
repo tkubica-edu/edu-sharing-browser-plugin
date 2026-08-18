@@ -65,6 +65,14 @@ export class ContentCardComponent {
   /** A card that is a way on: rendered as a button, and {@link activate} reports the click. */
   readonly interactive = input(false);
 
+  /**
+   * The card is lifted off the surface it sits on. For the place where it is the centre of the screen
+   * — the main menu, whose other entries are rows on that same surface: the shadow is what separates
+   * the one thing the panel is about from the list of ways on under it. Where the card merely repeats
+   * the content a screen is already about, it stays flat.
+   */
+  readonly elevated = input(false);
+
   readonly disabled = input(false);
 
   readonly activate = output<void>();
