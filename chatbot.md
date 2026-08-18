@@ -188,7 +188,9 @@ The other methods the widget forwards — `openChatbot`, `closeChatbot`, `toggle
 no-ops rather than exceptions. There is no `sendMessage`.
 
 The widget also reports back, as `window` CustomEvents with `bubbles: true, composed: true` — needed
-because it renders into a shadow root. Only the last of them is listened to here:
+because it renders into a shadow root. All five are heard here; the last of them is the only one the
+panel acts on, the other four are traced (`REPORTED_EVENTS`), which is what makes a turn's routing and
+its tool calls readable at all:
 
 | Event | When | Payload |
 |---|---|---|
@@ -199,8 +201,15 @@ because it renders into a shadow root. Only the last of them is listened to here
 | `boerdi:agent-result` | `result-schema` **and** `engine="agent"` | `{result, stop_reason}` |
 
 **Every one is dispatched twice** — first `boerdi:…`, then `badboerdi:…` for the predecessor system.
-`AiAssistantScreenComponent` listens to the first name only; listening to both would process every
-answer twice.
+`AiAssistantScreenComponent` listens to the first name only; listening to both would process — and log
+— every answer twice.
+
+The two that are silent unless asked for are asked for: the screen sets `emit-guide-suggestion="true"`
+and `emit-routing-debug="true"`. Neither changes what the chat does; `routing-debug` is where
+`tools_called` is, and that is the one thing that says whether a check fetched the collection's
+instruction or answered from memory. The listeners sit on `window` under the plain event names, so
+whatever dispatches them is traced the same — the widget, or something standing in for it while the
+development mode is on.
 
 `boerdi:agent-result` is what a stated schema is for. It arrives on **every** turn once a schema is
 set, including the turns that submitted nothing, so that a run cut off by a cap is distinguishable
@@ -417,14 +426,18 @@ Linsengleichung."* / *„Bewertung zur Linsengleichung korrigieren"*, and *„Ja
 / *„Ich möchte die Metadaten korrigieren"*. Not a guarantee — a consequence of what the answer says.
 
 The opening question benefits from this more than anything else does: it is a question with exactly two
-answers, and the generator turns it into exactly two chips — *„Das ist mein eigener Inhalt"* / *„Das ist
-ein fremder Inhalt"* in one run, *„Eigener Inhalt, von mir erstellt"* / *„Fremder Inhalt, den ich nur
-einordne"* in another. The person taps rather than types, without the panel drawing a control for it.
+answers, and the generator turns it into exactly two chips. Left to itself it words them anew each run —
+*„Das ist mein eigener Inhalt"* / *„Das ist ein fremder Inhalt"* in one, *„Eigener Inhalt, von mir
+erstellt"* / *„Fremder Inhalt, den ich nur einordne"* in another — so the task names both answers instead
+and gets the same two every time: **„Inhalt selbst erstellt"** / **„Fremder Inhalt"**, measured across
+runs whose guess pointed either way, and tapping either one submits `herkunft` accordingly with the guess
+beside it. The person taps rather than types, without the panel drawing a control for it.
 
 **So the chip is asked for through the answer, which is the only lever there is.** Each of the three
-tasks that end in a confirmation closes with the same line: end on the question, and name the confirming
-answer word for word — *„Ich bestätige die Korrekturen."*, *„Ich bestätige die Bewertung."*, *„Ich
-bestätige die Metadaten."* The assistant writes that sentence out as an *Antwortvorschlag*, the
+tasks that end in a confirmation closes with the same line: end on the question, and write the confirming
+answer out — *„Ich bestätige die Korrekturen."*, *„Ich bestätige die Bewertung."*, *„Ich bestätige die
+Metadaten."* — with the addition that it is a suggestion and not a requirement, so the assistant does not
+go on to demand that sentence back word for word. It writes it out as an *Antwortvorschlag*, the
 generator reads it, and it comes back as the first chip, verbatim:
 
 | step | chips |
@@ -485,14 +498,20 @@ the 10 000 characters a message may hold. Where the panel holds no text at all �
 erschließen itself — the address takes its place, with the instruction to fetch it (`get_url_text`)
 before judging; a check made on a title alone is worthless.
 
-**The shape** (`resultSchemaOf()`) is an object with one entry per criterion, each `{erfuellt,
+**The shape** (`resultSchemaOf()`) is an object with one entry per criterion, each `{ergebnis,
 begruendung}`, every key required, plus `geeignet` — one boolean over the whole content — and a
-summary. `geeignet` is required too, and it is the only place a collection's own requirements can land
+summary. `ergebnis` is one of three words rather than a yes-or-no: `erfolgreich`, `probleme`, and
+`unklar` for a criterion the content does not settle — which records nothing at all, holds the
+confirmation back, and keeps its reasoning. Without that third word a check may only answer no where it
+cannot tell, which reads as a finding about the content instead of one about the check; measured on a
+content quoted in excerpt, the assistant answered six of twelve criteria `unklar`, licence and
+accessibility among them. `geeignet` is required too, and it is the only place a collection's own requirements can land
 where the metadata set holds no field for them: the criteria are what the repository can record, and
 *für Bildung geeignet / ungeeignet* is what is left to say about everything else. An object rather than a list, because a list invites an answer
 about the criteria that were easy to judge — and a check that quietly skipped half of them reads
-exactly like a complete one. It stays far below the backend's limit of 10 000 characters; ten criteria
-measure about 5 500. `schemaFits()` is what says so, since beyond the limit the backend refuses the
+exactly like a complete one. It stays below the backend's limit of 10 000 characters; twelve criteria
+measure about 6 550, and what the three outcomes mean is stated once for the whole list rather than per
+criterion — said twelve times over it costs 3 000 characters of the 10 000. `schemaFits()` is what says so, since beyond the limit the backend refuses the
 request outright rather than applying half a schema.
 
 The schema's `description` texts are **prompt, not documentation**: they travel verbatim into the
@@ -501,8 +520,9 @@ written as such — and the criteria captions in them come from the repository's
 is also what the check is supposed to measure against.
 
 **The answer back.** `verdictsOf()` reads the result defensively: it comes from another project
-through a schema that constrains but does not guarantee, and an entry without a boolean verdict is
-dropped rather than read as "not met". `criteriaPropertiesOf()` then turns the verdicts into the very
+through a schema that constrains but does not guarantee, and an entry whose `ergebnis` is none of the
+three words is dropped rather than read as "not met" — which is a different thing from `unklar`, the
+answer that says so itself. `criteriaPropertiesOf()` then turns the verdicts into the very
 properties the structured check writes — a met knock-out criterion as the machine's all-clear where
 its valuespace states one, exactly as a judge's finding is recorded, because the assistant *is* a
 machine and a box claiming a person's confirmation would say more than happened.
@@ -772,19 +792,19 @@ One trap: the script defaults to `http://localhost:8000`, while the backend's de
 4. **The visibility flag belongs to another bundle.** Both entry points hang off
    `browserExtensionCustomWebComponent`, the WLO canvas's flag, because the assistant ships with that
    bundle — `model/navigation.ts` says so explicitly.
-5. **Nothing checks that the check ran against the skill.** The task asks for the collection's
-   instruction outright, but whether the model actually fetched it shows only in `tools_called`, and
-   that needs `emit-routing-debug` — which is not set and not read. A check that answered from memory
-   is indistinguishable here from one that followed the editorial instruction.
+5. **Nothing but the log checks that the check ran against the skill.** The task asks for the
+   collection's instruction outright, and `tools_called` from `boerdi:routing-debug` says whether the
+   model fetched it — but it says so in the console. Nothing in the panel reads it, so a check that
+   answered from memory is recorded exactly like one that followed the editorial instruction.
 6. **Only the first collection is handed over**, deliberately, since one skill is what the assistant
    works with. A content filed in several collections shows the chat only one of them, and there is no
    UI in which to choose which.
 7. **An unsaved content is checked without its collection.** No node means no id in the context at
    all, or the collection would become the subject — so the assistant has to find the collection by
    the name in the task, and may find the wrong one or none.
-8. **The return channel carries one thing.** `boerdi:agent-result` is read; the other four events are
-   not. `boerdi:page-action` and `boerdi:query-meta` are dispatched on every turn and would say what
-   the assistant looked at, which is the evidence point 5 is missing.
+8. **The return channel carries one thing.** `boerdi:agent-result` is what the panel acts on; the other
+   four reach the log and go no further. What the assistant looked at is therefore readable while the
+   console is open and nowhere afterwards.
 9. **Every turn costs an extra model pass** once a schema is stated — measured at 2 to 9 seconds, and
    30 for a ten-criterion schema. It is charged to "Danke!" as much as to the check itself, because
    the schema belongs to the embedding rather than to the message.
@@ -819,11 +839,10 @@ which one is a decision, not an array index.
 
 ### 3. Show what the check actually did
 
-The verdicts are recorded, but nothing shows what they rest on. `boerdi:query-meta` and
-`boerdi:page-action` are dispatched on every turn without any opt-in, and `emit-routing-debug` adds
-`tools_called` — which is the one thing that says whether the collection's instruction was fetched at
-all. Listening costs a handler apiece; every event fires twice (`boerdi:…`, then `badboerdi:…`), so
-only the first name is heard.
+The verdicts are recorded, but nothing on screen shows what they rest on. All five events are heard and
+traced, `tools_called` among them — so the evidence exists at the moment the check runs and is gone
+with the console. What is missing is somewhere to put it: whether the collection's instruction was
+fetched belongs beside the result the check writes, not in a log nobody reads afterwards.
 
 ### What not to do
 

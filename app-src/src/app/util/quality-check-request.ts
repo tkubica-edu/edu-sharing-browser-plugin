@@ -48,10 +48,26 @@ export interface QualityCriterion {
   kind: 'knockout' | 'editorial';
 }
 
+/**
+ * The three answers a criterion can get, as the schema states them. Two of them are a judgement; the third is
+ * the absence of one, and it is offered on purpose — a check that may only say yes or no answers no wherever
+ * the content is silent, which reads as a finding about the content instead of one about the check.
+ */
+const OUTCOMES = {
+  erfolgreich: true,
+  probleme: false,
+  unklar: null
+} as const satisfies Record<string, boolean | null>;
+
 /** The assistant's answer about one criterion. */
 export interface CriterionVerdict {
   criterion: QualityCriterion;
-  met: boolean;
+  /**
+   * Whether the content meets it — `null` where the check could not decide it. Nothing is recorded for such a
+   * criterion, and it holds the confirmation back just as an unanswered one does: a value written from a
+   * verdict nobody could reach would be a claim the check never made.
+   */
+  met: boolean | null;
   /** Why, in the assistant's own words; empty where it gave none. */
   reason: string;
 }
@@ -84,6 +100,10 @@ export function criteriaOf(mds: MdsDefinition | null | undefined): readonly Qual
  * The shape the assistant has to answer in: one entry per criterion, each a verdict with its reasoning. An
  * object with every key required rather than a list, because a list invites an answer about the criteria that
  * were easy to judge — and a check that quietly skipped half of them reads exactly like a complete one.
+ *
+ * The verdict is one of three words rather than a yes-or-no, so that a criterion the content does not settle
+ * has an answer of its own — see {@link OUTCOMES}. Every criterion is still answered; what changes is that
+ * "I cannot tell" is one of the answers instead of being pressed into "not met".
  */
 export function resultSchemaOf(criteria: readonly QualityCriterion[]): Record<string, unknown> {
   const properties: Record<string, unknown> = {};
@@ -92,11 +112,10 @@ export function resultSchemaOf(criteria: readonly QualityCriterion[]): Record<st
       type: 'object',
       description: item.caption,
       properties: {
-        erfuellt: {
-          type: 'boolean',
-          description:
-            'true, wenn der Inhalt dieses Kriterium erfüllt. Im Zweifel false — ein Kriterium gilt als ' +
-            'erfüllt nur, wenn der Inhalt es belegt.'
+        ergebnis: {
+          type: 'string',
+          enum: Object.keys(OUTCOMES),
+          description: 'Das Urteil zu diesem Kriterium.'
         },
         begruendung: {
           type: 'string',
@@ -105,7 +124,7 @@ export function resultSchemaOf(criteria: readonly QualityCriterion[]): Record<st
             'Anleitung der Sammlung etwas zu diesem Kriterium sagt, beziehe dich darauf.'
         }
       },
-      required: ['erfuellt', 'begruendung']
+      required: ['ergebnis', 'begruendung']
     };
   }
   return {
@@ -114,7 +133,12 @@ export function resultSchemaOf(criteria: readonly QualityCriterion[]): Record<st
     properties: {
       kriterien: {
         type: 'object',
-        description: 'Zu jedem Kriterium genau ein Urteil. Kein Kriterium darf fehlen.',
+        description:
+          'Zu jedem Kriterium genau ein Urteil. Kein Kriterium darf fehlen. Das Urteil ist eines von drei ' +
+          'Worten: „erfolgreich“, wenn der Inhalt das Kriterium erfüllt, „probleme“, wenn er es verletzt, ' +
+          'und „unklar“, wenn der Inhalt nichts hergibt, woran sich das entscheiden ließe — dann tragen ' +
+          'wir zu diesem Kriterium nichts ein. Rate nicht: „unklar“ ist die richtige Antwort, wo du ' +
+          'weder das eine noch das andere belegen kannst.',
         properties,
         required: criteria.map((item) => item.key)
       },
@@ -188,6 +212,11 @@ export function originSchemaOf(): Record<string, unknown> {
  * Nothing is judged in this turn. This greeting is the first thing the person sees of the whole check, and a
  * turn that read the content as well would spend its answer on findings nobody has asked for yet — so the task
  * ends at the question, and the answer is the person's to give.
+ *
+ * Both answers are named word for word, so that both are offered as reply chips: the widget composes those
+ * from the answer the assistant just gave, and nothing outside the conversation can set them. A question of
+ * two answers is the one place where that matters most — tapping one is the whole turn the person has to
+ * take, and a typed answer has to be understood before it can be believed.
  */
 export function originInstructionOf(subject: CheckSubject): string {
   // Accusative: it reads "… dass ihr jetzt gemeinsam <named> prüft".
@@ -205,6 +234,9 @@ export function originInstructionOf(subject: CheckSubject): string {
     'Stell ihr dann genau eine Frage: Ist das ein eigener Inhalt — von ihr selbst erstellt oder von ihr ' +
       'verantwortet — oder ein fremder, den sie nur einordnet? Ihre Antwort gilt, auch wenn sie deiner ' +
       'Vermutung widerspricht.',
+    'Beende deine Nachricht mit dieser Frage und schreib dabei beide Antworten aus, in dieser Reihenfolge, ' +
+      'damit sie ihr als Antwortvorschläge angeboten werden: „Inhalt selbst erstellt“ und „Fremder ' +
+      'Inhalt“. Das sind Vorschläge, keine Vorgabe — sie darf auch mit eigenen Worten antworten.',
     'Beurteile in diesem Zug nichts und lies den Inhalt nicht. Es geht allein um diese Frage.',
     'Warte ihre Antwort ab. Rufe submit_result ERST auf, wenn sie geantwortet hat — mit herkunft="eigen" ' +
       'oder herkunft="fremd" und deiner Vermutung in vermutung. Setz herkunft nicht auf deine Vermutung.',
@@ -326,8 +358,9 @@ export function proofreadInstructionOf(subject: CheckSubject): string {
       'Die Person sieht nur den Chat — was dort nicht steht, erfährt sie nicht.',
     'Bitte sie danach ausdrücklich, die Korrekturen durchzugehen und zu bestätigen oder zu verwerfen. Führe ' +
       'sie zu dieser Bestätigung: frag direkt, ob die Korrekturen so stehen bleiben sollen.',
-    'Beende deine Nachricht mit dieser Frage und nenne die bestätigende Antwort wörtlich, damit sie ihr als ' +
-      'Antwortvorschlag angeboten werden kann: „Ich bestätige die Korrekturen.“',
+    'Beende deine Nachricht mit dieser Frage und schreib die bestätigende Antwort dabei aus, damit sie ihr ' +
+      'als Antwortvorschlag angeboten werden kann: „Ich bestätige die Korrekturen.“ Das ist ein Vorschlag, keine Vorgabe — ' +
+      'verlang nicht, dass sie mit genau diesem Satz antwortet.',
     'Rufe submit_result ERST auf, wenn sie bestätigt hat — mit den Stellen, die stehen bleiben. Ohne diesen ' +
       'Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.',
     'Sag ihr danach, dass als Nächstes die Qualitätsprüfung folgt.',
@@ -476,8 +509,9 @@ export function enrichmentInstructionOf(subject: CheckSubject): string {
       'Die Person sieht nur den Chat.',
     'Bitte sie danach ausdrücklich, die Werte durchzugehen und zu bestätigen oder zu korrigieren. Führe sie ' +
       'zu dieser Bestätigung: frag direkt, ob die Metadaten so übernommen werden sollen.',
-    'Beende deine Nachricht mit dieser Frage und nenne die bestätigende Antwort wörtlich, damit sie ihr als ' +
-      'Antwortvorschlag angeboten werden kann: „Ich bestätige die Metadaten.“',
+    'Beende deine Nachricht mit dieser Frage und schreib die bestätigende Antwort dabei aus, damit sie ihr ' +
+      'als Antwortvorschlag angeboten werden kann: „Ich bestätige die Metadaten.“ Das ist ein Vorschlag, keine Vorgabe — ' +
+      'verlang nicht, dass sie mit genau diesem Satz antwortet.',
     'Rufe submit_result ERST auf, wenn sie bestätigt hat — mit ihren Korrekturen, falls sie welche hatte. ' +
       'Ohne diesen Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.',
     'Sag ihr danach, dass alle Schritte erledigt sind und sie unten im Panel mit „Abschließen und zur ' +
@@ -662,23 +696,28 @@ export function qualityInstructionOf(
         'zu, wenn es dorthin gehört. Gehört es nirgends hin, lass es in dein Gesamturteil (geeignet) ' +
         'einfließen und sag es in der Zusammenfassung — als eigenes Kriterium können wir es nicht führen.'
       : '',
-    'Rate nicht: wo der Inhalt nichts hergibt, ist das Kriterium nicht erfüllt, und die Begründung sagt ' +
-      'ausdrücklich, dass es nicht prüfbar war.',
+    'Zu jedem Kriterium gibt es drei mögliche Ergebnisse: „erfolgreich“, wenn der Inhalt es erfüllt, ' +
+      '„probleme“, wenn er es verletzt, und „unklar“, wenn der Inhalt nichts hergibt, woran sich das ' +
+      'entscheiden ließe.',
+    'Rate nicht: sag „unklar“, statt dich für eine der beiden Seiten zu entscheiden. Bei „unklar“ tragen wir ' +
+      'zu diesem Kriterium nichts ein — die Begründung sagt dann, was zum Prüfen gefehlt hat.',
     'Sag am Ende außerdem, ob der Inhalt für den Einsatz in Bildung geeignet ist — dein Gesamturteil über ' +
       'alle Dimensionen und alles, was die Anleitungen sonst noch prüfen.',
     '',
-    'Schreib dein Urteil zuerst in den Chat: je Kriterium eine Zeile mit ✓ oder ✗, dem Namen des Kriteriums ' +
-      'und dem Grund in einem Satz, darunter dein Gesamturteil, ob der Inhalt für Bildung geeignet ist, und ' +
+    'Schreib dein Urteil zuerst in den Chat: je Kriterium eine Zeile mit ✓ (erfolgreich), ✗ (Probleme ' +
+      'gefunden) oder ? (unklar), dem Namen des Kriteriums und dem Grund in einem Satz, darunter dein ' +
+      'Gesamturteil, ob der Inhalt für Bildung geeignet ist, und ' +
       'ein kurzes Fazit, was einer Freigabe im Weg steht. Die Person sieht nur den Chat — was dort nicht ' +
       'steht, erfährt sie nicht.',
     'Bitte sie danach ausdrücklich, dein Urteil durchzugehen und zu bestätigen oder zu korrigieren. Führe sie ' +
       'zu dieser Bestätigung: frag direkt, ob es so stehen bleiben soll, und geh auf ihre Einwände ein.',
-    'Beende deine Nachricht mit dieser Frage und nenne die bestätigende Antwort wörtlich, damit sie ihr als ' +
-      'Antwortvorschlag angeboten werden kann: „Ich bestätige die Bewertung.“',
+    'Beende deine Nachricht mit dieser Frage und schreib die bestätigende Antwort dabei aus, damit sie ihr ' +
+      'als Antwortvorschlag angeboten werden kann: „Ich bestätige die Bewertung.“ Das ist ein Vorschlag, keine Vorgabe — ' +
+      'verlang nicht, dass sie mit genau diesem Satz antwortet.',
     'Rufe submit_result ERST auf, wenn sie bestätigt hat — vorher nicht, auch wenn dein Urteil längst fertig ' +
       'ist.',
     'Sobald sie bestätigt: Rufe submit_result in genau diesem Zug auf, mit ihren Korrekturen, falls sie welche ' +
-      'hatte, und zu jedem Kriterium erfuellt und begruendung. Eine Bestätigung im Chat allein reicht nicht — ' +
+      'hatte, und zu jedem Kriterium ergebnis und begruendung. Eine Bestätigung im Chat allein reicht nicht — ' +
       'ohne diesen Werkzeugaufruf ist das Ergebnis für uns nicht da und es geht nicht weiter. Sag ihr dann, ' +
       'dass als Nächstes die Metadaten angereichert werden.',
     ''
@@ -739,8 +778,11 @@ export function verdictsOf(
   const verdicts: CriterionVerdict[] = [];
   for (const criterion of criteria) {
     const entry = asRecord(answered?.[criterion.key]);
-    const met = entry?.['erfuellt'];
-    if (typeof met !== 'boolean') continue;
+    const stated = entry?.['ergebnis'];
+    // Anything but one of the three answers is no answer: the criterion stays as it stood, which is what
+    // an assistant that skipped it left behind.
+    if (typeof stated !== 'string' || !(stated.trim().toLowerCase() in OUTCOMES)) continue;
+    const met = OUTCOMES[stated.trim().toLowerCase() as keyof typeof OUTCOMES];
     const reason = entry?.['begruendung'];
     verdicts.push({ criterion, met, reason: typeof reason === 'string' ? reason.trim() : '' });
   }
@@ -771,6 +813,10 @@ export function criteriaPropertiesOf(
   const editorial = new Set(asList(recorded?.[EDITORIAL_CRITERIA_PROPERTY]));
   let editorialTouched = false;
   for (const { criterion, met } of verdicts) {
+    // Undecided is not a verdict to record: on a knock-out property it would have to become one of the two
+    // values the vocabulary holds, and on the editorial list the criterion's presence or absence says met or
+    // not met — either way the record would state something firmer than the check found.
+    if (met === null) continue;
     if (criterion.kind === 'editorial') {
       editorialTouched = true;
       if (met) editorial.add(criterion.id);
@@ -789,8 +835,8 @@ export function criteriaPropertiesOf(
 
 /**
  * Whether the verdicts clear the way for the confirmation: every knock-out criterion judged, and judged met.
- * A criterion the assistant did not answer holds it back — the confirmation states that the criteria were
- * looked at, and an unanswered one was not.
+ * A criterion the assistant did not answer holds it back, and so does one it answered as undecided — the
+ * confirmation states that the criteria were looked at and found met, which neither of the two is.
  */
 export function knockoutSatisfied(
   verdicts: readonly CriterionVerdict[],

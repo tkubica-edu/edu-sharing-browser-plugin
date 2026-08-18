@@ -48,6 +48,23 @@ const FOLLOW_UP_DELAY_MS = 50;
 const RESULT_EVENT = 'boerdi:agent-result';
 
 /**
+ * What else the widget reports about a conversation, none of which the panel acts on. Traced all the same:
+ * the chat is another project running in our document, and apart from the text it writes these five events
+ * are everything it says about itself — which tools a turn called, how it was routed, where it would send
+ * the person. A check that went wrong is read from this trace or from nothing.
+ *
+ * They are heard on `window` because the widget's own view sits in a shadow root, and that is also what
+ * makes the trace independent of who dispatched them: an event our own development mode fires in the
+ * widget's place is logged exactly like the widget's own.
+ */
+const REPORTED_EVENTS = [
+  'boerdi:query-meta',
+  'boerdi:page-action',
+  'boerdi:guide-suggestion',
+  'boerdi:routing-debug'
+] as const;
+
+/**
  * The <boerdi-chat> element, typed for what we use of it. The methods exist on the element only once it has
  * been upgraded, hence the optional signatures — see {@link AiAssistantScreenComponent.mount}.
  */
@@ -193,6 +210,11 @@ export class AiAssistantScreenComponent implements OnDestroy {
     this.agentResult.emit({ result, stopReason });
   };
 
+  /** Traces anything the widget reports that the panel does not act on — see {@link REPORTED_EVENTS}. */
+  private readonly onReport = (event: Event) => {
+    this.trace(`← ${event.type}`, (event as CustomEvent).detail ?? null);
+  };
+
   constructor() {
     // Mount in the write phase, once the bundle defined the tag: this writes to the DOM and needs the
     // #host element, which a plain effect would run before.
@@ -225,10 +247,12 @@ export class AiAssistantScreenComponent implements OnDestroy {
     // on `window` because its own view sits in a shadow root, and the listener has to be there before the
     // task goes out — the first turn is the one that answers it.
     window.addEventListener(RESULT_EVENT, this.onResult);
+    for (const name of REPORTED_EVENTS) window.addEventListener(name, this.onReport);
   }
 
   ngOnDestroy(): void {
     window.removeEventListener(RESULT_EVENT, this.onResult);
+    for (const name of REPORTED_EVENTS) window.removeEventListener(name, this.onReport);
     if (this.followUp !== null) clearTimeout(this.followUp);
     this.stopWaitingForShell();
     this.element?.remove();
@@ -248,6 +272,11 @@ export class AiAssistantScreenComponent implements OnDestroy {
       'initial-state': 'expanded',
       'show-language-buttons': 'false',
       'show-debug-button': 'false',
+      // Two of the widget's five reports are silent unless asked for. Asked for here, not because the panel
+      // acts on them, but because they are the only account of how a turn was routed and which tools it
+      // called — see {@link REPORTED_EVENTS}.
+      'emit-guide-suggestion': 'true',
+      'emit-routing-debug': 'true',
       // The panel is not the page: the widget's own detection would contribute the extension's address
       // instead of the tab's, so what we hand over stands alone.
       'auto-context': 'false',
