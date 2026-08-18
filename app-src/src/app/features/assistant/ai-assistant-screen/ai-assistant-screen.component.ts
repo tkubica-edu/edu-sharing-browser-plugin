@@ -74,10 +74,27 @@ interface ChatElement extends HTMLElement {
   /** Replace the current context, as a navigation would: stale ids are dropped and the new page is greeted. */
   replaceContext?(context: PageContext): void;
   /**
-   * Put a task to the assistant straight away, shown as the page's own request rather than as something the
-   * person typed. It takes the context as it stands at that moment, so the page goes first.
+   * State what the host wants done. `text` is the instruction and stays out of the conversation: the widget
+   * carries it in the next turn's environment (`host_instruction`) and consumes it there. What the person sees
+   * is `options.message`, the bubble that turn is shown as — a task with no message would show them the whole
+   * instruction. `trigger: 'now'` starts that turn straight away; without it the instruction rides along with
+   * whatever they send next. The turn takes the context as it stands at that moment, so the page goes first.
    */
-  startTask?(text: string): void;
+  setHostInstruction?(
+    text: string,
+    options?: { trigger?: 'now' | 'next'; message?: string },
+  ): void;
+}
+
+/**
+ * What a screen has the assistant do, in the two parts the widget keeps apart: `text` is the instruction, which
+ * travels in the request's environment and is never shown, and `message` is the short bubble the person sees in
+ * its place. Both belong to one step — a bubble without its instruction is a message nobody wrote, an
+ * instruction without a bubble is a turn the person cannot account for.
+ */
+export interface AssistantTask {
+  text: string;
+  message: string;
 }
 
 /**
@@ -140,9 +157,10 @@ export class AiAssistantScreenComponent implements OnDestroy {
   /**
    * What the assistant is asked to do as the conversation opens, for a screen that embeds the chat to have
    * something done rather than to be talked to — the KI quality check has it measure the content against the
-   * criteria. Put once, as the conversation appears; the person then carries on in their own words.
+   * criteria. Put once, as the conversation appears; the person then carries on in their own words. The
+   * instruction itself stays out of the conversation and only its `message` is shown; see {@link AssistantTask}.
    */
-  readonly task = input<string | null>(null);
+  readonly task = input<AssistantTask | null>(null);
 
   /**
    * The shape an answer is expected in, as a JSON schema. Stated, every turn of the conversation ends in a
@@ -345,18 +363,20 @@ export class AiAssistantScreenComponent implements OnDestroy {
       this.trace('→ replaceContext (opening)', this.current);
       element.replaceContext?.(this.current);
       if (!task) return;
-      if (!element.startTask) {
+      if (!element.setHostInstruction) {
         // Without it the screen shows a chat that was never asked anything, and the person is left to word
         // the task the panel meant to put — worth a line, since nothing else would show.
-        console.warn(`${LOG} <${CHAT_TAG}> exposes no startTask — the screen's task was not put`);
+        console.warn(`${LOG} <${CHAT_TAG}> exposes no setHostInstruction — the screen's task was not put`);
         return;
       }
       // Whole, and on its own line: this text is the request the whole check hangs on, and reading it back
       // is the only way to tell a task that was worded badly from one that never went out.
-      this.trace(`→ startTask (${task.length} characters)\n${task}`);
-      this.asked = task;
+      this.trace(
+        `→ setHostInstruction, shown as „${task.message}“ (${task.text.length} characters)\n${task.text}`,
+      );
+      this.asked = task.text;
       this.sent = performance.now();
-      element.startTask(task);
+      element.setHostInstruction(task.text, { trigger: 'now', message: task.message });
     });
   }
 
@@ -369,27 +389,30 @@ export class AiAssistantScreenComponent implements OnDestroy {
    * and this is about to start that turn. Both are held for a moment before going out, because the widget is
    * still marked busy at the instant it reports the previous answer — see {@link FOLLOW_UP_DELAY_MS}.
    */
-  private ask(task: string | null, schema: Record<string, unknown> | null): void {
+  private ask(task: AssistantTask | null, schema: Record<string, unknown> | null): void {
     const element = this.element;
-    if (!element || !task || task === this.asked) return;
+    if (!element || !task || task.text === this.asked) return;
     const stated = schema ? JSON.stringify(schema) : null;
     if (stated && stated !== this.schema) {
       element.setAttribute('result-schema', stated);
       this.schema = stated;
       this.trace(`→ result-schema = ${stated}`);
     }
-    this.asked = task;
+    this.asked = task.text;
     if (this.followUp !== null) clearTimeout(this.followUp);
-    this.trace(`→ startTask in ${FOLLOW_UP_DELAY_MS}ms (${task.length} characters)\n${task}`);
+    this.trace(
+      `→ setHostInstruction in ${FOLLOW_UP_DELAY_MS}ms, shown as „${task.message}“ ` +
+        `(${task.text.length} characters)\n${task.text}`,
+    );
     this.followUp = window.setTimeout(() => {
       this.followUp = null;
-      if (!this.element?.startTask) {
-        console.warn(`${LOG} <${CHAT_TAG}> exposes no startTask — the follow-up task was not put`);
+      if (!this.element?.setHostInstruction) {
+        console.warn(`${LOG} <${CHAT_TAG}> exposes no setHostInstruction — the follow-up task was not put`);
         return;
       }
-      this.trace('→ startTask (follow-up) goes out now');
+      this.trace('→ setHostInstruction (follow-up) goes out now');
       this.sent = performance.now();
-      this.element.startTask(task);
+      this.element.setHostInstruction(task.text, { trigger: 'now', message: task.message });
     }, FOLLOW_UP_DELAY_MS);
   }
 

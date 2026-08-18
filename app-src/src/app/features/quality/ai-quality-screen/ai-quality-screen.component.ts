@@ -16,7 +16,7 @@ import {
   qualityInstructionOf, resultSchemaOf, schemaFits, verdictsOf
 } from '../../../util/quality-check-request';
 import {
-  AgentResult, AiAssistantScreenComponent
+  AgentResult, AiAssistantScreenComponent, AssistantTask
 } from '../../assistant/ai-assistant-screen/ai-assistant-screen.component';
 
 /** Log prefix for what this screen makes of the assistant's answer, as everywhere else in the extension. */
@@ -24,6 +24,18 @@ const LOG_QUALITY = '[edu-sharing][quality]';
 
 /** The steps the check runs through, in the order it runs them — see {@link AiQualityScreenComponent.step}. */
 type CheckStep = 'origin' | 'proofread' | 'quality' | 'enrichment' | 'done';
+
+/**
+ * The bubble each step is shown as in the chat. The instruction itself is long and written for the assistant —
+ * it stays out of the conversation (see {@link AssistantTask}), and this is what the person reads in its place:
+ * the step, in the words the panel uses for it elsewhere.
+ */
+const STEP_MESSAGE: Record<Exclude<CheckStep, 'done'>, string> = {
+  origin: 'Herkunft des Inhalts klären',
+  proofread: 'Inhalt Korrektur lesen',
+  quality: 'Qualität prüfen',
+  enrichment: 'Metadaten anreichern'
+};
 
 /** What each way a run can end means for the person, where it ended without an answer. */
 const STOPPED: Record<string, string> = {
@@ -211,7 +223,7 @@ export class AiQualityScreenComponent {
    * structured verdict without a schema to submit it in produces prose about criteria, which looks like a
    * check and records nothing.
    */
-  protected readonly task = computed<string | null>(() => {
+  protected readonly task = computed<AssistantTask | null>(() => {
     if (!this.resultSchema()) return null;
     const step = this.step();
     if (step === 'done') return null;
@@ -237,7 +249,7 @@ export class AiQualityScreenComponent {
       `${LOG_QUALITY} the assistant will be asked this (step ${step}, ${task.length} characters, ` +
         `${quoted} of them the content's own text)\n${task}`,
     );
-    return task;
+    return { text: task, message: STEP_MESSAGE[step] };
   });
 
   constructor() {

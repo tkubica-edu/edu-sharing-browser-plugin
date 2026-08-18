@@ -24,8 +24,14 @@ import {
 const SCHEMA_MAX = 10_000;
 
 /**
- * How long the request put to the assistant may be (`ChatRequest.message`, 10 000 characters). The content
- * travels inside it, so this is what the quoted text is cut to fit.
+ * How long the request put to the assistant may be. The content travels inside it, so this is what the quoted
+ * text is cut to fit.
+ *
+ * A bound of our own, not the API's: the instruction is handed over as `host_instruction` in the request's
+ * environment (see AiAssistantScreenComponent), and that field is declared without a length limit — the
+ * 10 000-character cap the chat endpoint enforces applies to the visible `message`, which here is a few words.
+ * What the bound protects is the prompt the model reads: the whole instruction goes into it, beside the page
+ * context and the conversation so far.
  */
 const TASK_MAX = 10_000;
 
