@@ -116,3 +116,11 @@
 
 .folder-none { @include m.muted; }
 
+
+// The list while the way on's write runs: it still says what was picked, it just cannot be changed any
+// more (see the template). Muted rather than hidden — the user is waiting for that very selection.
+.groups.is-locked {
+  opacity: 0.6;
+
+  .head, .folder { cursor: not-allowed; }
+}

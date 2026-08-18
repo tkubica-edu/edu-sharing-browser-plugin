@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
 import { IconDirective } from '../../../directives/icon.directive';
+import { BusyService } from '../../../services/busy.service';
 import { CurationService } from '../../../services/curation.service';
 import { EditorialGroup, EditorialGroupsService } from '../../../services/editorial-groups.service';
 import { NavigationService } from '../../../services/navigation.service';
@@ -20,6 +21,9 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
 export class EditorialForwardScreenComponent {
   protected readonly curation = inject(CurationService);
   protected readonly groups = inject(EditorialGroupsService);
+  // The way on writes what this screen picked, so the picking is closed while that write runs — see
+  // BusyService, which the shell's own controls are disabled by for the same reason.
+  protected readonly busy = inject(BusyService);
 
   private readonly navigation = inject(NavigationService);
 
@@ -31,8 +35,13 @@ export class EditorialForwardScreenComponent {
     void this.groups.recommendCollection();
   }
 
-  /** Open the step that picks the collection this group's forwarding lands in. */
+  /**
+   * Open the step that picks the collection this group's forwarding lands in. Refused while a write is
+   * in flight: navigation is refused then anyway (NavigationService.go), and the group would be left
+   * marked as the one being picked for without any step opening on it.
+   */
   protected selectCollection(group: EditorialGroup): void {
+    if (this.busy.busy()) return;
     this.groups.pick(group);
     this.navigation.go('select-collection');
   }

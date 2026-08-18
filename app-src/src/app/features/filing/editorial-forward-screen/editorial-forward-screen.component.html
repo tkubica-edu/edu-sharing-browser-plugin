@@ -25,12 +25,15 @@
     <p class="es-muted">Für dieses Repository sind keine Redaktionen konfiguriert.</p>
   }
 
-  <ul class="groups">
+  <!-- Locked while the way on writes what was picked here: what the save reads is settled the moment it
+       starts, so a group ticked afterwards would be recorded nowhere and read as though it were. -->
+  <ul class="groups" [class.is-locked]="busy.busy()">
     @for (group of groups.groups(); track group.collection.id) {
       <li class="group" [class.is-selected]="groups.isSelected(group)">
         <!-- The whole head is the checkbox's label, so the logo and the name toggle it too. -->
-        <label class="head">
+        <label class="head" [attr.title]="busy.hint()">
           <input type="checkbox" [checked]="groups.isSelected(group)"
+                 [disabled]="busy.busy()"
                  (change)="groups.toggle(group, $any($event.target).checked)" />
           <span class="logo">
             @if (group.logoUrl; as logo) {
@@ -45,7 +48,8 @@
         <!-- A group with collections inside it offers the choice of one; a group without says so, so
              the row means the same thing in both cases: where inside the group the content lands. -->
         @if (group.folders.length) {
-          <button type="button" class="folder" (click)="selectCollection(group)">
+          <button type="button" class="folder" [disabled]="busy.busy()"
+                  [attr.title]="busy.hint()" (click)="selectCollection(group)">
             <span class="folder-label">
               @if (groups.folderOf(group); as folder) {
                 <!-- Named as a proposal for as long as it is one: the collection was picked from the
