@@ -33,6 +33,14 @@ const SHELL_POLL_MS = 50;
 const AGENT_ENGINE = 'agent';
 
 /**
+ * How long a follow-up task waits before it goes out. The widget refuses anything put to it while it is busy,
+ * and it is still busy when it reports a result: it clears that flag in the line *after* the one that fires the
+ * event. A follow-up sent straight from the report would therefore be dropped without a word — this delay puts
+ * it in a later turn of the event loop, by which time the flag is down.
+ */
+const FOLLOW_UP_DELAY_MS = 50;
+
+/**
  * Where a structured result arrives. Every event the widget fires is dispatched twice — under this name first
  * and then under `badboerdi:…`, which is its indulgence towards the predecessor system. Listening to both
  * would process every answer twice.
@@ -159,6 +167,15 @@ export class AiAssistantScreenComponent implements OnDestroy {
   /** How many answers have come back, to number the turns in the trace. */
   private turns = 0;
 
+  /** The task last put to the assistant, so a screen that states a new one is told apart from a re-read. */
+  private asked: string | null = null;
+
+  /** The schema last set on the element, compared as text since it is an attribute. */
+  private schema: string | null = null;
+
+  /** The timer holding a follow-up task, while one is waiting — see {@link FOLLOW_UP_DELAY_MS}. */
+  private followUp: number | null = null;
+
   /** Reports a submitted result while the screen is open; the widget fires it on `window`. */
   private readonly onResult = (event: Event) => {
     const detail = (event as CustomEvent).detail as { result?: unknown; stop_reason?: unknown } | null;
@@ -200,6 +217,10 @@ export class AiAssistantScreenComponent implements OnDestroy {
     // the panel is told about — including a title that only arrives afterwards — and on every change to
     // a context an embedding screen states.
     effect(() => this.follow(this.subject()));
+    // A screen may ask a second thing once the first is answered — the KI check classifies the content after
+    // it judged it. Both the shape and the request are re-read here, in that order: the widget applies a
+    // changed schema from the next turn on, and the next turn is the one this is about to start.
+    effect(() => this.ask(this.task(), this.resultSchema()));
     // Registered for as long as the screen is open, not only once a schema is stated: the widget dispatches
     // on `window` because its own view sits in a shadow root, and the listener has to be there before the
     // task goes out — the first turn is the one that answers it.
@@ -208,6 +229,7 @@ export class AiAssistantScreenComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     window.removeEventListener(RESULT_EVENT, this.onResult);
+    if (this.followUp !== null) clearTimeout(this.followUp);
     this.stopWaitingForShell();
     this.element?.remove();
     this.element = null;
@@ -236,6 +258,7 @@ export class AiAssistantScreenComponent implements OnDestroy {
       ...(this.task() ? {} : { 'page-context': JSON.stringify(this.current) }),
       ...(schema ? { 'result-schema': JSON.stringify(schema), engine: AGENT_ENGINE } : {})
     };
+    this.schema = schema ? JSON.stringify(schema) : null;
     // One line per attribute, and the values whole rather than abbreviated: every one of them is read once
     // as the element connects and never again, so what stands here is what this conversation runs on for as
     // long as it lasts. Cut short, the one that was wrong would be the one that was cut.
@@ -302,9 +325,43 @@ export class AiAssistantScreenComponent implements OnDestroy {
       // Whole, and on its own line: this text is the request the whole check hangs on, and reading it back
       // is the only way to tell a task that was worded badly from one that never went out.
       this.trace(`→ startTask (${task.length} characters)\n${task}`);
+      this.asked = task;
       this.sent = performance.now();
       element.startTask(task);
     });
+  }
+
+  /**
+   * Put a further task, for a screen that asks a second thing once the first was answered. Nothing happens
+   * before the element is mounted (the first task rides along with the mount) or where the request has not
+   * actually changed — the input is a signal, and a re-read is not a new question.
+   *
+   * The shape goes first and the request after it: the widget applies a changed schema from its next turn on,
+   * and this is about to start that turn. Both are held for a moment before going out, because the widget is
+   * still marked busy at the instant it reports the previous answer — see {@link FOLLOW_UP_DELAY_MS}.
+   */
+  private ask(task: string | null, schema: Record<string, unknown> | null): void {
+    const element = this.element;
+    if (!element || !task || task === this.asked) return;
+    const stated = schema ? JSON.stringify(schema) : null;
+    if (stated && stated !== this.schema) {
+      element.setAttribute('result-schema', stated);
+      this.schema = stated;
+      this.trace(`→ result-schema = ${stated}`);
+    }
+    this.asked = task;
+    if (this.followUp !== null) clearTimeout(this.followUp);
+    this.trace(`→ startTask in ${FOLLOW_UP_DELAY_MS}ms (${task.length} characters)\n${task}`);
+    this.followUp = window.setTimeout(() => {
+      this.followUp = null;
+      if (!this.element?.startTask) {
+        console.warn(`${LOG} <${CHAT_TAG}> exposes no startTask — the follow-up task was not put`);
+        return;
+      }
+      this.trace('→ startTask (follow-up) goes out now');
+      this.sent = performance.now();
+      this.element.startTask(task);
+    }, FOLLOW_UP_DELAY_MS);
   }
 
   /**

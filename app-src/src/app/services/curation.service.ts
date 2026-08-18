@@ -352,6 +352,14 @@ export class CurationService {
   readonly qualityCriteriaJudged = this.criteriaJudged.asReadonly();
 
   /**
+   * Whether the assistant enriched the content's metadata — the KI check's second half. Held apart from the
+   * judgement because the step is only over when both are in: a content that was judged but never described
+   * is half done, and the way on out of that step says so.
+   */
+  private readonly metadataEnriched = signal(false);
+  readonly qualityMetadataEnriched = this.metadataEnriched.asReadonly();
+
+  /**
    * Whether a machine check on this content is still out. Exposed for the confirmation, which waits for it: the
    * checks tick criteria of their own, so a confirmation given while one is running would record an answer the
    * user never saw.
@@ -610,6 +618,11 @@ export class CurationService {
   /** Take over that the KI check answered the criteria — see {@link qualityCriteriaJudged}. */
   reportQualityJudged(): void {
     this.criteriaJudged.set(true);
+  }
+
+  /** Take over that the KI check enriched the metadata — see {@link qualityMetadataEnriched}. */
+  reportMetadataEnriched(): void {
+    this.metadataEnriched.set(true);
   }
 
   /**
@@ -1416,6 +1429,7 @@ export class CurationService {
     // The criteria belong to the content that is going: the next one's view reports its own.
     this.criteriaSatisfied.set(false);
     this.criteriaJudged.set(false);
+    this.metadataEnriched.set(false);
     // Nothing is known about the next content's Erschließung until it says so itself, and it was left
     // nowhere yet.
     this.curationFinished.set(null);

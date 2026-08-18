@@ -6,8 +6,9 @@ import { APP_CONFIG } from '../../../config';
 import { CurationService } from '../../../services/curation.service';
 import { PageContext, contentContextOf } from '../../../util/page-context';
 import {
-  CriterionVerdict, criteriaOf, criteriaPropertiesOf, instructionOf, knockoutSatisfied, resultSchemaOf,
-  schemaFits, verdictsOf
+  CriterionVerdict, EnrichedMetadata, criteriaOf, criteriaPropertiesOf, enrichmentInstructionOf,
+  enrichmentOf, enrichmentSchemaOf, knockoutSatisfied, qualityInstructionOf, resultSchemaOf, schemaFits,
+  verdictsOf
 } from '../../../util/quality-check-request';
 import {
   AgentResult, AiAssistantScreenComponent
@@ -30,6 +31,11 @@ const STOPPED: Record<string, string> = {
 // assistant's own chat, the same widget its screen embeds, handed the content instead of the open tab: the
 // assistant retrieves the skill it checks with by the collection, and reads the content off the title and the
 // text it was erschlossen from.
+//
+// The dialogue leads through two steps, and both end with the person: the assistant judges the quality, has
+// them go through the judgement and confirm it, then enriches the metadata and has them confirm those too.
+// Only a confirmed step is submitted, and only both of them together open the footer's way out. Being the one
+// thing here that can talk, the assistant is what brings them there — the panel says none of it beside it.
 //
 // It ends in the same record the structured check produces. The criteria are read out of the metadata set and
 // go to the assistant twice over: as the task, so it knows what it is judging, and as the shape of its answer,
@@ -88,6 +94,27 @@ export class AiQualityScreenComponent {
   protected readonly criteria = computed(() => criteriaOf(this.mds()));
 
   /**
+   * Which of the check's two steps is out. The enrichment is not asked for until the judgement is in: both
+   * steps run through the same iteration and token caps, and asked at once they compete for them — the one
+   * the model reaches last is the one that suffers. Asked in turn, each gets a run of its own, and the
+   * enrichment starts from a content whose quality is already established.
+   *
+   * What moves the step on is the person, through the assistant: each task has it propose in the chat, ask
+   * them to go through it, and submit only once they have confirmed — so the answer that lands here is one
+   * somebody stood behind. Where they are in the check is therefore said in the conversation, by the one
+   * thing on this screen that can talk; the panel does not narrate it a second time beside it.
+   *
+   * `done` is the end of what the panel asks for; the person can carry the conversation on from there.
+   */
+  private readonly step = signal<'quality' | 'enrichment' | 'done'>('quality');
+
+  /** What the enrichment answered; null until it has. */
+  private readonly metadata = signal<EnrichedMetadata | null>(null);
+
+  /** The assistant's summary over the criteria, kept for the finished result. */
+  private readonly summary = signal('');
+
+  /**
    * What the assistant answered per criterion; empty until it has. Not on screen: the dialogue itself is what
    * the person reads, and a second rendering of the same answer beside it would compete with it. It is held
    * because a later turn is laid over it, and it goes to the console for whoever is following the check.
@@ -102,9 +129,17 @@ export class AiQualityScreenComponent {
   protected readonly resultSchema = computed<Record<string, unknown> | null>(() => {
     const criteria = this.criteria();
     if (!criteria.length) return null;
+    if (this.step() !== 'quality') {
+      const schema = enrichmentSchemaOf();
+      console.log(`${LOG_QUALITY} the enrichment is asked for in this shape`, {
+        characters: JSON.stringify(schema).length,
+        schema
+      });
+      return schema;
+    }
     const schema = resultSchemaOf(criteria);
     if (schemaFits(schema)) {
-      console.log(`${LOG_QUALITY} the answer is asked for in this shape`, {
+      console.log(`${LOG_QUALITY} the judgement is asked for in this shape`, {
         criteria: criteria.length,
         characters: JSON.stringify(schema).length,
         schema
@@ -124,16 +159,20 @@ export class AiQualityScreenComponent {
    */
   protected readonly task = computed<string | null>(() => {
     if (!this.resultSchema()) return null;
+    const step = this.step();
+    if (step === 'done') return null;
     const text = this.curation.contentText();
-    const task = instructionOf(this.criteria(), {
+    const subject = {
       title: this.curation.contentTitle(),
       text,
       url: this.curation.contentUrl(),
       collection: this.collection()?.name ?? null
-    });
+    };
+    const task =
+      step === 'quality' ? qualityInstructionOf(this.criteria(), subject) : enrichmentInstructionOf(subject);
     console.log(
-      `${LOG_QUALITY} the assistant will be asked this (${task.length} characters, ` +
-        `${text.length} of them the content's own text)\n${task}`,
+      `${LOG_QUALITY} the assistant will be asked this (step ${step}, ${task.length} characters, ` +
+        `${step === 'quality' ? text.length : 0} of them the content's own text)\n${task}`,
     );
     return task;
   });
@@ -166,6 +205,10 @@ export class AiQualityScreenComponent {
    * whole result would drop every other criterion from the record and close the confirmation again.
    */
   protected take(answer: AgentResult): void {
+    if (this.step() !== 'quality') {
+      this.takeEnrichment(answer);
+      return;
+    }
     const { verdicts, summary } = verdictsOf(answer.result, this.criteria());
     if (!verdicts.length) {
       console.log(`${LOG_QUALITY} ← the turn submitted no verdicts`, {
@@ -199,9 +242,54 @@ export class AiQualityScreenComponent {
     this.curation.recordValues(properties);
     this.curation.reportQualityCriteria(satisfied);
     // What the footer's confirmation waits for. Not the same as the gate above: the assistant judged
-    // every criterion, including the ones it found wanting, and whether that judgement is confirmed is
-    // the person's call — so the button opens on an answer, not on a good one.
+    // every criterion, including the ones it found wanting, and an answer arrives here only once the
+    // person has gone through it in the chat — so the button opens on a judgement somebody stood behind,
+    // not on a good one.
     this.curation.reportQualityJudged();
+    // Only now: the enrichment is a run of its own, and it starts from a content whose quality is
+    // established. Flipping the step re-states task and schema, which the chat then puts as a further turn.
+    this.summary.set(summary);
+    this.step.set('enrichment');
+  }
+
+  /**
+   * Take the enriched metadata over — the check's second answer and its last. Nothing is recorded from it:
+   * the values are the assistant's proposal about what the content is, not a judgement anybody confirmed, and
+   * where they would go on the node is a decision this step does not make.
+   */
+  private takeEnrichment(answer: AgentResult): void {
+    const metadata = enrichmentOf(answer.result);
+    if (!metadata) {
+      // The ordinary case, not a failure: the assistant proposed its values and is waiting for the person
+      // to go through them. It submits once they have, and that turn lands here again.
+      console.log(`${LOG_QUALITY} ← the turn enriched nothing`, {
+        stopReason: answer.stopReason,
+        result: answer.result
+      });
+      if (this.step() === 'enrichment') this.problem.set(STOPPED[answer.stopReason] ?? null);
+      return;
+    }
+    this.problem.set(null);
+    this.metadata.set(metadata);
+    this.step.set('done');
+    // The other half of what the way on out of this step waits for; the judgement reported the first.
+    this.curation.reportMetadataEnriched();
+    // The finished result, both halves in one line: what the content is worth, and what it is about.
+    console.log(`${LOG_QUALITY} ✔ the check is complete`, {
+      subject: { title: this.curation.contentTitle(), nodeId: this.curation.activeNode()?.nodeId ?? null },
+      collection: this.collection(),
+      quality: {
+        verdicts: this.verdicts().map(({ criterion, met, reason }) => ({
+          criterion: criterion.caption,
+          met,
+          reason
+        })),
+        summary: this.summary(),
+        knockoutSatisfied: this.curation.qualityCriteriaMet(),
+        recorded: this.curation.editorMetadata()
+      },
+      metadata
+    });
   }
 
   /** Read the set the criteria are defined in. Without them there is nothing to check against. */

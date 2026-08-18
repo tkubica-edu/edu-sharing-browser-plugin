@@ -240,21 +240,33 @@ export class ActionBarService {
       }
 
       // "Individuelle Qualitätsprüfung mit KI": the dialogue with the assistant IS the step, and it ends
-      // in the same record the structured check produces — so it offers the same confirmation and the
-      // same write (see AiQualityScreenComponent). What it waits for is an answer, not a good one: the
-      // assistant judges every criterion and the person decides what to do with that, which is the
-      // difference from the structured check, where the ticked boxes ARE the decision. Until an answer
-      // is in, the way back is all there is.
+      // it — the check has both halves in by then, the quality judged and the metadata enriched, so the
+      // way on is out of the flow rather than into a further view. What it waits for is that both
+      // answers are in, not that they are good ones: the assistant judges every criterion and the person
+      // decides what to do with that, which is the difference from the structured check, where the
+      // ticked boxes ARE the decision. Until both are in, the way back is all there is.
       case 'ai-quality': {
         if (this.curation.qualityConfirmed()) return [this.backAction()];
         return [
           this.backAction(),
           {
-            label: this.curation.saving() ? 'Speichern…' : 'Qualität bestätigen',
-            disabled: !this.curation.qualityCriteriaJudged() || this.curation.saving(),
-            // The same write as in the structured check: the criteria go onto the content and the
-            // quality workflow is started with them (CurationService.confirmQuality).
-            run: () => this.curation.confirmQuality()
+            label: this.curation.saving() ? 'Speichern…' : 'Abschließen und zur Inhaltsübersicht',
+            disabled:
+              !this.curation.qualityCriteriaJudged() ||
+              !this.curation.qualityMetadataEnriched() ||
+              this.curation.saving(),
+            run: async () => {
+              // The same write as in the structured check: the criteria go onto the content and the
+              // quality workflow is started with them (CurationService.confirmQuality).
+              await this.curation.confirmQuality();
+              // Only on the back of a confirmation that held; one the repository refused is reported in
+              // the view (CurationService.qualityError), and the step stays open for it.
+              if (!this.curation.qualityConfirmed()) return;
+              // The content has been erschlossen and judged, so the recognition's earlier answer about
+              // this page no longer holds — asked again on the way back to the menu.
+              this.pageRecognition.invalidate();
+              this.navigation.go('overview');
+            }
           }
         ];
       }

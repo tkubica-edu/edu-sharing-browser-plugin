@@ -334,9 +334,71 @@ Each becomes a `QualityCriterion` with a short key, `k1`, `k2`, …: their own i
 and vocabulary URIs, and as schema keys they would spend the budget on addresses the model has no use
 for.
 
-**The task** (`instructionOf()`) names the collection, lists the criteria by key and caption, asks for
-the released instruction outright — `get_skill_registry`, then `get_skill` — and **quotes the
-content's own text in full**. The prompt carries only the *titles* of a collection's skills, so the
+**The check is two tasks, one after the other**, and the second is not put until the first has
+answered:
+
+1. **Qualität bewerten** (`qualityInstructionOf()`) — the criteria, listed by key and caption, judged
+   against the collection's released instruction, which the assistant is told to fetch outright
+   (`get_skill_registry`, then `get_skill`). This task **quotes the content's own text in full**.
+2. **Metadaten anreichern** (`enrichmentInstructionOf()`) — subject, education level and resource
+   type, each looked up in its WLO vocabulary (`lookup_wlo_vocabulary` with `discipline`,
+   `educationalContext`, `lrt`) and answered **with the URI**, plus five to ten keywords. A guessed
+   URI does not fail; it quietly matches nothing, which is why the schema says a value that cannot be
+   looked up is left empty rather than formed. It asks for a released skill for this step too, and
+   softly: there may not be one yet, and a skill that does not exist must not read as a step that
+   failed — but where one appears it takes precedence over anything the model would do on its own.
+
+**Both steps end with the person, not with the assistant.** Each task has it write its proposal into the
+chat, ask the person to go through it and confirm or correct it, and call `submit_result` only in the
+turn where they do. So what the panel records is an answer somebody stood behind, and the two
+confirmations are what carry the check from its first step to its second and finally to the footer. The
+panel narrates none of it beside the chat: the assistant is the one thing on this screen that can talk,
+so leading through the two steps is its part. Measured end to end, one session, four turns:
+
+| turn | message | `result` |
+|---|---|---|
+| 1 | the quality task | none — twelve verdicts in the chat, ending in *„Soll es so stehen bleiben, oder möchtest du einzelne Bewertungen korrigieren?"* |
+| 2 | *„Ich bestätige das Urteil zur Linsengleichung."* | `submit`, all twelve criteria |
+| 3 | the enrichment task | none — the values in the chat, ending in *„Sollen diese Metadaten so übernommen werden?"* |
+| 4 | *„Ja, die Metadaten passen so."* | `submit`, subject, level, type and keywords |
+
+**The confirmation turn only submits under the agent engine.** The `engine` attribute travels to the
+backend as the header `X-Boerdi-Engine`, and the routing is decided per message: without it, a short
+*„Ich bestätige das Urteil"* is taken for ordinary chat — measured, it was answered by an unrelated
+skill (*„[ edu-sharing Skill ] Vertretungsstunde planen"*) and submitted nothing, while the same turn
+with the header came back `submit` with all twelve criteria. The panel sets `engine="agent"` together
+with the schema, so every turn of the check runs the agent, not only the one that carries the task.
+
+**A side effect worth knowing about: the chips now offer the confirmation.** Prescribing them is
+impossible — no widget attribute, no `Environment` field, and an explicit instruction in the task is
+ignored by the generator (measured). But the generator reads the answer, and an answer that ends in a
+question about confirming produces chips about confirming: *„Ich bestätige das Urteil zur
+Linsengleichung."* / *„Bewertung zur Linsengleichung korrigieren"*, and *„Ja, Metadaten so übernehmen"*
+/ *„Ich möchte die Metadaten korrigieren"*. Not a guarantee — a consequence of what the answer says.
+
+They are asked in turn rather than together because both run under the same iteration and token caps:
+asked at once they compete for them, and whichever the model reaches last is the one that suffers.
+Split, each gets a run and a schema of its own, and the second does not repeat the content — it is
+the same conversation, and what the first task quoted is still in it. Measured against the deployed
+backend, twelve criteria: judgement `submit` with 12 of 12 answered in ~27 s, classification `submit`
+in ~10 s with three vocabulary lookups. The classification is the faster half precisely because the
+first turn established the subject.
+
+**Both tasks name `submit_result` outright**, and that is not decoration. Measured: the enrichment
+task without it came back `stop_reason: "text"` — the run had answered in prose, the chat showed a
+perfect enrichment, and `result` was `null`, so the panel had nothing. Asking for the closing tool by
+name turned the same task into a `submit`. The extra tool calls a skill lookup costs make the drift
+more likely, which is exactly where it showed up. Both tasks now say the same thing twice over: not
+before the confirmation, and then in that very turn, because a confirmation answered with nothing but
+a friendly acknowledgement leaves the step where it was.
+
+**Switching the schema mid-conversation is supported** — the widget holds it in an effect of its own
+and applies it from the next turn on. `AiAssistantScreenComponent.ask()` sets the new schema, then
+sends the follow-up task **after a short delay**: the widget refuses anything put to it while it is
+busy, and it is still busy at the instant it reports a result — `setLoading(false)` runs on the line
+*after* the one that fires the event. A follow-up sent straight from the report would be dropped
+without a word. Verified through the packaged bundle: two turns, both `submit`, the second answering
+in the switched shape. The prompt carries only the *titles* of a collection's skills, so the
 assistant has to fetch the one it checks against itself, and an unspecific task lets it answer from
 memory instead.
 
@@ -376,7 +438,24 @@ properties the structured check writes — a met knock-out criterion as the mach
 its valuespace states one, exactly as a judge's finding is recorded, because the assistant *is* a
 machine and a box claiming a person's confirmation would say more than happened.
 
-What the screen does with it is the same pair of statements the structured check's view makes:
+The finished result is both halves together — what the content is worth and what it is about — logged
+as one line when the second answer lands. That is also what the step's way on waits for: the footer
+offers *Abschließen und zur Inhaltsübersicht* once the quality is judged **and** the metadata
+enriched (`qualityCriteriaJudged` and `qualityMetadataEnriched`), writes the confirmation, and leaves
+the flow. A content judged but never described is half done, and the button says so by staying shut.
+
+Which raises the question the gate creates: **what if a step never lands?** A turn that submits nothing
+is the ordinary case here — the assistant has proposed and is waiting to be confirmed — so the panel
+does not read it as a failure and does not ask again. An earlier version did, and the nag would now
+fire on exactly the turn that was doing the right thing. Only a run that ended badly says anything
+above the chat (`deadline`, `token_budget`, `max_iterations`, `no_progress`, `error`). The way out is
+the conversation itself: any later turn that submits lands in the same handler and opens the button.
+The classification is **not** recorded on the node: those
+values are the assistant's proposal about what the content is, not a judgement anybody confirmed, and
+where they would go is a decision this step does not make.
+
+What the screen does with the judgement is the same pair of statements the structured check's view
+makes:
 
 ```ts
 this.curation.recordValues(properties);
@@ -396,8 +475,8 @@ structured flow hangs its own Metadaten sub step off that.
 
 **The result is shown in the chat, by the assistant itself.** Nothing can inject a message into that
 conversation from outside — so the task asks for it: a line per criterion with ✓ or ✗, the criterion
-and the reason, then a short verdict on what stands in the way of a release. The person sees only the
-chat, so what is not written there is not known. The panel draws nothing beside it; a second rendering
+and the reason, then a short verdict on what stands in the way of a release, and then the question
+that ends the step. The person sees only the chat, so what is not written there is not known. The panel draws nothing beside it; a second rendering
 of the same answer would only compete with the first. What the panel keeps goes to the console.
 
 ### Following a check in the console
@@ -471,7 +550,7 @@ that containing block the chat covers the whole panel.
 |---|---|---|
 | **Strukturierte Qualitätsprüfung** (`quality`) | fixed steps: work through the criteria, confirm, then metadata; writes the quality workflow onto the node; KI only proposes | `features/quality/quality-check-screen/`, `features/quality/quality-criteria/` |
 | The machine judges underneath | no chat at all, plain HTTP scoring: MetaLookUp measures (on by default), ContentJudge runs an LLM pass per scheme (off by default, needs a credential); started right after the content was analysed and read steps later | `services/quality-judge.service.ts`, `metalookup.service.ts`, `content-judge.service.ts`, `util/quality-schemes.ts` |
-| **Individuelle Qualitätsprüfung mit KI** (`ai-quality`) | a dialogue with the assistant about the content and its collection, opened with the criteria as its task and answered in a schema built from them; no fixed steps, but the same record and the same confirmation as the structured check | `features/quality/ai-quality-screen/`, `util/quality-check-request.ts` |
+| **Individuelle Qualitätsprüfung mit KI** (`ai-quality`) | a dialogue with the assistant about the content and its collection, opened with the criteria as its task and answered in a schema built from them; two steps, each confirmed by the person in the chat, ending in the same record and the same confirmation as the structured check | `features/quality/ai-quality-screen/`, `util/quality-check-request.ts` |
 
 What separates the first from the last is exactly that it runs through fixed steps — which is why it
 is called the structured one rather than the guided one.

@@ -118,6 +118,154 @@ export function resultSchemaOf(criteria: readonly QualityCriterion[]): Record<st
   };
 }
 
+/**
+ * The three vocabularies a value is looked up in, by what they classify. Named in the task and in the schema
+ * alike: a value formed from memory does not fail loudly — a guessed URI simply matches nothing.
+ */
+const VOCABULARIES = {
+  fach: 'discipline',
+  bildungsstufe: 'educationalContext',
+  materialtyp: 'lrt'
+} as const;
+
+/** What the enrichment answered; every field empty where the content did not give it. */
+export interface EnrichedMetadata {
+  fach: VocabularyValue;
+  bildungsstufe: VocabularyValue;
+  materialtyp: VocabularyValue;
+  schlagworte: readonly string[];
+}
+
+/** One value from a WLO vocabulary: what it is called, and the URI that is the actual filter value. */
+export interface VocabularyValue {
+  label: string;
+  uri: string;
+}
+
+/** The whole of what a check produced: what the content is worth, and what it is about. */
+export interface CheckOutcome {
+  verdicts: readonly CriterionVerdict[];
+  summary: string;
+  metadata: EnrichedMetadata | null;
+}
+
+/**
+ * The shape the enrichment is answered in. Every field required, none of them allowed to be invented: a
+ * field the content does not give is answered empty, which is a statement, while a missing field would be
+ * indistinguishable from one the assistant forgot.
+ */
+export function enrichmentSchemaOf(): Record<string, unknown> {
+  const value = (what: string, vocabulary: string) => ({
+    type: 'object',
+    description: `${what}, aus dem Vokabular „${vocabulary}“.`,
+    properties: {
+      label: { type: 'string', description: `Die Bezeichnung, wie sie im Vokabular steht. Leer, wenn der Inhalt ${what.toLowerCase()} nicht hergibt.` },
+      uri: { type: 'string', description: 'Die vollständige URI des Eintrags, wie lookup_wlo_vocabulary sie zurückgibt. Niemals selbst gebildet — leer, wenn keine nachgeschlagen wurde.' }
+    },
+    required: ['label', 'uri']
+  });
+  return {
+    type: 'object',
+    description: 'Die angereicherten Metadaten des Inhalts, jeder Wert aus dem vorgegebenen Vokabular.',
+    properties: {
+      fach: value('Das Schulfach', VOCABULARIES.fach),
+      bildungsstufe: value('Die Bildungsstufe', VOCABULARIES.bildungsstufe),
+      materialtyp: value('Der Materialtyp', VOCABULARIES.materialtyp),
+      schlagworte: {
+        type: 'array',
+        description: 'Schlagworte, mit denen der Inhalt gefunden werden soll. Fünf bis zehn, aus dem Inhalt selbst.',
+        items: { type: 'string' }
+      }
+    },
+    required: ['fach', 'bildungsstufe', 'materialtyp', 'schlagworte']
+  };
+}
+
+/**
+ * The check's second task, put once the first has answered: enrich the metadata of the content that was just
+ * judged — *Metadaten anreichern*, the step's name in the editorial process this panel serves.
+ *
+ * A task of its own rather than a second half of the first, because the two ask different things of the run.
+ * The judgement reads the content and the collection's instruction; the enrichment looks values up in three
+ * vocabularies. Asked together they compete for the same iteration and token caps, and the answer that
+ * suffers is whichever the model reaches last. Asked in turn, each gets its own run, its own schema, and the
+ * enrichment starts from a content whose quality is already established.
+ *
+ * It asks for the collection's instruction again, and softly: a skill for the enrichment may or may not be
+ * released, and one that is not there yet must not read as a step that failed. Where one appears it takes
+ * precedence over everything the model would do on its own, so asking costs nothing and gains the whole
+ * editorial convention the day it exists.
+ *
+ * It does not repeat the content: the conversation is the same one, and what was quoted in the first task is
+ * still in it.
+ *
+ * It ends the way the first task does — proposed in the chat, confirmed by the person, submitted only then —
+ * and with the one sentence that says the check is through: both steps are done, and the panel's footer is
+ * where it is closed.
+ */
+export function enrichmentInstructionOf(subject: CheckSubject): string {
+  // Dative: it reads "… die Metadaten VON <named> an".
+  const named = subject.title ? `„${subject.title}“` : 'diesem Inhalt';
+  return [
+    `Zweiter Schritt: Reichere jetzt die Metadaten von ${named} an — demselben Inhalt, den du gerade ` +
+      'geprüft hast. Der Schritt ist fertig, wenn die Person deine Werte bestätigt hat.',
+    ...(subject.collection
+      ? [
+          'Falls die Sammlung für das Anreichern von Metadaten eine Anleitung freigegeben hat, hol sie dir ' +
+            '(get_skill_registry, dann get_skill) und halte dich an sie. Gibt es dazu keine, reichere nach ' +
+            'den folgenden Vorgaben an.'
+        ]
+      : []),
+    `Hol dir Fach, Bildungsstufe und Materialtyp aus den vorgegebenen Vokabularen: lookup_wlo_vocabulary mit ` +
+      `vocabulary="${VOCABULARIES.fach}", "${VOCABULARIES.bildungsstufe}" und "${VOCABULARIES.materialtyp}". ` +
+      'Gib zu jedem Wert die Bezeichnung UND die vollständige URI an, wie das Vokabular sie zurückgibt.',
+    'Bilde keine URI selbst — eine geratene trifft still nichts. Gibt der Inhalt einen Wert nicht her, lass ' +
+      'ihn leer, statt zu raten.',
+    'Nenne dazu fünf bis zehn Schlagworte aus dem Inhalt selbst.',
+    '',
+    'Nenne die Werte zuerst im Chat, je Wert eine Zeile mit Bezeichnung und URI, darunter die Schlagworte. ' +
+      'Die Person sieht nur den Chat.',
+    'Bitte sie danach ausdrücklich, die Werte durchzugehen und zu bestätigen oder zu korrigieren. Führe sie ' +
+      'zu dieser Bestätigung: frag direkt, ob die Metadaten so übernommen werden sollen.',
+    'Rufe submit_result ERST auf, wenn sie bestätigt hat — mit ihren Korrekturen, falls sie welche hatte. ' +
+      'Ohne diesen Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.',
+    'Sag ihr danach, dass beide Schritte erledigt sind und sie unten im Panel mit „Abschließen und zur ' +
+      'Inhaltsübersicht“ fertig wird.'
+  ]
+    .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
+    .join('\n');
+}
+
+/** What the enrichment answered; null where the turn submitted nothing usable. */
+export function enrichmentOf(result: unknown): EnrichedMetadata | null {
+  const answer = asRecord(result);
+  if (!answer) return null;
+  const value = (key: string): VocabularyValue => {
+    const entry = asRecord(answer[key]);
+    return {
+      label: typeof entry?.['label'] === 'string' ? entry['label'].trim() : '',
+      uri: typeof entry?.['uri'] === 'string' ? entry['uri'].trim() : ''
+    };
+  };
+  const keywords = Array.isArray(answer['schlagworte'])
+    ? answer['schlagworte'].filter((entry): entry is string => typeof entry === 'string' && !!entry.trim())
+    : [];
+  const metadata: EnrichedMetadata = {
+    fach: value('fach'),
+    bildungsstufe: value('bildungsstufe'),
+    materialtyp: value('materialtyp'),
+    schlagworte: keywords.map((entry) => entry.trim())
+  };
+  // Nothing at all is not an enrichment: an answer about a different question would otherwise be recorded
+  // as one whose every field happened to be empty.
+  const stated =
+    metadata.fach.label ||
+    metadata.bildungsstufe.label ||
+    metadata.materialtyp.label ||
+    metadata.schlagworte.length;
+  return stated ? metadata : null;
+}
+
 /** Whether a schema fits what the backend accepts — see {@link SCHEMA_MAX}. */
 export function schemaFits(schema: Record<string, unknown>): boolean {
   return JSON.stringify(schema).length <= SCHEMA_MAX;
@@ -136,9 +284,10 @@ export interface CheckSubject {
 }
 
 /**
- * The task the check runs on.
+ * The first of the check's two tasks: judge the content against the criteria. The enrichment follows in a
+ * task of its own, once this one has answered — see {@link enrichmentInstructionOf}.
  *
- * It says four things, and each of them had to be said.
+ * Six things it says, each of which had to be said.
  *
  * **What is being judged**: the one content, and expressly not the other contents of its collection — a
  * collection in the context invites exactly that confusion, and the assistant then reports on a stock nobody
@@ -156,34 +305,51 @@ export interface CheckSubject {
  *
  * **What to judge it by**: the collection's released instruction, fetched outright, because the prompt carries
  * the titles of a collection's skills but no ids and an unspecific task lets the model answer from memory.
+ *
+ * **Where it is read**: in the chat as well as in the schema. Nothing can put a message into that conversation
+ * from outside, so the assistant is asked to write the result there itself — the person sees only the chat.
+ *
+ * **Who ends the step**: the person, and the assistant is told to bring them to it. The judgement goes into
+ * the chat first, then the assistant asks them to go through it and confirm or correct it, and only their
+ * confirmation releases `submit_result` — which is what carries the check on to its second step. The
+ * assistant is the one thing on this screen that can talk, so leading through the two steps is its part.
  */
-export function instructionOf(
+export function qualityInstructionOf(
   criteria: readonly QualityCriterion[],
   subject: CheckSubject
 ): string {
   const { title, url, collection } = subject;
   const text = subject.text.trim();
-  const named = title ? `den Inhalt „${title}“` : 'den Inhalt der aktuellen Seite';
+  // Dative: the one place it is used reads "… bei der Erschließung VON <named>".
+  const named = title ? `dem Inhalt „${title}“` : 'dem Inhalt der aktuellen Seite';
+  const forCollection = collection ? ` für die Sammlung „${collection}“` : '';
   const head = [
-    collection
-      ? `Prüfe ${named} anhand der Anforderungen der Sammlung „${collection}“.`
-      : `Prüfe die Qualität von ${named}.`,
+    `Bewerte die Qualität von ${named}${forCollection}.`,
     'Gemeint ist genau dieser eine Inhalt. Beurteile NICHT die übrigen Inhalte der Sammlung und nicht die ' +
       'Sammlung als Ganzes.',
+    'Das ist der erste von zwei Schritten; der zweite ist das Anreichern der Metadaten. Der Schritt ist ' +
+      'fertig, wenn die Person deine Bewertung durchgegangen ist und sie bestätigt hat.',
     collection
-      ? 'Hol dir zuerst die für die Sammlung freigegebene Anleitung (get_skill_registry, dann get_skill) ' +
-        'und halte dich an sie, falls eine dabei ist.'
+      ? 'Hol dir dazu zuerst die für die Sammlung freigegebene Anleitung (get_skill_registry, dann ' +
+        'get_skill) und halte dich an sie, falls eine dabei ist.'
       : '',
     '',
     'Beurteile jedes dieser Kriterien einzeln:',
     criteria.map((item) => `${item.key}: ${item.caption}`).join('\n'),
+    'Rate nicht: wo der Inhalt nichts hergibt, ist das Kriterium nicht erfüllt, und die Begründung sagt ' +
+      'ausdrücklich, dass es nicht prüfbar war.',
     '',
-    'Gib das Ergebnis strukturiert zurück — zu jedem Kriterium erfuellt und begruendung. Rate nicht: wo der ' +
-      'Inhalt nichts hergibt, ist das Kriterium nicht erfüllt, und die Begründung sagt ausdrücklich, dass es ' +
-      'nicht prüfbar war.',
-    'Schreibe das Ergebnis AUSSERDEM in deine Antwort im Chat: je Kriterium eine Zeile mit ✓ oder ✗, dem ' +
-      'Namen des Kriteriums und dem Grund in einem Satz, darunter ein kurzes Fazit, was der Freigabe im Weg ' +
-      'steht. Die Person sieht nur den Chat — was dort nicht steht, erfährt sie nicht.',
+    'Schreib dein Urteil zuerst in den Chat: je Kriterium eine Zeile mit ✓ oder ✗, dem Namen des Kriteriums ' +
+      'und dem Grund in einem Satz, darunter ein kurzes Fazit, was einer Freigabe im Weg steht. Die Person ' +
+      'sieht nur den Chat — was dort nicht steht, erfährt sie nicht.',
+    'Bitte sie danach ausdrücklich, dein Urteil durchzugehen und zu bestätigen oder zu korrigieren. Führe sie ' +
+      'zu dieser Bestätigung: frag direkt, ob es so stehen bleiben soll, und geh auf ihre Einwände ein.',
+    'Rufe submit_result ERST auf, wenn sie bestätigt hat — vorher nicht, auch wenn dein Urteil längst fertig ' +
+      'ist.',
+    'Sobald sie bestätigt: Rufe submit_result in genau diesem Zug auf, mit ihren Korrekturen, falls sie welche ' +
+      'hatte, und zu jedem Kriterium erfuellt und begruendung. Eine Bestätigung im Chat allein reicht nicht — ' +
+      'ohne diesen Werkzeugaufruf ist das Ergebnis für uns nicht da und es geht nicht weiter. Sag ihr dann, ' +
+      'dass der zweite Schritt folgt: die Metadaten anreichern.',
     ''
   ]
     .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
