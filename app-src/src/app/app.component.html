@@ -88,8 +88,12 @@
 
 <es-action-bar></es-action-bar>
 
-<!-- Above the session bar, and only in the WLO context: who there is to ask (AiAssistantBarComponent). -->
-<es-ai-assistant-bar></es-ai-assistant-bar>
+<!-- The offer of the KI assistant above the session bar: who there is to ask (AiAssistantBarComponent).
+     Taken off screen for now — the assistant is reached through the Qualitätsprüfung, and a second way
+     in that leads to a chat about the open tab is not wanted at the moment. Kept rather than deleted
+     because it is expected back; the component, its condition and its styles all stand unchanged, so
+     this line and its import in AppComponent are the whole of the switch. -->
+<!-- <es-ai-assistant-bar></es-ai-assistant-bar> -->
 
 <!-- The session's bar at the bottom edge; it decides itself when it applies (UserBarComponent). -->
 <es-user-bar></es-user-bar>

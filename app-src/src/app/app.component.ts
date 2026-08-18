@@ -25,7 +25,8 @@ import { SessionResumeService } from './services/session-resume.service';
 
 import { IconDirective } from './directives/icon.directive';
 import { ActionBarComponent } from './template/action-bar/action-bar.component';
-import { AiAssistantBarComponent } from './template/ai-assistant-bar/ai-assistant-bar.component';
+// Commented out with the tag in the template — see the note there.
+// import { AiAssistantBarComponent } from './template/ai-assistant-bar/ai-assistant-bar.component';
 import { MenuComponent } from './template/menu/menu.component';
 import { TabBarComponent } from './template/tab-bar/tab-bar.component';
 import { UserBarComponent } from './template/user-bar/user-bar.component';
@@ -65,7 +66,8 @@ const DISCARD_PROMPT =
   selector: 'es-root',
   imports: [
     IconDirective,
-    ActionBarComponent, TabBarComponent, UserBarComponent, AiAssistantBarComponent, MenuComponent,
+    // AiAssistantBarComponent belongs here — commented out with its tag, see the template.
+    ActionBarComponent, TabBarComponent, UserBarComponent, MenuComponent,
     LoginComponent, LoginGateComponent, AiAssistantScreenComponent, HistoryScreenComponent,
     SettingsScreenComponent, SearchScreenComponent, AddContentScreenComponent,
     ContentOptionsScreenComponent, CurationScreenComponent, CurationPreviewScreenComponent,
