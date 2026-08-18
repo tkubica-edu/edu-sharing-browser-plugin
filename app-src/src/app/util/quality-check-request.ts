@@ -9,6 +9,8 @@
 import type { MdsDefinition, MdsValue, MdsWidget } from 'ngx-edu-sharing-api';
 
 import type { CriteriaProperties } from '../features/quality/quality-criteria/quality-criteria.component';
+import { EXTENDED_TYPE_FIELD, LRT_FIELD } from './agent-payload';
+import type { MdsValues } from './mds-values';
 import {
   CRITERION_MET, CRITERION_VIOLATED, EDITORIAL_CRITERIA_PROPERTY, KNOCKOUT_CRITERIA_WIDGET, autoMetValue,
   valueFor, widgetOf
@@ -264,6 +266,60 @@ export function enrichmentOf(result: unknown): EnrichedMetadata | null {
     metadata.materialtyp.label ||
     metadata.schlagworte.length;
   return stated ? metadata : null;
+}
+
+/** The property a content's keywords are held in — plain words, not values of a vocabulary. */
+const KEYWORD_PROPERTY = 'cclom:general_keyword';
+
+/**
+ * Where an enriched value is recorded, and what it has to be to go there. Each of these properties holds the
+ * values of exactly one WLO vocabulary, so it is the vocabulary the URI came out of that decides the property
+ * — not the field it was answered under. *Materialtyp* is the case that makes the difference: asked for `lrt`,
+ * `lookup_wlo_vocabulary` answers out of `new_lrt` or out of the aggregated `new_lrt_aggregated`, and on the
+ * node those are two separate fields. A URI from any other vocabulary is not recorded at all: it would sit in
+ * a field whose valuespace does not contain it, where the editor shows a blank and no search finds it.
+ */
+const ENRICHED_PROPERTIES: readonly {
+  field: 'fach' | 'bildungsstufe' | 'materialtyp';
+  vocabulary: string;
+  property: string;
+}[] = [
+  { field: 'fach', vocabulary: 'discipline', property: 'ccm:taxonid' },
+  { field: 'bildungsstufe', vocabulary: 'educationalContext', property: 'ccm:educationalcontext' },
+  { field: 'materialtyp', vocabulary: 'new_lrt', property: LRT_FIELD },
+  { field: 'materialtyp', vocabulary: 'new_lrt_aggregated', property: EXTENDED_TYPE_FIELD }
+];
+
+/**
+ * The enriched metadata as the node properties it is written to, so what the person confirmed in the chat
+ * reaches the content instead of the console. Recorded, not saved: they travel with the next write, which is
+ * the confirmation this step ends in.
+ *
+ * The vocabulary values are stated as the URI alone, since that *is* the value a vocabulary property holds —
+ * a label is what the editor renders from it. Only a URI that came out of the expected vocabulary is taken;
+ * one the assistant formed itself does not fail loudly, it simply matches nothing.
+ *
+ * The keywords are added to those already on the content rather than put in their place. They come from the
+ * same reading of the same text as the ones the extraction proposed, and the two lists overlap without being
+ * the same; replacing would drop the difference, which is what a second pair of eyes was for.
+ */
+export function enrichmentPropertiesOf(
+  metadata: EnrichedMetadata,
+  recorded: Record<string, unknown> | null
+): MdsValues {
+  const properties: MdsValues = {};
+  for (const { field, vocabulary, property } of ENRICHED_PROPERTIES) {
+    const uri = metadata[field].uri;
+    if (uri.includes(`/vocabs/${vocabulary}/`)) properties[property] = [uri];
+  }
+  const kept = new Map<string, string>();
+  // Standing first, so a keyword both lists hold stays in the spelling the content already carries.
+  for (const keyword of [...asList(recorded?.[KEYWORD_PROPERTY]), ...metadata.schlagworte]) {
+    const word = keyword.trim();
+    if (word && !kept.has(word.toLowerCase())) kept.set(word.toLowerCase(), word);
+  }
+  if (kept.size) properties[KEYWORD_PROPERTY] = [...kept.values()];
+  return properties;
 }
 
 /** Whether a schema fits what the backend accepts — see {@link SCHEMA_MAX}. */

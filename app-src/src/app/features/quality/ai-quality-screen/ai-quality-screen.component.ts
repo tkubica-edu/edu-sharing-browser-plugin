@@ -7,8 +7,8 @@ import { CurationService } from '../../../services/curation.service';
 import { PageContext, contentContextOf } from '../../../util/page-context';
 import {
   CriterionVerdict, EnrichedMetadata, criteriaOf, criteriaPropertiesOf, enrichmentInstructionOf,
-  enrichmentOf, enrichmentSchemaOf, knockoutSatisfied, qualityInstructionOf, resultSchemaOf, schemaFits,
-  verdictsOf
+  enrichmentOf, enrichmentPropertiesOf, enrichmentSchemaOf, knockoutSatisfied, qualityInstructionOf,
+  resultSchemaOf, schemaFits, verdictsOf
 } from '../../../util/quality-check-request';
 import {
   AgentResult, AiAssistantScreenComponent
@@ -253,9 +253,10 @@ export class AiQualityScreenComponent {
   }
 
   /**
-   * Take the enriched metadata over — the check's second answer and its last. Nothing is recorded from it:
-   * the values are the assistant's proposal about what the content is, not a judgement anybody confirmed, and
-   * where they would go on the node is a decision this step does not make.
+   * Take the enriched metadata over — the check's second answer and its last. What it states goes onto the
+   * content's own properties, the same ones the metadata step writes: the person has been through these
+   * values in the chat and confirmed them, which is what makes them the content's rather than a proposal
+   * about it. They are recorded, not saved; the write is the confirmation this step ends in.
    */
   private takeEnrichment(answer: AgentResult): void {
     const metadata = enrichmentOf(answer.result);
@@ -269,8 +270,10 @@ export class AiQualityScreenComponent {
       if (this.step() === 'enrichment') this.problem.set(STOPPED[answer.stopReason] ?? null);
       return;
     }
+    const properties = enrichmentPropertiesOf(metadata, this.curation.editorMetadata());
     this.problem.set(null);
     this.metadata.set(metadata);
+    this.curation.recordValues(properties);
     this.step.set('done');
     // The other half of what the way on out of this step waits for; the judgement reported the first.
     this.curation.reportMetadataEnriched();
@@ -288,7 +291,10 @@ export class AiQualityScreenComponent {
         knockoutSatisfied: this.curation.qualityCriteriaMet(),
         recorded: this.curation.editorMetadata()
       },
-      metadata
+      metadata,
+      // What of the enrichment reached the node, beside what was answered: a value whose URI came out of a
+      // vocabulary the property does not hold is left out, and the two lines side by side say which.
+      recordedMetadata: properties
     });
   }
 

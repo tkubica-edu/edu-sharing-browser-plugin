@@ -450,9 +450,33 @@ does not read it as a failure and does not ask again. An earlier version did, an
 fire on exactly the turn that was doing the right thing. Only a run that ended badly says anything
 above the chat (`deadline`, `token_budget`, `max_iterations`, `no_progress`, `error`). The way out is
 the conversation itself: any later turn that submits lands in the same handler and opens the button.
-The classification is **not** recorded on the node: those
-values are the assistant's proposal about what the content is, not a judgement anybody confirmed, and
-where they would go is a decision this step does not make.
+**The enrichment is recorded on the node**, the same way the verdicts are: `enrichmentPropertiesOf()`
+turns it into the very properties the metadata step writes, and `recordValues()` has them travel with
+the confirming save. The person went through these values in the chat and confirmed them, which is
+what makes them the content's rather than a proposal about it.
+
+Which property a value goes to is decided by **the vocabulary its URI came out of**, not by the field
+it was answered under — each of these properties holds the values of exactly one vocabulary:
+
+| answered | vocabulary | property |
+|---|---|---|
+| `fach` | `discipline` | `ccm:taxonid` |
+| `bildungsstufe` | `educationalContext` | `ccm:educationalcontext` |
+| `materialtyp` | `new_lrt` | `ccm:oeh_lrt` |
+| `materialtyp` | `new_lrt_aggregated` | `ccm:oeh_extendedType` |
+| `schlagworte` | — | `cclom:general_keyword` |
+
+*Materialtyp* is why it has to work that way. Asked for `lrt`, `lookup_wlo_vocabulary` answers out of
+either vocabulary — measured, it came back
+`…/vocabs/new_lrt_aggregated/c8e52242-361b-4a2a-b95d-25e516b28b45` for *Arbeitsblatt* — and on the node
+those are two separate fields. A URI out of any other vocabulary is not recorded at all: it would sit
+in a field whose valuespace does not contain it, where the editor shows a blank and no search finds
+it. The value stated is the URI alone, since that *is* what a vocabulary property holds; the label is
+what the editor renders from it.
+
+The keywords are the one list that is **added to** rather than replaced: they come from the same
+reading of the same text as the ones the extraction proposed, the two overlap without being the same,
+and a keyword both lists hold keeps the spelling the content already carries.
 
 What the screen does with the judgement is the same pair of statements the structured check's view
 makes:
