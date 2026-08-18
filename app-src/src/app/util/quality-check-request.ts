@@ -137,6 +137,233 @@ export function resultSchemaOf(criteria: readonly QualityCriterion[]): Record<st
 }
 
 /**
+ * Whose content is being checked, as the opening question answers it. It decides one thing: whether a pass
+ * over spelling and wording is worth doing. On one's own content its findings are something the person can go
+ * and fix; on someone else's they are a list of complaints about a text nobody here can touch.
+ */
+export type ContentOrigin = 'eigen' | 'fremd';
+
+/**
+ * The shape the opening question is answered in: one word, and expressly not one the assistant works out for
+ * itself. Whether a content is the person's own is not a property of its text, and a check that guessed it
+ * would send half of them through a step that is not theirs.
+ */
+export function originSchemaOf(): Record<string, unknown> {
+  return {
+    type: 'object',
+    description: 'Wem der Inhalt gehört — so, wie die Person es beantwortet hat.',
+    properties: {
+      herkunft: {
+        type: 'string',
+        enum: ['eigen', 'fremd'],
+        description:
+          '„eigen“, wenn die Person den Inhalt selbst erstellt hat oder für ihn verantwortlich ist. ' +
+          '„fremd“, wenn er von jemand anderem stammt und sie ihn nur einordnet. Trag nur ein, was sie ' +
+          'geantwortet hat — rate nicht und leite es nicht aus dem Inhalt ab.'
+      },
+      vermutung: {
+        type: 'string',
+        enum: ['eigen', 'fremd'],
+        description:
+          'Wovon du selbst ausgegangen bist, bevor die Person geantwortet hat. Ihre Antwort steht in ' +
+          'herkunft und gilt — auch dann, wenn sie deiner Vermutung widerspricht.'
+      }
+    },
+    required: ['herkunft']
+  };
+}
+
+/**
+ * The check's opening: greet the person, say what is about to happen, and ask the one question the rest of the
+ * run turns on — is this their own content, or someone else's?
+ *
+ * Asked rather than derived, because nothing here knows it for certain. The panel holds who is signed in, where
+ * the content came from and whom it names as its author, and those three together are usually enough to see
+ * which of the two it is — but only usually: whoever checks a content is routinely neither its author nor its
+ * owner, and a content can be one's own without naming one at all. So the three are handed over and the
+ * assistant says what it makes of them, and then asks anyway. What the person answers is what counts; the guess
+ * is there to save them a decision they mostly only have to nod at, and it is kept beside their answer so the
+ * two can be compared.
+ *
+ * Nothing is judged in this turn. This greeting is the first thing the person sees of the whole check, and a
+ * turn that read the content as well would spend its answer on findings nobody has asked for yet — so the task
+ * ends at the question, and the answer is the person's to give.
+ */
+export function originInstructionOf(subject: CheckSubject): string {
+  // Accusative: it reads "… dass ihr jetzt gemeinsam <named> prüft".
+  const named = subject.title ? `den Inhalt „${subject.title}“` : 'diesen Inhalt';
+  return [
+    `Begrüße die Person und sag ihr, dass ihr jetzt gemeinsam ${named} prüft.`,
+    'Sag in einem Satz, was ansteht: erst die Qualitätsprüfung, danach das Anreichern der Metadaten. Bei ' +
+      'einem eigenen Inhalt schaust du vorher noch auf Rechtschreibung und Sprache.',
+    'Sag ihr dann, wovon du ausgehst, in einem Satz und mit dem Grund. Was dafür bekannt ist:',
+    `- Quelle: ${subject.url ?? 'nicht bekannt'}`,
+    `- als Urheber genannt: ${subject.author ?? 'niemand'}`,
+    `- angemeldet ist: ${subject.signedIn ?? 'unbekannt'}`,
+    'Eine fremde Website als Quelle spricht für einen fremden Inhalt; ein Urheber, der der angemeldeten ' +
+      'Person entspricht, für einen eigenen. Sag ausdrücklich, dass das deine Vermutung ist.',
+    'Stell ihr dann genau eine Frage: Ist das ein eigener Inhalt — von ihr selbst erstellt oder von ihr ' +
+      'verantwortet — oder ein fremder, den sie nur einordnet? Ihre Antwort gilt, auch wenn sie deiner ' +
+      'Vermutung widerspricht.',
+    'Beurteile in diesem Zug nichts und lies den Inhalt nicht. Es geht allein um diese Frage.',
+    'Warte ihre Antwort ab. Rufe submit_result ERST auf, wenn sie geantwortet hat — mit herkunft="eigen" ' +
+      'oder herkunft="fremd" und deiner Vermutung in vermutung. Setz herkunft nicht auf deine Vermutung.',
+    'Ist die Antwort unklar, frag nach, statt dich selbst zu entscheiden.'
+  ].join('\n');
+}
+
+/** Whose content the opening question established; null where the turn did not say. */
+export function originOf(result: unknown): ContentOrigin | null {
+  return originIn(asRecord(result)?.['herkunft']);
+}
+
+/**
+ * What the assistant took the content for before it asked; null where it said nothing. Beside the answer, not
+ * in its place: it is kept so the guess can be held against what the person actually said, which is the only
+ * way to find out whether it is worth making.
+ */
+export function originGuessOf(result: unknown): ContentOrigin | null {
+  return originIn(asRecord(result)?.['vermutung']);
+}
+
+function originIn(stated: unknown): ContentOrigin | null {
+  if (typeof stated !== 'string') return null;
+  const answer = stated.trim().toLowerCase();
+  return answer === 'eigen' || answer === 'fremd' ? answer : null;
+}
+
+/** One place the language pass wants changed. */
+export interface ProofreadFinding {
+  /** The wording as it stands in the content, quoted so it can be found again. */
+  passage: string;
+  /** What it is to say instead. */
+  correction: string;
+  /** What is wrong with it — Rechtschreibung, Grammatik, Zeichensetzung, Ausdruck; empty where it said none. */
+  kind: string;
+}
+
+/** What the language pass answered — see {@link proofreadOf}. */
+export interface ProofreadResult {
+  findings: readonly ProofreadFinding[];
+  /** Its word on the text as a whole, empty where it gave none. */
+  summary: string;
+}
+
+/**
+ * The shape the language pass is answered in: the passages to change, each quoted and each with what it is to
+ * say instead. A quoted passage is what makes a finding actionable — the person has to find the place in their
+ * own text, and "einige Kommafehler" is not a place.
+ *
+ * The list may come back empty, and the schema says so twice over: a text with nothing to correct is the good
+ * outcome, and it must not read as a step that failed to answer.
+ */
+export function proofreadSchemaOf(): Record<string, unknown> {
+  return {
+    type: 'object',
+    description: 'Das Ergebnis der sprachlichen Durchsicht: jede Stelle, die zu korrigieren ist.',
+    properties: {
+      befunde: {
+        type: 'array',
+        description:
+          'Eine Stelle je Eintrag, in der Reihenfolge, in der sie im Text vorkommen. Leere Liste, wenn ' +
+          'sprachlich nichts zu beanstanden ist — das ist ein Ergebnis, kein fehlendes.',
+        items: {
+          type: 'object',
+          properties: {
+            stelle: {
+              type: 'string',
+              description: 'Der Wortlaut der Stelle, wörtlich wie im Inhalt, damit sie wiederzufinden ist.'
+            },
+            korrektur: { type: 'string', description: 'Wie die Stelle stattdessen lauten soll.' },
+            art: {
+              type: 'string',
+              description: 'Was daran zu ändern ist: Rechtschreibung, Grammatik, Zeichensetzung oder Ausdruck.'
+            }
+          },
+          required: ['stelle', 'korrektur', 'art']
+        }
+      },
+      fazit: {
+        type: 'string',
+        description: 'Ein bis zwei Sätze zum Text als Ganzem: Wie steht es um Sprache und Rechtschreibung?'
+      }
+    },
+    required: ['befunde']
+  };
+}
+
+/**
+ * The step that runs on one's own content and only there: read the text for spelling, grammar, punctuation and
+ * wording, and name the places to change.
+ *
+ * Why it is bound to the answer of the opening question: a correction is worth having only where somebody can
+ * carry it out. The author of a content can go and fix what this finds; whoever is filing someone else's
+ * content can do nothing with a list of its typos but read it — the text is not theirs to touch, and the step
+ * would cost them a turn of the dialogue for nothing.
+ *
+ * It quotes the content again, although the conversation has been running since the greeting: what it judges
+ * is the wording itself, down to the character, and the page context the backend renders is a description of
+ * the node rather than its text.
+ */
+export function proofreadInstructionOf(subject: CheckSubject): string {
+  // Genitive: it reads "… die Sprache VON <named> durch".
+  const named = subject.title ? `„${subject.title}“` : 'diesem Inhalt';
+  const head = [
+    `Das ist ein eigener Inhalt. Geh deshalb zuerst die Sprache von ${named} durch: Rechtschreibung, ` +
+      'Grammatik, Zeichensetzung und Ausdruck. Der Schritt ist fertig, wenn die Person deine Korrekturen ' +
+      'durchgegangen ist und sie bestätigt hat.',
+    subject.collection
+      ? 'Nutze dafür die Skills der Sammlung, die zu Sprache, Rechtschreibung oder Textqualität etwas sagen: ' +
+        'hol dir mit get_skill_registry die Liste und mit get_skill jede Anleitung, die dazu passt, und halte ' +
+        'dich an sie. Gibt es dazu keine, korrigiere nach den Regeln der deutschen Rechtschreibung.'
+      : '',
+    'Zitiere jede beanstandete Stelle wörtlich, wie sie im Text steht, und stell die Korrektur daneben. ' +
+      'Erfinde keine Stelle, die dort nicht steht.',
+    'Ist sprachlich nichts zu beanstanden, sag das und gib eine leere Liste ab — auch das ist ein Ergebnis.',
+    'Beurteile hier noch nicht die Qualität des Inhalts, das ist der nächste Schritt.',
+    '',
+    'Nenne die Stellen zuerst im Chat, je Stelle eine Zeile mit dem Wortlaut und der Korrektur darunter. ' +
+      'Die Person sieht nur den Chat — was dort nicht steht, erfährt sie nicht.',
+    'Bitte sie danach ausdrücklich, die Korrekturen durchzugehen und zu bestätigen oder zu verwerfen. Führe ' +
+      'sie zu dieser Bestätigung: frag direkt, ob die Korrekturen so stehen bleiben sollen.',
+    'Beende deine Nachricht mit dieser Frage und nenne die bestätigende Antwort wörtlich, damit sie ihr als ' +
+      'Antwortvorschlag angeboten werden kann: „Ich bestätige die Korrekturen.“',
+    'Rufe submit_result ERST auf, wenn sie bestätigt hat — mit den Stellen, die stehen bleiben. Ohne diesen ' +
+      'Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.',
+    'Sag ihr danach, dass als Nächstes die Qualitätsprüfung folgt.',
+    ''
+  ]
+    .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
+    .join('\n');
+  return head + contentBlock(subject.text.trim(), subject.url, TASK_MAX - head.length);
+}
+
+/**
+ * What the language pass found; null where the turn answered something else. The list is what says a pass
+ * happened — an empty one is its answer, while no list at all is a turn about a different question. A finding
+ * without a passage or without a correction is dropped: it names nothing the person could act on.
+ */
+export function proofreadOf(result: unknown): ProofreadResult | null {
+  const answer = asRecord(result);
+  const stated = answer?.['befunde'];
+  if (!Array.isArray(stated)) return null;
+  const findings: ProofreadFinding[] = [];
+  for (const entry of stated) {
+    const finding = asRecord(entry);
+    const passage = typeof finding?.['stelle'] === 'string' ? finding['stelle'].trim() : '';
+    const correction = typeof finding?.['korrektur'] === 'string' ? finding['korrektur'].trim() : '';
+    if (!passage || !correction) continue;
+    findings.push({
+      passage,
+      correction,
+      kind: typeof finding?.['art'] === 'string' ? finding['art'].trim() : ''
+    });
+  }
+  const summary = answer?.['fazit'];
+  return { findings, summary: typeof summary === 'string' ? summary.trim() : '' };
+}
+
+/**
  * The three vocabularies a value is looked up in, by what they classify. Named in the task and in the schema
  * alike: a value formed from memory does not fail loudly — a guessed URI simply matches nothing.
  */
@@ -160,8 +387,11 @@ export interface VocabularyValue {
   uri: string;
 }
 
-/** The whole of what a check produced: what the content is worth, and what it is about. */
+/** The whole of what a check produced: whose the content is, what it is worth, and what it is about. */
 export interface CheckOutcome {
+  origin: ContentOrigin | null;
+  /** What the language pass found; null on someone else's content, where it is not run. */
+  proofread: ProofreadResult | null;
   verdicts: readonly CriterionVerdict[];
   summary: string;
   suitable: boolean | null;
@@ -201,7 +431,7 @@ export function enrichmentSchemaOf(): Record<string, unknown> {
 }
 
 /**
- * The check's second task, put once the first has answered: enrich the metadata of the content that was just
+ * The check's last task, put once the judgement is in: enrich the metadata of the content that was just
  * judged — *Metadaten anreichern*, the step's name in the editorial process this panel serves.
  *
  * A task of its own rather than a second half of the first, because the two ask different things of the run.
@@ -226,7 +456,7 @@ export function enrichmentInstructionOf(subject: CheckSubject): string {
   // Dative: it reads "… die Metadaten VON <named> an".
   const named = subject.title ? `„${subject.title}“` : 'diesem Inhalt';
   return [
-    `Zweiter Schritt: Reichere jetzt die Metadaten von ${named} an — demselben Inhalt, den du gerade ` +
+    `Letzter Schritt: Reichere jetzt die Metadaten von ${named} an — demselben Inhalt, den du gerade ` +
       'geprüft hast. Der Schritt ist fertig, wenn die Person deine Werte bestätigt hat.',
     ...(subject.collection
       ? [
@@ -246,9 +476,11 @@ export function enrichmentInstructionOf(subject: CheckSubject): string {
       'Die Person sieht nur den Chat.',
     'Bitte sie danach ausdrücklich, die Werte durchzugehen und zu bestätigen oder zu korrigieren. Führe sie ' +
       'zu dieser Bestätigung: frag direkt, ob die Metadaten so übernommen werden sollen.',
+    'Beende deine Nachricht mit dieser Frage und nenne die bestätigende Antwort wörtlich, damit sie ihr als ' +
+      'Antwortvorschlag angeboten werden kann: „Ich bestätige die Metadaten.“',
     'Rufe submit_result ERST auf, wenn sie bestätigt hat — mit ihren Korrekturen, falls sie welche hatte. ' +
       'Ohne diesen Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.',
-    'Sag ihr danach, dass beide Schritte erledigt sind und sie unten im Panel mit „Abschließen und zur ' +
+    'Sag ihr danach, dass alle Schritte erledigt sind und sie unten im Panel mit „Abschließen und zur ' +
       'Inhaltsübersicht“ fertig wird.'
   ]
     .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
@@ -354,11 +586,17 @@ export interface CheckSubject {
   url: string | null;
   /** The collection whose requirements it is measured against. */
   collection: string | null;
+  /** Who the content names as its author or publisher; null where it names none. */
+  author: string | null;
+  /** Who is signed in, so the named author has somebody to be compared against. */
+  signedIn: string | null;
 }
 
 /**
- * The first of the check's two tasks: judge the content against the criteria. The enrichment follows in a
- * task of its own, once this one has answered — see {@link enrichmentInstructionOf}.
+ * The check's judging task: measure the content against the criteria. It follows the opening question, and
+ * on one's own content the language pass as well; the enrichment follows it in a task of its own, once this
+ * one has answered — see {@link originInstructionOf}, {@link proofreadInstructionOf} and
+ * {@link enrichmentInstructionOf}.
  *
  * Six things it says, each of which had to be said.
  *
@@ -387,8 +625,11 @@ export interface CheckSubject {
  *
  * **Who ends the step**: the person, and the assistant is told to bring them to it. The judgement goes into
  * the chat first, then the assistant asks them to go through it and confirm or correct it, and only their
- * confirmation releases `submit_result` — which is what carries the check on to its second step. The
- * assistant is the one thing on this screen that can talk, so leading through the two steps is its part.
+ * confirmation releases `submit_result` — which is what carries the check on to its next step. The assistant
+ * is the one thing on this screen that can talk, so leading through the steps is its part. Down to the reply
+ * chips: the widget composes those from the answer it just gave, and nothing outside the conversation can set
+ * them — so the task has the assistant close on the question and name the confirming answer word for word,
+ * which is what puts that answer among the chips for the person to tap.
  */
 export function qualityInstructionOf(
   criteria: readonly QualityCriterion[],
@@ -403,8 +644,8 @@ export function qualityInstructionOf(
     `Bewerte die Qualität von ${named}${forCollection}.`,
     'Gemeint ist genau dieser eine Inhalt. Beurteile NICHT die übrigen Inhalte der Sammlung und nicht die ' +
       'Sammlung als Ganzes.',
-    'Das ist der erste von zwei Schritten; der zweite ist das Anreichern der Metadaten. Der Schritt ist ' +
-      'fertig, wenn die Person deine Bewertung durchgegangen ist und sie bestätigt hat.',
+    'Danach folgt noch ein Schritt: das Anreichern der Metadaten. Dieser hier ist fertig, wenn die Person ' +
+      'deine Bewertung durchgegangen ist und sie bestätigt hat.',
     '',
     'Das sind unsere Prüfdimensionen. Beurteile jede einzeln:',
     criteria.map((item) => `${item.key}: ${item.caption}`).join('\n'),
@@ -429,12 +670,14 @@ export function qualityInstructionOf(
       'steht, erfährt sie nicht.',
     'Bitte sie danach ausdrücklich, dein Urteil durchzugehen und zu bestätigen oder zu korrigieren. Führe sie ' +
       'zu dieser Bestätigung: frag direkt, ob es so stehen bleiben soll, und geh auf ihre Einwände ein.',
+    'Beende deine Nachricht mit dieser Frage und nenne die bestätigende Antwort wörtlich, damit sie ihr als ' +
+      'Antwortvorschlag angeboten werden kann: „Ich bestätige die Bewertung.“',
     'Rufe submit_result ERST auf, wenn sie bestätigt hat — vorher nicht, auch wenn dein Urteil längst fertig ' +
       'ist.',
     'Sobald sie bestätigt: Rufe submit_result in genau diesem Zug auf, mit ihren Korrekturen, falls sie welche ' +
       'hatte, und zu jedem Kriterium erfuellt und begruendung. Eine Bestätigung im Chat allein reicht nicht — ' +
       'ohne diesen Werkzeugaufruf ist das Ergebnis für uns nicht da und es geht nicht weiter. Sag ihr dann, ' +
-      'dass der zweite Schritt folgt: die Metadaten anreichern.',
+      'dass als Nächstes die Metadaten angereichert werden.',
     ''
   ]
     .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')

@@ -334,10 +334,44 @@ Each becomes a `QualityCriterion` with a short key, `k1`, `k2`, …: their own i
 and vocabulary URIs, and as schema keys they would spend the budget on addresses the model has no use
 for.
 
-**The check is two tasks, one after the other**, and the second is not put until the first has
-answered:
+**The check is up to four tasks, one after the other**, and none of them is put until the previous one
+has answered:
 
-1. **Qualität bewerten** (`qualityInstructionOf()`) — the criteria, listed by key and caption and named
+1. **Begrüßen und fragen, wem der Inhalt gehört** (`originInstructionOf()`) — the greeting, one sentence
+   on what is about to happen, and the one question nothing here can answer for itself: is this the
+   person's own content, or someone else's? The panel holds who is logged in and who owns the node, but
+   whoever checks a content is routinely neither its author nor its owner, and the text says nothing
+   about it at all. The task judges nothing and does not read the content. Its schema is a single word,
+   `herkunft`, with `enum: ["eigen", "fremd"]` — enums do reach the model through `submit_result`,
+   measured — and the assistant is told not to fill it in before the person answered. Measured, three
+   turns: the greeting submitted nothing; *„Das ist mein eigener Inhalt"* came back
+   `{"herkunft":"eigen"}` and *„Der Inhalt ist nicht von mir, ich ordne ihn nur ein"*
+   `{"herkunft":"fremd"}`; *„Weiß nicht so genau"* submitted nothing and asked again, which is what the
+   task tells it to do with an unclear answer.
+
+   **The assistant states a guess before it asks**, so the person mostly only has to nod. It is handed
+   three facts the panel holds and the text does not carry: the source URL, whom the content names as
+   author (`ccm:author_freetext`, else `ccm:oeh_publisher_combined`) and who is signed in
+   (`AuthorityNamePipe` over `AuthService.currentUser()`). A foreign host speaks for someone else's
+   content, an author matching the signed-in person for one's own. The guess is kept beside the answer
+   in `vermutung`, never in its place — measured across three runs: a LEIFIphysik source with a
+   LEIFIphysik author guessed `fremd` and was confirmed; an own author with no source guessed `eigen`
+   and was confirmed; and *„Nein, der Inhalt ist von mir, ich habe ihn nur dort veröffentlicht"* came
+   back `{"herkunft":"eigen","vermutung":"fremd"}` — the person's answer won, and the guess is logged
+   beside it so it can be told how often it is worth making.
+2. **Sprache durchsehen** (`proofreadInstructionOf()`) — **only where the answer was `eigen`.** Spelling,
+   grammar, punctuation and wording, against the collection's skills on language or text quality where
+   it has released any. Each finding quotes the passage verbatim and puts the correction beside it,
+   because the person has to find the place in their own text and *„einige Kommafehler"* is not a place.
+   An empty list is an answer and is taken as one. The step is bound to the ownership question because a
+   correction is worth having only where somebody can carry it out: the author of a content can go and
+   fix what this finds, while whoever files someone else's can do nothing with a list of its typos but
+   read it. This task **quotes the content's own text in full** — what it judges is the wording itself,
+   down to the character. Measured on a text with three planted errors: all three found and classified
+   (Rechtschreibung, Zeichensetzung, Zeichensetzung), the confirmation turn `submit`. Nothing of it is
+   recorded on the node — there is no property that holds a correction — so it is logged and left where
+   it is of use, in the chat next to the person's own text.
+3. **Qualität bewerten** (`qualityInstructionOf()`) — the criteria, listed by key and caption and named
    as *our check dimensions*, judged against **every** quality-assurance skill the collection has
    released: the assistant is told to fetch the registry (`get_skill_registry`) and then each
    instruction that speaks to one of those dimensions (`get_skill`). Naming the dimensions is what lets
@@ -345,7 +379,7 @@ answered:
    we hold no criterion for is not dropped and not invented as one either: it goes into the single
    overall verdict, `geeignet`, and is named in the summary. This task **quotes the content's own text
    in full**.
-2. **Metadaten anreichern** (`enrichmentInstructionOf()`) — subject, education level and resource
+4. **Metadaten anreichern** (`enrichmentInstructionOf()`) — subject, education level and resource
    type, each looked up in its WLO vocabulary (`lookup_wlo_vocabulary` with `discipline`,
    `educationalContext`, `lrt`) and answered **with the URI**, plus five to ten keywords. A guessed
    URI does not fail; it quietly matches nothing, which is why the schema says a value that cannot be
@@ -353,12 +387,13 @@ answered:
    softly: there may not be one yet, and a skill that does not exist must not read as a step that
    failed — but where one appears it takes precedence over anything the model would do on its own.
 
-**Both steps end with the person, not with the assistant.** Each task has it write its proposal into the
-chat, ask the person to go through it and confirm or correct it, and call `submit_result` only in the
-turn where they do. So what the panel records is an answer somebody stood behind, and the two
-confirmations are what carry the check from its first step to its second and finally to the footer. The
-panel narrates none of it beside the chat: the assistant is the one thing on this screen that can talk,
-so leading through the two steps is its part. Measured end to end, one session, four turns:
+**Every step ends with the person, not with the assistant.** Each task has it write its proposal into
+the chat, ask the person to go through it and confirm or correct it, and call `submit_result` only in
+the turn where they do. So what the panel records is an answer somebody stood behind, and those
+confirmations are what carry the check from one step to the next and finally to the footer. The panel
+narrates none of it beside the chat: the assistant is the one thing on this screen that can talk, so
+leading through the steps is its part. Measured end to end for the judgement and the enrichment, one
+session, four turns:
 
 | turn | message | `result` |
 |---|---|---|
@@ -380,6 +415,32 @@ ignored by the generator (measured). But the generator reads the answer, and an 
 question about confirming produces chips about confirming: *„Ich bestätige das Urteil zur
 Linsengleichung."* / *„Bewertung zur Linsengleichung korrigieren"*, and *„Ja, Metadaten so übernehmen"*
 / *„Ich möchte die Metadaten korrigieren"*. Not a guarantee — a consequence of what the answer says.
+
+The opening question benefits from this more than anything else does: it is a question with exactly two
+answers, and the generator turns it into exactly two chips — *„Das ist mein eigener Inhalt"* / *„Das ist
+ein fremder Inhalt"* in one run, *„Eigener Inhalt, von mir erstellt"* / *„Fremder Inhalt, den ich nur
+einordne"* in another. The person taps rather than types, without the panel drawing a control for it.
+
+**So the chip is asked for through the answer, which is the only lever there is.** Each of the three
+tasks that end in a confirmation closes with the same line: end on the question, and name the confirming
+answer word for word — *„Ich bestätige die Korrekturen."*, *„Ich bestätige die Bewertung."*, *„Ich
+bestätige die Metadaten."* The assistant writes that sentence out as an *Antwortvorschlag*, the
+generator reads it, and it comes back as the first chip, verbatim:
+
+| step | chips |
+|---|---|
+| language pass | *„Ich bestätige die Korrekturen."* / *„Ich verwerfe die Korrekturen."* |
+| judgement | *„Ich bestätige die Bewertung."* / *„Ich möchte die Bewertung korrigieren."* |
+| enrichment | *„Ich bestätige die Metadaten."* / *„Ich möchte die Metadaten korrigieren."* |
+
+**Writing the sentence out is what does it, not asking for it.** Measured against the same task with one
+line changed — *„Stell die Frage so, dass „Ich bestätige die Bewertung." wörtlich darauf passt, aber
+schreib diesen Satz nicht als Vorschlag aus"* — the answer still ended in **„Soll die Bewertung so
+stehen bleiben?"**, and the chips came back *„Zeig mir weitere Infoblätter zur Optik"* / *„Erstelle ein
+Arbeitsblatt zur Linsengleichung"*: the confirmation was gone. The generator works from the words in the
+answer, so the words have to be there. The panel draws no chip of its own — there would be no way to put
+its answer into the conversation as the person's anyway, since the widget forwards no `sendMessage` and
+`startTask()` shows up under its own *„Auftrag der Seite"* label.
 
 They are asked in turn rather than together because both run under the same iteration and token caps:
 asked at once they compete for them, and whichever the model reaches last is the one that suffers.
@@ -582,7 +643,7 @@ that containing block the chat covers the whole panel.
 |---|---|---|
 | **Strukturierte Qualitätsprüfung** (`quality`) | fixed steps: work through the criteria, confirm, then metadata; writes the quality workflow onto the node; KI only proposes | `features/quality/quality-check-screen/`, `features/quality/quality-criteria/` |
 | The machine judges underneath | no chat at all, plain HTTP scoring: MetaLookUp measures (on by default), ContentJudge runs an LLM pass per scheme (off by default, needs a credential); started right after the content was analysed and read steps later | `services/quality-judge.service.ts`, `metalookup.service.ts`, `content-judge.service.ts`, `util/quality-schemes.ts` |
-| **Individuelle Qualitätsprüfung mit KI** (`ai-quality`) | a dialogue with the assistant about the content and its collection, opened with the criteria as its task and answered in a schema built from them; two steps, each confirmed by the person in the chat, ending in the same record and the same confirmation as the structured check | `features/quality/ai-quality-screen/`, `util/quality-check-request.ts` |
+| **Individuelle Qualitätsprüfung mit KI** (`ai-quality`) | a dialogue with the assistant about the content and its collection, opened with the criteria as its task and answered in a schema built from them; a greeting that asks whose content it is, a language pass on one's own content, then judgement and enrichment, each confirmed by the person in the chat, ending in the same record and the same confirmation as the structured check | `features/quality/ai-quality-screen/`, `util/quality-check-request.ts` |
 
 What separates the first from the last is exactly that it runs through fixed steps — which is why it
 is called the structured one rather than the guided one.

@@ -3,12 +3,17 @@ import { firstValueFrom } from 'rxjs';
 import { HOME_REPOSITORY, MdsDefinition, MdsService } from 'ngx-edu-sharing-api';
 
 import { APP_CONFIG } from '../../../config';
+import { AuthorityNamePipe } from '../../../pipes/authority-name.pipe';
+import { AuthService } from '../../../services/auth.service';
 import { CurationService } from '../../../services/curation.service';
+import { firstString } from '../../../util/mds-values';
 import { PageContext, contentContextOf } from '../../../util/page-context';
 import {
-  CriterionVerdict, EnrichedMetadata, criteriaOf, criteriaPropertiesOf, enrichmentInstructionOf,
-  enrichmentOf, enrichmentPropertiesOf, enrichmentSchemaOf, knockoutSatisfied, qualityInstructionOf,
-  resultSchemaOf, schemaFits, verdictsOf
+  ContentOrigin, CriterionVerdict, EnrichedMetadata, ProofreadResult, criteriaOf, criteriaPropertiesOf,
+  enrichmentInstructionOf, enrichmentOf, enrichmentPropertiesOf, enrichmentSchemaOf, knockoutSatisfied,
+  originGuessOf, originInstructionOf, originOf, originSchemaOf, proofreadInstructionOf, proofreadOf,
+  proofreadSchemaOf,
+  qualityInstructionOf, resultSchemaOf, schemaFits, verdictsOf
 } from '../../../util/quality-check-request';
 import {
   AgentResult, AiAssistantScreenComponent
@@ -16,6 +21,9 @@ import {
 
 /** Log prefix for what this screen makes of the assistant's answer, as everywhere else in the extension. */
 const LOG_QUALITY = '[edu-sharing][quality]';
+
+/** The steps the check runs through, in the order it runs them — see {@link AiQualityScreenComponent.step}. */
+type CheckStep = 'origin' | 'proofread' | 'quality' | 'enrichment' | 'done';
 
 /** What each way a run can end means for the person, where it ended without an answer. */
 const STOPPED: Record<string, string> = {
@@ -32,10 +40,14 @@ const STOPPED: Record<string, string> = {
 // assistant retrieves the skill it checks with by the collection, and reads the content off the title and the
 // text it was erschlossen from.
 //
-// The dialogue leads through two steps, and both end with the person: the assistant judges the quality, has
-// them go through the judgement and confirm it, then enriches the metadata and has them confirm those too.
-// Only a confirmed step is submitted, and only both of them together open the footer's way out. Being the one
-// thing here that can talk, the assistant is what brings them there — the panel says none of it beside it.
+// The dialogue opens with a greeting that asks the one thing nothing here knows: whether the content is the
+// person's own or someone else's. On their own content a pass over spelling and wording follows, since its
+// findings are theirs to act on; on someone else's it is skipped, and the check goes straight on.
+//
+// Then two steps, and both end with the person: the assistant judges the quality, has them go through the
+// judgement and confirm it, then enriches the metadata and has them confirm those too. Only a confirmed step
+// is submitted, and only both of them together open the footer's way out. Being the one thing here that can
+// talk, the assistant is what brings them there — the panel says none of it beside it.
 //
 // It ends in the same record the structured check produces. The criteria are read out of the metadata set and
 // go to the assistant twice over: as the task, so it knows what it is judging, and as the shape of its answer,
@@ -46,9 +58,12 @@ const STOPPED: Record<string, string> = {
   imports: [AiAssistantScreenComponent],
   templateUrl: './ai-quality-screen.component.html',
   styleUrl: './ai-quality-screen.component.scss',
+  providers: [AuthorityNamePipe],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AiQualityScreenComponent {
+  private readonly auth = inject(AuthService);
+  private readonly authorityName = inject(AuthorityNamePipe);
   private readonly curation = inject(CurationService);
   private readonly mdsService = inject(MdsService);
 
@@ -75,6 +90,29 @@ export class AiQualityScreenComponent {
   );
 
   /**
+   * Whom the content names as having made it. The free-text author first, since that is the field an editor
+   * fills in and the one a person would recognise themselves in; the combined publisher stands in for it where
+   * the extraction found an organisation and no person.
+   */
+  private readonly author = computed<string | null>(() => {
+    const metadata = this.curation.editorMetadata();
+    return (
+      firstString(metadata?.['ccm:author_freetext']) ?? firstString(metadata?.['ccm:oeh_publisher_combined'])
+    );
+  });
+
+  /**
+   * Who the panel is acting as, named the way the repository names them everywhere else. Handed over so the
+   * assistant's guess has somebody to hold the content's author against — the two matching is the one clear
+   * sign that a content is the person's own.
+   */
+  private readonly signedIn = computed<string | null>(() => {
+    const user = this.auth.currentUser();
+    const name = user ? this.authorityName.transform(user) : null;
+    return (name === 'invalid' ? null : name) || this.auth.username();
+  });
+
+  /**
    * The metadata set the criteria are defined in — the WLO one, as in the structured check: they are defined
    * nowhere else, and this step exists only where the panel is a WLO one anyway.
    */
@@ -94,19 +132,28 @@ export class AiQualityScreenComponent {
   protected readonly criteria = computed(() => criteriaOf(this.mds()));
 
   /**
-   * Which of the check's two steps is out. The enrichment is not asked for until the judgement is in: both
-   * steps run through the same iteration and token caps, and asked at once they compete for them — the one
-   * the model reaches last is the one that suffers. Asked in turn, each gets a run of its own, and the
-   * enrichment starts from a content whose quality is already established.
+   * Which of the check's steps is out. One at a time, never two at once: they run through the same iteration
+   * and token caps, and asked together they compete for them — the one the model reaches last is the one that
+   * suffers. Asked in turn, each gets a run of its own, and each starts from what the previous one settled.
    *
-   * What moves the step on is the person, through the assistant: each task has it propose in the chat, ask
+   * `origin` is the greeting and its question, and it is what decides whether `proofread` is run at all. What
+   * moves every later step on is the person, through the assistant: each task has it propose in the chat, ask
    * them to go through it, and submit only once they have confirmed — so the answer that lands here is one
    * somebody stood behind. Where they are in the check is therefore said in the conversation, by the one
    * thing on this screen that can talk; the panel does not narrate it a second time beside it.
    *
    * `done` is the end of what the panel asks for; the person can carry the conversation on from there.
    */
-  private readonly step = signal<'quality' | 'enrichment' | 'done'>('quality');
+  private readonly step = signal<CheckStep>('origin');
+
+  /** Whose content this is, as the person answered the opening question; null until they have. */
+  private readonly origin = signal<ContentOrigin | null>(null);
+
+  /**
+   * What the language pass found, on one's own content. Null on someone else's, where the step is not run —
+   * which is a different thing from a pass that found nothing, and the two are told apart by it.
+   */
+  private readonly proofread = signal<ProofreadResult | null>(null);
 
   /** What the enrichment answered; null until it has. */
   private readonly metadata = signal<EnrichedMetadata | null>(null);
@@ -136,13 +183,13 @@ export class AiQualityScreenComponent {
   protected readonly resultSchema = computed<Record<string, unknown> | null>(() => {
     const criteria = this.criteria();
     if (!criteria.length) return null;
-    if (this.step() !== 'quality') {
-      const schema = enrichmentSchemaOf();
-      console.log(`${LOG_QUALITY} the enrichment is asked for in this shape`, {
-        characters: JSON.stringify(schema).length,
-        schema
-      });
-      return schema;
+    const step = this.step();
+    if (step === 'origin') return announced('the opening question is asked in this shape', originSchemaOf());
+    if (step === 'proofread') {
+      return announced('the language pass is asked for in this shape', proofreadSchemaOf());
+    }
+    if (step !== 'quality') {
+      return announced('the enrichment is asked for in this shape', enrichmentSchemaOf());
     }
     const schema = resultSchemaOf(criteria);
     if (schemaFits(schema)) {
@@ -173,13 +220,22 @@ export class AiQualityScreenComponent {
       title: this.curation.contentTitle(),
       text,
       url: this.curation.contentUrl(),
-      collection: this.collection()?.name ?? null
+      collection: this.collection()?.name ?? null,
+      author: this.author(),
+      signedIn: this.signedIn()
     };
     const task =
-      step === 'quality' ? qualityInstructionOf(this.criteria(), subject) : enrichmentInstructionOf(subject);
+      step === 'origin'
+        ? originInstructionOf(subject)
+        : step === 'proofread'
+          ? proofreadInstructionOf(subject)
+          : step === 'quality'
+            ? qualityInstructionOf(this.criteria(), subject)
+            : enrichmentInstructionOf(subject);
+    const quoted = step === 'quality' || step === 'proofread' ? text.length : 0;
     console.log(
       `${LOG_QUALITY} the assistant will be asked this (step ${step}, ${task.length} characters, ` +
-        `${step === 'quality' ? text.length : 0} of them the content's own text)\n${task}`,
+        `${quoted} of them the content's own text)\n${task}`,
     );
     return task;
   });
@@ -212,7 +268,16 @@ export class AiQualityScreenComponent {
    * whole result would drop every other criterion from the record and close the confirmation again.
    */
   protected take(answer: AgentResult): void {
-    if (this.step() !== 'quality') {
+    const step = this.step();
+    if (step === 'origin') {
+      this.takeOrigin(answer);
+      return;
+    }
+    if (step === 'proofread') {
+      this.takeProofread(answer);
+      return;
+    }
+    if (step !== 'quality') {
       this.takeEnrichment(answer);
       return;
     }
@@ -262,6 +327,74 @@ export class AiQualityScreenComponent {
   }
 
   /**
+   * Take the answer to the opening question over — whose content this is, and with it whether the language
+   * pass is run. Nothing about the content itself is settled here; what the turn establishes is who the
+   * person is in relation to it, which is the one thing the panel cannot work out for itself.
+   *
+   * Most turns of this step submit nothing, and that is the step working: the assistant greeted, asked, and
+   * is waiting. An answer arrives once the person has given one.
+   */
+  private takeOrigin(answer: AgentResult): void {
+    const origin = originOf(answer.result);
+    if (!origin) {
+      console.log(`${LOG_QUALITY} ← the turn did not say whose content this is`, {
+        stopReason: answer.stopReason,
+        result: answer.result
+      });
+      this.problem.set(STOPPED[answer.stopReason] ?? null);
+      return;
+    }
+    // Own content is the only case a language pass helps: its author can go and fix what it finds, while
+    // whoever files someone else's can do nothing with a list of its typos but read it.
+    const next = origin === 'eigen' ? 'proofread' : 'quality';
+    const guess = originGuessOf(answer.result);
+    console.log(`${LOG_QUALITY} ← the person calls this ${origin === 'eigen' ? 'their own' : "someone else's"} content`, {
+      origin,
+      // What the assistant took it for beforehand, and whether that held. The guess is made from the source,
+      // the named author and who is signed in; how often it matches is what says whether it is worth making.
+      guess,
+      guessHeld: guess === null ? null : guess === origin,
+      author: this.author(),
+      signedIn: this.signedIn(),
+      next,
+      stopReason: answer.stopReason
+    });
+    this.problem.set(null);
+    this.origin.set(origin);
+    this.step.set(next);
+  }
+
+  /**
+   * Take the language pass over: the places it wants changed, as the person confirmed them. They are kept and
+   * logged, not recorded — there is no property on the content that holds a correction, and the person has
+   * them where they are of use, which is in the chat next to their own text.
+   *
+   * An empty list is an answer and is taken as one: a text with nothing to correct is what this step hopes
+   * for, and it moves the check on exactly like a list of findings does.
+   */
+  private takeProofread(answer: AgentResult): void {
+    const proofread = proofreadOf(answer.result);
+    if (!proofread) {
+      // The ordinary case: the assistant named its corrections and is waiting for the person to go through
+      // them. It submits once they have, and that turn lands here again.
+      console.log(`${LOG_QUALITY} ← the turn proofread nothing`, {
+        stopReason: answer.stopReason,
+        result: answer.result
+      });
+      this.problem.set(STOPPED[answer.stopReason] ?? null);
+      return;
+    }
+    console.log(`${LOG_QUALITY} ← the language pass names ${proofread.findings.length} place(s) to change`, {
+      findings: proofread.findings.map(({ passage, correction, kind }) => `${kind}: ${passage} → ${correction}`),
+      summary: proofread.summary,
+      stopReason: answer.stopReason
+    });
+    this.problem.set(null);
+    this.proofread.set(proofread);
+    this.step.set('quality');
+  }
+
+  /**
    * Take the enriched metadata over — the check's second answer and its last. What it states goes onto the
    * content's own properties, the same ones the metadata step writes: the person has been through these
    * values in the chat and confirmed them, which is what makes them the content's rather than a proposal
@@ -290,6 +423,10 @@ export class AiQualityScreenComponent {
     console.log(`${LOG_QUALITY} ✔ the check is complete`, {
       subject: { title: this.curation.contentTitle(), nodeId: this.curation.activeNode()?.nodeId ?? null },
       collection: this.collection(),
+      origin: this.origin(),
+      // Null where the pass was not run at all, which is what someone else's content means here — a text
+      // that came back clean states an empty list instead.
+      proofread: this.proofread(),
       quality: {
         verdicts: this.verdicts().map(({ criterion, met, reason }) => ({
           criterion: criterion.caption,
@@ -336,6 +473,16 @@ export class AiQualityScreenComponent {
       this.settled.set(true);
     }
   }
+}
+
+/**
+ * A schema, with the line that says what the assistant was asked for. Logged rather than shown: what shape an
+ * answer had to arrive in is the first question about a step that answered nothing, and none of it is on
+ * screen anywhere.
+ */
+function announced(what: string, schema: Record<string, unknown>): Record<string, unknown> {
+  console.log(`${LOG_QUALITY} ${what}`, { characters: JSON.stringify(schema).length, schema });
+  return schema;
 }
 
 /**
