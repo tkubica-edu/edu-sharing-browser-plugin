@@ -4,6 +4,7 @@ import browser from 'webextension-polyfill';
 import { errorMessage } from '../util/errors';
 import { installBundleWindowRedirect } from '../util/bundle-windows';
 import { installDraftRequestGuard } from '../util/bundle-requests';
+import { installBundleLanguage } from '../util/bundle-language';
 import { AuthService } from './auth.service';
 import { MetadataAgentApiService } from './metadata-agent-api.service';
 
@@ -87,6 +88,9 @@ export class WebComponentBundleService {
       // the curation renders a form on — which identifies nothing there. Also a correction that
       // belongs to the bundle rather than to a screen; see installDraftRequestGuard.
       installDraftRequestGuard();
+      // The bundle chooses its language from the user's profile and from the browser, both of which can be
+      // English while the panel around its forms is German only; see installBundleLanguage.
+      installBundleLanguage();
     }
     const { styles, scripts } = await this.entriesOf(bundle);
     for (const href of styles) this.addLink(href);
