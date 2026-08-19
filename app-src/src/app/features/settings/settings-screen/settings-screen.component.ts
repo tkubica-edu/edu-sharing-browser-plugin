@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { APP_CONFIG } from '../../../config';
 import { IconDirective } from '../../../directives/icon.directive';
 import { AuthService } from '../../../services/auth.service';
+import { ChatStyleService } from '../../../services/chat-style.service';
 import { CollectionRecommendationService } from '../../../services/collection-recommendation.service';
 import { ContextRefreshService } from '../../../services/context-refresh.service';
 import { DebugService } from '../../../services/debug.service';
@@ -25,6 +26,7 @@ export class SettingsScreenComponent implements OnDestroy {
   protected readonly auth = inject(AuthService);
   protected readonly debug = inject(DebugService);
   protected readonly devMode = inject(DevModeService);
+  protected readonly chatStyle = inject(ChatStyleService);
   protected readonly recommendations = inject(CollectionRecommendationService);
   protected readonly qualityJudge = inject(QualityJudgeService);
   protected readonly contentJudge = inject(ContentJudgeService);
@@ -122,6 +124,11 @@ export class SettingsScreenComponent implements OnDestroy {
 
   protected setContentJudge(enabled: boolean): void {
     void this.qualityJudge.setContentJudgeEnabled(enabled);
+  }
+
+  /** No condition depends on it, so leaving the settings needs no refresh on its account. */
+  protected setChatStyleOverrides(enabled: boolean): void {
+    void this.chatStyle.setOverridesEnabled(enabled);
   }
 
   protected setContentJudgeAuth(credential: string): void {

@@ -3,8 +3,10 @@ import {
   OnDestroy, computed, effect, inject, input, output, viewChild
 } from '@angular/core';
 
+import { ChatStyleService } from '../../../services/chat-style.service';
 import { ConditionsService } from '../../../services/conditions.service';
 import { loadWebComponentBundle } from '../../../services/web-component-bundle.service';
+import { installChatOverrides } from '../../../util/chat-overrides';
 import { chatSession } from '../../../util/chat-session';
 import { PageContext, pageContextOf, sameSubject } from '../../../util/page-context';
 
@@ -142,6 +144,7 @@ const NO_CONTEXT: PageContext = { page_kind: 'other' };
 })
 export class AiAssistantScreenComponent implements OnDestroy {
   private readonly conditions = inject(ConditionsService);
+  private readonly chatStyle = inject(ChatStyleService);
 
   private readonly host = viewChild.required<ElementRef<HTMLElement>>('host');
 
@@ -309,6 +312,11 @@ export class AiAssistantScreenComponent implements OnDestroy {
     this.host().nativeElement.appendChild(element);
     this.element = element;
     this.trace(`→ <${CHAT_TAG}> appended, the widget now boots`);
+    // Read here rather than watched: the switch is a setting, and reaching the settings closes this screen.
+    if (this.chatStyle.overridesEnabled()) {
+      installChatOverrides(element);
+      this.trace('→ styling corrections go into the widget\'s shadow root');
+    }
     this.openConversation();
   }
 

@@ -22,6 +22,22 @@
   </div>
 </section>
 
+<!-- Korrekturen an der Darstellung des Chat-Widgets; das Panel setzt sie in dessen Shadow-DOM ein. -->
+<section class="es-card">
+  <label class="check">
+    <input type="checkbox" [ngModel]="chatStyle.overridesEnabled()"
+           (ngModelChange)="setChatStyleOverrides($event)" />
+    <span>Chat-Darstellung anpassen</span>
+  </label>
+
+  <p class="desc">
+    Blendet im KI-Chat aus, was zu den Schritten des Panels nicht passt: die Begrüßung des Widgets, den
+    Hinweis „KI-generierte Antwort“ und die Antwortvorschläge nach einer selbst geschriebenen Nachricht
+    sowie die Schaltflächen „Mit WLO-Konto anmelden“ und „Neuer Chat“. Standardmäßig an — ausgeschaltet
+    zeigt sich der Chat so, wie das Widget ihn ausliefert. Gilt ab dem nächsten Öffnen des Chats.
+  </p>
+</section>
+
 <!-- Entwicklung: ersetzt die Antworten der KI-Dienste durch Fixtures. -->
 <section class="es-card">
   <label class="check">

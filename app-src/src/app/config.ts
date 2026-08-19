@@ -184,7 +184,9 @@ export const APP_CONFIG = {
      * fixtures — the literal there has to stay in step with this one
      * (`DEV_MODE_GENERATE_STORAGE_KEY` in background/background.js).
      */
-    devModeGenerate: 'eduSharingDevModeGenerate'
+    devModeGenerate: 'eduSharingDevModeGenerate',
+    /** Whether the chat widget is corrected by our own stylesheet — see ChatStyleService. */
+    chatStyleOverrides: 'eduSharingChatStyleOverrides'
   },
   maxHistory: 200
 };
