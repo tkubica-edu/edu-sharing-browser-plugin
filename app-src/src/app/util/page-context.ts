@@ -119,9 +119,13 @@ export interface CuratedContent {
  * context that names the collection as the page therefore produces a check of the collection, however plainly
  * the task asks about this one content.
  *
- * So the node leads. With one, the context is that content and the collection travels beside it, which is what
- * the assistant looks the skill up by. Without one — a content not yet saved — nothing is named at all: the
- * title and text then reach the model as the page's own text, and the collection is named in the task instead.
+ * So the node leads: with one, `page_kind` is that content and the collection travels beside it as a field of
+ * its own. Without one — a content not yet saved, which is what a run with the writes switched off is — no page
+ * is named, and the title and text reach the model as the page's own text instead.
+ *
+ * The collection is stated either way, because it is not an answer to "which page is this": it is what the
+ * assistant looks the collection's skills up by, and a check that cannot reach them measures the content
+ * against nothing in particular. Only the page identity is withheld where there is no node.
  */
 export function contentContextOf(content: CuratedContent): PageContext {
   const collection = content.collectionId?.trim();
@@ -130,7 +134,7 @@ export function contentContextOf(content: CuratedContent): PageContext {
     page_kind: node ? 'content' : 'other',
     ...addressOf(content.url),
     ...(node ? { node_id: node } : {}),
-    ...(node && collection ? { collection_id: collection } : {}),
+    ...(collection ? { collection_id: collection } : {}),
     ...contentText(content.title, content.text),
     detection_source: 'panel:content'
   };
