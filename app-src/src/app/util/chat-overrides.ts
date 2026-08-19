@@ -13,9 +13,28 @@
 //
 // `.host-bubble` marks a user row the panel wrote itself — the step's instruction — as against one the
 // person sent.
+//
+// One correction is not a rule but a mark: the verdict glyph an answer's criteria lines start with says
+// whether that criterion passed, and no selector can read text, so the classes below are put on the lines
+// from script and coloured by the sheet.
 
 /** Says which `<style>` in the shadow root is ours, so it is installed once per element. */
 const MARKER = 'data-es-chat-overrides';
+
+/** Marks the bold name of a criterion the answer found met, and one it found violated. */
+const MET_CLASS = 'es-verdict-met';
+const VIOLATED_CLASS = 'es-verdict-violated';
+
+/**
+ * The verdict glyphs a criterion line can start with, each with the class its name is then given. Several
+ * per verdict: the check asks for ✓ and ✗, and the assistant reaches for a neighbouring glyph often enough
+ * that a line marked ✔ or ❌ is the same verdict and is coloured as one. An unclear verdict (`?`) is in
+ * neither list and stays in the text colour.
+ */
+const VERDICTS: ReadonlyArray<readonly [className: string, glyphs: readonly string[]]> = [
+  [MET_CLASS, ['✓', '✔', '✅', '☑']],
+  [VIOLATED_CLASS, ['✗', '✘', '❌', '×', '✕', '☒']],
+];
 
 /** How long to wait for the widget's shadow root, and how often to look for it. */
 const ROOT_TIMEOUT_MS = 10_000;
@@ -45,6 +64,16 @@ const CSS = `
 .chat-footer > button.btn-restart {
   display: none;
 }
+
+/* The name of a criterion in an answer's verdict list, in the colour of its verdict: the glyph the line
+   starts with says which one, and markVerdicts puts the class on the line's bold name.
+
+   The panel's own tokens carry through the shadow boundary — custom properties inherit — with the literal
+   they hold as the fallback, so the colours also hold in a document that does not define them. Declared
+   important because the widget colours the text of a bubble and its markdown from its own sheet, which the shadow
+   root may hold as an adopted one — those win a tie on order regardless of where this sheet sits. */
+.${MET_CLASS} { color: var(--es-success, #1e8e5a) !important; }
+.${VIOLATED_CLASS} { color: var(--es-danger, #c0392b) !important; }
 `;
 
 /**
@@ -65,7 +94,7 @@ export function installChatOverrides(element: HTMLElement): void {
   }, ROOT_POLL_MS);
 }
 
-/** Whether the shadow root is there — and carries the sheet once it is. */
+/** Whether the shadow root is there — and carries the sheet and the verdict marking once it is. */
 function attach(element: HTMLElement): boolean {
   const root = element.shadowRoot;
   if (!root) return false;
@@ -74,6 +103,45 @@ function attach(element: HTMLElement): boolean {
     style.setAttribute(MARKER, '');
     style.textContent = CSS;
     root.appendChild(style);
+    observeVerdicts(root);
   }
   return true;
+}
+
+/**
+ * Keep the verdict marking up with the messages: an answer arrives as new rows, and while it streams the
+ * text of a row it is still writing changes under it, so both kinds of change are watched over the whole
+ * tree. Marking is idempotent and reads only what is already in the DOM, so running it again on the rows it
+ * has already seen costs a class that is set to what it holds.
+ *
+ * The observer lives as long as the shadow root does, which is as long as the element: it is dropped with
+ * the tree it watches when the chat is destroyed.
+ */
+function observeVerdicts(root: ShadowRoot): void {
+  markVerdicts(root);
+  new MutationObserver(() => markVerdicts(root)).observe(root, {
+    subtree: true,
+    childList: true,
+    characterData: true,
+  });
+}
+
+/**
+ * Give the bold criterion name in each of an answer's verdict lines the class of that line's verdict.
+ *
+ * The lines are what the check asks the assistant to write — a glyph, the name of the criterion in bold,
+ * then the reason. Markdown renders each as a list item, or as a paragraph where the assistant wrote them
+ * without a list, so both are looked at: the glyph at the start of the line's text decides, and the class
+ * goes on its first bold run. A line beginning with anything else — `?` for an unclear verdict, prose — and
+ * any other bold text in the answer keep the text colour.
+ */
+function markVerdicts(root: ShadowRoot): void {
+  for (const item of Array.from(root.querySelectorAll('.msg-content li, .msg-content p'))) {
+    const name = item.querySelector('strong');
+    if (!name) continue;
+    const glyph = (item.textContent ?? '').trimStart().charAt(0);
+    for (const [className, glyphs] of VERDICTS) {
+      name.classList.toggle(className, glyphs.includes(glyph));
+    }
+  }
 }
