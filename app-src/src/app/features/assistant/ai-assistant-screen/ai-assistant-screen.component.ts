@@ -435,6 +435,13 @@ export class AiAssistantScreenComponent implements OnDestroy {
         console.warn(`${LOG} <${SHELL_TAG}> never rendered — the chat kept its previous page (${reason})`);
         return;
       }
+      // Merged for a screen that states a task, for the reason {@link follow} gives: a replacement is a turn
+      // of the widget's own, and the tasks are what this conversation is made of.
+      if (this.task()) {
+        this.trace(`→ updateContext (${reason}, the screen states a task)`, this.current);
+        element.updateContext?.(this.current);
+        return;
+      }
       this.trace(`→ replaceContext (${reason})`, this.current);
       element.replaceContext?.(this.current);
     });
@@ -471,6 +478,17 @@ export class AiAssistantScreenComponent implements OnDestroy {
    * Hand a page to the widget, if it is a different one. Which method says what kind of change it was: another
    * page is replaced, so the previous page's ids leave the context and the new one can be greeted, while the
    * same page under a changed address is merged in, which keeps the running conversation quiet.
+   *
+   * **A screen that states a task always merges.** Replacing tells the widget the page changed, and it answers
+   * that by starting a turn of its own — it asks the backend about the new context and writes what comes back
+   * into the conversation. In a dialogue whose turns the panel is putting, that is one message nobody asked
+   * for, and it arrives in the middle of a step: such a screen states one content throughout, and what changes
+   * about it are the fields its own steps produce — the node once the content is saved, the collection once one
+   * is picked. Merging is what those are, and it leaves the conversation to the tasks.
+   *
+   * The opening hand-over is the one exception, and it replaces on purpose (see {@link openConversation}): a
+   * resumed session still carries the previous content's ids, and the turn the panel starts in the same breath
+   * is what keeps the widget from greeting that replacement.
    */
   private follow(context: PageContext): void {
     const element = this.element;
@@ -491,8 +509,14 @@ export class AiAssistantScreenComponent implements OnDestroy {
       this.handOverWhenRendered('page changed before the chat was on screen');
       return;
     }
-    const merge = sameSubject(previous, context);
-    this.trace(`→ ${merge ? 'updateContext (same subject, merged)' : 'replaceContext (new page)'}`, {
+    const driven = !!this.task();
+    const merge = driven || sameSubject(previous, context);
+    const how = driven
+      ? 'updateContext (the screen states a task, merged)'
+      : merge
+        ? 'updateContext (same subject, merged)'
+        : 'replaceContext (new page)';
+    this.trace(`→ ${how}`, {
       previous,
       context
     });
