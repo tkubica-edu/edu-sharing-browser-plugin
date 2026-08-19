@@ -186,7 +186,9 @@ export const APP_CONFIG = {
      */
     devModeGenerate: 'eduSharingDevModeGenerate',
     /** Whether the chat widget is corrected by our own stylesheet — see ChatStyleService. */
-    chatStyleOverrides: 'eduSharingChatStyleOverrides'
+    chatStyleOverrides: 'eduSharingChatStyleOverrides',
+    /** What the panel says about the chat's master skill — see ChatSkillService. */
+    chatMasterSkill: 'eduSharingChatMasterSkill'
   },
   maxHistory: 200
 };

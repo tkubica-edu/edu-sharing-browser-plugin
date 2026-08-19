@@ -3,6 +3,7 @@ import {
   OnDestroy, computed, effect, inject, input, output, viewChild
 } from '@angular/core';
 
+import { ChatSkillService } from '../../../services/chat-skill.service';
 import { ChatStyleService } from '../../../services/chat-style.service';
 import { ConditionsService } from '../../../services/conditions.service';
 import { loadWebComponentBundle } from '../../../services/web-component-bundle.service';
@@ -145,6 +146,7 @@ const NO_CONTEXT: PageContext = { page_kind: 'other' };
 export class AiAssistantScreenComponent implements OnDestroy {
   private readonly conditions = inject(ConditionsService);
   private readonly chatStyle = inject(ChatStyleService);
+  private readonly chatSkill = inject(ChatSkillService);
 
   private readonly host = viewChild.required<ElementRef<HTMLElement>>('host');
 
@@ -276,6 +278,7 @@ export class AiAssistantScreenComponent implements OnDestroy {
     const element = document.createElement(CHAT_TAG) as ChatElement;
     this.current = this.subject();
     const schema = this.resultSchema();
+    const masterSkill = this.chatSkill.masterSkillAttribute();
     const attributes: Record<string, string> = {
       'api-url': CHAT_API_URL,
       'embed-mode': 'frameless',
@@ -295,7 +298,11 @@ export class AiAssistantScreenComponent implements OnDestroy {
       // while the widget is busy is dropped without a word. A screen with a task therefore hands the page
       // over itself, in front of the task; see {@link AiAssistantScreenComponent.openConversation}.
       ...(this.task() ? {} : { 'page-context': JSON.stringify(this.current) }),
-      ...(schema ? { 'result-schema': JSON.stringify(schema), engine: AGENT_ENGINE } : {})
+      ...(schema ? { 'result-schema': JSON.stringify(schema), engine: AGENT_ENGINE } : {}),
+      // The widget's master skill, and only where the panel states something about it: the attribute has
+      // three states rather than two, and it is its absence that leaves the skill to the operator's own
+      // configuration. See ChatSkillService.
+      ...(masterSkill ? { 'master-skill': masterSkill } : {})
     };
     this.schema = schema ? JSON.stringify(schema) : null;
     // One line per attribute, and the values whole rather than abbreviated: every one of them is read once

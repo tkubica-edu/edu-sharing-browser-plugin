@@ -38,6 +38,27 @@
   </p>
 </section>
 
+<!-- Der Master-Skill des Chatbots: an, aus oder wie beim Betreiber eingestellt. -->
+<section class="es-card">
+  <h2 id="master-skill-label">Master-Skill des Chatbots</h2>
+
+  <div class="seg" role="group" aria-labelledby="master-skill-label">
+    @for (option of masterSkillOptions; track option.value) {
+      <button type="button" class="seg-btn"
+              [class.is-active]="chatSkill.masterSkill() === option.value"
+              [attr.aria-pressed]="chatSkill.masterSkill() === option.value"
+              (click)="setMasterSkill(option.value)">{{ option.label }}</button>
+    }
+  </div>
+
+  <p class="desc">
+    Ob der Chatbot in den Chats des Panels seinen Master-Skill ausführt. „Vorgabe des Betreibers“ sagt dazu
+    nichts und lässt es bei dem, was am Chatbot-Dienst konfiguriert ist (<code>MASTER_SKILL_ENABLED</code>);
+    „An“ und „Aus“ setzen es für diese Einbettung, unabhängig davon. Standardmäßig die Vorgabe des
+    Betreibers. Gilt ab dem nächsten Öffnen des Chats.
+  </p>
+</section>
+
 <!-- Entwicklung: ersetzt die Antworten der KI-Dienste durch Fixtures. -->
 <section class="es-card">
   <label class="check">

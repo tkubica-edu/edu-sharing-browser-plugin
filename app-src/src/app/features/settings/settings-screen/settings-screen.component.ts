@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { APP_CONFIG } from '../../../config';
 import { IconDirective } from '../../../directives/icon.directive';
 import { AuthService } from '../../../services/auth.service';
+import { ChatSkillService, MasterSkillSetting } from '../../../services/chat-skill.service';
 import { ChatStyleService } from '../../../services/chat-style.service';
 import { CollectionRecommendationService } from '../../../services/collection-recommendation.service';
 import { ContextRefreshService } from '../../../services/context-refresh.service';
@@ -27,6 +28,7 @@ export class SettingsScreenComponent implements OnDestroy {
   protected readonly debug = inject(DebugService);
   protected readonly devMode = inject(DevModeService);
   protected readonly chatStyle = inject(ChatStyleService);
+  protected readonly chatSkill = inject(ChatSkillService);
   protected readonly recommendations = inject(CollectionRecommendationService);
   protected readonly qualityJudge = inject(QualityJudgeService);
   protected readonly contentJudge = inject(ContentJudgeService);
@@ -129,6 +131,21 @@ export class SettingsScreenComponent implements OnDestroy {
   /** No condition depends on it, so leaving the settings needs no refresh on its account. */
   protected setChatStyleOverrides(enabled: boolean): void {
     void this.chatStyle.setOverridesEnabled(enabled);
+  }
+
+  /**
+   * The three states of the master skill, in the order they are offered: the operator's configuration first,
+   * because that is what the panel keeps to unless it is told otherwise.
+   */
+  protected readonly masterSkillOptions: { value: MasterSkillSetting; label: string }[] = [
+    { value: 'operator', label: 'Vorgabe des Betreibers' },
+    { value: 'on', label: 'An' },
+    { value: 'off', label: 'Aus' }
+  ];
+
+  /** Like the other chat switches: read as the next conversation's element is created, so no refresh. */
+  protected setMasterSkill(setting: MasterSkillSetting): void {
+    void this.chatSkill.setMasterSkill(setting);
   }
 
   protected setContentJudgeAuth(credential: string): void {

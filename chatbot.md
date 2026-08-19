@@ -122,6 +122,14 @@ carries no view-encapsulation attribute, so this component's styles would not ma
 fills 100 % of its container in both directions, which means a container without a height leaves it
 silently 0 px tall — hence `min-height`.
 
+`master-skill` is set only where the settings say something about it. The attribute has **three**
+states, not two: `"off"` and `"on"` decide the master skill for this embedding, while leaving the
+attribute off the element altogether is what defers to the operator's own configuration
+(`MASTER_SKILL_ENABLED` at the chatbot service). The settings offer those three as a button group,
+defaulting to the operator's, and `ChatSkillService.masterSkillAttribute()` returns `null` for that
+state so the attribute is never written — an empty value would be read as the same thing by this
+version of the widget only.
+
 Two more are set where a screen wants an answer it can record — `result-schema` and, with it,
 `engine="agent"`. They belong together: under the default engine a schema takes no effect at all, and
 the KI check is the one screen that states them, see

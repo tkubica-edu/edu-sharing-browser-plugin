@@ -10,6 +10,7 @@ import { AuthService } from './services/auth.service';
 import { BrowserExtensionService } from './services/browser-extension.service';
 import { ContentFlowService } from './services/content-flow.service';
 import { BusyService } from './services/busy.service';
+import { ChatSkillService } from './services/chat-skill.service';
 import { ChatStyleService } from './services/chat-style.service';
 import { CollectionRecommendationService } from './services/collection-recommendation.service';
 import { ConditionsService } from './services/conditions.service';
@@ -110,6 +111,7 @@ export class AppComponent implements OnInit {
   private readonly recommendations = inject(CollectionRecommendationService);
   private readonly qualityJudge = inject(QualityJudgeService);
   private readonly chatStyle = inject(ChatStyleService);
+  private readonly chatSkill = inject(ChatSkillService);
   private readonly sessionResume = inject(SessionResumeService);
 
   /** A node received while logged out — opened once the user logs in. */
@@ -180,8 +182,9 @@ export class AppComponent implements OnInit {
     // Which judges are asked, before a content can be judged — a resumed session may start its
     // Erschließung on this boot, and the judgement follows it.
     await this.qualityJudge.load();
-    // Before the assistant screen can mount its chat element, which reads the switch as it creates it.
+    // Before the assistant screen can mount its chat element, which reads both switches as it creates it.
     await this.chatStyle.load();
+    await this.chatSkill.load();
     await this.auth.init();
     await this.history.load();
     const tab = await this.browserExtension.getActiveTab().catch(() => null);

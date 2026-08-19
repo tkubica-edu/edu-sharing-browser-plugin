@@ -217,7 +217,9 @@ visibility, guards and view title.
   `RepositoryNodeService.get`) and opens it; if there is unsaved work the shell confirms first, and a
   failed fetch is surfaced via an alert.
 - **Einstellungen** *(dotted while a change waits to be applied)* — the Repository-URL (used for
-  login and every embedded element), the debug mode and the recommendation settings.
+  login and every embedded element), the debug mode, the recommendation settings and the two chat
+  settings: the corrections to the widget's display, and the chatbot's master skill as *Vorgabe des
+  Betreibers* / *An* / *Aus* (see [chatbot.md](chatbot.md#the-attributes-set-on-mount)).
 - **WLO Metadaten-Agent** — only when the repository config enables it, see
   [WEB-COMPONENTS.md](WEB-COMPONENTS.md#the-optional-wlo-metadata-editor).
 - **Boerdi — KI-Assistent** — the assistant's chat widget, offered as a row above the session bar
