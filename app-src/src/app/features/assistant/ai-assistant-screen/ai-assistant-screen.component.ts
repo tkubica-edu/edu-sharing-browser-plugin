@@ -299,6 +299,9 @@ export class AiAssistantScreenComponent implements OnDestroy {
       'initial-state': 'expanded',
       'show-language-buttons': 'false',
       'show-debug-button': 'false',
+      // The widget's own welcome message, which the panel's steps do not account for: the first message the
+      // person is to read is the one the screen opens with.
+      'show-welcome': 'false',
       // Two of the widget's five reports are silent unless asked for. Asked for here, not because the panel
       // acts on them, but because they are the only account of how a turn was routed and which tools it
       // called — see {@link REPORTED_EVENTS}.

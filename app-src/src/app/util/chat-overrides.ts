@@ -23,18 +23,12 @@ const ROOT_POLL_MS = 50;
 
 const CSS = `
 /* TODO: Replace by updated chatbot version */
-/* The widget's own welcome message, which stands before the first message of the check. Only where the very
-   first row is the bot's: :first-child is a condition on that one row, so a conversation that opens with a
-   user row keeps every bot row it has. */
-.messages-area > .message-row.bot-row:first-child {
-  display: none;
-}
-
-/* TODO: Replace by updated chatbot version */
-/* The assistant's answer to a message the person sent themselves: the AI notice and the widget's suggested
-   replies are dropped there, so the answer stands on its own. */
-.messages-area > .message-row.user-row:not(:has(.host-bubble)) + .message-row.bot-row .ai-notice,
-.messages-area > .message-row.user-row:not(:has(.host-bubble)) + .message-row.bot-row boerdi-quick-replies {
+/* The AI notice and the widget's suggested replies under an answer the check has already moved past: the row
+   after it is the panel's own instruction, so what that answer noted and offered is no longer what the
+   person is being asked. The condition is on the following row, which is what :has(+ …) states — an answer
+   keeps both for as long as it is the last thing said. */
+.messages-area > .message-row.bot-row:has(+ .message-row.user-row:has(.host-bubble)) .ai-notice,
+.messages-area > .message-row.bot-row:has(+ .message-row.user-row:has(.host-bubble)) boerdi-quick-replies {
   display: none;
 }
 
