@@ -60,9 +60,9 @@ export interface QualityCriterion {
  * the content is silent, which reads as a finding about the content instead of one about the check.
  */
 const OUTCOMES = {
-  erfolgreich: true,
-  probleme: false,
-  unklar: null
+  met: true,
+  violated: false,
+  unclear: null
 } as const satisfies Record<string, boolean | null>;
 
 /** The assistant's answer about one criterion. */
@@ -124,57 +124,57 @@ export function resultSchemaOf(criteria: readonly QualityCriterion[]): Record<st
       type: 'object',
       description: item.caption,
       properties: {
-        ergebnis: {
+        outcome: {
           type: 'string',
           enum: Object.keys(OUTCOMES),
           description: 'Das Urteil zu diesem Kriterium.'
         },
-        begruendung: {
+        reason: {
           type: 'string',
           description:
             'Ein bis zwei Sätze, worauf sich das Urteil stützt. Nenne die Stelle im Inhalt, und wo die ' +
             'Anleitung der Sammlung etwas zu diesem Kriterium sagt, beziehe dich darauf.'
         }
       },
-      required: ['ergebnis', 'begruendung']
+      required: ['outcome', 'reason']
     };
   }
   return {
     type: 'object',
     description: 'Das Ergebnis der Qualitätsprüfung: zu jedem Kriterium ein Urteil mit Begründung.',
     properties: {
-      kriterien: {
+      criteria: {
         type: 'object',
         description:
           'Zu jedem Kriterium genau ein Urteil. Kein Kriterium darf fehlen. Das Urteil ist eines von drei ' +
-          'Worten: „erfolgreich“, wenn der Inhalt das Kriterium erfüllt, „probleme“, wenn er es verletzt, ' +
-          'und „unklar“, wenn der Inhalt nichts hergibt, woran sich das entscheiden ließe — dann tragen ' +
-          'wir zu diesem Kriterium nichts ein. Rate nicht: „unklar“ ist die richtige Antwort, wo du ' +
+          'Worten: „met“, wenn der Inhalt das Kriterium erfüllt, „violated“, wenn er es verletzt, ' +
+          'und „unclear“, wenn der Inhalt nichts hergibt, woran sich das entscheiden ließe — dann tragen ' +
+          'wir zu diesem Kriterium nichts ein. Rate nicht: „unclear“ ist die richtige Antwort, wo du ' +
           'weder das eine noch das andere belegen kannst.',
         properties,
         required: criteria.map((item) => item.key)
       },
-      geeignet: {
+      suitable: {
         type: 'boolean',
         description:
           'Dein Gesamturteil: true, wenn der Inhalt für den Einsatz in Bildung geeignet ist. Über alle ' +
           'Kriterien hinweg und einschließlich dessen, was die Anleitungen der Sammlung sonst noch prüfen ' +
           'und wofür es hier kein eigenes Kriterium gibt.'
       },
-      zusammenfassung: {
+      summary: {
         type: 'string',
         description:
           'Zwei bis drei Sätze: Was steht der Freigabe im Weg, und was wäre als Nächstes zu tun? Nenne ' +
           'hier auch, was eine Anleitung geprüft hat, wofür es kein eigenes Kriterium gibt.'
       },
-      bestaetigt: {
+      confirmed: {
         type: 'boolean',
         description:
           'Nur true, wenn die Person deine Bewertung im Chat durchgegangen ist und ihr zugestimmt hat. ' +
           'Solange sie nicht geantwortet hat: false — dann gilt der Schritt als offen und es geht nicht weiter.'
       }
     },
-    required: ['kriterien', 'geeignet', 'bestaetigt']
+    required: ['criteria', 'suitable', 'confirmed']
   };
 }
 
@@ -183,7 +183,7 @@ export function resultSchemaOf(criteria: readonly QualityCriterion[]): Record<st
  * over spelling and wording is worth doing. On one's own content its findings are something the person can go
  * and fix; on someone else's they are a list of complaints about a text nobody here can touch.
  */
-export type ContentOrigin = 'eigen' | 'fremd';
+export type ContentOrigin = 'own' | 'external';
 
 /**
  * The shape the opening question is answered in: one word, and expressly not one the assistant works out for
@@ -195,23 +195,23 @@ export function originSchemaOf(): Record<string, unknown> {
     type: 'object',
     description: 'Wem der Inhalt gehört — so, wie die Person es beantwortet hat.',
     properties: {
-      herkunft: {
+      origin: {
         type: 'string',
-        enum: ['eigen', 'fremd'],
+        enum: ['own', 'external'],
         description:
-          '„eigen“, wenn die Person den Inhalt selbst erstellt hat oder für ihn verantwortlich ist. ' +
-          '„fremd“, wenn er von jemand anderem stammt und sie ihn nur einordnet. Trag nur ein, was sie ' +
+          '„own“, wenn die Person den Inhalt selbst erstellt hat oder für ihn verantwortlich ist. ' +
+          '„external“, wenn er von jemand anderem stammt und sie ihn nur einordnet. Trag nur ein, was sie ' +
           'geantwortet hat — rate nicht und leite es nicht aus dem Inhalt ab.'
       },
-      vermutung: {
+      guess: {
         type: 'string',
-        enum: ['eigen', 'fremd'],
+        enum: ['own', 'external'],
         description:
           'Wovon du selbst ausgegangen bist, bevor die Person geantwortet hat. Ihre Antwort steht in ' +
-          'herkunft und gilt — auch dann, wenn sie deiner Vermutung widerspricht.'
+          'origin und gilt — auch dann, wenn sie deiner Vermutung widerspricht.'
       }
     },
-    required: ['herkunft']
+    required: ['origin']
   };
 }
 
@@ -263,15 +263,15 @@ export function originInstructionOf(subject: CheckSubject): string {
       'Vorschläge, keine Vorgabe — sie darf auch mit eigenen Worten antworten, verlang also nicht genau diese ' +
       'Worte zurück.',
     'Beurteile in diesem Zug nichts und lies den Inhalt nicht. Es geht allein um diese Frage.',
-    'Warte ihre Antwort ab. Rufe submit_result ERST auf, wenn sie geantwortet hat — mit herkunft="eigen" ' +
-      'oder herkunft="fremd" und deiner Vermutung in vermutung. Setz herkunft nicht auf deine Vermutung.',
+    'Warte ihre Antwort ab. Rufe submit_result ERST auf, wenn sie geantwortet hat — mit origin="own" ' +
+      'oder origin="external" und deiner Vermutung in guess. Setz origin nicht auf deine Vermutung.',
     'Ist die Antwort unklar, frag nach, statt dich selbst zu entscheiden.'
   ].join('\n');
 }
 
 /** Whose content the opening question established; null where the turn did not say. */
 export function originOf(result: unknown): ContentOrigin | null {
-  return originIn(asRecord(result)?.['herkunft']);
+  return originIn(asRecord(result)?.['origin']);
 }
 
 /**
@@ -280,13 +280,13 @@ export function originOf(result: unknown): ContentOrigin | null {
  * way to find out whether it is worth making.
  */
 export function originGuessOf(result: unknown): ContentOrigin | null {
-  return originIn(asRecord(result)?.['vermutung']);
+  return originIn(asRecord(result)?.['guess']);
 }
 
 function originIn(stated: unknown): ContentOrigin | null {
   if (typeof stated !== 'string') return null;
   const answer = stated.trim().toLowerCase();
-  return answer === 'eigen' || answer === 'fremd' ? answer : null;
+  return answer === 'own' || answer === 'external' ? answer : null;
 }
 
 /** One place the language pass wants changed. */
@@ -295,7 +295,7 @@ export interface ProofreadFinding {
   passage: string;
   /** What it is to say instead. */
   correction: string;
-  /** What is wrong with it — Rechtschreibung, Grammatik, Zeichensetzung; empty where it said none. */
+  /** What is wrong with it — spelling, grammar or punctuation; empty where it said none. */
   kind: string;
 }
 
@@ -316,7 +316,7 @@ export interface ProofreadResult {
 }
 
 /** What the person did with the places the pass named. */
-export type ProofreadDecision = 'uebernommen' | 'uebersprungen';
+export type ProofreadDecision = 'accepted' | 'skipped';
 
 /**
  * The shape the language pass is answered in: the passages to change, each quoted and each with what it is to
@@ -331,7 +331,7 @@ export function proofreadSchemaOf(): Record<string, unknown> {
     type: 'object',
     description: 'Das Ergebnis der sprachlichen Durchsicht: jede Stelle, die zu korrigieren ist.',
     properties: {
-      befunde: {
+      findings: {
         type: 'array',
         description:
           'Eine Stelle je Eintrag, in der Reihenfolge, in der sie im Text vorkommen. Leere Liste, wenn ' +
@@ -339,39 +339,41 @@ export function proofreadSchemaOf(): Record<string, unknown> {
         items: {
           type: 'object',
           properties: {
-            stelle: {
+            passage: {
               type: 'string',
               description: 'Der Wortlaut der Stelle, wörtlich wie im Inhalt, damit sie wiederzufinden ist.'
             },
-            korrektur: { type: 'string', description: 'Wie die Stelle stattdessen lauten soll.' },
-            art: {
+            correction: { type: 'string', description: 'Wie die Stelle stattdessen lauten soll.' },
+            kind: {
               type: 'string',
               // Closed on purpose: these three are the whole of what this step looks at, and a finding
               // that fits none of them is one about the subject matter — which the criteria judge, not
               // this pass (see {@link proofreadInstructionOf}).
-              enum: ['Rechtschreibung', 'Grammatik', 'Zeichensetzung'],
-              description: 'Was daran zu ändern ist: Rechtschreibung, Grammatik oder Zeichensetzung.'
+              enum: ['spelling', 'grammar', 'punctuation'],
+              description:
+                'Was daran zu ändern ist: „spelling“ für die Rechtschreibung, „grammar“ für die ' +
+                'Grammatik, „punctuation“ für die Zeichensetzung.'
             }
           },
-          required: ['stelle', 'korrektur', 'art']
+          required: ['passage', 'correction', 'kind']
         }
       },
-      fazit: {
+      summary: {
         type: 'string',
         description: 'Ein bis zwei Sätze zum Text als Ganzem: Wie steht es um Sprache und Rechtschreibung?'
       },
-      entscheidung: {
+      decision: {
         type: 'string',
-        enum: ['offen', 'uebernommen', 'uebersprungen'],
+        enum: ['open', 'accepted', 'skipped'],
         description:
-          'Was die Person entschieden hat: „uebernommen“, wenn sie die Korrekturen annimmt und selbst in ' +
-          'ihren Text einträgt, „uebersprungen“, wenn der Text vorerst so bleiben soll. Solange sie nicht ' +
-          'geantwortet hat: „offen“ — dann gilt der Schritt als offen und es geht nicht weiter. Du selbst ' +
+          'Was die Person entschieden hat: „accepted“, wenn sie die Korrekturen annimmt und selbst in ' +
+          'ihren Text einträgt, „skipped“, wenn der Text vorerst so bleiben soll. Solange sie nicht ' +
+          'geantwortet hat: „open“ — dann gilt der Schritt als offen und es geht nicht weiter. Du selbst ' +
           'änderst den Text nicht und gibst die Korrekturen auch nirgends weiter; beide Antworten sind ' +
           'nur ihre Entscheidung, was sie damit vorhat.'
       }
     },
-    required: ['befunde', 'entscheidung']
+    required: ['findings', 'decision']
   };
 }
 
@@ -434,11 +436,11 @@ export function proofreadInstructionOf(subject: CheckSubject): string {
       'Antwortvorschläge angeboten werden: „Ich bestätige die Korrekturen.“ und „Korrekturen überspringen“. ' +
       'Das sind Vorschläge, keine Vorgabe — sie darf auch mit eigenen Worten antworten.',
     'Rufe submit_result ERST auf, wenn sie geantwortet hat — mit den gefundenen Stellen und mit ' +
-      'entscheidung="uebernommen" oder entscheidung="uebersprungen", je nachdem, was sie gesagt hat. In dem ' +
+      'decision="accepted" oder decision="skipped", je nachdem, was sie gesagt hat. In dem ' +
       'Zug, in dem du die Korrekturen nennst, rufst du es nicht auf: dieser Zug endet mit der Frage. Ohne den ' +
       'Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.',
-    'Sag ihr danach in einem Satz, wie es steht — bei „uebernommen“, dass sie die Stellen in ihrem Text ' +
-      'nachziehen kann, bei „uebersprungen“, dass der Text unverändert bleibt — und dass als Nächstes die ' +
+    'Sag ihr danach in einem Satz, wie es steht — bei „accepted“, dass sie die Stellen in ihrem Text ' +
+      'nachziehen kann, bei „skipped“, dass der Text unverändert bleibt — und dass als Nächstes die ' +
       'Qualitätsprüfung folgt. Sag in keinem der beiden Fälle, der Text sei geändert worden.',
     ''
   ]
@@ -468,7 +470,7 @@ const PROOFREAD_REMINDER = [
     'dabei aus: „Ich bestätige die Korrekturen.“ und „Korrekturen überspringen“.',
   '- Du änderst den Text nicht und gibst nichts weiter. Sag nie, etwas sei korrigiert oder übernommen worden.',
   '- Rufe submit_result in diesem Zug nicht auf. Erst wenn die Person geantwortet hat, und dann mit ' +
-    'entscheidung="uebernommen" oder entscheidung="uebersprungen".'
+    'decision="accepted" oder decision="skipped".'
 ].join('\n');
 
 /**
@@ -478,27 +480,27 @@ const PROOFREAD_REMINDER = [
  */
 export function proofreadOf(result: unknown): ProofreadResult | null {
   const answer = asRecord(result);
-  const stated = answer?.['befunde'];
+  const stated = answer?.['findings'];
   if (!Array.isArray(stated)) return null;
   const findings: ProofreadFinding[] = [];
   for (const entry of stated) {
     const finding = asRecord(entry);
-    const passage = typeof finding?.['stelle'] === 'string' ? finding['stelle'].trim() : '';
-    const correction = typeof finding?.['korrektur'] === 'string' ? finding['korrektur'].trim() : '';
+    const passage = typeof finding?.['passage'] === 'string' ? finding['passage'].trim() : '';
+    const correction = typeof finding?.['correction'] === 'string' ? finding['correction'].trim() : '';
     if (!passage || !correction) continue;
     findings.push({
       passage,
       correction,
-      kind: typeof finding?.['art'] === 'string' ? finding['art'].trim() : ''
+      kind: typeof finding?.['kind'] === 'string' ? finding['kind'].trim() : ''
     });
   }
-  const summary = answer?.['fazit'];
-  const decision = answer?.['entscheidung'];
+  const summary = answer?.['summary'];
+  const decision = answer?.['decision'];
   return {
     findings,
     summary: typeof summary === 'string' ? summary.trim() : '',
     decision:
-      decision === 'uebernommen' || decision === 'uebersprungen' ? decision : null
+      decision === 'accepted' || decision === 'skipped' ? decision : null
   };
 }
 
@@ -609,14 +611,14 @@ export function enrichmentSchemaOf(): Record<string, unknown> {
         description: 'Schlagworte, mit denen der Inhalt gefunden werden soll. Fünf bis zehn, aus dem Inhalt selbst.',
         items: { type: 'string' }
       },
-      bestaetigt: {
+      confirmed: {
         type: 'boolean',
         description:
           'Nur true, wenn die Person die Werte im Chat durchgegangen ist und ihnen zugestimmt hat. Solange ' +
           'sie nicht geantwortet hat: false — dann gilt der Schritt als offen und der Vorschlag steht noch aus.'
       }
     },
-    required: [...VOCABULARY_FIELD_NAMES, 'keywords', 'bestaetigt']
+    required: [...VOCABULARY_FIELD_NAMES, 'keywords', 'confirmed']
   };
 }
 
@@ -672,7 +674,7 @@ export function enrichmentInstructionOf(subject: CheckSubject): string {
       'als Antwortvorschlag angeboten werden kann: „Ich bestätige die Metadaten.“ Das ist ein Vorschlag, keine Vorgabe — ' +
       'verlang nicht, dass sie mit genau diesem Satz antwortet.',
     'Rufe submit_result ERST auf, wenn sie bestätigt hat — mit ihren Korrekturen, falls sie welche hatte, und ' +
-      'mit bestaetigt=true. In dem Zug, in dem du die Werte vorschlägst, rufst du es nicht auf: dieser Zug ' +
+      'mit confirmed=true. In dem Zug, in dem du die Werte vorschlägst, rufst du es nicht auf: dieser Zug ' +
       'endet mit der Frage. Ohne den Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.',
     'Sag ihr danach, dass alle Schritte erledigt sind und sie unten im Panel mit „Abschließen und zur ' +
       'Inhaltsübersicht“ fertig wird.'
@@ -713,7 +715,7 @@ export function enrichmentOf(result: unknown): EnrichedMetadata | null {
     lrt: list('lrt'),
     intendedEndUserRole: list('intendedEndUserRole'),
     keywords: keywords.map((entry) => entry.trim()),
-    confirmed: answer['bestaetigt'] === true
+    confirmed: answer['confirmed'] === true
   };
   // Nothing at all is not an enrichment: an answer about a different question would otherwise be recorded
   // as one whose every field happened to be empty.
@@ -873,13 +875,13 @@ export function qualityInstructionOf(
       : '',
     collection
       ? 'Prüft eine Anleitung etwas, wofür es oben keine Dimension gibt, dann ordne es der nächstliegenden ' +
-        'zu, wenn es dorthin gehört. Gehört es nirgends hin, lass es in dein Gesamturteil (geeignet) ' +
+        'zu, wenn es dorthin gehört. Gehört es nirgends hin, lass es in dein Gesamturteil (suitable) ' +
         'einfließen und sag es in der Zusammenfassung — als eigenes Kriterium können wir es nicht führen.'
       : '',
-    'Zu jedem Kriterium gibt es drei mögliche Ergebnisse: „erfolgreich“, wenn der Inhalt es erfüllt, ' +
-      '„probleme“, wenn er es verletzt, und „unklar“, wenn der Inhalt nichts hergibt, woran sich das ' +
+    'Zu jedem Kriterium gibt es drei mögliche Ergebnisse: „met“, wenn der Inhalt es erfüllt, ' +
+      '„violated“, wenn er es verletzt, und „unclear“, wenn der Inhalt nichts hergibt, woran sich das ' +
       'entscheiden ließe.',
-    'Rate nicht: sag „unklar“, statt dich für eine der beiden Seiten zu entscheiden. Bei „unklar“ tragen wir ' +
+    'Rate nicht: sag „unclear“, statt dich für eine der beiden Seiten zu entscheiden. Bei „unclear“ tragen wir ' +
       'zu diesem Kriterium nichts ein — die Begründung sagt dann, was zum Prüfen gefehlt hat.',
     'Sag am Ende außerdem, ob der Inhalt für den Einsatz in Bildung geeignet ist — dein Gesamturteil über ' +
       'alle Dimensionen und alles, was die Anleitungen sonst noch prüfen.',
@@ -897,7 +899,7 @@ export function qualityInstructionOf(
     'Rufe submit_result ERST auf, wenn sie bestätigt hat — vorher nicht, auch wenn dein Urteil längst fertig ' +
       'ist.',
     'Sobald sie bestätigt: Rufe submit_result in genau diesem Zug auf, mit ihren Korrekturen, falls sie welche ' +
-      'hatte, mit bestaetigt=true und zu jedem Kriterium ergebnis und begruendung. Eine Bestätigung im Chat ' +
+      'hatte, mit confirmed=true und zu jedem Kriterium outcome und reason. Eine Bestätigung im Chat ' +
       'allein reicht nicht — ohne diesen Werkzeugaufruf ist das Ergebnis für uns nicht da und es geht nicht ' +
       'weiter. Sag ihr dann, dass als Nächstes die Metadaten angereichert werden.',
     ''
@@ -922,7 +924,7 @@ const QUALITY_REMINDER = [
   '- Schreib dein Urteil in den Chat und beende deine Nachricht mit der Frage, ob es so stehen bleiben soll. ' +
     'Schreib die Antwort „Ich bestätige die Bewertung.“ dabei aus.',
   '- Rufe submit_result in diesem Zug nicht auf. Erst wenn die Person geantwortet hat, und dann mit ' +
-    'bestaetigt=true.'
+    'confirmed=true.'
 ].join('\n');
 
 /**
@@ -972,25 +974,25 @@ export function verdictsOf(
   criteria: readonly QualityCriterion[]
 ): QualityCheckResult {
   const answer = asRecord(result);
-  const answered = asRecord(answer?.['kriterien']);
+  const answered = asRecord(answer?.['criteria']);
   const verdicts: CriterionVerdict[] = [];
   for (const criterion of criteria) {
     const entry = asRecord(answered?.[criterion.key]);
-    const stated = entry?.['ergebnis'];
+    const stated = entry?.['outcome'];
     // Anything but one of the three answers is no answer: the criterion stays as it stood, which is what
     // an assistant that skipped it left behind.
     if (typeof stated !== 'string' || !(stated.trim().toLowerCase() in OUTCOMES)) continue;
     const met = OUTCOMES[stated.trim().toLowerCase() as keyof typeof OUTCOMES];
-    const reason = entry?.['begruendung'];
+    const reason = entry?.['reason'];
     verdicts.push({ criterion, met, reason: typeof reason === 'string' ? reason.trim() : '' });
   }
-  const summary = answer?.['zusammenfassung'];
-  const suitable = answer?.['geeignet'];
+  const summary = answer?.['summary'];
+  const suitable = answer?.['suitable'];
   return {
     verdicts,
     summary: typeof summary === 'string' ? summary.trim() : '',
     suitable: typeof suitable === 'boolean' ? suitable : null,
-    confirmed: answer?.['bestaetigt'] === true
+    confirmed: answer?.['confirmed'] === true
   };
 }
 

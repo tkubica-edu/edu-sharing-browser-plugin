@@ -406,9 +406,9 @@ export class AiQualityScreenComponent implements OnDestroy {
     }
     // Own content is the only case a language pass helps: its author can go and fix what it finds, while
     // whoever files someone else's can do nothing with a list of its typos but read it.
-    const next = origin === 'eigen' ? 'proofread' : 'quality';
+    const next = origin === 'own' ? 'proofread' : 'quality';
     const guess = originGuessOf(answer.result);
-    console.log(`${LOG_QUALITY} ← the person calls this ${origin === 'eigen' ? 'their own' : "someone else's"} content`, {
+    console.log(`${LOG_QUALITY} ← the person calls this ${origin === 'own' ? 'their own' : "someone else's"} content`, {
       origin,
       // What the assistant took it for beforehand, and whether that held. The guess is made from the source,
       // the named author and who is signed in; how often it matches is what says whether it is worth making.

@@ -364,11 +364,11 @@ has answered:
    person's own content, or someone else's? The panel holds who is logged in and who owns the node, but
    whoever checks a content is routinely neither its author nor its owner, and the text says nothing
    about it at all. The task judges nothing and does not read the content. Its schema is a single word,
-   `herkunft`, with `enum: ["eigen", "fremd"]` — enums do reach the model through `submit_result`,
+   `origin`, with `enum: ["own", "external"]` — enums do reach the model through `submit_result`,
    measured — and the assistant is told not to fill it in before the person answered. Measured, three
    turns: the greeting submitted nothing; *„Das ist mein eigener Inhalt"* came back
-   `{"herkunft":"eigen"}` and *„Der Inhalt ist nicht von mir, ich ordne ihn nur ein"*
-   `{"herkunft":"fremd"}`; *„Weiß nicht so genau"* submitted nothing and asked again, which is what the
+   `{"origin":"own"}` and *„Der Inhalt ist nicht von mir, ich ordne ihn nur ein"*
+   `{"origin":"external"}`; *„Weiß nicht so genau"* submitted nothing and asked again, which is what the
    task tells it to do with an unclear answer.
 
    **The assistant states a guess before it asks**, so the person mostly only has to nod. It is handed
@@ -376,12 +376,12 @@ has answered:
    author (`ccm:author_freetext`, else `ccm:oeh_publisher_combined`) and who is signed in
    (`AuthorityNamePipe` over `AuthService.currentUser()`). A foreign host speaks for someone else's
    content, an author matching the signed-in person for one's own. The guess is kept beside the answer
-   in `vermutung`, never in its place — measured across three runs: a LEIFIphysik source with a
-   LEIFIphysik author guessed `fremd` and was confirmed; an own author with no source guessed `eigen`
+   in `guess`, never in its place — measured across three runs: a LEIFIphysik source with a
+   LEIFIphysik author guessed `external` and was confirmed; an own author with no source guessed `own`
    and was confirmed; and *„Nein, der Inhalt ist von mir, ich habe ihn nur dort veröffentlicht"* came
-   back `{"herkunft":"eigen","vermutung":"fremd"}` — the person's answer won, and the guess is logged
+   back `{"origin":"own","guess":"external"}` — the person's answer won, and the guess is logged
    beside it so it can be told how often it is worth making.
-2. **Sprache durchsehen** (`proofreadInstructionOf()`) — **only where the answer was `eigen`.** Spelling,
+2. **Sprache durchsehen** (`proofreadInstructionOf()`) — **only where the answer was `own`.** Spelling,
    grammar and punctuation, against the collection's skills on language where it has released any. Language
    and nothing else: the task rules out anything about the subject matter — whether a statement, formula,
    figure or source is correct, and equally completeness, level, didactics and structure — because that is
@@ -394,11 +394,11 @@ has answered:
    turn, without the closing question — the quoted text is the longest part of the task and the last thing
    read before the answer, and a text that argues for itself beats a rule standing thousands of characters
    above it. So the rules are repeated **behind the quoted text** (`PROOFREAD_REMINDER`), where they are what
-   the run reads last, and `art` is a **closed enum** — `Rechtschreibung` / `Grammatik` / `Zeichensetzung` —
+   the run reads last, and `kind` is a **closed enum** — `spelling` / `grammar` / `punctuation` —
    so a factual finding has no category to be filed under.
 
-   **The step ends on a decision, and skipping is one of them.** The schema carries `entscheidung` —
-   `uebernommen` / `uebersprungen` / `offen` — and only the first two move the check on: a pass that submits
+   **The step ends on a decision, and skipping is one of them.** The schema carries `decision` —
+   `accepted` / `skipped` / `open` — and only the first two move the check on: a pass that submits
    its findings in the same turn as it names them has asked nobody anything, and the panel used to walk on
    past the person. Undecided, the findings are kept and logged and the step stays open; the schema stands for
    every turn, so the assistant submits again once they have answered. **Skipping exists because nothing here
@@ -422,7 +422,7 @@ has answered:
    instruction that speaks to one of those dimensions (`get_skill`). Naming the dimensions is what lets
    it pick — asked for "the collection's instruction" it fetches one, or none. What a skill checks that
    we hold no criterion for is not dropped and not invented as one either: it goes into the single
-   overall verdict, `geeignet`, and is named in the summary. This task **quotes the content's own text
+   overall verdict, `suitable`, and is named in the summary. This task **quotes the content's own text
    in full**.
 4. **Metadaten anreichern** (`enrichmentInstructionOf()`) — subject, education level, resource type
    and intended target groups, each looked up in its WLO vocabulary (`lookup_wlo_vocabulary` with
@@ -458,7 +458,7 @@ skill (*„[ edu-sharing Skill ] Vertretungsstunde planen"*) and submitted nothi
 with the header came back `submit` with all twelve criteria. The panel sets `engine="agent"` together
 with the schema, so every turn of the check runs the agent, not only the one that carries the task.
 
-**Every step's confirmation is machine-checked, not assumed.** Each schema carries a `bestaetigt` flag, and
+**Every step's confirmation is machine-checked, not assumed.** Each schema carries a `confirmed` flag, and
 the panel walks on only where it came back `true`: measured, a task that ends in a question is not enough on
 its own — the judgement arrived proposed and submitted in one turn, and the panel moved to the enrichment
 past a person who had said nothing. Unconfirmed answers are kept, recorded where they belong and logged, and
@@ -479,7 +479,7 @@ answers, and the generator turns it into exactly two chips. Left to itself it wo
 *„Das ist mein eigener Inhalt"* / *„Das ist ein fremder Inhalt"* in one, *„Eigener Inhalt, von mir
 erstellt"* / *„Fremder Inhalt, den ich nur einordne"* in another — so the task names both answers instead
 and gets the same two every time: **„Inhalt selbst erstellt"** / **„Fremder Inhalt"**, measured across
-runs whose guess pointed either way, and tapping either one submits `herkunft` accordingly with the guess
+runs whose guess pointed either way, and tapping either one submits `origin` accordingly with the guess
 beside it. The person taps rather than types, without the panel drawing a control for it.
 
 **Where the two answers stand in the message decides whether both come back.** Named in a line of their
@@ -555,14 +555,14 @@ the 10 000 characters a message may hold. Where the panel holds no text at all �
 erschließen itself — the address takes its place, with the instruction to fetch it (`get_url_text`)
 before judging; a check made on a title alone is worthless.
 
-**The shape** (`resultSchemaOf()`) is an object with one entry per criterion, each `{ergebnis,
-begruendung}`, every key required, plus `geeignet` — one boolean over the whole content — and a
-summary. `ergebnis` is one of three words rather than a yes-or-no: `erfolgreich`, `probleme`, and
-`unklar` for a criterion the content does not settle — which records nothing at all, holds the
+**The shape** (`resultSchemaOf()`) is an object with one entry per criterion, each `{outcome,
+reason}`, every key required, plus `suitable` — one boolean over the whole content — and a
+summary. `outcome` is one of three words rather than a yes-or-no: `met`, `violated`, and
+`unclear` for a criterion the content does not settle — which records nothing at all, holds the
 confirmation back, and keeps its reasoning. Without that third word a check may only answer no where it
 cannot tell, which reads as a finding about the content instead of one about the check; measured on a
-content quoted in excerpt, the assistant answered six of twelve criteria `unklar`, licence and
-accessibility among them. `geeignet` is required too, and it is the only place a collection's own requirements can land
+content quoted in excerpt, the assistant answered six of twelve criteria `unclear`, licence and
+accessibility among them. `suitable` is required too, and it is the only place a collection's own requirements can land
 where the metadata set holds no field for them: the criteria are what the repository can record, and
 *für Bildung geeignet / ungeeignet* is what is left to say about everything else. An object rather than a list, because a list invites an answer
 about the criteria that were easy to judge — and a check that quietly skipped half of them reads
@@ -577,8 +577,8 @@ written as such — and the criteria captions in them come from the repository's
 is also what the check is supposed to measure against.
 
 **The answer back.** `verdictsOf()` reads the result defensively: it comes from another project
-through a schema that constrains but does not guarantee, and an entry whose `ergebnis` is none of the
-three words is dropped rather than read as "not met" — which is a different thing from `unklar`, the
+through a schema that constrains but does not guarantee, and an entry whose `outcome` is none of the
+three words is dropped rather than read as "not met" — which is a different thing from `unclear`, the
 answer that says so itself. `criteriaPropertiesOf()` then turns the verdicts into the very
 properties the structured check writes — a met knock-out criterion as the machine's all-clear where
 its valuespace states one, exactly as a judge's finding is recorded, because the assistant *is* a
