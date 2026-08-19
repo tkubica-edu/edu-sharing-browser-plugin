@@ -235,8 +235,8 @@ must not read as a step that failed.
 
 ### The content block
 
-Both text-quoting tasks append the content verbatim, cut to what is left of `TASK_MAX` after head, tail
-and a 200-character reserve:
+Both text-quoting tasks append the content verbatim, cut to what is left of the request bound after head,
+tail and a 200-character reserve:
 
 ```
 Hier ist der Inhalt im Wortlaut:
@@ -487,7 +487,7 @@ and opens it.
 | Constant | Value | Bounds |
 |---|---|---|
 | `SCHEMA_MAX` | 10 000 chars | what the backend accepts as `result-schema`; beyond it the request is refused outright |
-| `TASK_MAX` | 10 000 chars | our own bound on the instruction, which is what the quoted text is cut to fit |
+| the request bound | a **setting** — *Länge einer KI-Anfrage*; default `APP_CONFIG.assistantRequestMaxCharacters` = 10 000, range `TASK_MIN` 1 000 … `TASK_LIMIT` 100 000 | our own bound on the instruction, which is what the quoted text is cut to fit |
 | `CONTENT_TEXT_MAX` | 8 000 chars | the content's text in `page_text` |
 | `TEXT_MAX` | 300 chars | a tab title in `page_text` |
 | `QUERY_MIN` / `QUERY_MAX` | 2 / 200 chars | a search term worth passing on |
@@ -496,7 +496,12 @@ and opens it.
 | a run | 90 s, 12 iterations | the backend's caps, reported as `deadline` / `max_iterations` |
 
 The instruction travels as `host_instruction` in the request's environment, a field declared without a
-length limit — `TASK_MAX` protects the *prompt* the model reads, not the API.
+length limit — the bound protects the *prompt* the model reads, not the API. That is why it is the one
+limit here that is set rather than fixed: the settings screen offers it as *Länge einer KI-Anfrage*
+(`AssistantRequestService`, persisted), and a longer request buys a longer excerpt of a long content at
+the price of the run's token budget. `boundedTaskMax()` brings whatever is entered or stored into
+`TASK_MIN` … `TASK_LIMIT`, falling back to the checked-in default; the two tasks that quote the content
+take it as an argument, so a change reaches the next check rather than a running one.
 
 ---
 
@@ -510,7 +515,13 @@ back. Three prefixes, one sequence:
   its `stopReason`.
 - `[edu-sharing][quality]` — the check: what it is about, how many criteria were read and under which
   keys, each schema with its character count, each task with how much of it is the content's own text,
-  and every answer with what it changed.
+  how many characters the page has against the 10 000 a request supports and how many of them are left
+  for the text, and every answer with what it changed.
+- `[edu-sharing][agent]` — said as a `/generate` answers, long before a check is opened: how many characters
+  the erschlossene page has against the bound the setting states (10 000 by default), and by how much it is
+  over — which is the moment to raise the setting, since by the time a check quotes the text the run is paid
+  for. `[edu-sharing][quality]` then says how many of them are actually left for the text once an
+  instruction has its share.
 - `[edu-sharing][write]` — what reaches the node.
 
 **How to tell a check ran against the collection's skill:** not by reading the answer — a fluent answer

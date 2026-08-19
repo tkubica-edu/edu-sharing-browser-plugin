@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 
 import { APP_CONFIG } from '../../../config';
 import { IconDirective } from '../../../directives/icon.directive';
+import { AssistantRequestService } from '../../../services/assistant-request.service';
 import { AuthService } from '../../../services/auth.service';
 import { ChatSkillService, MasterSkillSetting } from '../../../services/chat-skill.service';
 import { ChatStyleService } from '../../../services/chat-style.service';
@@ -12,6 +13,7 @@ import { DebugService } from '../../../services/debug.service';
 import { DevModeService } from '../../../services/dev-mode.service';
 import { ContentJudgeService } from '../../../services/content-judge.service';
 import { QualityJudgeService } from '../../../services/quality-judge.service';
+import { DEFAULT_TASK_MAX, TASK_LIMIT, TASK_MIN } from '../../../util/quality-check-request';
 import { configuredSchemes } from '../../../util/quality-schemes';
 
 // Repository configuration plus the two development switches. Changing the URL requires a reload,
@@ -29,6 +31,7 @@ export class SettingsScreenComponent implements OnDestroy {
   protected readonly devMode = inject(DevModeService);
   protected readonly chatStyle = inject(ChatStyleService);
   protected readonly chatSkill = inject(ChatSkillService);
+  protected readonly assistantRequest = inject(AssistantRequestService);
   protected readonly recommendations = inject(CollectionRecommendationService);
   protected readonly qualityJudge = inject(QualityJudgeService);
   protected readonly contentJudge = inject(ContentJudgeService);
@@ -146,6 +149,28 @@ export class SettingsScreenComponent implements OnDestroy {
   /** Like the other chat switches: read as the next conversation's element is created, so no refresh. */
   protected setMasterSkill(setting: MasterSkillSetting): void {
     void this.chatSkill.setMasterSkill(setting);
+  }
+
+  // ---- Length of a KI request --------------------------------------------
+  // The range is stated by the util that spends it, so the field cannot offer what a request would not be
+  // built with; the service brings a typed value into that range as well.
+
+  protected readonly requestMin = TASK_MIN;
+  protected readonly requestLimit = TASK_LIMIT;
+  protected readonly requestDefault = DEFAULT_TASK_MAX;
+
+  /**
+   * Written as it is edited, like the other numbers here. An emptied field reports no number at all — that is a
+   * field halfway through being typed in, not a value, so the setting keeps what it had until one arrives.
+   */
+  protected setAssistantRequestMax(characters: number | null): void {
+    if (typeof characters === 'number' && Number.isFinite(characters)) {
+      void this.assistantRequest.setMaxCharacters(characters);
+    }
+  }
+
+  protected resetAssistantRequestMax(): void {
+    void this.assistantRequest.resetToDefault();
   }
 
   protected setContentJudgeAuth(credential: string): void {

@@ -147,6 +147,17 @@ export const APP_CONFIG = {
    * view reads this one directly. Named rather than resolved, because a repository's default is not its WLO set.
    */
   metadataSet: 'mds_oeh',
+  /**
+   * How long a request to the KI assistant may be, in characters — the bound the content quoted inside it is
+   * cut to fit (see `util/quality-check-request.ts`).
+   *
+   * Settable because it is a bound of ours rather than the API's: the instruction travels as
+   * `host_instruction` in the request's environment, a field declared without a length limit, so what the
+   * number protects is the prompt the model reads — a longer one buys a longer excerpt of the content and
+   * spends the run's token budget on it. Only the fallback for what the settings hold (see
+   * AssistantRequestService), and it is capped at `TASK_LIMIT` either way.
+   */
+  assistantRequestMaxCharacters: 10_000,
   storageKeys: {
     repositoryUrl: 'eduSharingRepoUrl',
     history: 'eduSharingHistory',
@@ -188,7 +199,9 @@ export const APP_CONFIG = {
     /** Whether the chat widget is corrected by our own stylesheet — see ChatStyleService. */
     chatStyleOverrides: 'eduSharingChatStyleOverrides',
     /** What the panel says about the chat's master skill — see ChatSkillService. */
-    chatMasterSkill: 'eduSharingChatMasterSkill'
+    chatMasterSkill: 'eduSharingChatMasterSkill',
+    /** How long a request to the KI assistant may be — see AssistantRequestService. */
+    assistantRequestMax: 'eduSharingAssistantRequestMax'
   },
   maxHistory: 200
 };

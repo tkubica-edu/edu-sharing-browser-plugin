@@ -6,6 +6,7 @@ import { HOME_REPOSITORY, MdsDefinition, MdsService } from 'ngx-edu-sharing-api'
 
 import { APP_CONFIG } from '../../../config';
 import { AuthorityNamePipe } from '../../../pipes/authority-name.pipe';
+import { AssistantRequestService } from '../../../services/assistant-request.service';
 import { AuthService } from '../../../services/auth.service';
 import { CurationService } from '../../../services/curation.service';
 import { LeaveGuard, NavigationService } from '../../../services/navigation.service';
@@ -100,6 +101,7 @@ const STOPPED: Record<string, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AiQualityScreenComponent implements OnDestroy {
+  private readonly assistantRequest = inject(AssistantRequestService);
   private readonly auth = inject(AuthService);
   private readonly authorityName = inject(AuthorityNamePipe);
   private readonly curation = inject(CurationService);
@@ -270,13 +272,16 @@ export class AiQualityScreenComponent implements OnDestroy {
       author: this.author(),
       signedIn: this.signedIn()
     };
+    // Only the two tasks that quote the content are bounded: the other two state a few hundred characters of
+    // instruction and nothing that could grow with the page.
+    const taskMax = this.assistantRequest.maxCharacters();
     const task =
       step === 'origin'
         ? originInstructionOf(subject)
         : step === 'proofread'
-          ? proofreadInstructionOf(subject)
+          ? proofreadInstructionOf(subject, taskMax)
           : step === 'quality'
-            ? qualityInstructionOf(this.criteria(), subject)
+            ? qualityInstructionOf(this.criteria(), subject, taskMax)
             : enrichmentInstructionOf(subject);
     const quoted = step === 'quality' || step === 'proofread' ? text.length : 0;
     console.log(

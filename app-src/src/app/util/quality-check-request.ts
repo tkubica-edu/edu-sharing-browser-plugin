@@ -8,6 +8,7 @@
 
 import type { MdsDefinition, MdsValue, MdsWidget } from 'ngx-edu-sharing-api';
 
+import { APP_CONFIG } from '../config';
 import type { CriteriaProperties } from '../features/quality/quality-criteria/quality-criteria.component';
 import { EXTENDED_TYPE_FIELD, LRT_FIELD } from './agent-payload';
 import type { MdsValues } from './mds-values';
@@ -23,17 +24,52 @@ import {
  */
 const SCHEMA_MAX = 10_000;
 
+/** Log prefix of what the request says about itself, as everywhere else in the check. */
+const LOG = '[edu-sharing][quality]';
+
 /**
- * How long the request put to the assistant may be. The content travels inside it, so this is what the quoted
- * text is cut to fit.
- *
- * A bound of our own, not the API's: the instruction is handed over as `host_instruction` in the request's
- * environment (see AiAssistantScreenComponent), and that field is declared without a length limit — the
- * 10 000-character cap the chat endpoint enforces applies to the visible `message`, which here is a few words.
- * What the bound protects is the prompt the model reads: the whole instruction goes into it, beside the page
- * context and the conversation so far.
+ * The shortest request worth building. Below this nothing of the content fits beside the instruction, and a
+ * check on the title alone is worthless — so a field somebody is halfway through typing does not become a
+ * request that quotes nothing.
  */
-const TASK_MAX = 10_000;
+export const TASK_MIN = 1_000;
+
+/**
+ * The longest request the panel will build, whatever it is asked for. A bound on the bound, because the number
+ * decides how much of a content is carried into every single turn of the check: past this the run spends its
+ * token budget on the quotation and answers with what is left, which reads as a check that went wrong rather
+ * than as a request that was too large.
+ */
+export const TASK_LIMIT = 100_000;
+
+/**
+ * How long a request may be where nobody set it: the checked-in configuration, brought into range. It needs no
+ * fallback of its own — the configuration types it as a number, so the only thing that can be wrong with it is
+ * its size.
+ */
+export const DEFAULT_TASK_MAX = Math.min(
+  Math.max(Math.floor(APP_CONFIG.assistantRequestMaxCharacters), TASK_MIN),
+  TASK_LIMIT
+);
+
+/**
+ * A request length as it can be used: a whole number between {@link TASK_MIN} and {@link TASK_LIMIT}, and the
+ * configured default for anything that is no number at all — a stored value from another version of the panel,
+ * or none.
+ *
+ * What the bound is for: the content travels inside the request, so this is what the quoted text is cut to fit.
+ * It is a bound of ours rather than the API's — the instruction is handed over as `host_instruction` in the
+ * request's environment (see AiAssistantScreenComponent) and that field is declared without a length limit,
+ * while the 10 000-character cap the chat endpoint enforces applies to the visible `message`, which here is a
+ * few words. So what it protects is the prompt the model reads: the whole instruction goes into it, beside the
+ * page context and the conversation so far. Raising it buys a longer excerpt of a long content at the price of
+ * the run's token budget, which is why it is a setting rather than a constant (see AssistantRequestService).
+ */
+export function boundedTaskMax(value: unknown): number {
+  const stated = Math.floor(Number(value));
+  if (!Number.isFinite(stated)) return DEFAULT_TASK_MAX;
+  return Math.min(Math.max(stated, TASK_MIN), TASK_LIMIT);
+}
 
 /** One criterion the assistant is to judge, as the metadata set defines it. */
 export interface QualityCriterion {
@@ -395,7 +431,7 @@ export function proofreadSchemaOf(): Record<string, unknown> {
  * is the wording itself, down to the character, and the page context the backend renders is a description of
  * the node rather than its text.
  */
-export function proofreadInstructionOf(subject: CheckSubject): string {
+export function proofreadInstructionOf(subject: CheckSubject, taskMax: number): string {
   // Genitive: it reads "… die Sprache VON <named> durch".
   const named = subject.title ? `„${subject.title}“` : 'diesem Inhalt';
   const head = [
@@ -442,7 +478,7 @@ export function proofreadInstructionOf(subject: CheckSubject): string {
     .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
     .join('\n');
   const tail = PROOFREAD_REMINDER;
-  return head + contentBlock(subject.text.trim(), subject.url, TASK_MAX - head.length - tail.length) + tail;
+  return head + contentBlock(subject.text.trim(), subject.url, taskMax, taskMax - head.length - tail.length) + tail;
 }
 
 /**
@@ -851,7 +887,8 @@ export interface CheckSubject {
  */
 export function qualityInstructionOf(
   criteria: readonly QualityCriterion[],
-  subject: CheckSubject
+  subject: CheckSubject,
+  taskMax: number
 ): string {
   const { title, url, collection } = subject;
   const text = subject.text.trim();
@@ -909,7 +946,7 @@ export function qualityInstructionOf(
     .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
     .join('\n');
   const tail = QUALITY_REMINDER;
-  return head + contentBlock(text, url, TASK_MAX - head.length - tail.length) + tail;
+  return head + contentBlock(text, url, taskMax, taskMax - head.length - tail.length) + tail;
 }
 
 /**
@@ -938,8 +975,12 @@ const QUALITY_REMINDER = [
  * third copy in the task only spends the budget the text needs. `url` therefore decides what is worth
  * ASKING for — reading the page is only an instruction where there is a page to read.
  */
-function contentBlock(text: string, url: string | null, room: number): string {
+function contentBlock(text: string, url: string | null, taskMax: number, room: number): string {
   if (!text) {
+    console.log(
+      `${LOG} the page has no text here — 0 of the ${taskMax} characters a request supports are quoted` +
+        (url ? ', so the assistant is asked to fetch it' : ' and no address to fetch it from'),
+    );
     return (
       '\nDer Volltext dieses Inhalts liegt hier nicht vor.' +
       (url
@@ -956,6 +997,16 @@ function contentBlock(text: string, url: string | null, room: number): string {
   const budget = room - opening.length - closing.length - 200;
   const fits = text.length <= budget;
   const quoted = fits ? text : text.slice(0, Math.max(budget, 0));
+  // How much of the page reaches the model, against what a request holds at all. A cut text is the one thing
+  // that makes a criterion unanswerable for a reason nobody can see in the answer: the assistant then judges
+  // an excerpt and says so per criterion, which reads as a finding about the content. `taskMax` is the whole
+  // request, `budget` what is left of it for the text once the instruction and its reminder have their share.
+  console.log(
+    `${LOG} the page has ${text.length} characters; ${taskMax} are supported per request, of which ` +
+      `${Math.max(budget, 0)} are left for the text — ${
+        fits ? 'it is quoted whole' : `cut, ${text.length - Math.max(budget, 0)} characters are not quoted`
+      }`,
+  );
   if (fits) return opening + quoted;
   return (
     opening +

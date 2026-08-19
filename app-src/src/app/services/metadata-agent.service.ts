@@ -8,15 +8,20 @@ import {
 } from './browser-extension.service';
 import { DevModeService } from './dev-mode.service';
 import { MetadataAgentApiService } from './metadata-agent-api.service';
+import { SOURCE_TEXT_KEY } from '../util/agent-payload';
 import { EXTRACT_FIELD_ANSWER } from '../util/dev-fixtures';
 import { errorMessage } from '../util/errors';
 import { withoutQualityCriteria } from '../util/quality-criteria-values';
+import { AssistantRequestService } from './assistant-request.service';
 
 /** Reserved (non-metadata) top-level keys in the metadata-agent response. */
 const ENVELOPE_KEYS = new Set([
   'contextName', 'schemaVersion', 'metadataset', 'metadataset_uri',
   'language', 'exportedAt', 'processing', 'preview_image_url', '_origins', '_source_text'
 ]);
+
+/** Log prefix, as everywhere else in the extension (`[edu-sharing][<station>]`). */
+const LOG = '[edu-sharing][agent]';
 
 /** Language the metadata agent generates for. */
 const LANGUAGE = 'de';
@@ -82,6 +87,7 @@ interface ExtractFieldAnswer {
 export class MetadataAgentService {
   private readonly browserExtension = inject(BrowserExtensionService);
   private readonly agentApi = inject(MetadataAgentApiService);
+  private readonly assistantRequest = inject(AssistantRequestService);
   private readonly devMode = inject(DevModeService);
 
   private readonly lastRunState = signal<AnalyzeOutcome | null>(null);
@@ -202,7 +208,34 @@ export class MetadataAgentService {
 
   private remember(outcome: AnalyzeOutcome): AnalyzeOutcome {
     this.lastRunState.set(outcome);
+    if (outcome.ok) this.reportTextLength(outcome.parsed?.raw ?? null);
     return outcome;
+  }
+
+  /**
+   * How long the page's own text is, against how much of it a request to the KI assistant can carry.
+   *
+   * Said here because this is where the text arrives and where it can still be acted on: a page far over the
+   * bound is one the assistant will judge by an excerpt, and it says so per criterion in a way that reads as a
+   * finding about the content rather than about the check. By the time the check quotes it the run is paid for.
+   *
+   * The bound is the whole request, so the instruction and its reminder take their share of it; how much is
+   * left for the text differs per task and is stated by the check's own line as it builds one. It is a
+   * setting, which is the other half of why this is worth saying: a page over it can be judged whole by
+   * raising it (see AssistantRequestService).
+   */
+  private reportTextLength(payload: Record<string, unknown> | null): void {
+    const text = payload?.[SOURCE_TEXT_KEY];
+    const length = typeof text === 'string' ? text.trim().length : 0;
+    if (!length) {
+      console.log(`${LOG} the run carries no page text — a KI check would have to fetch the page itself`);
+      return;
+    }
+    const supported = this.assistantRequest.maxCharacters();
+    console.log(
+      `${LOG} the erschlossene page has ${length} characters; ${supported} are supported per assistant ` +
+        `request${length > supported ? ` — ${length - supported} over the bound, so it cannot be quoted whole` : ''}`,
+    );
   }
 
   private asCount(value: unknown): number | null {
