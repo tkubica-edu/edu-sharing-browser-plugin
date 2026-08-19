@@ -90,6 +90,12 @@ export interface QualityCheckResult {
    * missing one must not read as "unfit".
    */
   suitable: boolean | null;
+  /**
+   * Whether the person went through the verdicts and let them stand. What carries the check on to the
+   * enrichment: a judgement submitted in the same turn as it was proposed is the assistant's word on the
+   * content, not a step the person is done with.
+   */
+  confirmed: boolean;
 }
 
 /** The criteria of a metadata set, knock-out ones first, in the order the set lists them. */
@@ -160,9 +166,15 @@ export function resultSchemaOf(criteria: readonly QualityCriterion[]): Record<st
         description:
           'Zwei bis drei Sätze: Was steht der Freigabe im Weg, und was wäre als Nächstes zu tun? Nenne ' +
           'hier auch, was eine Anleitung geprüft hat, wofür es kein eigenes Kriterium gibt.'
+      },
+      bestaetigt: {
+        type: 'boolean',
+        description:
+          'Nur true, wenn die Person deine Bewertung im Chat durchgegangen ist und ihr zugestimmt hat. ' +
+          'Solange sie nicht geantwortet hat: false — dann gilt der Schritt als offen und es geht nicht weiter.'
       }
     },
-    required: ['kriterien', 'geeignet']
+    required: ['kriterien', 'geeignet', 'bestaetigt']
   };
 }
 
@@ -283,7 +295,7 @@ export interface ProofreadFinding {
   passage: string;
   /** What it is to say instead. */
   correction: string;
-  /** What is wrong with it — Rechtschreibung, Grammatik, Zeichensetzung, Ausdruck; empty where it said none. */
+  /** What is wrong with it — Rechtschreibung, Grammatik, Zeichensetzung; empty where it said none. */
   kind: string;
 }
 
@@ -292,7 +304,19 @@ export interface ProofreadResult {
   findings: readonly ProofreadFinding[];
   /** Its word on the text as a whole, empty where it gave none. */
   summary: string;
+  /**
+   * What the person decided about the places: to take them on, or to leave the text as it stands for now.
+   * `null` while they have not answered, which is what holds the check at this step — a pass submitted
+   * before they said anything is an answer about the text, not a step somebody is done with.
+   *
+   * Both ways out end the step, and neither of them changes the content: nothing here writes a correction
+   * anywhere, so what is settled is what the person intends to do, not what happened to the text.
+   */
+  decision: ProofreadDecision | null;
 }
+
+/** What the person did with the places the pass named. */
+export type ProofreadDecision = 'uebernommen' | 'uebersprungen';
 
 /**
  * The shape the language pass is answered in: the passages to change, each quoted and each with what it is to
@@ -322,7 +346,11 @@ export function proofreadSchemaOf(): Record<string, unknown> {
             korrektur: { type: 'string', description: 'Wie die Stelle stattdessen lauten soll.' },
             art: {
               type: 'string',
-              description: 'Was daran zu ändern ist: Rechtschreibung, Grammatik, Zeichensetzung oder Ausdruck.'
+              // Closed on purpose: these three are the whole of what this step looks at, and a finding
+              // that fits none of them is one about the subject matter — which the criteria judge, not
+              // this pass (see {@link proofreadInstructionOf}).
+              enum: ['Rechtschreibung', 'Grammatik', 'Zeichensetzung'],
+              description: 'Was daran zu ändern ist: Rechtschreibung, Grammatik oder Zeichensetzung.'
             }
           },
           required: ['stelle', 'korrektur', 'art']
@@ -331,15 +359,37 @@ export function proofreadSchemaOf(): Record<string, unknown> {
       fazit: {
         type: 'string',
         description: 'Ein bis zwei Sätze zum Text als Ganzem: Wie steht es um Sprache und Rechtschreibung?'
+      },
+      entscheidung: {
+        type: 'string',
+        enum: ['offen', 'uebernommen', 'uebersprungen'],
+        description:
+          'Was die Person entschieden hat: „uebernommen“, wenn sie die Korrekturen annimmt und selbst in ' +
+          'ihren Text einträgt, „uebersprungen“, wenn der Text vorerst so bleiben soll. Solange sie nicht ' +
+          'geantwortet hat: „offen“ — dann gilt der Schritt als offen und es geht nicht weiter. Du selbst ' +
+          'änderst den Text nicht und gibst die Korrekturen auch nirgends weiter; beide Antworten sind ' +
+          'nur ihre Entscheidung, was sie damit vorhat.'
       }
     },
-    required: ['befunde']
+    required: ['befunde', 'entscheidung']
   };
 }
 
 /**
- * The step that runs on one's own content and only there: read the text for spelling, grammar, punctuation and
- * wording, and name the places to change.
+ * The step that runs on one's own content and only there: read the text for spelling, grammar and punctuation,
+ * and name the places to change.
+ *
+ * Language and nothing else. Whether the content is correct in its subject matter, complete, or fit for its
+ * audience is judged by the criteria two steps on ({@link qualityInstructionOf}) — a pass that answered that
+ * here would put the same content up for judgement twice, in one place against the collection's quality-assurance
+ * skills and in the other against nothing in particular, and the person would have to reconcile the two.
+ *
+ * Nothing it finds is applied. There is no property on the content that holds a correction and the panel writes
+ * none: the places are a list the person carries over into their own text, in their own time. So the step ends
+ * on what they intend — to take the places on, or to leave the text as it stands for now (see
+ * {@link ProofreadResult.decision}) — and both ends it. Left to itself the assistant narrates the confirmation
+ * as an act ("die Korrekturen sind übernommen"), which tells the person their text was changed when it was not,
+ * hence the task says outright that it changes nothing and must not claim otherwise.
  *
  * Why it is bound to the answer of the opening question: a correction is worth having only where somebody can
  * carry it out. The author of a content can go and fix what this finds; whoever is filing someone else's
@@ -355,34 +405,71 @@ export function proofreadInstructionOf(subject: CheckSubject): string {
   const named = subject.title ? `„${subject.title}“` : 'diesem Inhalt';
   const head = [
     `Das ist ein eigener Inhalt. Geh deshalb zuerst die Sprache von ${named} durch: Rechtschreibung, ` +
-      'Grammatik, Zeichensetzung und Ausdruck. Der Schritt ist fertig, wenn die Person deine Korrekturen ' +
-      'durchgegangen ist und sie bestätigt hat.',
+      'Grammatik und Zeichensetzung. Der Schritt ist fertig, wenn die Person deine Korrekturen ' +
+      'durchgegangen ist und gesagt hat, was sie damit macht.',
+    'Du selbst änderst am Inhalt nichts und kannst es auch nicht: die Korrekturen sind eine Liste für die ' +
+      'Person, die sie in ihrem Text selbst einträgt. Es wird dadurch nichts gespeichert, nichts überarbeitet ' +
+      'und nichts weitergegeben. Behaupte also nie, du hättest etwas korrigiert, übernommen oder ' +
+      'weitergegeben, und stell auch die Zustimmung der Person nicht so dar.',
     subject.collection
-      ? 'Nutze dafür die Skills der Sammlung, die zu Sprache, Rechtschreibung oder Textqualität etwas sagen: ' +
+      ? 'Nutze dafür die Skills der Sammlung, die zu Sprache oder Rechtschreibung etwas sagen: ' +
         'hol dir mit get_skill_registry die Liste und mit get_skill jede Anleitung, die dazu passt, und halte ' +
         'dich an sie. Gibt es dazu keine, korrigiere nach den Regeln der deutschen Rechtschreibung.'
       : '',
     'Zitiere jede beanstandete Stelle wörtlich, wie sie im Text steht, und stell die Korrektur daneben. ' +
       'Erfinde keine Stelle, die dort nicht steht.',
     'Ist sprachlich nichts zu beanstanden, sag das und gib eine leere Liste ab — auch das ist ein Ergebnis.',
-    'Beurteile hier noch nicht die Qualität des Inhalts, das ist der nächste Schritt.',
+    'Es geht allein um die Sprache. Sag in diesem Schritt nichts zur Sachrichtigkeit: nicht, ob eine Aussage, ' +
+      'eine Formel, eine Zahl oder eine Quelle fachlich stimmt, und auch nichts zu Vollständigkeit, Niveau, ' +
+      'Didaktik oder Aufbau. Das bewerten wir später anhand der Qualitätskriterien. Ein fachlicher Fehler ist ' +
+      'hier also kein Befund, solange die Stelle sprachlich richtig geschrieben ist.',
     '',
     'Nenne die Stellen zuerst im Chat, je Stelle eine Zeile mit dem Wortlaut und der Korrektur darunter. ' +
       'Die Person sieht nur den Chat — was dort nicht steht, erfährt sie nicht.',
-    'Bitte sie danach ausdrücklich, die Korrekturen durchzugehen und zu bestätigen oder zu verwerfen. Führe ' +
-      'sie zu dieser Bestätigung: frag direkt, ob die Korrekturen so stehen bleiben sollen.',
-    'Beende deine Nachricht mit dieser Frage und schreib die bestätigende Antwort dabei aus, damit sie ihr ' +
-      'als Antwortvorschlag angeboten werden kann: „Ich bestätige die Korrekturen.“ Das ist ein Vorschlag, keine Vorgabe — ' +
-      'verlang nicht, dass sie mit genau diesem Satz antwortet.',
-    'Rufe submit_result ERST auf, wenn sie bestätigt hat — mit den Stellen, die stehen bleiben. Ohne diesen ' +
+    'Bitte sie danach ausdrücklich zu entscheiden, was mit den Stellen passieren soll, und lass ihr beide Wege ' +
+      'offen: Sie kann die Korrekturen annehmen und selbst in ihren Text eintragen — oder sie überspringen, ' +
+      'wenn sie den Text gerade nicht ändern kann; dann bleibt er, wie er ist. Beides ist in Ordnung, und der ' +
+      'Schritt ist mit beidem fertig. Dräng sie nicht zur Korrektur.',
+    'Beende deine Nachricht mit dieser Frage und schreib beide Antworten dabei aus, damit sie ihr als ' +
+      'Antwortvorschläge angeboten werden: „Ich bestätige die Korrekturen.“ und „Korrekturen überspringen“. ' +
+      'Das sind Vorschläge, keine Vorgabe — sie darf auch mit eigenen Worten antworten.',
+    'Rufe submit_result ERST auf, wenn sie geantwortet hat — mit den gefundenen Stellen und mit ' +
+      'entscheidung="uebernommen" oder entscheidung="uebersprungen", je nachdem, was sie gesagt hat. In dem ' +
+      'Zug, in dem du die Korrekturen nennst, rufst du es nicht auf: dieser Zug endet mit der Frage. Ohne den ' +
       'Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.',
-    'Sag ihr danach, dass als Nächstes die Qualitätsprüfung folgt.',
+    'Sag ihr danach in einem Satz, wie es steht — bei „uebernommen“, dass sie die Stellen in ihrem Text ' +
+      'nachziehen kann, bei „uebersprungen“, dass der Text unverändert bleibt — und dass als Nächstes die ' +
+      'Qualitätsprüfung folgt. Sag in keinem der beiden Fälle, der Text sei geändert worden.',
     ''
   ]
     .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
     .join('\n');
-  return head + contentBlock(subject.text.trim(), subject.url, TASK_MAX - head.length);
+  const tail = PROOFREAD_REMINDER;
+  return head + contentBlock(subject.text.trim(), subject.url, TASK_MAX - head.length - tail.length) + tail;
 }
+
+/**
+ * The rules of the language pass again, behind the quoted text. The text is the longest part of the task by far
+ * and the last thing read before the answer is written — a text riddled with subject-matter errors then makes
+ * its own case for what to answer, and the rules that stand thousands of characters above it lose to it
+ * (measured: a physics page full of wrong figures came back as a list of factual corrections, in one turn and
+ * without the closing question). Repeated here, they are what the run reads last.
+ */
+const PROOFREAD_REMINDER = [
+  '',
+  '---',
+  'Zur Erinnerung, bevor du antwortest:',
+  '- Es geht allein um die Sprache: Rechtschreibung, Grammatik, Zeichensetzung. Kein Wort zur Sachrichtigkeit, ' +
+    'auch wenn im Text fachlich etwas falsch ist — Aussagen, Formeln, Zahlen und Quellen bewerten wir im ' +
+    'nächsten Schritt anhand der Qualitätskriterien. Eine fachlich falsche, aber korrekt geschriebene Stelle ' +
+    'ist hier kein Befund.',
+  '- Zitiere jede Stelle wörtlich, wie sie oben steht, und stell die Korrektur daneben.',
+  '- Beende deine Nachricht mit der Frage, was mit den Stellen passieren soll, und schreib beide Antworten ' +
+    'dabei aus: „Ich bestätige die Korrekturen.“ und „Korrekturen überspringen“.',
+  '- Du änderst den Text nicht und gibst nichts weiter. Sag nie, etwas sei korrigiert oder übernommen worden.',
+  '- Rufe submit_result in diesem Zug nicht auf. Erst wenn die Person geantwortet hat, und dann mit ' +
+    'entscheidung="uebernommen" oder entscheidung="uebersprungen".'
+].join('\n');
 
 /**
  * What the language pass found; null where the turn answered something else. The list is what says a pass
@@ -406,7 +493,13 @@ export function proofreadOf(result: unknown): ProofreadResult | null {
     });
   }
   const summary = answer?.['fazit'];
-  return { findings, summary: typeof summary === 'string' ? summary.trim() : '' };
+  const decision = answer?.['entscheidung'];
+  return {
+    findings,
+    summary: typeof summary === 'string' ? summary.trim() : '',
+    decision:
+      decision === 'uebernommen' || decision === 'uebersprungen' ? decision : null
+  };
 }
 
 /**
@@ -455,6 +548,11 @@ export interface EnrichedMetadata {
   lrt: readonly VocabularyValue[];
   intendedEndUserRole: readonly VocabularyValue[];
   keywords: readonly string[];
+  /**
+   * Whether the person went through the values and let them stand. What ends the check: values submitted in
+   * the same turn as they were proposed are the assistant's suggestion, not metadata anybody agreed to.
+   */
+  confirmed: boolean;
 }
 
 /** One value from a WLO vocabulary: what it is called, and the URI that is the actual filter value. */
@@ -510,9 +608,15 @@ export function enrichmentSchemaOf(): Record<string, unknown> {
         type: 'array',
         description: 'Schlagworte, mit denen der Inhalt gefunden werden soll. Fünf bis zehn, aus dem Inhalt selbst.',
         items: { type: 'string' }
+      },
+      bestaetigt: {
+        type: 'boolean',
+        description:
+          'Nur true, wenn die Person die Werte im Chat durchgegangen ist und ihnen zugestimmt hat. Solange ' +
+          'sie nicht geantwortet hat: false — dann gilt der Schritt als offen und der Vorschlag steht noch aus.'
       }
     },
-    required: [...VOCABULARY_FIELD_NAMES, 'keywords']
+    required: [...VOCABULARY_FIELD_NAMES, 'keywords', 'bestaetigt']
   };
 }
 
@@ -567,8 +671,9 @@ export function enrichmentInstructionOf(subject: CheckSubject): string {
     'Beende deine Nachricht mit dieser Frage und schreib die bestätigende Antwort dabei aus, damit sie ihr ' +
       'als Antwortvorschlag angeboten werden kann: „Ich bestätige die Metadaten.“ Das ist ein Vorschlag, keine Vorgabe — ' +
       'verlang nicht, dass sie mit genau diesem Satz antwortet.',
-    'Rufe submit_result ERST auf, wenn sie bestätigt hat — mit ihren Korrekturen, falls sie welche hatte. ' +
-      'Ohne diesen Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.',
+    'Rufe submit_result ERST auf, wenn sie bestätigt hat — mit ihren Korrekturen, falls sie welche hatte, und ' +
+      'mit bestaetigt=true. In dem Zug, in dem du die Werte vorschlägst, rufst du es nicht auf: dieser Zug ' +
+      'endet mit der Frage. Ohne den Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.',
     'Sag ihr danach, dass alle Schritte erledigt sind und sie unten im Panel mit „Abschließen und zur ' +
       'Inhaltsübersicht“ fertig wird.'
   ]
@@ -607,7 +712,8 @@ export function enrichmentOf(result: unknown): EnrichedMetadata | null {
     educationalContext: list('educationalContext'),
     lrt: list('lrt'),
     intendedEndUserRole: list('intendedEndUserRole'),
-    keywords: keywords.map((entry) => entry.trim())
+    keywords: keywords.map((entry) => entry.trim()),
+    confirmed: answer['bestaetigt'] === true
   };
   // Nothing at all is not an enrichment: an answer about a different question would otherwise be recorded
   // as one whose every field happened to be empty.
@@ -791,15 +897,33 @@ export function qualityInstructionOf(
     'Rufe submit_result ERST auf, wenn sie bestätigt hat — vorher nicht, auch wenn dein Urteil längst fertig ' +
       'ist.',
     'Sobald sie bestätigt: Rufe submit_result in genau diesem Zug auf, mit ihren Korrekturen, falls sie welche ' +
-      'hatte, und zu jedem Kriterium ergebnis und begruendung. Eine Bestätigung im Chat allein reicht nicht — ' +
-      'ohne diesen Werkzeugaufruf ist das Ergebnis für uns nicht da und es geht nicht weiter. Sag ihr dann, ' +
-      'dass als Nächstes die Metadaten angereichert werden.',
+      'hatte, mit bestaetigt=true und zu jedem Kriterium ergebnis und begruendung. Eine Bestätigung im Chat ' +
+      'allein reicht nicht — ohne diesen Werkzeugaufruf ist das Ergebnis für uns nicht da und es geht nicht ' +
+      'weiter. Sag ihr dann, dass als Nächstes die Metadaten angereichert werden.',
     ''
   ]
     .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
     .join('\n');
-  return head + contentBlock(text, url, TASK_MAX - head.length);
+  const tail = QUALITY_REMINDER;
+  return head + contentBlock(text, url, TASK_MAX - head.length - tail.length) + tail;
 }
+
+/**
+ * The rules of the judgement again, behind the quoted text — for the same reason the language pass repeats
+ * its own ({@link PROOFREAD_REMINDER}): the content is the longest part of the task and the last thing read
+ * before the answer, and what stands closest to the answer is what the run holds to. The two rules worth the
+ * repetition are the ones a run that is done judging drops first: end on the question, and submit only once
+ * it has been answered.
+ */
+const QUALITY_REMINDER = [
+  '',
+  '---',
+  'Zur Erinnerung, bevor du antwortest:',
+  '- Schreib dein Urteil in den Chat und beende deine Nachricht mit der Frage, ob es so stehen bleiben soll. ' +
+    'Schreib die Antwort „Ich bestätige die Bewertung.“ dabei aus.',
+  '- Rufe submit_result in diesem Zug nicht auf. Erst wenn die Person geantwortet hat, und dann mit ' +
+    'bestaetigt=true.'
+].join('\n');
 
 /**
  * The content itself, appended to the task and cut to what is left of the request's length.
@@ -865,7 +989,8 @@ export function verdictsOf(
   return {
     verdicts,
     summary: typeof summary === 'string' ? summary.trim() : '',
-    suitable: typeof suitable === 'boolean' ? suitable : null
+    suitable: typeof suitable === 'boolean' ? suitable : null,
+    confirmed: answer?.['bestaetigt'] === true
   };
 }
 

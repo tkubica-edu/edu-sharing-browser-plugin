@@ -333,7 +333,7 @@ export class AiQualityScreenComponent implements OnDestroy {
       this.takeEnrichment(answer);
       return;
     }
-    const { verdicts, summary, suitable } = verdictsOf(answer.result, this.criteria());
+    const { verdicts, summary, suitable, confirmed } = verdictsOf(answer.result, this.criteria());
     if (!verdicts.length) {
       console.log(`${LOG_QUALITY} ← the turn submitted no verdicts`, {
         stopReason: answer.stopReason,
@@ -359,6 +359,7 @@ export class AiQualityScreenComponent implements OnDestroy {
       summary,
       recorded: properties,
       knockoutSatisfied: satisfied,
+      confirmed,
       stopReason: answer.stopReason,
       raw: answer.result
     });
@@ -366,15 +367,22 @@ export class AiQualityScreenComponent implements OnDestroy {
     this.verdicts.set(judged);
     this.curation.recordValues(properties);
     this.curation.reportQualityCriteria(satisfied);
-    // What the footer's confirmation waits for. Not the same as the gate above: the assistant judged
-    // every criterion, including the ones it found wanting, and an answer arrives here only once the
-    // person has gone through it in the chat — so the button opens on a judgement somebody stood behind,
-    // not on a good one.
+    this.summary.set(summary);
+    if (suitable !== null) this.suitable.set(suitable);
+    // The step is the person going through the verdicts, not the assistant reaching them: a judgement
+    // submitted in the same turn as it was proposed has been put to nobody, so it is kept as it stands and
+    // the step stays open. The assistant submits again once they have answered — the schema stands for every
+    // turn of the conversation.
+    if (!confirmed) {
+      console.log(`${LOG_QUALITY} … the judgement is not confirmed yet — the step stays open`);
+      return;
+    }
+    // What the footer's confirmation waits for: the assistant judged every criterion, including the ones it
+    // found wanting, and the person has stood behind that judgement in the chat — so the button opens on a
+    // judgement somebody answered for, not on a good one.
     this.curation.reportQualityJudged();
     // Only now: the enrichment is a run of its own, and it starts from a content whose quality is
     // established. Flipping the step re-states task and schema, which the chat then puts as a further turn.
-    this.summary.set(summary);
-    if (suitable !== null) this.suitable.set(suitable);
     this.step.set('enrichment');
   }
 
@@ -423,6 +431,9 @@ export class AiQualityScreenComponent implements OnDestroy {
    *
    * An empty list is an answer and is taken as one: a text with nothing to correct is what this step hopes
    * for, and it moves the check on exactly like a list of findings does.
+   *
+   * What moves the check on is the person's decision about the places — taken on or skipped, both of them end
+   * the step — and not the answer itself; see {@link ProofreadResult.decision}.
    */
   private takeProofread(answer: AgentResult): void {
     const proofread = proofreadOf(answer.result);
@@ -439,10 +450,20 @@ export class AiQualityScreenComponent implements OnDestroy {
     console.log(`${LOG_QUALITY} ← the language pass names ${proofread.findings.length} place(s) to change`, {
       findings: proofread.findings.map(({ passage, correction, kind }) => `${kind}: ${passage} → ${correction}`),
       summary: proofread.summary,
+      decision: proofread.decision,
       stopReason: answer.stopReason
     });
     this.problem.set(null);
     this.proofread.set(proofread);
+    // The step is the person going through the places, not the assistant naming them: a pass submitted in the
+    // same turn as its findings has asked nobody anything yet, so what it says is kept and the step stays open.
+    // It submits again once they have answered — the schema stands for every turn of the conversation.
+    if (!proofread.decision) {
+      console.log(`${LOG_QUALITY} … the language pass is not decided yet — the step stays open`);
+      return;
+    }
+    // Taken on or skipped, the step is done either way: nothing was written to the content in either case,
+    // and a person who cannot edit the text right now must be able to walk on (see ProofreadResult.decision).
     this.step.set('quality');
   }
 
@@ -468,6 +489,13 @@ export class AiQualityScreenComponent implements OnDestroy {
     this.problem.set(null);
     this.metadata.set(metadata);
     this.curation.recordValues(properties);
+    // The values are the assistant's until the person says otherwise: proposed and submitted in one turn,
+    // they are a suggestion nobody has been through, and the way out of the check must not open on one. The
+    // proposal is kept — a confirming turn submits it again, and then it counts.
+    if (!metadata.confirmed) {
+      console.log(`${LOG_QUALITY} … the metadata are not confirmed yet — the step stays open`);
+      return;
+    }
     this.step.set('done');
     // The other half of what the way on out of this step waits for; the judgement reported the first.
     this.curation.reportMetadataEnriched();

@@ -382,8 +382,31 @@ has answered:
    back `{"herkunft":"eigen","vermutung":"fremd"}` — the person's answer won, and the guess is logged
    beside it so it can be told how often it is worth making.
 2. **Sprache durchsehen** (`proofreadInstructionOf()`) — **only where the answer was `eigen`.** Spelling,
-   grammar, punctuation and wording, against the collection's skills on language or text quality where
-   it has released any. Each finding quotes the passage verbatim and puts the correction beside it,
+   grammar and punctuation, against the collection's skills on language where it has released any. Language
+   and nothing else: the task rules out anything about the subject matter — whether a statement, formula,
+   figure or source is correct, and equally completeness, level, didactics and structure — because that is
+   what step 3 judges, against the collection's quality-assurance skills. A factual error is not a finding
+   here as long as its wording is spelled correctly.
+
+   **Two things enforce that, because the task's opening lines alone did not.** Measured on a physics page
+   whose figures were wrong throughout: the pass came back as a list of factual corrections (*„Die
+   Lichtgeschwindigkeit beträgt ungefähr 300.000 Kilometer pro Sekunde, nicht pro Stunde"*), in a single
+   turn, without the closing question — the quoted text is the longest part of the task and the last thing
+   read before the answer, and a text that argues for itself beats a rule standing thousands of characters
+   above it. So the rules are repeated **behind the quoted text** (`PROOFREAD_REMINDER`), where they are what
+   the run reads last, and `art` is a **closed enum** — `Rechtschreibung` / `Grammatik` / `Zeichensetzung` —
+   so a factual finding has no category to be filed under.
+
+   **The step ends on a decision, and skipping is one of them.** The schema carries `entscheidung` —
+   `uebernommen` / `uebersprungen` / `offen` — and only the first two move the check on: a pass that submits
+   its findings in the same turn as it names them has asked nobody anything, and the panel used to walk on
+   past the person. Undecided, the findings are kept and logged and the step stays open; the schema stands for
+   every turn, so the assistant submits again once they have answered. **Skipping exists because nothing here
+   changes the text**: there is no property that holds a correction, the panel writes none, and the content is
+   often not editable at that moment — so *„Korrekturen überspringen"* is offered as a chip beside *„Ich
+   bestätige die Korrekturen."* and ends the step just as well. The task also forbids the wording the run
+   reached for on its own — *„Ich habe die Korrekturen an den Inhalt weitergegeben"*, *„Die Korrekturen sind
+   übernommen"* — which told the person their text had been rewritten when nothing had been touched. Each finding quotes the passage verbatim and puts the correction beside it,
    because the person has to find the place in their own text and *„einige Kommafehler"* is not a place.
    An empty list is an answer and is taken as one. The step is bound to the ownership question because a
    correction is worth having only where somebody can carry it out: the author of a content can go and
@@ -434,6 +457,15 @@ backend as the header `X-Boerdi-Engine`, and the routing is decided per message:
 skill (*„[ edu-sharing Skill ] Vertretungsstunde planen"*) and submitted nothing, while the same turn
 with the header came back `submit` with all twelve criteria. The panel sets `engine="agent"` together
 with the schema, so every turn of the check runs the agent, not only the one that carries the task.
+
+**Every step's confirmation is machine-checked, not assumed.** Each schema carries a `bestaetigt` flag, and
+the panel walks on only where it came back `true`: measured, a task that ends in a question is not enough on
+its own — the judgement arrived proposed and submitted in one turn, and the panel moved to the enrichment
+past a person who had said nothing. Unconfirmed answers are kept, recorded where they belong and logged, and
+the step stays open; the schema stands for every turn, so the assistant submits the same answer again once
+the person has replied. The two tasks that quote the content also repeat their closing rules **behind the
+quoted text** (`PROOFREAD_REMINDER`, `QUALITY_REMINDER`) — the text is the last thing read before the answer,
+and rules thousands of characters above it lose to it.
 
 **A side effect worth knowing about: the chips now offer the confirmation.** Prescribing them is
 impossible — no widget attribute, no `Environment` field, and an explicit instruction in the task is
