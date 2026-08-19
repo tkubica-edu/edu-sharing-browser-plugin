@@ -109,6 +109,16 @@
   .chevron { flex: 0 0 auto; width: 14px; height: 14px; font-size: 14px; line-height: 14px; }
 }
 
+// The wait for the proposal, inside the row it will fill: small enough to sit on the line of the
+// text beside it, so the row keeps its height and the list does not jump when the answer arrives.
+.folder-spinner {
+  --es-spinner-size: 16px;
+
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: var(--es-space-1);
+}
+
 // The collection's name, set off from the label that introduces it — the two read as one sentence,
 // and the extra room is what lets the name be picked out of it at a glance. A margin rather than a
 // flex gap, so the row still wraps like the text it is where the panel is narrow.

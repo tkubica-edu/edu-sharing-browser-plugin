@@ -54,8 +54,13 @@
               @if (groups.folderOf(group); as folder) {
                 <!-- Named as a proposal for as long as it is one: the collection was picked from the
                      content's keywords rather than by the user, who may well want another. -->
-                {{ groups.isRecommended(group) ? 'Empfohlene Sammlung' : 'Sammlung' }}:
+                {{ groups.isRecommended(group) ? 'Empfohlene Sammlung' : 'Ausgewählte Sammlung' }}:
                 <strong>{{ folder.name }}</strong>
+              } @else if (groups.recommending()) {
+                <!-- The proposal takes a moment and lands in this very row, so the wait is shown where
+                     its answer will be. The row stays usable: picking by hand ends the wait for good. -->
+                <es-spinner class="folder-spinner"></es-spinner>
+                Empfohlene Sammlung wird ermittelt …
               } @else {
                 Sammlung auswählen
               }
@@ -68,12 +73,6 @@
       </li>
     }
   </ul>
-
-  <!-- The proposal is asked for as the step opens and takes a moment to arrive; said so, because when
-       it does it ticks a group and picks a collection inside it. -->
-  @if (groups.recommending()) {
-    <p class="es-muted">Eine passende Sammlung wird ermittelt …</p>
-  }
 
   <!-- Groups the config names but the repository would not hand back: named, because the list is
        otherwise silently short and a group that is not offered cannot be forwarded to. -->
