@@ -1,6 +1,6 @@
 {
   "name": "edu-sharing-extension",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "description": "Cross-browser (Chrome/Edge/Firefox/Safari) edu-sharing Erschließung extension with an Angular sidebar.",
