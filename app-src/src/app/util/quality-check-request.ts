@@ -231,15 +231,10 @@ export function originSchemaOf(): Record<string, unknown> {
  * turn that read the content as well would spend its answer on findings nobody has asked for yet — so the task
  * ends at the question, and the answer is the person's to give.
  *
- * Both answers are named word for word *inside the closing question*, so that both are offered as reply chips:
- * the widget composes those from the answer the assistant just gave, and nothing outside the conversation can
- * set them. A question of two answers is the one place where that matters most — tapping one is the whole turn
- * the person has to take, and a typed answer has to be understood before it can be believed.
- *
- * Where they stand is what decides it. Listed after the question under a heading of their own — „Antwortvorschläge:
- * …“ — they read as text about the conversation rather than as the answers to the question that is being asked,
- * and the generator falls back to inventing one chip of its own wording. Written into the question sentence, they
- * are what the question offers, and both come back as chips.
+ * The two answers the person may tap are not this task's business: the panel hands them to the widget for the
+ * whole step (see the check screen's STEP_REPLIES), which is what makes them dependable — composed from the
+ * answer by the widget's own generator, they came back as offers about the collection instead. What the task
+ * still owes them is a message that ends on the question they answer, and nothing after it.
  */
 export function originInstructionOf(subject: CheckSubject): string {
   // Accusative: it reads "… dass ihr jetzt gemeinsam <named> prüft".
@@ -257,11 +252,9 @@ export function originInstructionOf(subject: CheckSubject): string {
     'Stell ihr dann genau eine Frage: ob sie den Inhalt selbst erstellt beziehungsweise verantwortet oder ob ' +
       'es ein fremder ist, den sie nur einordnet. Ihre Antwort gilt, auch wenn sie deiner Vermutung ' +
       'widerspricht.',
-    'Schreib beide Antworten wörtlich in diesen Fragesatz hinein, in dieser Reihenfolge — etwa so: Ist es ' +
-      '„Inhalt selbst erstellt“ oder „Fremder Inhalt“? Diese Frage ist das Letzte in deiner Nachricht: keine ' +
-      'gesonderte Zeile mit Antwortvorschlägen, keine Aufzählung der Antworten und kein Satz danach. Es sind ' +
-      'Vorschläge, keine Vorgabe — sie darf auch mit eigenen Worten antworten, verlang also nicht genau diese ' +
-      'Worte zurück.',
+    'Unter deiner Nachricht werden ihr die beiden Antworten als Buttons angeboten: „Inhalt selbst erstellt“ ' +
+      'und „Fremder Inhalt“. Du musst sie nicht ausschreiben und keine Antwortvorschläge auflisten — deine ' +
+      'Nachricht endet mit der Frage, danach kommt kein Satz mehr. Sie darf auch mit eigenen Worten antworten.',
     'Beurteile in diesem Zug nichts und lies den Inhalt nicht. Es geht allein um diese Frage.',
     'Warte ihre Antwort ab. Rufe submit_result ERST auf, wenn sie geantwortet hat — mit origin="own" ' +
       'oder origin="external" und deiner Vermutung in guess. Setz origin nicht auf deine Vermutung.',
@@ -432,9 +425,11 @@ export function proofreadInstructionOf(subject: CheckSubject): string {
       'offen: Sie kann die Korrekturen annehmen und selbst in ihren Text eintragen — oder sie überspringen, ' +
       'wenn sie den Text gerade nicht ändern kann; dann bleibt er, wie er ist. Beides ist in Ordnung, und der ' +
       'Schritt ist mit beidem fertig. Dräng sie nicht zur Korrektur.',
-    'Beende deine Nachricht mit dieser Frage und schreib beide Antworten dabei aus, damit sie ihr als ' +
-      'Antwortvorschläge angeboten werden: „Ich bestätige die Korrekturen.“ und „Korrekturen überspringen“. ' +
-      'Das sind Vorschläge, keine Vorgabe — sie darf auch mit eigenen Worten antworten.',
+    'Unter deiner Nachricht werden ihr beide Antworten als Buttons angeboten: „Ich bestätige die Korrekturen“ ' +
+      'und „Korrekturen überspringen“. Du musst sie nicht ausschreiben. Deine Nachricht endet mit der Frage, ' +
+      'danach kommt kein Satz mehr — was du nicht prüfen konntest, sagst du davor.',
+    'Hast du nichts gefunden, sag das in einem Satz und frag, ob es weitergehen soll: sie beendet den Schritt ' +
+      'dann mit einem der beiden Buttons, und beide bedeuten hier dasselbe, weil es nichts zu korrigieren gibt.',
     'Rufe submit_result ERST auf, wenn sie geantwortet hat — mit den gefundenen Stellen und mit ' +
       'decision="accepted" oder decision="skipped", je nachdem, was sie gesagt hat. In dem ' +
       'Zug, in dem du die Korrekturen nennst, rufst du es nicht auf: dieser Zug endet mit der Frage. Ohne den ' +
@@ -466,8 +461,9 @@ const PROOFREAD_REMINDER = [
     'nächsten Schritt anhand der Qualitätskriterien. Eine fachlich falsche, aber korrekt geschriebene Stelle ' +
     'ist hier kein Befund.',
   '- Zitiere jede Stelle wörtlich, wie sie oben steht, und stell die Korrektur daneben.',
-  '- Beende deine Nachricht mit der Frage, was mit den Stellen passieren soll, und schreib beide Antworten ' +
-    'dabei aus: „Ich bestätige die Korrekturen.“ und „Korrekturen überspringen“.',
+  '- Der letzte Satz deiner Nachricht ist die Frage, was mit den Stellen passieren soll — auch dann, wenn du ' +
+    'nichts gefunden hast. Die Antworten dazu werden ihr als Buttons angeboten; du listest keine ' +
+    'Antwortvorschläge auf und schreibst nach der Frage keinen Satz mehr.',
   '- Du änderst den Text nicht und gibst nichts weiter. Sag nie, etwas sei korrigiert oder übernommen worden.',
   '- Rufe submit_result in diesem Zug nicht auf. Erst wenn die Person geantwortet hat, und dann mit ' +
     'decision="accepted" oder decision="skipped".'
@@ -670,9 +666,12 @@ export function enrichmentInstructionOf(subject: CheckSubject): string {
       'Die Person sieht nur den Chat.',
     'Bitte sie danach ausdrücklich, die Werte durchzugehen und zu bestätigen oder zu korrigieren. Führe sie ' +
       'zu dieser Bestätigung: frag direkt, ob die Metadaten so übernommen werden sollen.',
-    'Beende deine Nachricht mit dieser Frage und schreib die bestätigende Antwort dabei aus, damit sie ihr ' +
-      'als Antwortvorschlag angeboten werden kann: „Ich bestätige die Metadaten.“ Das ist ein Vorschlag, keine Vorgabe — ' +
-      'verlang nicht, dass sie mit genau diesem Satz antwortet.',
+    'Unter deiner Nachricht werden ihr die beiden Antworten als Buttons angeboten: „Metadaten bestätigen“ und ' +
+      '„Anpassungen vornehmen“. Du musst sie nicht ausschreiben. Deine Nachricht endet mit der Frage, danach ' +
+      'kommt kein Satz mehr.',
+    'Wählt sie „Anpassungen vornehmen“: nimm ihre Änderungen auf, zeig die Werte, wie sie damit lauten, und ' +
+      'stell dieselbe Frage erneut. So oft, wie sie Anpassungen will — der Schritt endet erst mit ihrer ' +
+      'Bestätigung, und jede deiner Nachrichten endet deshalb mit dieser Frage.',
     'Rufe submit_result ERST auf, wenn sie bestätigt hat — mit ihren Korrekturen, falls sie welche hatte, und ' +
       'mit confirmed=true. In dem Zug, in dem du die Werte vorschlägst, rufst du es nicht auf: dieser Zug ' +
       'endet mit der Frage. Ohne den Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.',
@@ -891,11 +890,14 @@ export function qualityInstructionOf(
       'Gesamturteil, ob der Inhalt für Bildung geeignet ist, und ' +
       'ein kurzes Fazit, was einer Freigabe im Weg steht. Die Person sieht nur den Chat — was dort nicht ' +
       'steht, erfährt sie nicht.',
-    'Bitte sie danach ausdrücklich, dein Urteil durchzugehen und zu bestätigen oder zu korrigieren. Führe sie ' +
-      'zu dieser Bestätigung: frag direkt, ob es so stehen bleiben soll, und geh auf ihre Einwände ein.',
-    'Beende deine Nachricht mit dieser Frage und schreib die bestätigende Antwort dabei aus, damit sie ihr ' +
-      'als Antwortvorschlag angeboten werden kann: „Ich bestätige die Bewertung.“ Das ist ein Vorschlag, keine Vorgabe — ' +
-      'verlang nicht, dass sie mit genau diesem Satz antwortet.',
+    'Bitte sie danach ausdrücklich, dein Urteil durchzugehen und zu bestätigen oder Anpassungen vorzunehmen. ' +
+      'Führe sie zu dieser Entscheidung: frag direkt, ob es so stehen bleiben soll, und geh auf ihre Einwände ein.',
+    'Unter deiner Nachricht werden ihr die beiden Antworten als Buttons angeboten: „Qualität bestätigen“ und ' +
+      '„Anpassungen vornehmen“. Du musst sie nicht ausschreiben. Deine Nachricht endet mit der Frage, danach ' +
+      'kommt kein Satz mehr.',
+    'Wählt sie „Anpassungen vornehmen“: nimm ihre Änderungen auf, zeig das Urteil, wie es damit lautet, und ' +
+      'stell dieselbe Frage erneut. So oft, wie sie Anpassungen will — der Schritt endet erst mit ihrer ' +
+      'Bestätigung, und jede deiner Nachrichten endet deshalb mit dieser Frage.',
     'Rufe submit_result ERST auf, wenn sie bestätigt hat — vorher nicht, auch wenn dein Urteil längst fertig ' +
       'ist.',
     'Sobald sie bestätigt: Rufe submit_result in genau diesem Zug auf, mit ihren Korrekturen, falls sie welche ' +
@@ -921,10 +923,11 @@ const QUALITY_REMINDER = [
   '',
   '---',
   'Zur Erinnerung, bevor du antwortest:',
-  '- Schreib dein Urteil in den Chat und beende deine Nachricht mit der Frage, ob es so stehen bleiben soll. ' +
-    'Schreib die Antwort „Ich bestätige die Bewertung.“ dabei aus.',
-  '- Rufe submit_result in diesem Zug nicht auf. Erst wenn die Person geantwortet hat, und dann mit ' +
-    'confirmed=true.'
+  '- Rufe submit_result in diesem Zug nicht auf. Erst wenn die Person bestätigt hat, und dann mit ' +
+    'confirmed=true. Wählt sie „Anpassungen vornehmen“, arbeitest du sie ein und fragst erneut.',
+  '- Schreib dein Urteil in den Chat, und der letzte Satz deiner Nachricht ist die Frage, ob es so stehen ' +
+    'bleiben soll. Die Antworten dazu werden ihr als Buttons angeboten; du listest keine Antwortvorschläge ' +
+    'auf und schreibst nach der Frage keinen Satz mehr.'
 ].join('\n');
 
 /**

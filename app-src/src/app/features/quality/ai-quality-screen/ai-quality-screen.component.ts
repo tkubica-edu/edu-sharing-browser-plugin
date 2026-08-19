@@ -42,6 +42,20 @@ const STEP_MESSAGE: Record<Exclude<CheckStep, 'done'>, string> = {
 };
 
 /**
+ * The two answers each step offers as chips, in the order they are shown. Handed to the widget rather than left
+ * to it: its own generator composes the chips from the assistant's answer and regularly offers something else
+ * entirely — *„Was bedeuten die Lizenzen?"* under the question whose content this is — and a step whose way on
+ * is a tap needs that tap to be there. They stand for the whole step, so a person who asks for changes is
+ * offered the same two again in the turn after, which is what eventually carries the check to its end.
+ */
+const STEP_REPLIES: Record<Exclude<CheckStep, 'done'>, readonly string[]> = {
+  origin: ['Inhalt selbst erstellt', 'Fremder Inhalt'],
+  proofread: ['Ich bestätige die Korrekturen', 'Korrekturen überspringen'],
+  quality: ['Qualität bestätigen', 'Anpassungen vornehmen'],
+  enrichment: ['Metadaten bestätigen', 'Anpassungen vornehmen']
+};
+
+/**
  * Asked before the step is walked back out of: the dialogue lives in the chat widget, which is destroyed with
  * this screen, and the check cannot be picked up halfway — the next entry opens a new conversation.
  */
@@ -270,6 +284,12 @@ export class AiQualityScreenComponent implements OnDestroy {
         `${quoted} of them the content's own text)\n${task}`,
     );
     return { text: task, message: STEP_MESSAGE[step] };
+  });
+
+  /** What the open step offers as chips; nothing once the check is through — see {@link STEP_REPLIES}. */
+  protected readonly quickReplies = computed<readonly string[]>(() => {
+    const step = this.step();
+    return step === 'done' ? [] : STEP_REPLIES[step];
   });
 
   constructor() {

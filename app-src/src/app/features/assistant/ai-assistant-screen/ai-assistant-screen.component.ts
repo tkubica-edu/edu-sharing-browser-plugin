@@ -173,6 +173,14 @@ export class AiAssistantScreenComponent implements OnDestroy {
   readonly resultSchema = input<Record<string, unknown> | null>(null);
 
   /**
+   * The replies to offer as chips under the assistant's answers, in the order they are to appear. Stated, the
+   * widget puts exactly these to the person and its own generator is out of it — which is what makes a step's
+   * two answers dependable. They stand until this input names others, so every turn of a step offers the same
+   * way on; an empty list hands the chips back to the widget.
+   */
+  readonly quickReplies = input<readonly string[]>([]);
+
+  /**
    * What the assistant submitted, one per turn — including the turns that submitted nothing, so that a run cut
    * off by a cap is not indistinguishable from one that had nothing to add.
    */
@@ -204,6 +212,9 @@ export class AiAssistantScreenComponent implements OnDestroy {
 
   /** The schema last set on the element, compared as text since it is an attribute. */
   private schema: string | null = null;
+
+  /** The chips last set on the element, compared as text for the same reason. */
+  private replies: string | null = null;
 
   /** The timer holding a follow-up task, while one is waiting — see {@link FOLLOW_UP_DELAY_MS}. */
   private followUp: number | null = null;
@@ -255,6 +266,9 @@ export class AiAssistantScreenComponent implements OnDestroy {
     // it judged it. Both the shape and the request are re-read here, in that order: the widget applies a
     // changed schema from the next turn on, and the next turn is the one this is about to start.
     effect(() => this.ask(this.task(), this.resultSchema()));
+    // Independent of the task: a step may change what it offers without asking anything new, and the chips
+    // apply to whichever turn comes next.
+    effect(() => this.offer(this.quickReplies()));
     // Registered for as long as the screen is open, not only once a schema is stated: the widget dispatches
     // on `window` because its own view sits in a shadow root, and the listener has to be there before the
     // task goes out — the first turn is the one that answers it.
@@ -302,9 +316,13 @@ export class AiAssistantScreenComponent implements OnDestroy {
       // The widget's master skill, and only where the panel states something about it: the attribute has
       // three states rather than two, and it is its absence that leaves the skill to the operator's own
       // configuration. See ChatSkillService.
-      ...(masterSkill ? { 'master-skill': masterSkill } : {})
+      ...(masterSkill ? { 'master-skill': masterSkill } : {}),
+      // The chips the embedding screen wants offered; left out where it names none, so the widget composes
+      // its own. See {@link AiAssistantScreenComponent.offer}.
+      ...(this.quickReplies().length ? { 'quick-replies': JSON.stringify(this.quickReplies()) } : {})
     };
     this.schema = schema ? JSON.stringify(schema) : null;
+    this.replies = this.quickReplies().length ? JSON.stringify(this.quickReplies()) : null;
     // One line per attribute, and the values whole rather than abbreviated: every one of them is read once
     // as the element connects and never again, so what stands here is what this conversation runs on for as
     // long as it lasts. Cut short, the one that was wrong would be the one that was cut.
@@ -402,6 +420,25 @@ export class AiAssistantScreenComponent implements OnDestroy {
       this.followUp = null;
       this.put(task, 'follow-up');
     }, FOLLOW_UP_DELAY_MS);
+  }
+
+  /**
+   * Put the chips the screen wants offered on the element. The widget carries them into every turn it sends
+   * until they are replaced, so they are set per step rather than per turn — and they are the one way the panel
+   * decides what the person can tap: left to itself, the widget composes the chips from the assistant's answer
+   * with a generator nothing here can reach, which answers a question about the content with offers about the
+   * collection.
+   */
+  private offer(replies: readonly string[]): void {
+    const element = this.element;
+    if (!element) return;
+    const stated = replies.length ? JSON.stringify(replies) : null;
+    if (stated === this.replies) return;
+    this.replies = stated;
+    // Emptied rather than removed: the attribute is read as it changes, and an empty array is what hands the
+    // chips back to the widget.
+    element.setAttribute('quick-replies', stated ?? '[]');
+    this.trace(`→ quick-replies = ${stated ?? '[]'}`);
   }
 
   /**

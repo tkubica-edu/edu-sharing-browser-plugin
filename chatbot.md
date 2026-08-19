@@ -19,6 +19,9 @@ one of the three packaged bundles that talks to a backend of its own.
 - [Weak points](#weak-points)
 - [What is still open in the KI check](#what-is-still-open-in-the-ki-check)
 
+The **data contract** on top of this — every context field, every task, every result schema and the node
+properties an answer is recorded in — is [CHATBOT-IO.md](CHATBOT-IO.md).
+
 **Keeping this file current.** It describes `app-src/src/app/features/assistant/`,
 `app-src/src/app/features/quality/ai-quality-screen/`, `app-src/src/app/util/page-context.ts`,
 `app-src/src/app/util/quality-check-request.ts`, the
@@ -129,6 +132,11 @@ attribute off the element altogether is what defers to the operator's own config
 defaulting to the operator's, and `ChatSkillService.masterSkillAttribute()` returns `null` for that
 state so the attribute is never written — an empty value would be read as the same thing by this
 version of the widget only.
+
+`quick-replies` takes a JSON array of strings and prescribes the chips under the assistant's answers, for as
+long as it stands: the widget sends them along as `forced_quick_replies`, and its own generator is out of it.
+Set per step by the KI check, see [the chips](#the-ki-quality-check--about-the-curated-content); an empty
+array hands the chips back to the widget.
 
 Two more are set where a screen wants an answer it can record — `result-schema` and, with it,
 `engine="agent"`. They belong together: under the default engine a schema takes no effect at all, and
@@ -475,50 +483,36 @@ the person has replied. The two tasks that quote the content also repeat their c
 quoted text** (`PROOFREAD_REMINDER`, `QUALITY_REMINDER`) — the text is the last thing read before the answer,
 and rules thousands of characters above it lose to it.
 
-**A side effect worth knowing about: the chips now offer the confirmation.** Prescribing them is
-impossible — no widget attribute, no `Environment` field, and an explicit instruction in the task is
-ignored by the generator (measured). But the generator reads the answer, and an answer that ends in a
-question about confirming produces chips about confirming: *„Ich bestätige das Urteil zur
-Linsengleichung."* / *„Bewertung zur Linsengleichung korrigieren"*, and *„Ja, Metadaten so übernehmen"*
-/ *„Ich möchte die Metadaten korrigieren"*. Not a guarantee — a consequence of what the answer says.
-
-The opening question benefits from this more than anything else does: it is a question with exactly two
-answers, and the generator turns it into exactly two chips. Left to itself it words them anew each run —
-*„Das ist mein eigener Inhalt"* / *„Das ist ein fremder Inhalt"* in one, *„Eigener Inhalt, von mir
-erstellt"* / *„Fremder Inhalt, den ich nur einordne"* in another — so the task names both answers instead
-and gets the same two every time: **„Inhalt selbst erstellt"** / **„Fremder Inhalt"**, measured across
-runs whose guess pointed either way, and tapping either one submits `origin` accordingly with the guess
-beside it. The person taps rather than types, without the panel drawing a control for it.
-
-**Where the two answers stand in the message decides whether both come back.** Named in a line of their
-own behind the question — *„**Antwortvorschläge:** „Inhalt selbst erstellt" oder „Fremder Inhalt""* — they
-read as a remark about the conversation rather than as the answers to the question being asked, and the
-generator ignores them and invents a single chip of its own wording (*„Ja, ich habe den Inhalt selbst
-erstellt."*, observed). The task therefore asks for them **inside the closing question sentence** — *„Ist
-es „Inhalt selbst erstellt" oder „Fremder Inhalt"?"* — and forbids anything after it: no suggestion line,
-no list, no closing sentence.
-
-**So the chip is asked for through the answer, which is the only lever there is.** Each of the three
-tasks that end in a confirmation closes with the same line: end on the question, and write the confirming
-answer out — *„Ich bestätige die Korrekturen."*, *„Ich bestätige die Bewertung."*, *„Ich bestätige die
-Metadaten."* — with the addition that it is a suggestion and not a requirement, so the assistant does not
-go on to demand that sentence back word for word. It writes it out as an *Antwortvorschlag*, the
-generator reads it, and it comes back as the first chip, verbatim:
+**The chips are prescribed, not hoped for.** The widget takes a `quick-replies` attribute — a JSON array of
+strings — and carries it into every turn it sends (`forced_quick_replies` in the environment), so the person
+is offered exactly what the panel names until the panel names something else. The check sets it per step
+(`STEP_REPLIES` at the check screen, handed down through `AiAssistantScreenComponent.quickReplies`):
 
 | step | chips |
 |---|---|
-| language pass | *„Ich bestätige die Korrekturen."* / *„Ich verwerfe die Korrekturen."* |
-| judgement | *„Ich bestätige die Bewertung."* / *„Ich möchte die Bewertung korrigieren."* |
-| enrichment | *„Ich bestätige die Metadaten."* / *„Ich möchte die Metadaten korrigieren."* |
+| whose content | *„Inhalt selbst erstellt"* / *„Fremder Inhalt"* |
+| language pass | *„Ich bestätige die Korrekturen"* / *„Korrekturen überspringen"* |
+| judgement | *„Qualität bestätigen"* / *„Anpassungen vornehmen"* |
+| enrichment | *„Metadaten bestätigen"* / *„Anpassungen vornehmen"* |
 
-**Writing the sentence out is what does it, not asking for it.** Measured against the same task with one
-line changed — *„Stell die Frage so, dass „Ich bestätige die Bewertung." wörtlich darauf passt, aber
-schreib diesen Satz nicht als Vorschlag aus"* — the answer still ended in **„Soll die Bewertung so
-stehen bleiben?"**, and the chips came back *„Zeig mir weitere Infoblätter zur Optik"* / *„Erstelle ein
-Arbeitsblatt zur Linsengleichung"*: the confirmation was gone. The generator works from the words in the
-answer, so the words have to be there. The panel draws no chip of its own — there would be no way to put
-its answer into the conversation as the person's anyway, since the widget forwards no `sendMessage` and
-`startTask()` shows up under its own *„Auftrag der Seite"* label.
+They stand for the whole step, which is what carries the check to an end: a person who asks for changes is
+offered the same pair again in the turn after, and the way to confirm never leaves the screen. The tasks are
+correspondingly free of chip engineering — they name the two answers so the wording of the question matches
+the buttons, and they still have to **end on the question**, because a message that closes on something else
+leaves the buttons answering nothing.
+
+**Why this replaced the previous arrangement.** Before the attribute existed, the chips were composed by the
+backend's own generator from the assistant's answer, and nothing outside the conversation could reach it. The
+task could only shape the answer and hope: an answer ending in a confirming question mostly produced
+confirming chips, but the failures were routine and unfixable from here — *„Was bedeuten die Lizenzen?"* /
+*„Erstelle mir eine Checkliste zur Quellenprüfung"* under the question whose content it is, *„Erstelle ein
+Arbeitsblatt zur Linsenoptik"* under the corrections. Two rounds of prompt engineering (quoting both answers
+inside the question, forbidding any sentence after it) improved the odds and never made them dependable.
+
+The panel draws no chip of its own, and never needs to: there would be no way to put its answer into the
+conversation as the person's anyway — the widget forwards no `sendMessage`, and `startTask()` shows up under
+its own *„Auftrag der Seite"* label. `quick-replies` is the one place the panel decides what a turn can be
+answered with.
 
 They are asked in turn rather than together because both run under the same iteration and token caps:
 asked at once they compete for them, and whichever the model reaches last is the one that suffers.

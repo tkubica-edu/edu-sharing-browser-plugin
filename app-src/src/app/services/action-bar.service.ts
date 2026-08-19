@@ -7,6 +7,15 @@ import { NavigationService } from './navigation.service';
 import { PageRecognitionService } from './page-recognition.service';
 
 /**
+ * Asked before the KI check is closed while one of its steps is still unanswered: what the dialogue got to is
+ * written either way, and the person is told what that means rather than kept in the step. Skipped once both
+ * halves are in — see the `ai-quality` case.
+ */
+const AI_CHECK_UNFINISHED =
+  'Die KI-Prüfung ist noch nicht abgeschlossen: Es wird nur gespeichert, was im Dialog bisher bestätigt ' +
+  'wurde. Trotzdem abschließen?';
+
+/**
  * What the metadata screen hands to the footer: how to save, and whether saving is possible right now.
  * `canSave` is a signal, so the footer derives its state instead of being pushed to. `save` answers whether the
  * write succeeded, since the footer's action continues on the back of it.
@@ -241,22 +250,26 @@ export class ActionBarService {
       }
 
       // "Individuelle Qualitätsprüfung mit KI": the dialogue with the assistant IS the step, and it ends
-      // it — the check has both halves in by then, the quality judged and the metadata enriched, so the
-      // way on is out of the flow rather than into a further view. What it waits for is that both
-      // answers are in, not that they are good ones: the assistant judges every criterion and the person
-      // decides what to do with that, which is the difference from the structured check, where the
-      // ticked boxes ARE the decision. Until both are in, the way back is all there is.
+      // it — the way on is out of the flow rather than into a further view. What it records is what the
+      // dialogue got to: the assistant judges every criterion and the person decides what to do with that,
+      // which is the difference from the structured check, where the ticked boxes ARE the decision.
+      //
+      // The way on stays open throughout, even where a step is still unanswered: a dialogue can stall on a
+      // content the assistant cannot judge, and a person who has to leave it must not be left with the back
+      // button as their only way out. What an unfinished check costs them is a question before the write —
+      // see {@link AI_CHECK_UNFINISHED} — and skipped once both halves are in, which is the state the button
+      // used to wait for.
       case 'ai-quality': {
         if (this.curation.qualityConfirmed()) return [this.backAction()];
+        const answered =
+          this.curation.qualityCriteriaJudged() && this.curation.qualityMetadataEnriched();
         return [
           this.backAction(),
           {
             label: this.curation.saving() ? 'Speichern…' : 'Abschließen und zur Inhaltsübersicht',
-            disabled:
-              !this.curation.qualityCriteriaJudged() ||
-              !this.curation.qualityMetadataEnriched() ||
-              this.curation.saving(),
+            disabled: this.curation.saving(),
             run: async () => {
+              if (!answered && !confirm(AI_CHECK_UNFINISHED)) return;
               // The same write as in the structured check: the criteria go onto the content and the
               // quality workflow is started with them (CurationService.confirmQuality).
               await this.curation.confirmQuality();
