@@ -191,12 +191,6 @@ export class AiAssistantScreenComponent implements OnDestroy {
   /** The timer waiting for the conversation to be on screen, while one is running. */
   private shellWait: number | null = null;
 
-  /** When this screen opened, so every line of the trace can say how far into the conversation it happened. */
-  private readonly opened = performance.now();
-
-  /** When the last thing went out, so the answer can be timed. Null while nothing is outstanding. */
-  private sent: number | null = null;
-
   /** How many answers have come back, to number the turns in the trace. */
   private turns = 0;
 
@@ -215,14 +209,11 @@ export class AiAssistantScreenComponent implements OnDestroy {
     const stopReason = typeof detail?.stop_reason === 'string' ? detail.stop_reason : 'unknown';
     const result = detail?.result ?? null;
     this.turns += 1;
-    // A turn the person typed has no `sent` of ours in front of it — then the time is left out rather
-    // than measured from something unrelated.
-    this.trace(`← agent-result (turn ${this.turns})${this.answeredIn()}`, {
+    this.trace(`← agent-result (turn ${this.turns})`, {
       stopReason,
       submitted: result !== null,
       result
     });
-    this.sent = null;
     this.agentResult.emit({ result, stopReason });
   };
 
@@ -361,20 +352,8 @@ export class AiAssistantScreenComponent implements OnDestroy {
       this.trace('→ replaceContext (opening)', this.current);
       element.replaceContext?.(this.current);
       if (!task) return;
-      if (!element.setHostInstruction) {
-        // Without it the screen shows a chat that was never asked anything, and the person is left to word
-        // the task the panel meant to put — worth a line, since nothing else would show.
-        console.warn(`${LOG} <${CHAT_TAG}> exposes no setHostInstruction — the screen's task was not put`);
-        return;
-      }
-      // Whole, and on its own line: this text is the request the whole check hangs on, and reading it back
-      // is the only way to tell a task that was worded badly from one that never went out.
-      this.trace(
-        `→ setHostInstruction, shown as „${task.message}“ (${task.text.length} characters)\n${task.text}`,
-      );
       this.asked = task.text;
-      this.sent = performance.now();
-      element.setHostInstruction(task.text, { trigger: 'now', message: task.message });
+      this.put(task, 'opening');
     });
   }
 
@@ -394,24 +373,45 @@ export class AiAssistantScreenComponent implements OnDestroy {
     if (stated && stated !== this.schema) {
       element.setAttribute('result-schema', stated);
       this.schema = stated;
-      this.trace(`→ result-schema = ${stated}`);
+      // The schema goes to the log as the object it is, not as the text the attribute takes: the console
+      // renders one as a tree that folds and the other as a wall the width of the panel.
+      this.trace(`→ result-schema (${stated.length} characters)`, schema);
     }
     this.asked = task.text;
     if (this.followUp !== null) clearTimeout(this.followUp);
     this.trace(
       `→ setHostInstruction in ${FOLLOW_UP_DELAY_MS}ms, shown as „${task.message}“ ` +
-        `(${task.text.length} characters)\n${task.text}`,
+        `(${task.text.length} characters)`,
     );
     this.followUp = window.setTimeout(() => {
       this.followUp = null;
-      if (!this.element?.setHostInstruction) {
-        console.warn(`${LOG} <${CHAT_TAG}> exposes no setHostInstruction — the follow-up task was not put`);
-        return;
-      }
-      this.trace('→ setHostInstruction (follow-up) goes out now');
-      this.sent = performance.now();
-      this.element.setHostInstruction(task.text, { trigger: 'now', message: task.message });
+      this.put(task, 'follow-up');
     }, FOLLOW_UP_DELAY_MS);
+  }
+
+  /**
+   * Hand one task to the widget, and put its instruction on the record in the same breath.
+   *
+   * The instruction never appears in the conversation — the person reads `task.message` in its place, and the
+   * widget carries the text itself in the turn's environment as `host_instruction`. This line is therefore the
+   * only place the wording can be read back from: whole, verbatim, on its own line, and written at the moment
+   * of the hand-over rather than when the task was worded, so that what the log shows is what actually went
+   * out. A check that answered the wrong question is told apart from one that was asked the wrong thing here
+   * or nowhere.
+   */
+  private put(task: AssistantTask, occasion: string): void {
+    const element = this.element;
+    if (!element?.setHostInstruction) {
+      // Without it the screen shows a chat that was never asked anything, and the person is left to word the
+      // task the panel meant to put — worth a line, since nothing else would show.
+      console.warn(`${LOG} <${CHAT_TAG}> exposes no setHostInstruction — the ${occasion} task was not put`);
+      return;
+    }
+    this.trace(
+      `→ setHostInstruction (${occasion}), shown as „${task.message}“, ` +
+        `${task.text.length} characters going out as host_instruction:\n${task.text}`,
+    );
+    element.setHostInstruction(task.text, { trigger: 'now', message: task.message });
   }
 
   /**
@@ -498,22 +498,16 @@ export class AiAssistantScreenComponent implements OnDestroy {
   }
 
   /**
-   * One line of this conversation's trace, stamped with how long the screen has been open. The stamp is what
-   * makes the log readable as a sequence: everything here is asynchronous — the bundle, the widget's own boot,
-   * the answers — and which of them happened before which is the whole question when a chat stays empty.
+   * One line of this conversation's trace. Everything here is asynchronous — the bundle, the widget's own boot,
+   * the answers — and which of them happened before which is the whole question when a chat stays empty, so the
+   * order the lines are written in is what the trace is read for.
    *
    * `→` is what goes to the widget, `←` what comes back from it. A turn the person typed shows only as `←`;
    * their message never passes through this component.
    */
   private trace(message: string, detail?: unknown): void {
-    const stamp = `${LOG} +${Math.round(performance.now() - this.opened)}ms`;
-    if (detail === undefined) console.log(`${stamp} ${message}`);
-    else console.log(`${stamp} ${message}`, detail);
-  }
-
-  /** How long the answer took, where it answers something this component sent; nothing where it does not. */
-  private answeredIn(): string {
-    return this.sent === null ? '' : ` after ${Math.round(performance.now() - this.sent)}ms`;
+    if (detail === undefined) console.log(`${LOG} ${message}`);
+    else console.log(`${LOG} ${message}`, detail);
   }
 }
 
