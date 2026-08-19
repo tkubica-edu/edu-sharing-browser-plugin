@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { CollectionServiceUnwrapped, HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 import { firstValueFrom } from 'rxjs';
 
+import type { SectionId } from '../model/navigation';
 import { REVIEW_RECEIVER, WorkflowStatus } from '../model/workflow';
 import {
   createdAtOf, fieldOrigins, isPickedPicture, previewImageOf, previewSrcOfNode, toDataUrl,
@@ -303,6 +304,20 @@ export class CurationService {
   /** Take over the collections the user's own filing step picked — see {@link personalCollections}. */
   setPersonalCollections(collections: readonly Collection[]): void {
     this.personalCollectionsState.set([...collections]);
+  }
+
+  /**
+   * The checking process the junction marked — the structured Qualitätsprüfung or the KI dialogue. Held
+   * here because the choice outlives the screen that makes it: opening a process tears that screen down,
+   * so coming back to the junction finds the marked process only if the flow remembers it. Null until a
+   * process was marked.
+   */
+  private readonly checkProcessState = signal<SectionId | null>(null);
+  readonly checkProcess = this.checkProcessState.asReadonly();
+
+  /** Take over the process the choice step marked — see {@link checkProcess}. */
+  setCheckProcess(section: SectionId | null): void {
+    this.checkProcessState.set(section);
   }
 
   readonly running = this.metadataAgent.running;
@@ -1495,6 +1510,8 @@ export class CurationService {
     this.editorialTargetsState.set([]);
     this.storageParentState.set(null);
     this.personalCollectionsState.set([]);
+    // Which process a content is checked in is a statement about that content, not a standing preference.
+    this.checkProcessState.set(null);
     this.extractionUrl.set(null);
     // The page to erschließen belongs to the content that is going; the next one names its own.
     this.pendingExtractionState.set(null);

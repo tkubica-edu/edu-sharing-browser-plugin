@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, computed, inject } from '@angular/core';
 
 import { SectionId } from '../../../model/navigation';
 import { ActionBarService, ApplyHandler } from '../../../services/action-bar.service';
+import { CurationService } from '../../../services/curation.service';
 import { NavigationService } from '../../../services/navigation.service';
 import { resetChatSession } from '../../../util/chat-session';
 
@@ -26,9 +27,7 @@ interface FlowOption {
 export class FlowChoiceScreenComponent implements OnDestroy {
   private readonly navigation = inject(NavigationService);
   private readonly actionBar = inject(ActionBarService);
-
-  /** The marked process — preset in the constructor, so the way on is open from the start. */
-  private readonly selected = signal<SectionId | null>(null);
+  private readonly curation = inject(CurationService);
 
   private readonly allOptions: readonly FlowOption[] = [
     {
@@ -50,6 +49,20 @@ export class FlowChoiceScreenComponent implements OnDestroy {
     this.allOptions.filter((option) => this.navigation.isVisible(option.section)),
   );
 
+  /**
+   * The marked process: the one the flow holds for this content (CurationService.checkProcess), so a
+   * process opened and left again is found marked on the way back. Where nothing is marked yet — or what
+   * is marked cannot be entered any more — the first process on offer stands in, which heads the list
+   * with the guided Qualitätsprüfung and keeps the way on open from the start.
+   */
+  private readonly selected = computed<SectionId | null>(() => {
+    const options = this.options();
+    const marked = this.curation.checkProcess();
+    return options.some((option) => option.section === marked)
+      ? marked
+      : options[0]?.section ?? null;
+  });
+
   /** The way on: the process that is marked, opened by the footer. */
   private readonly handler: ApplyHandler = {
     apply: () => this.open(this.selected()),
@@ -58,9 +71,6 @@ export class FlowChoiceScreenComponent implements OnDestroy {
 
   constructor() {
     this.actionBar.registerApplyHandler(this.handler);
-    // The guided Qualitätsprüfung is the ordinary process, so it is marked to begin with — it heads
-    // the list, and where it is not on offer the first process that is takes its place.
-    this.selected.set(this.options()[0]?.section ?? null);
   }
 
   ngOnDestroy(): void {
@@ -73,7 +83,7 @@ export class FlowChoiceScreenComponent implements OnDestroy {
 
   /** Mark a process, so the footer's way on knows which step it opens. */
   protected select(option: FlowOption): void {
-    this.selected.set(option.section);
+    this.curation.setCheckProcess(option.section);
   }
 
   /** Open the marked process's step. The mark stays, so coming back finds the choice as it was left. */
