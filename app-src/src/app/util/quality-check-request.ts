@@ -219,10 +219,15 @@ export function originSchemaOf(): Record<string, unknown> {
  * turn that read the content as well would spend its answer on findings nobody has asked for yet — so the task
  * ends at the question, and the answer is the person's to give.
  *
- * Both answers are named word for word, so that both are offered as reply chips: the widget composes those
- * from the answer the assistant just gave, and nothing outside the conversation can set them. A question of
- * two answers is the one place where that matters most — tapping one is the whole turn the person has to
- * take, and a typed answer has to be understood before it can be believed.
+ * Both answers are named word for word *inside the closing question*, so that both are offered as reply chips:
+ * the widget composes those from the answer the assistant just gave, and nothing outside the conversation can
+ * set them. A question of two answers is the one place where that matters most — tapping one is the whole turn
+ * the person has to take, and a typed answer has to be understood before it can be believed.
+ *
+ * Where they stand is what decides it. Listed after the question under a heading of their own — „Antwortvorschläge:
+ * …“ — they read as text about the conversation rather than as the answers to the question that is being asked,
+ * and the generator falls back to inventing one chip of its own wording. Written into the question sentence, they
+ * are what the question offers, and both come back as chips.
  */
 export function originInstructionOf(subject: CheckSubject): string {
   // Accusative: it reads "… dass ihr jetzt gemeinsam <named> prüft".
@@ -237,12 +242,14 @@ export function originInstructionOf(subject: CheckSubject): string {
     `- angemeldet ist: ${subject.signedIn ?? 'unbekannt'}`,
     'Eine fremde Website als Quelle spricht für einen fremden Inhalt; ein Urheber, der der angemeldeten ' +
       'Person entspricht, für einen eigenen. Sag ausdrücklich, dass das deine Vermutung ist.',
-    'Stell ihr dann genau eine Frage: Ist das ein eigener Inhalt — von ihr selbst erstellt oder von ihr ' +
-      'verantwortet — oder ein fremder, den sie nur einordnet? Ihre Antwort gilt, auch wenn sie deiner ' +
-      'Vermutung widerspricht.',
-    'Beende deine Nachricht mit dieser Frage und schreib dabei beide Antworten aus, in dieser Reihenfolge, ' +
-      'damit sie ihr als Antwortvorschläge angeboten werden: „Inhalt selbst erstellt“ und „Fremder ' +
-      'Inhalt“. Das sind Vorschläge, keine Vorgabe — sie darf auch mit eigenen Worten antworten.',
+    'Stell ihr dann genau eine Frage: ob sie den Inhalt selbst erstellt beziehungsweise verantwortet oder ob ' +
+      'es ein fremder ist, den sie nur einordnet. Ihre Antwort gilt, auch wenn sie deiner Vermutung ' +
+      'widerspricht.',
+    'Schreib beide Antworten wörtlich in diesen Fragesatz hinein, in dieser Reihenfolge — etwa so: Ist es ' +
+      '„Inhalt selbst erstellt“ oder „Fremder Inhalt“? Diese Frage ist das Letzte in deiner Nachricht: keine ' +
+      'gesonderte Zeile mit Antwortvorschlägen, keine Aufzählung der Antworten und kein Satz danach. Es sind ' +
+      'Vorschläge, keine Vorgabe — sie darf auch mit eigenen Worten antworten, verlang also nicht genau diese ' +
+      'Worte zurück.',
     'Beurteile in diesem Zug nichts und lies den Inhalt nicht. Es geht allein um diese Frage.',
     'Warte ihre Antwort ab. Rufe submit_result ERST auf, wenn sie geantwortet hat — mit herkunft="eigen" ' +
       'oder herkunft="fremd" und deiner Vermutung in vermutung. Setz herkunft nicht auf deine Vermutung.',

@@ -450,6 +450,14 @@ and gets the same two every time: **„Inhalt selbst erstellt"** / **„Fremder 
 runs whose guess pointed either way, and tapping either one submits `herkunft` accordingly with the guess
 beside it. The person taps rather than types, without the panel drawing a control for it.
 
+**Where the two answers stand in the message decides whether both come back.** Named in a line of their
+own behind the question — *„**Antwortvorschläge:** „Inhalt selbst erstellt" oder „Fremder Inhalt""* — they
+read as a remark about the conversation rather than as the answers to the question being asked, and the
+generator ignores them and invents a single chip of its own wording (*„Ja, ich habe den Inhalt selbst
+erstellt."*, observed). The task therefore asks for them **inside the closing question sentence** — *„Ist
+es „Inhalt selbst erstellt" oder „Fremder Inhalt"?"* — and forbids anything after it: no suggestion line,
+no list, no closing sentence.
+
 **So the chip is asked for through the answer, which is the only lever there is.** Each of the three
 tasks that end in a confirmation closes with the same line: end on the question, and write the confirming
 answer out — *„Ich bestätige die Korrekturen."*, *„Ich bestätige die Bewertung."*, *„Ich bestätige die
