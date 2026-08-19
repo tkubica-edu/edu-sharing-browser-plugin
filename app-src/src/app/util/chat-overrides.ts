@@ -26,9 +26,14 @@ const CSS = `
 /* The AI notice and the widget's suggested replies under an answer the check has already moved past: the row
    after it is the panel's own instruction, so what that answer noted and offered is no longer what the
    person is being asked. The condition is on the following row, which is what :has(+ …) states — an answer
-   keeps both for as long as it is the last thing said. */
-.messages-area > .message-row.bot-row:has(+ .message-row.user-row:has(.host-bubble)) .ai-notice,
-.messages-area > .message-row.bot-row:has(+ .message-row.user-row:has(.host-bubble)) boerdi-quick-replies {
+   keeps both for as long as it is the last thing said.
+
+   The row after is a .user-row and what marks it as the panel's is the .host-bubble inside it, so the
+   relative selector reaches that far down in one step. It has to: :has() may not be nested inside :has(),
+   and a nested one is a syntax error — which takes the whole rule with it, both lines included, so nothing
+   was hidden anywhere. Measured in the browser: 0 rules parsed, and querySelectorAll throws on it. */
+.messages-area > .message-row.bot-row:has(+ .message-row.user-row .host-bubble) .ai-notice,
+.messages-area > .message-row.bot-row:has(+ .message-row.user-row .host-bubble) boerdi-quick-replies {
   display: none;
 }
 
