@@ -196,6 +196,13 @@ input[type='checkbox'] {
   es-spinner { --es-spinner-size: 44px; }
 }
 
+// Why the left list decides whether the step goes on, right under its heading. Quiet like the
+// footnote below the lists: it explains a list, it does not stand among its criteria.
+.gate-hint {
+  margin: -4px 0 10px;
+  font-size: 11px;
+}
+
 // What the star behind a criterion means. Small and quiet: it explains a mark, it does not compete
 // with the criteria it stands under.
 .footnote {

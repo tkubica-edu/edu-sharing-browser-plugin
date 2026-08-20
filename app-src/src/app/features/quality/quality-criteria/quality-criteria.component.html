@@ -26,6 +26,16 @@
     <div class="criteria-group">
       <div class="criteria-column">
         <h3>Such-Veröffentlichung</h3>
+        <!-- Why this one of the two lists gates the step, stated at the list it is about: the
+             confirmation and the Metadaten view behind it wait for every criterion in it (see
+             knockoutSatisfied). Gone once the confirmation was given — the gate is behind the
+             user then, not in front. -->
+        @if (!confirmed()) {
+          <p class="note gate-hint">
+            Alle Kriterien dieser Kategorie müssen als erfüllt bestätigt werden. Erst dann lässt sich die
+            Qualität bestätigen und mit den Metadaten weiterarbeiten.
+          </p>
+        }
         <ul class="criteria">
           @for (criterion of knockoutCriteria(); track criterion.id) {
             <li>
