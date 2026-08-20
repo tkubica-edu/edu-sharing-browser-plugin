@@ -256,6 +256,14 @@ auswählen* → *Qualitätsprüfung* → *Inhaltsübersicht*.
 on boot) → *Metadaten anreichern* reads it through the plugin → the metadata screen → *Speichern*
 updates **that** node, never creating a second one → the same filing and checking steps.
 
+**Adding a file or a link.** *Inhalt hinzufügen* → *Datei oder Link* → the repository's own dialog
+reports the picked file or the entered link → `MaterialUploadService` creates the node in the picked
+folder (the inbox without a login) → the Erschließung's **Vorschau** step, where the new node's
+picture and title are checked (`ContentFlowService.showCurationPreview`) → *Weiter* writes them onto
+that node → the same filing and checking steps. A **link** carries its own source page along: the
+metadata view erschließt it when it opens, so the description starts from that page rather than from
+the bare URL the node holds.
+
 **Picking a content takes the tab with it**: a node chosen in *Meine Inhalte* or im *Verlauf* opens
 its own page in the repository (`…/components/render/<id>`) and the panel comes back there on
 *Inhaltsoptionen*, working on that same node (`ContentFlowService.showContentOptions`). See

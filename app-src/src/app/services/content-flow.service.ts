@@ -87,6 +87,15 @@ export class ContentFlowService {
   }
 
   /**
+   * The preview step of "Inhalt erschließen": the picture and the title of the content, checked before anything
+   * else is done with it. Where a content that was just added goes — it exists as a node, but nothing has
+   * described it yet, and this is the step that does. Its own footer carries the flow on from there.
+   */
+  showCurationPreview(): void {
+    this.navigation.go('curation-preview');
+  }
+
+  /**
    * "Qualitätsprüfung": the quality and metadata step, straight from a node — nothing to decide.
    * On the Qualität tab: that is what the step is entered for, and the metadata are worked on off
    * the back of it.

@@ -311,9 +311,11 @@ export const SECTIONS: readonly AppSection[] = [
     label: 'Inhalt erschließen',
     description: 'Vorschaubild und Titel des erschlossenen Inhalts prüfen',
     // The second step of "Inhalt erschließen", and the one that writes the content: confirming picture and
-    // title creates the node. The condition is the curated content rather than the unsaved draft, so the
-    // step stays returnable once that node exists and then works on it.
-    visible: requiresLogin((c) => c.hasCuratedContent),
+    // title creates the node. Editable metadata rather than a curated content, so the step is not the
+    // Erschließung's alone — a content that was just added has a node and nothing said about it yet, and this
+    // is where it is described (see ContentFlowService.showCurationPreview). It also keeps the step returnable
+    // once the node exists, and then it works on that node.
+    visible: requiresLogin((c) => c.hasEditableMetadata),
     tabs: [{ id: 'curation-preview', label: 'Vorschau' }]
   },
   {

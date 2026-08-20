@@ -124,15 +124,15 @@ export class AddMaterialScreenComponent implements OnDestroy {
     try {
       const [node] = await this.upload.create(result);
       if (!node) return;
-      // Same handover as a newly created document: hydrate the node into the flow (which records
-      // it in the history), then enter the big step it calls for — for an added material that is
-      // normally the Qualitätsprüfung.
+      // Hydrate the node into the flow (which records it in the history), then hand over to the step
+      // that describes it: the material is in the repository, but nothing has been said about it yet,
+      // and picture and title are what the content is recognised by everywhere else.
       await this.curation.openNode(node.nodeId);
       // A link brings its own source: the page it points at. The metadata editor erschließt it as
       // it opens, so the form starts from that page instead of from the bare URL the node carries.
       // (openNode resets this, so it is set afterwards.)
       if (result.kind === 'link') this.curation.extractionUrl.set(withScheme(result.link));
-      await this.flow.edit();
+      this.flow.showCurationPreview();
     } catch (cause: unknown) {
       this.error.set('Der Inhalt konnte nicht hinzugefügt werden: ' + errorMessage(cause));
     } finally {
