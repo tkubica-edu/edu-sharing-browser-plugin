@@ -53,8 +53,8 @@ export class AddMaterialScreenComponent implements OnDestroy {
   protected readonly saving = signal(false);
 
   private element: AddMaterialElement | null = null;
-  /** `chooseParent` the mounted element was created with; see {@link mount}. */
-  private mountedWithPicker: boolean | null = null;
+  /** The session state the mounted element was created with; see {@link mount}. */
+  private mountedLoggedIn: boolean | null = null;
 
   private readonly onResult = (event: Event): void => {
     const added = (event as CustomEvent).detail as AddMaterialResult | null;
@@ -64,8 +64,8 @@ export class AddMaterialScreenComponent implements OnDestroy {
   constructor() {
     afterRenderEffect({
       write: () => {
-        // Reads loggedIn() as well, so a login that arrives later re-creates the element with the
-        // location picker (the dialog reads dialogData once, at its own ngOnInit).
+        // Reads loggedIn() as well, so a login that arrives later re-creates the element for the
+        // session it can write with (the dialog reads dialogData once, at its own ngOnInit).
         this.auth.loggedIn();
         if (this.bundle.ready()) this.mount();
       }
@@ -84,20 +84,18 @@ export class AddMaterialScreenComponent implements OnDestroy {
   private mount(): void {
     const host = this.host()?.nativeElement;
     if (!host) return;
-    // The location picker, exactly as the repository shows it (create-menu / nodes-selector: no
-    // parent given ⇒ let the user choose one). It needs a session to browse and to write outside
-    // the inbox, so without a login it stays off and the node goes to the inbox — which is also
-    // the only thing that works where the panel runs without one.
-    const withPicker = this.auth.loggedIn();
-    if (this.element?.isConnected && this.mountedWithPicker === withPicker) return;
+    const loggedIn = this.auth.loggedIn();
+    if (this.element?.isConnected && this.mountedLoggedIn === loggedIn) return;
     this.detach();
     const element = document.createElement(MATERIAL_TAG) as AddMaterialElement;
     element.dialogData = {
-      // No parent: with the picker on, that is what makes the dialog ask for one (and it insists —
-      // its save stays disabled until a folder is picked); with it off, MaterialUploadService falls
-      // back to the inbox, where a curated content lands too.
+      // No parent and no picker: where the content is filed is asked once, by the "Persönliche
+      // Ablage" step of the flow this hands over to — that step moves the node into the folder it
+      // picks (CurationService.pendingStorageParent), so asking here as well would ask twice and
+      // let the two answers disagree. The material is created in the inbox meanwhile, where a
+      // curated content lands too (MaterialUploadService).
       parent: null,
-      chooseParent: withPicker,
+      chooseParent: false,
       childobject: false,
       // One material at a time — the flow it hands over to carries exactly one node.
       multiple: false,
@@ -109,14 +107,14 @@ export class AddMaterialScreenComponent implements OnDestroy {
     element.addEventListener('dialogResult', this.onResult);
     host.appendChild(element);
     this.element = element;
-    this.mountedWithPicker = withPicker;
+    this.mountedLoggedIn = loggedIn;
   }
 
   private detach(): void {
     this.element?.removeEventListener('dialogResult', this.onResult);
     this.element?.remove();
     this.element = null;
-    this.mountedWithPicker = null;
+    this.mountedLoggedIn = null;
   }
 
   /** Write the picked file / entered link into the repository and continue with the new node. */
