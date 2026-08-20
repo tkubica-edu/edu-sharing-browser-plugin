@@ -164,9 +164,9 @@ export class CurationService {
   }
 
   /**
-   * The page a content taken up from the Verlauf is still to be erschlossen from. Held until the run
-   * has answered and carried across a page change (SessionResumeService), because opening such a
-   * content takes the tab to it — see {@link runPendingExtraction}.
+   * The page a content taken up from the Verlauf is still to be erschlossen from. Held until the run has
+   * answered and carried across a page change (SessionResumeService), so a run cut short by the page the
+   * flow moves to is picked up again there — see {@link runPendingExtraction}.
    */
   private readonly pendingExtractionState = signal<string | null>(null);
   readonly pendingExtraction = this.pendingExtractionState.asReadonly();
@@ -859,8 +859,8 @@ export class CurationService {
     else this.applyLoadedNode(entry.nodeId, node, node.name ?? entry.title, source);
     this.applyStoredFlow(entry);
     // Only for an entry that carries no run: the page is erschlossen once more so the content has one.
-    // Marked here and run where the panel is settled, since opening a content this way takes the tab
-    // to it (see {@link runPendingExtraction}).
+    // Marked here rather than started, because the caller is what settles the panel on the content
+    // and the run belongs behind that (see {@link runPendingExtraction}).
     this.pendingExtractionState.set(entry.run ? null : entry.url || null);
     if (!entry.run) {
       console.log(`${LOG_HISTORY} … the entry carries no run, so ${entry.url} is erschlossen again for it`);
@@ -921,8 +921,8 @@ export class CurationService {
     if (this.activeNode() || this.hasUnsavedWork()) return false;
     await this.openFromHistory(entry, 'detected');
     const adopted = this.activeNode()?.nodeId === entry.nodeId;
-    // Nothing takes the tab anywhere here — the page this content is about is the one that is open —
-    // so the Erschließung the entry asks for is started right away.
+    // The page this content is about is the one that is open, so the Erschließung the entry asks for
+    // is started right away.
     if (adopted) void this.runPendingExtraction();
     return adopted;
   }

@@ -242,20 +242,18 @@ export class AppComponent implements OnInit {
   /**
    * Open a saved node from the history (requested by the history screen). The content is taken up at the
    * *Inhaltsoptionen* junction — picking it from the list is choosing what to work on, and what to do with it
-   * is the next choice rather than one the panel makes — and the tab follows the pick to that content's own
-   * page, see ContentFlowService.showContentOptions.
+   * is the next choice rather than one the panel makes. The open page stays as it is, see
+   * ContentFlowService.showContentOptions.
    */
   protected async openFromHistory(entry: HistoryEntry): Promise<void> {
     if (!this.confirmDiscardUnsaved()) return;
     await this.openNode(
       () => this.curation.openFromHistory(entry),
       async () => {
-        // Only for an entry that carries no run of its own, and only where this panel stays: a tab that
-        // follows the pick tears it down, and the panel that comes back on the new page picks the
-        // Erschließung up from the stored state (CurationService.runPendingExtraction).
-        if (!(await this.contentFlow.showContentOptions())) {
-          void this.curation.runPendingExtraction();
-        }
+        this.contentFlow.showContentOptions();
+        // The Erschließung the entry asks for where it carries no run of its own, started here because
+        // this is where the panel is settled on the content (CurationService.runPendingExtraction).
+        void this.curation.runPendingExtraction();
       },
     );
   }

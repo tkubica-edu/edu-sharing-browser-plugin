@@ -78,23 +78,21 @@ re-lands away from, which is the very thing this prevents. The editors are locke
 
 ## Page changes the panel asks for itself
 
-**Picking a content takes the tab with it**: a node chosen in *Meine Inhalte* or im *Verlauf* opens
-its own page in the repository (`…/components/render/<id>`) and the panel comes back there on
-*Inhaltsoptionen*, working on that same node (`ContentFlowService.showContentOptions`). The page then
-shows the content the panel's steps act on.
+**Picking a content leaves the tab where it is**: a node chosen in *Meine Inhalte* or im *Verlauf*
+becomes the panel's content and the *Inhaltsoptionen* open on it right away
+(`ContentFlowService.showContentOptions`) — the page the person is reading is theirs, not the panel's
+to replace, so nothing is sent to the content's own page in the repository.
 
 Always the junction, whatever step the entry remembers (`HistoryEntry.step`): picking a content is
 choosing what to work on, and what to do with it is the next choice rather than one the panel makes.
 Where a content was left is still said — on the main menu's card for an Erschließung that was left
 unfinished (`CurationService.leftAtStep`), which continues it there.
 
-The panel cannot survive the load — it is an iframe in the page — so the state is written to storage
-first and restored on boot, exactly as for the *Bearbeitungsmodus*, which takes the tab to the
-connector the same way. The step is **not entered before the load**: it is carried across in that
-stored state (`NavigationService.stateFor`) and the panel stays on the screen the content was picked
-from, so the Inhaltsoptionen are not shown for the moment before the page replaces them. A tab
-already standing on that page is left alone — then there is no load, and the step is entered right
-away.
+**The Bearbeitungsmodus is the step that does take the tab along**: it opens the node in its
+connector, or in the node's own page (`…/components/render/<id>`) where there is none
+(`ContentFlowService.edit`). The panel cannot survive that load — it is an iframe in the page — so
+its state is written to storage first and restored on boot; a tab already standing on that page is
+left alone, and the panel only switches into the mode.
 
 The mechanics of putting the panel back and restoring what it was doing (background worker,
 `storage.session`, `SessionResumeService`) are documented in

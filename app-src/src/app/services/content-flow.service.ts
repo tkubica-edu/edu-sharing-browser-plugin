@@ -3,7 +3,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { BrowserExtensionService } from './browser-extension.service';
 import { ConditionsService } from './conditions.service';
 import { CurationService } from './curation.service';
-import { NavState, NavigationService } from './navigation.service';
+import { NavigationService } from './navigation.service';
 import { NodeConnectorService } from './node-connector.service';
 import { OnlyOfficeDocumentService } from './onlyoffice-document.service';
 import { SessionResumeService } from './session-resume.service';
@@ -11,7 +11,8 @@ import { SessionResumeService } from './session-resume.service';
 /**
  * Enters the big steps of the content flow for the active node. The branch is the connector: a node that opens in one
  * is edited there, everything else goes straight to the Qualitätsprüfung — and that check needs the repository's
- * connector list, hence {@link deciding}. Two steps belong on a page of their own, so the tab is taken along.
+ * connector list, hence {@link deciding}. The Bearbeitungsmodus belongs on a page of its own, so it takes the tab
+ * along; every other step is entered in the panel and leaves the open page alone.
  */
 @Injectable({ providedIn: 'root' })
 export class ContentFlowService {
@@ -57,33 +58,17 @@ export class ContentFlowService {
   }
 
   /**
-   * "Inhaltsoptionen" for a content the user picked themselves, on that content's own page: picking is choosing
-   * what to work on, so the tab follows. The step is carried across in the stored state rather than entered
-   * first, so the panel stays where the user is until the page is there. Answers whether the tab was sent
-   * anywhere — this panel does not outlive that, so what is still to be done for the content waits for the one
-   * that comes back (see CurationService.pendingExtraction).
+   * "Inhaltsoptionen" for a content the user picked themselves, from the Verlauf or from their own contents. The
+   * panel stays on the page that is open: picking a content is choosing what to work on, not asking to leave the
+   * page being read, so the tab is not taken to that content's own page in the repository.
    *
    * Always the junction, whichever step the content was last worked on: picking a content is choosing what to
    * do with it next, and that choice is what the junction offers — being dropped straight back into the middle
    * of the flow answers it for the person. Where the content was left is still said, on the main menu's card
    * for it (see CurationService.leftAtStep).
    */
-  async showContentOptions(): Promise<boolean> {
-    const target = this.curation.activeNode()?.link;
-    const state = this.navigation.stateFor('content-options');
-    const ahead = target && target !== this.conditions.activeUrl() ? state : null;
-    if (!target || !ahead) {
-      this.navigation.go(state?.section ?? 'content-options', { tab: state?.tab ?? undefined });
-      return false;
-    }
-    try {
-      await this.openPage(target, ahead);
-      return true;
-    } catch (cause: unknown) {
-      // The page stayed, so the step has to be entered here after all — nothing will restore it.
-      this.navigation.go('content-options');
-      throw cause;
-    }
+  showContentOptions(): void {
+    this.navigation.go('content-options');
   }
 
   /**
@@ -157,17 +142,17 @@ export class ContentFlowService {
   }
 
   /**
-   * Take the current tab to `target` and have the panel come back there — on the step it is on, or on `state`
-   * where that step belongs to the page being opened. The panel cannot survive the load, so it is restored
-   * from storage instead. Same tab, since a window the panel cannot reach would leave the two apart.
+   * Take the current tab to `target` and have the panel come back there, on the step it is on. The panel cannot
+   * survive the load, so it is restored from storage instead. Same tab, since a window the panel cannot reach
+   * would leave the two apart.
    */
-  private async openPage(target: string, state?: NavState): Promise<void> {
+  private async openPage(target: string): Promise<void> {
     if (this.conditions.activeUrl() === target) return;
     // Save BEFORE navigating: the load tears this app down without further notice. The page we are
     // about to open goes into the state as the page it belongs to, so the panel comes back working
     // on it — this navigation is the flow continuing, not the page changing under it (see
     // SessionResumeService.nodeStillApplies).
-    await this.sessionResume.save(target, state);
+    await this.sessionResume.save(target);
     try {
       await this.browserExtension.navigateTab(target);
     } catch (cause: unknown) {

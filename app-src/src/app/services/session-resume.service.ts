@@ -5,7 +5,7 @@ import { ScreenId, SectionId } from '../model/navigation';
 import { BrowserExtensionService } from './browser-extension.service';
 import { ConditionsService } from './conditions.service';
 import { CurationService, NodeSource } from './curation.service';
-import { NavState, NavStep, NavigationService } from './navigation.service';
+import { NavStep, NavigationService } from './navigation.service';
 
 /** What is carried across a page change. Ids only — everything else is re-derived on the new page. */
 interface ResumeState {
@@ -18,9 +18,9 @@ interface ResumeState {
   /** The page the state belongs to — the current one, or the one it is being carried to. */
   url: string | null;
   /**
-   * The page the restored content is still to be erschlossen from, where one is outstanding: opening a
-   * content from the Verlauf takes the tab to that content, so its Erschließung has to survive the
-   * load that follows — see CurationService.pendingExtraction.
+   * The page the restored content is still to be erschlossen from, where one is outstanding: a run that has
+   * not answered yet outlives the page it was started on, because the panel is torn down with the page —
+   * see CurationService.pendingExtraction.
    */
   extractUrl?: string | null;
   at: number;
@@ -66,17 +66,14 @@ export class SessionResumeService {
   }
 
   /**
-   * Write the state right now and wait for it — for the app's own navigations, where the scheduled effect above would
-   * not have run before the load tears the app down. `targetUrl` is stored as the state's page and `state` as where
-   * the panel should come back. The app's last write: tracking is switched off first, so nothing overwrites it.
+   * Write the state right now and wait for it — for the app's own navigations, where the scheduled effect above
+   * would not have run before the load tears the app down. `targetUrl` is stored as the state's page, so the
+   * restored panel reads the page it is about to land on as its own. The app's last write: tracking is switched
+   * off first, so nothing overwrites it.
    */
-  async save(targetUrl?: string, state?: NavState): Promise<void> {
+  async save(targetUrl?: string): Promise<void> {
     this.tracking.set(false);
-    await this.write({
-      ...this.snapshot(),
-      url: targetUrl ?? this.conditions.activeUrl(),
-      ...(state ? { section: state.section, tab: state.tab, trail: [...state.trail] } : {})
-    });
+    await this.write({ ...this.snapshot(), url: targetUrl ?? this.conditions.activeUrl() });
   }
 
   /** Where the user is. Reads every signal the state is made of, so the effect tracks them all. */

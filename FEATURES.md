@@ -228,7 +228,7 @@ navigating to it, and closes it again where it stands; the step keeps running be
 - **Verlauf** *(with the entry count as a badge)* — the **saved nodes**, newest first. An entry is
   recorded only when a node is actually saved, so every row carries a `nodeId` (legacy pre-node
   entries are dropped on load, and re-saving a node moves its row to the top instead of
-  duplicating). *Inhalt öffnen* fetches the live node by id (`CurationService.openFromHistory` →
+  duplicating). *Inhaltsoptionen öffnen* fetches the live node by id (`CurationService.openFromHistory` →
   `RepositoryNodeService.get`) and takes the content up at the *Inhaltsoptionen*; if there is unsaved
   work the shell confirms first, and a failed fetch is surfaced via an alert.
 - **Einstellungen** *(dotted while a change waits to be applied)* — the Repository-URL (used for
@@ -264,7 +264,7 @@ that node → the same filing and checking steps. A **link** carries its own sou
 metadata view erschließt it when it opens, so the description starts from that page rather than from
 the bare URL the node holds.
 
-**Picking a content takes the tab with it**: a node chosen in *Meine Inhalte* or im *Verlauf* opens
-its own page in the repository (`…/components/render/<id>`) and the panel comes back there on
-*Inhaltsoptionen*, working on that same node (`ContentFlowService.showContentOptions`). See
+**Picking a content leaves the tab where it is**: a node chosen in *Meine Inhalte* or im *Verlauf*
+becomes the panel's content and the *Inhaltsoptionen* open on it right away
+(`ContentFlowService.showContentOptions`), without the open page being replaced. See
 [UI-SHELL.md § Page changes the panel asks for itself](UI-SHELL.md#page-changes-the-panel-asks-for-itself).

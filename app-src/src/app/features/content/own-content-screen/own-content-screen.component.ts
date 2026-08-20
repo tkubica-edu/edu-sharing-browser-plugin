@@ -10,7 +10,8 @@ import { NodesSelectorComponent, NodesSelectorOption } from '../../../shared/com
 // "Meine Inhalte": the shared nodes selector, restricted to the user's own workspace. The picked node becomes the
 // app's active content, from where the flow is the same as for a detected one — which is why the selector's button
 // is labelled after the *Inhaltsoptionen* screen it opens. A collection can be picked as well as a file: both are
-// content of the user's own.
+// content of the user's own. Picking one does not move the tab: the page that is open is the person's, not the
+// panel's to replace.
 @Component({
   selector: 'es-own-content-screen',
   imports: [LoginGateComponent, NodesSelectorComponent],
@@ -54,8 +55,8 @@ export class OwnContentScreenComponent {
   };
 
   /**
-   * Load the picked node into the flow and hand over to the *Inhaltsoptionen* screen — which takes
-   * the tab to that content's own page in the repository, see
+   * Load the picked node into the flow and hand over to the *Inhaltsoptionen* screen, which is where what to
+   * do with the content is chosen. The open page is left as it is, see
    * {@link ContentFlowService.showContentOptions}.
    */
   private async open(nodeId: string | undefined): Promise<void> {
@@ -64,7 +65,7 @@ export class OwnContentScreenComponent {
     this.loading.set(true);
     try {
       await this.curation.openNode(nodeId);
-      await this.contentFlow.showContentOptions();
+      this.contentFlow.showContentOptions();
     } catch (cause: unknown) {
       this.error.set('Der Inhalt konnte nicht geladen werden: ' + errorMessage(cause));
     } finally {
