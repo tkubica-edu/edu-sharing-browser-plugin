@@ -76,6 +76,11 @@ switched on — otherwise that finding would go on standing for the page. Neithe
 host, where the announced document stands for the page rather than a lookup, and neither throws away
 unsaved work.
 
+Flipping the switch either way, and choosing another **Gefakter Inhalt**, also lets go of the content
+the panel currently holds — it came out of the run those settings shaped, and *Geöffneter Inhalt*
+would otherwise go on naming the old fixture while *Inhalt erschließen* stays disabled for the page.
+This one does drop unsaved work: a faked run's result is a test result.
+
 Three further settings appear while the mode is on, and hold only while it is (the middle one only in
 a WLO panel, see there):
 

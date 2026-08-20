@@ -10,6 +10,7 @@ import { ChatSkillService, MasterSkillSetting } from '../../../services/chat-ski
 import { ChatStyleService } from '../../../services/chat-style.service';
 import { CollectionRecommendationService } from '../../../services/collection-recommendation.service';
 import { ContextRefreshService } from '../../../services/context-refresh.service';
+import { CurationService } from '../../../services/curation.service';
 import { DebugService } from '../../../services/debug.service';
 import { DevModeService } from '../../../services/dev-mode.service';
 import { ContentJudgeService } from '../../../services/content-judge.service';
@@ -60,6 +61,7 @@ export class SettingsScreenComponent implements OnDestroy {
   protected readonly metalookupChecks = APP_CONFIG.qualityMetalookupRules;
 
   private readonly contextRefresh = inject(ContextRefreshService);
+  private readonly curation = inject(CurationService);
 
   protected readonly repositoryUrl = signal(this.auth.repositoryUrl());
   /** True once the field was edited, so the "required" hint only shows after a change. */
@@ -206,13 +208,28 @@ export class SettingsScreenComponent implements OnDestroy {
   }
 
   // ---- Dev mode -----------------------------------------------------------
+
+  /**
+   * Let go of the content the panel holds, which the switches below have just made a statement about a
+   * run that is over: it came out of the fixture that was chosen, or out of faked answers the mode no
+   * longer gives. Keeping it would leave *Geöffneter Inhalt* naming the old fixture and take the
+   * Erschließung away from the page — the offer is disabled for a page that already has a content.
+   * Unsaved work is dropped along with it, since a faked run's result is a test result.
+   */
+  private releaseFakedRun(): void {
+    if (this.curation.activeNode() || this.curation.hasUnsavedWork()) this.curation.startNew();
+  }
+
   protected setDevMode(enabled: boolean): void {
     this.changed = true;
+    this.releaseFakedRun();
     void this.devMode.setEnabled(enabled);
   }
 
   protected setDevGenerate(id: string): void {
+    if (id === this.devMode.generate()) return;
     this.changed = true;
+    this.releaseFakedRun();
     void this.devMode.setGenerate(id);
   }
 
