@@ -63,7 +63,7 @@ Since a watch build is unoptimized, measure size and check budgets with a normal
 
 ## Dev mode (faked KI answers)
 
-*Einstellungen* → **Dev-Modus: KI-Antworten faken** (`DevModeService`). The slow, paid services answer
+*Einstellungen* → *Entwickler-Optionen* → **Dev-Modus: KI-Antworten faken** (`DevModeService`). The slow, paid services answer
 from fixtures instead of being asked: the metadata agent's `/health`, `/generate` (in the background
 worker, `background/dev-fixtures.js`) and `/extract-field`, and ContentJudge's `/health` and
 `/evaluate`. The assistant's own chat is **not** faked — a check it runs is the thing under test.
@@ -123,7 +123,7 @@ and this run wrote none. To test the writing instead, untick the checkbox and wa
 
 ## Debug mode (OnlyOffice without OnlyOffice)
 
-*Einstellungen* → **Debug-Modus: OnlyOffice-Events simulieren**. With it on, the sidebar behaves as
+*Einstellungen* → *Entwickler-Optionen* → **Debug-Modus: OnlyOffice-Events simulieren**. With it on, the sidebar behaves as
 if it ran on an OnlyOffice page with the edu-sharing plugin active:
 
 - every page counts as an insert host, so *Metadaten anreichern*, *Passende Inhalte finden* and

@@ -232,9 +232,13 @@ navigating to it, and closes it again where it stands; the step keeps running be
   `RepositoryNodeService.get`) and takes the content up at the *Inhaltsoptionen*; if there is unsaved
   work the shell confirms first, and a failed fetch is surfaced via an alert.
 - **Einstellungen** *(dotted while a change waits to be applied)* — the Repository-URL (used for
-  login and every embedded element), the debug mode, the recommendation settings and the two chat
-  settings: the corrections to the widget's display, and the chatbot's master skill as *Vorgabe des
-  Betreibers* / *An* / *Aus* (see [chatbot.md](chatbot.md#the-attributes-set-on-mount)).
+  login and every embedded element) at the top, and below it four folded groups, one open at a time:
+  *Entwickler-Optionen* (the dev and the debug mode, see [TESTING.md](TESTING.md)), *KI- und
+  Chatbot-Optionen* (the corrections to the chat widget's display, the chatbot's master skill as
+  *Vorgabe des Betreibers* / *An* / *Aus* — see
+  [chatbot.md](chatbot.md#the-attributes-set-on-mount) — and the *Länge einer KI-Anfrage*),
+  *Zugehörige Sammlungen empfehlen* and *Qualitätsprüfung*. Everything but the Entwickler-Optionen
+  belongs to the WLO panel and is shown only there (`browserExtensionCustomWebComponent`).
 - **WLO Metadaten-Agent** — only when the repository config enables it, see
   [WEB-COMPONENTS.md](WEB-COMPONENTS.md#the-optional-wlo-metadata-editor).
 - **Boerdi — KI-Assistent** — the assistant's chat widget, offered as a row above the session bar

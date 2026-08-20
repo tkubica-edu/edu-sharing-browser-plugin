@@ -18,8 +18,16 @@ import { QualityJudgeService } from '../../../services/quality-judge.service';
 import { DEFAULT_TASK_MAX, TASK_LIMIT, TASK_MIN } from '../../../util/quality-check-request';
 import { configuredSchemes } from '../../../util/quality-schemes';
 
-// Repository configuration plus the two development switches. Changing the URL requires a reload,
-// because the API library freezes its rootUrl at bootstrap (see AuthService).
+/**
+ * The folded groups of this screen, in the order they are offered and each named after what it holds: the
+ * switches that stand in for a service while the panel is developed on, the chat and the size of a KI
+ * request, what a collection proposal is derived from, and which services a quality check asks.
+ */
+type SettingsSection = 'developer' | 'ai' | 'recommendation' | 'quality';
+
+// Repository configuration plus the settings of the chat, the checks and the two development switches.
+// Changing the URL requires a reload, because the API library freezes its rootUrl at bootstrap (see
+// AuthService).
 @Component({
   selector: 'es-settings-screen',
   imports: [FormsModule, IconDirective],
@@ -73,13 +81,13 @@ export class SettingsScreenComponent implements OnDestroy {
   private changed = false;
 
   /**
-   * Which of the folded sections is open, if any. The settings the panel is opened for are the ones at
-   * the top; what these two hold is tuning, and shown as a heading until it is asked for. One at a time,
-   * so the screen stays as short as it is when both are closed.
+   * Which of the folded sections is open, if any. The setting the panel is opened for — the repository —
+   * is the one at the top; everything else is tuning of one kind or another and shown as a heading until
+   * it is asked for. One at a time, so the screen stays as short as it is with all of them closed.
    */
-  protected readonly openSection = signal<'recommendation' | 'quality' | null>(null);
+  protected readonly openSection = signal<SettingsSection | null>(null);
 
-  protected toggleSection(section: 'recommendation' | 'quality'): void {
+  protected toggleSection(section: SettingsSection): void {
     this.openSection.update((open) => (open === section ? null : section));
   }
 

@@ -22,158 +22,182 @@
   </div>
 </section>
 
+<!-- The two switches that stand in for a service, folded together: both are for developing on the
+     panel, and neither belongs in front of someone using it. -->
+<section class="es-card">
+  <button type="button" class="section-head" (click)="toggleSection('developer')"
+          [attr.aria-expanded]="openSection() === 'developer'">
+    <h2>Entwickler-Optionen</h2>
+    <i class="section-chevron" [class.is-open]="openSection() === 'developer'" esIcon="expand_more"></i>
+  </button>
+
+  @if (openSection() === 'developer') {
+    <!-- Entwicklung: ersetzt die Antworten der KI-Dienste durch Fixtures. -->
+    <div class="group-item">
+      <label class="check">
+        <input type="checkbox" [ngModel]="devMode.enabled()" (ngModelChange)="setDevMode($event)" />
+        <span>Dev-Modus: KI-Antworten faken</span>
+      </label>
+
+      <p class="desc">
+        Fragt die langsamen Dienste nicht, sondern antwortet sofort aus hartcodierten Beispielen: der
+        Metadaten-Agent liefert über <code>/health</code> und <code>/generate</code> eine fertige
+        Erschließung und über <code>/extract-field</code> Schlagwörter, ContentJudge meldet sich bereit
+        und beantwortet <code>/evaluate</code> mit <code>422</code>. Standardmäßig aus — nur zum
+        Entwickeln einschalten, sonst antworten die echten Dienste.
+      </p>
+
+      @if (devMode.enabled()) {
+        <label class="es-field-label" for="dev-generate">Gefakter Inhalt</label>
+        <select id="dev-generate" class="es-input"
+                [ngModel]="devMode.generate()" (ngModelChange)="setDevGenerate($event)">
+          @for (fixture of devMode.generateFixtures; track fixture.id) {
+            <option [value]="fixture.id">{{ fixture.label }}</option>
+          }
+        </select>
+        <p class="desc">
+          Welche fertige Erschließung <code>/generate</code> zurückgibt. „Optik“ enthält absichtlich
+          fachliche Fehler im Text — damit hat eine Qualitätsprüfung etwas zu finden.
+        </p>
+
+        <!-- Prüfgegenstand der „Individuellen Qualitätsprüfung mit KI“, die es nur im WLO-Panel gibt. -->
+        @if (wlo.enabled()) {
+          <label class="es-field-label" for="dev-collection">Test-Sammlungs-ID</label>
+          <input id="dev-collection" type="text" class="es-input" placeholder="Sammlungs-ID"
+                 [ngModel]="devMode.collectionId()" (ngModelChange)="setDevCollectionId($event)" />
+          <p class="desc">
+            Sammlung, in der der Inhalt als einsortiert gilt — ohne die Einsortier-Schritte durchlaufen zu
+            müssen. Die „Individuelle Qualitätsprüfung mit KI“ prüft gegen diese Sammlung, weil die KI ihre
+            Prüf-Anweisung darüber lädt. Der Inhalt wird nicht in sie einsortiert: sie ist der
+            Prüfgegenstand, keine Ablage-Entscheidung.
+          </p>
+        }
+
+        <label class="check">
+          <input type="checkbox" [ngModel]="devMode.skipWrites()"
+                 (ngModelChange)="setDevSkipWrites($event)" />
+          <span>Nichts ins Repositorium schreiben</span>
+        </label>
+
+        <p class="desc">
+          „Weiter“ führt weiter, ohne zu speichern — es wird kein Node angelegt und keiner geändert. So
+          lässt sich eine Prüfung beliebig oft wiederholen, ohne bei jedem Durchlauf einen Node
+          zurückzulassen. Zum Testen des Speicherns ausgeschaltet lassen.
+        </p>
+      }
+    </div>
+
+    <!-- Entwicklung: ersetzt das OnlyOffice-Plugin durch simulierte Events. -->
+    <div class="group-item">
+      <label class="check">
+        <input type="checkbox" [ngModel]="debug.enabled()" (ngModelChange)="setDebug($event)" />
+        <span>Debug-Modus: OnlyOffice-Events simulieren</span>
+      </label>
+
+      <p class="desc">
+        Beantwortet die Anfragen an das OnlyOffice-Plugin sofort mit hartcodierten Testdaten und
+        behandelt jede Seite als OnlyOffice-Seite. Damit lassen sich „Metadaten anreichern“,
+        „Passende Inhalte finden“ und „Inhalt suchen“ ohne Editor testen.
+      </p>
+
+      @if (debug.enabled()) {
+        <label class="es-field-label" for="debug-node">Test-Node-ID</label>
+        <input id="debug-node" type="text" class="es-input" placeholder="Node-ID"
+               [ngModel]="debug.documentNodeId()" (ngModelChange)="setDebugNodeId($event)" />
+        <p class="desc">
+          Node, den das simulierte Dokument als bearbeiteten Node meldet. Mit einer echten Node-ID
+          des Repositoriums läuft auch das Speichern der Metadaten durch — als aktiver Inhalt wird
+          sie beim nächsten Öffnen des Panels übernommen.
+        </p>
+
+        <div class="es-row">
+          <button class="es-btn es-btn--tonal es-btn--small" (click)="simulatePreviewNode()">
+            PREVIEW_NODE simulieren
+          </button>
+        </div>
+      }
+    </div>
+  }
+</section>
+
 <!-- Die Einstellungen zum KI-Chat und zur KI-Prüfung: beides gibt es nur im WLO-Panel, also
      werden sie nur dort gezeigt. -->
 @if (wlo.enabled()) {
-  <!-- Korrekturen an der Darstellung des Chat-Widgets; das Panel setzt sie in dessen Shadow-DOM ein. -->
+  <!-- The chat's own settings and the size of a KI request, in one folded card: three settings about
+       the same thing, and none of them is what the panel's settings are opened for. -->
   <section class="es-card">
-    <label class="check">
-      <input type="checkbox" [ngModel]="chatStyle.overridesEnabled()"
-             (ngModelChange)="setChatStyleOverrides($event)" />
-      <span>Chat-Darstellung anpassen</span>
-    </label>
+    <button type="button" class="section-head" (click)="toggleSection('ai')"
+            [attr.aria-expanded]="openSection() === 'ai'">
+      <h2>KI- und Chatbot-Optionen</h2>
+      <i class="section-chevron" [class.is-open]="openSection() === 'ai'" esIcon="expand_more"></i>
+    </button>
 
-    <p class="desc">
-      Blendet im KI-Chat aus, was zu den Schritten des Panels nicht passt: die Begrüßung des Widgets, den
-      Hinweis „KI-generierte Antwort“ und die Antwortvorschläge nach einer selbst geschriebenen Nachricht
-      sowie die Schaltflächen „Mit WLO-Konto anmelden“ und „Neuer Chat“. Standardmäßig an — ausgeschaltet
-      zeigt sich der Chat so, wie das Widget ihn ausliefert. Gilt ab dem nächsten Öffnen des Chats.
-    </p>
-  </section>
+    @if (openSection() === 'ai') {
+      <!-- Korrekturen an der Darstellung des Chat-Widgets; das Panel setzt sie in dessen Shadow-DOM ein. -->
+      <div class="group-item">
+        <label class="check">
+          <input type="checkbox" [ngModel]="chatStyle.overridesEnabled()"
+                 (ngModelChange)="setChatStyleOverrides($event)" />
+          <span>Chat-Darstellung anpassen</span>
+        </label>
 
-  <!-- Der Master-Skill des Chatbots: an, aus oder wie beim Betreiber eingestellt. -->
-  <section class="es-card">
-    <h2 id="master-skill-label">Master-Skill des Chatbots</h2>
+        <p class="desc">
+          Blendet im KI-Chat aus, was zu den Schritten des Panels nicht passt: die Begrüßung des Widgets, den
+          Hinweis „KI-generierte Antwort“ und die Antwortvorschläge nach einer selbst geschriebenen Nachricht
+          sowie die Schaltflächen „Mit WLO-Konto anmelden“ und „Neuer Chat“. Standardmäßig an — ausgeschaltet
+          zeigt sich der Chat so, wie das Widget ihn ausliefert. Gilt ab dem nächsten Öffnen des Chats.
+        </p>
+      </div>
 
-    <div class="seg" role="group" aria-labelledby="master-skill-label">
-      @for (option of masterSkillOptions; track option.value) {
-        <button type="button" class="seg-btn"
-                [class.is-active]="chatSkill.masterSkill() === option.value"
-                [attr.aria-pressed]="chatSkill.masterSkill() === option.value"
-                (click)="setMasterSkill(option.value)">{{ option.label }}</button>
-      }
-    </div>
+      <!-- Der Master-Skill des Chatbots: an, aus oder wie beim Betreiber eingestellt. -->
+      <div class="group-item">
+        <h2 id="master-skill-label">Master-Skill des Chatbots</h2>
 
-    <p class="desc">
-      Ob der Chatbot in den Chats des Panels seinen Master-Skill ausführt. „Vorgabe des Betreibers“ sagt dazu
-      nichts und lässt es bei dem, was am Chatbot-Dienst konfiguriert ist (<code>MASTER_SKILL_ENABLED</code>);
-      „An“ und „Aus“ setzen es für diese Einbettung, unabhängig davon. Standardmäßig die Vorgabe des
-      Betreibers. Gilt ab dem nächsten Öffnen des Chats.
-    </p>
-  </section>
+        <div class="seg" role="group" aria-labelledby="master-skill-label">
+          @for (option of masterSkillOptions; track option.value) {
+            <button type="button" class="seg-btn"
+                    [class.is-active]="chatSkill.masterSkill() === option.value"
+                    [attr.aria-pressed]="chatSkill.masterSkill() === option.value"
+                    (click)="setMasterSkill(option.value)">{{ option.label }}</button>
+          }
+        </div>
 
-  <!-- Wie viel Text eine Anfrage an die KI mitnimmt; der zitierte Inhalt wird darauf gekürzt. -->
-  <section class="es-card">
-    <h2>Länge einer KI-Anfrage</h2>
+        <p class="desc">
+          Ob der Chatbot in den Chats des Panels seinen Master-Skill ausführt. „Vorgabe des Betreibers“ sagt dazu
+          nichts und lässt es bei dem, was am Chatbot-Dienst konfiguriert ist (<code>MASTER_SKILL_ENABLED</code>);
+          „An“ und „Aus“ setzen es für diese Einbettung, unabhängig davon. Standardmäßig die Vorgabe des
+          Betreibers. Gilt ab dem nächsten Öffnen des Chats.
+        </p>
+      </div>
 
-    <label class="es-field-label" for="assistant-request-max">Zeichen je Anfrage</label>
-    <input id="assistant-request-max" type="number" class="es-input"
-           [min]="requestMin" [max]="requestLimit" step="1000"
-           [ngModel]="assistantRequest.maxCharacters()"
-           (ngModelChange)="setAssistantRequestMax($event)" />
+      <!-- Wie viel Text eine Anfrage an die KI mitnimmt; der zitierte Inhalt wird darauf gekürzt. -->
+      <div class="group-item">
+        <h2>Länge einer KI-Anfrage</h2>
 
-    <p class="desc">
-      Bei der Qualitätsprüfung wird der Inhalt im Auftrag an die KI wörtlich zitiert und auf diese Länge
-      gekürzt. Ein langer Inhalt, der nicht hineinpasst, wird nur an seinem Anfang beurteilt — die KI
-      antwortet dann bei Kriterien „unklar“, ohne dass der Grund dafür in ihrer Antwort zu sehen wäre. Mehr
-      Zeichen heißen also, dass mehr vom Inhalt beurteilt wird, kosten aber vom Zeit- und Token-Budget des
-      Durchlaufs. Standard {{ requestDefault }}, erlaubt sind {{ requestMin }} bis {{ requestLimit }}. Gilt ab
-      der nächsten Prüfung.
-    </p>
+        <label class="es-field-label" for="assistant-request-max">Zeichen je Anfrage</label>
+        <input id="assistant-request-max" type="number" class="es-input"
+               [min]="requestMin" [max]="requestLimit" step="1000"
+               [ngModel]="assistantRequest.maxCharacters()"
+               (ngModelChange)="setAssistantRequestMax($event)" />
 
-    <div class="es-row">
-      <button class="es-btn es-btn--text" (click)="resetAssistantRequestMax()">
-        Auf Standard zurücksetzen
-      </button>
-    </div>
+        <p class="desc">
+          Bei der Qualitätsprüfung wird der Inhalt im Auftrag an die KI wörtlich zitiert und auf diese Länge
+          gekürzt. Ein langer Inhalt, der nicht hineinpasst, wird nur an seinem Anfang beurteilt — die KI
+          antwortet dann bei Kriterien „unklar“, ohne dass der Grund dafür in ihrer Antwort zu sehen wäre. Mehr
+          Zeichen heißen also, dass mehr vom Inhalt beurteilt wird, kosten aber vom Zeit- und Token-Budget des
+          Durchlaufs. Standard {{ requestDefault }}, erlaubt sind {{ requestMin }} bis {{ requestLimit }}. Gilt ab
+          der nächsten Prüfung.
+        </p>
+
+        <div class="es-row">
+          <button class="es-btn es-btn--text" (click)="resetAssistantRequestMax()">
+            Auf Standard zurücksetzen
+          </button>
+        </div>
+      </div>
+    }
   </section>
 }
-
-<!-- Entwicklung: ersetzt die Antworten der KI-Dienste durch Fixtures. -->
-<section class="es-card">
-  <label class="check">
-    <input type="checkbox" [ngModel]="devMode.enabled()" (ngModelChange)="setDevMode($event)" />
-    <span>Dev-Modus: KI-Antworten faken</span>
-  </label>
-
-  <p class="desc">
-    Fragt die langsamen Dienste nicht, sondern antwortet sofort aus hartcodierten Beispielen: der
-    Metadaten-Agent liefert über <code>/health</code> und <code>/generate</code> eine fertige
-    Erschließung und über <code>/extract-field</code> Schlagwörter, ContentJudge meldet sich bereit
-    und beantwortet <code>/evaluate</code> mit <code>422</code>. Standardmäßig aus — nur zum
-    Entwickeln einschalten, sonst antworten die echten Dienste.
-  </p>
-
-  @if (devMode.enabled()) {
-    <label class="es-field-label" for="dev-generate">Gefakter Inhalt</label>
-    <select id="dev-generate" class="es-input"
-            [ngModel]="devMode.generate()" (ngModelChange)="setDevGenerate($event)">
-      @for (fixture of devMode.generateFixtures; track fixture.id) {
-        <option [value]="fixture.id">{{ fixture.label }}</option>
-      }
-    </select>
-    <p class="desc">
-      Welche fertige Erschließung <code>/generate</code> zurückgibt. „Optik“ enthält absichtlich
-      fachliche Fehler im Text — damit hat eine Qualitätsprüfung etwas zu finden.
-    </p>
-
-    <!-- Prüfgegenstand der „Individuellen Qualitätsprüfung mit KI“, die es nur im WLO-Panel gibt. -->
-    @if (wlo.enabled()) {
-      <label class="es-field-label" for="dev-collection">Test-Sammlungs-ID</label>
-      <input id="dev-collection" type="text" class="es-input" placeholder="Sammlungs-ID"
-             [ngModel]="devMode.collectionId()" (ngModelChange)="setDevCollectionId($event)" />
-      <p class="desc">
-        Sammlung, in der der Inhalt als einsortiert gilt — ohne die Einsortier-Schritte durchlaufen zu
-        müssen. Die „Individuelle Qualitätsprüfung mit KI“ prüft gegen diese Sammlung, weil die KI ihre
-        Prüf-Anweisung darüber lädt. Der Inhalt wird nicht in sie einsortiert: sie ist der
-        Prüfgegenstand, keine Ablage-Entscheidung.
-      </p>
-    }
-
-    <label class="check">
-      <input type="checkbox" [ngModel]="devMode.skipWrites()"
-             (ngModelChange)="setDevSkipWrites($event)" />
-      <span>Nichts ins Repositorium schreiben</span>
-    </label>
-
-    <p class="desc">
-      „Weiter“ führt weiter, ohne zu speichern — es wird kein Node angelegt und keiner geändert. So
-      lässt sich eine Prüfung beliebig oft wiederholen, ohne bei jedem Durchlauf einen Node
-      zurückzulassen. Zum Testen des Speicherns ausgeschaltet lassen.
-    </p>
-  }
-</section>
-
-<!-- Entwicklung: ersetzt das OnlyOffice-Plugin durch simulierte Events. -->
-<section class="es-card">
-  <label class="check">
-    <input type="checkbox" [ngModel]="debug.enabled()" (ngModelChange)="setDebug($event)" />
-    <span>Debug-Modus: OnlyOffice-Events simulieren</span>
-  </label>
-
-  <p class="desc">
-    Beantwortet die Anfragen an das OnlyOffice-Plugin sofort mit hartcodierten Testdaten und
-    behandelt jede Seite als OnlyOffice-Seite. Damit lassen sich „Metadaten anreichern“,
-    „Passende Inhalte finden“ und „Inhalt suchen“ ohne Editor testen.
-  </p>
-
-  @if (debug.enabled()) {
-    <label class="es-field-label" for="debug-node">Test-Node-ID</label>
-    <input id="debug-node" type="text" class="es-input" placeholder="Node-ID"
-           [ngModel]="debug.documentNodeId()" (ngModelChange)="setDebugNodeId($event)" />
-    <p class="desc">
-      Node, den das simulierte Dokument als bearbeiteten Node meldet. Mit einer echten Node-ID
-      des Repositoriums läuft auch das Speichern der Metadaten durch — als aktiver Inhalt wird
-      sie beim nächsten Öffnen des Panels übernommen.
-    </p>
-
-    <div class="es-row">
-      <button class="es-btn es-btn--tonal es-btn--small" (click)="simulatePreviewNode()">
-        PREVIEW_NODE simulieren
-      </button>
-    </div>
-  }
-</section>
 
 <!-- Die Sammlungs-Empfehlung gehört zu „An Redaktionen weiterleiten“, die Prüf-Dienste zur
      Qualitätsprüfung — beide Schritte gibt es nur im WLO-Panel. -->

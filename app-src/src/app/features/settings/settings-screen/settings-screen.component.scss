@@ -100,6 +100,14 @@
 // The first element of an unfolded card, against the heading it belongs to.
 .section-head + * { margin-top: var(--es-space-3); }
 
+// One setting inside a folded group of several. Ruled off from the one above rather than merely spaced:
+// each block is a setting of its own, and its heading would otherwise read as a part of the previous one.
+.group-item + .group-item {
+  margin-top: var(--es-space-4);
+  padding-top: var(--es-space-4);
+  border-top: 1px solid var(--es-border);
+}
+
 // A choice of a few short states, as one row of buttons that share their edges — a setting with three
 // states rather than two, where a checkbox would have to become two of them.
 .seg {
