@@ -203,9 +203,15 @@ export class NavigationService {
   });
 
   constructor() {
-    // Where the user stands, told to the history: an entry written from here says which step its
-    // content was left on, so taking it up again continues there (see HistoryService.noteStep).
-    effect(() => this.history.noteStep({ section: this.section(), tab: this.screen() }));
+    // Where the user stands, told to the history together with the content it is about: an entry says
+    // which step its content was left on, so taking it up again continues there — and the flow walks on
+    // long after the save that wrote the entry (see HistoryService.noteStep).
+    effect(() =>
+      this.history.noteStep(
+        { section: this.section(), tab: this.screen() },
+        this.curation.activeNode()?.nodeId ?? null,
+      ),
+    );
 
     // Guard: if the open section becomes invisible (logout, node cleared, page change) or disabled
     // (a content was detected for this page while "Inhalt erschließen" was open), don't strand the
@@ -382,8 +388,8 @@ export class NavigationService {
 
   /**
    * The state a {@link go} to `id` would leave behind, without performing it; null where `go` would refuse
-   * it. For a step that belongs on another page: carrying it in the stored state keeps the panel on the
-   * screen the user is looking at instead of rendering the next one just before the load.
+   * it — the step's own reachability test, made without entering it. What {@link resumableStep} answers a
+   * remembered step with, so a caller can offer that step only where it can really be opened.
    */
   stateFor(id: SectionId, options?: { tab?: ScreenId }): NavState | null {
     const conditions = this.conditions.snapshot();

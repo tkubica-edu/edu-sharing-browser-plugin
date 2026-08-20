@@ -88,6 +88,11 @@ choosing what to work on, and what to do with it is the next choice rather than 
 Where a content was left is still said — on the main menu's card for an Erschließung that was left
 unfinished (`CurationService.leftAtStep`), which continues it there.
 
+That remembered step is the step the content was **left** on, not the one its save was made from: for
+as long as the panel works on a content the history holds, every move writes the step onto its entry
+(`NavigationService` → `HistoryService.noteStep`). The main menu is not such a step — it is where the
+offer to continue is made, so a content taken up there keeps the step it is offered for.
+
 **The Bearbeitungsmodus is the step that does take the tab along**: it opens the node in its
 connector, or in the node's own page (`…/components/render/<id>`) where there is none
 (`ContentFlowService.edit`). The panel cannot survive that load — it is an iframe in the page — so
