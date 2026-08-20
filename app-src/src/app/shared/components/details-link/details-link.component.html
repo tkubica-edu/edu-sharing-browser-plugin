@@ -1,6 +1,8 @@
 @if (curation.activeNode(); as node) {
   <a class="details-link" [href]="node.link" target="_blank" rel="noopener noreferrer">
-    Alle Details anzeigen
+    <!-- The wording carries the underline, so it stops where the words do rather than running on
+         under the glyph beside them. -->
+    <span class="label">Alle Details anzeigen</span>
     <!-- The arrow out of the box says the link leaves the panel. Sized to the text it follows, so it
          reads as part of the line rather than as an icon beside it. -->
     <i esIcon="open_in_new"></i>

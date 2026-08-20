@@ -12,6 +12,10 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--es-blue);
+  // The link's own line would span the whole row, glyph included; the wording underlines itself.
+  text-decoration: none;
+
+  .label { text-decoration: underline; }
 
   i { font-size: 13px; line-height: 1; }
 }
