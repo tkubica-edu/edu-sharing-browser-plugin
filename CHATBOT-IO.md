@@ -182,8 +182,8 @@ Not ours, but part of what the model reads, so worth knowing when a task seems t
 
 ## The tasks
 
-Four, in order, and **none of them is put until the previous one has answered**: they run under the same
-iteration and token caps, and asked together they compete for them.
+Four requests and one closing word, in order, and **none of them is put until the previous one has
+answered**: they run under the same iteration and token caps, and asked together they compete for them.
 
 | # | Step | Instruction | Runs | Bubble | Quotes the text | Tools it names |
 |---|---|---|---|---|---|---|
@@ -191,6 +191,7 @@ iteration and token caps, and asked together they compete for them.
 | 2 | `proofread` | `proofreadInstructionOf()` | only where step 1 answered `own` | *Inhalt Korrektur lesen* | **yes** | `get_skill_registry`, `get_skill` |
 | 3 | `quality` | `qualityInstructionOf()` | always | *Qualität prüfen* | **yes** | `get_skill_registry`, `get_skill` |
 | 4 | `enrichment` | `enrichmentInstructionOf()` | always | *Metadaten anreichern* | no | `lookup_wlo_vocabulary`, `get_skill_registry`, `get_skill` |
+| 5 | `done` | `closingInstructionOf()` | once the enrichment was confirmed | *Prüfung abschließen* | no | — |
 
 **1 — Whose content is this.** The greeting, one sentence on what is about to happen, and the one
 question nothing here can answer for itself. The assistant is handed the three facts above (source,
@@ -221,12 +222,21 @@ ever written. A guessed URI does not fail loudly; it quietly matches nothing, so
 forming one. It asks for a skill *softly*: there may not be one yet, and a skill that does not exist
 must not read as a step that failed.
 
+**5 — The closing word.** Not a request: it states that the check is complete, congratulates the person,
+names the four steps behind them and points at the footer — *Abschließen und zur Inhaltsübersicht*, the
+way on into the next step of the flow. It is a turn of its own rather than a sentence at the end of the
+enrichment for two reasons: the enrichment's message has to end on its question, because the chips are
+shown beneath it, and "everything is done" is only true once the confirmation has actually arrived. It
+asks nothing, proposes nothing and forbids `submit_result` — the enrichment's schema still stands, and a
+run filling it in again would write the confirmed values a second time. The panel ignores what such a
+turn submits anyway (`take()` returns on `done`).
+
 ### Three rules every task follows
 
 - **It ends with the person, not with the assistant.** Each task has it write its proposal into the
   chat, ask the person to go through it, and call `submit_result` only in the turn where they answer. The
   panel narrates none of it beside the chat — the assistant is the one thing on this screen that can
-  talk.
+  talk, the closing word included.
 - **It names `submit_result` outright**, twice: not before the confirmation, and then in that very
   turn. Measured, the enrichment task without it came back `stop_reason: "text"` — a perfect answer in
   prose, and `result: null`.
@@ -274,6 +284,9 @@ changes is offered the same way on again (`STEP_REPLIES`):
 | `proofread` | *Ich bestätige die Korrekturen* / *Korrekturen überspringen* |
 | `quality` | *Qualität bestätigen* / *Anpassungen vornehmen* |
 | `enrichment` | *Metadaten bestätigen* / *Anpassungen vornehmen* |
+
+Once the check is through the panel prescribes none: the closing word asks nothing, and what the person
+says after it is their own conversation, so the chips go back to the widget (`[]`).
 
 Left to itself the widget composes chips from the answer it just gave, with a generator nothing here can
 reach — measured failures include *„Was bedeuten die Lizenzen?"* under the question whose content it is.

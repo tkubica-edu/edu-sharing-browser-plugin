@@ -14,11 +14,10 @@ import { chatSession, resetChatSession } from '../../../util/chat-session';
 import { firstString } from '../../../util/mds-values';
 import { PageContext, contentContextOf } from '../../../util/page-context';
 import {
-  ContentOrigin, CriterionVerdict, EnrichedMetadata, ProofreadResult, criteriaOf, criteriaPropertiesOf,
-  enrichmentInstructionOf, enrichmentOf, enrichmentPropertiesOf, enrichmentSchemaOf, knockoutSatisfied,
-  originGuessOf, originInstructionOf, originOf, originSchemaOf, proofreadInstructionOf, proofreadOf,
-  proofreadSchemaOf,
-  qualityInstructionOf, resultSchemaOf, schemaFits, verdictsOf
+  ContentOrigin, CriterionVerdict, EnrichedMetadata, ProofreadResult, closingInstructionOf, criteriaOf,
+  criteriaPropertiesOf, enrichmentInstructionOf, enrichmentOf, enrichmentPropertiesOf, enrichmentSchemaOf,
+  knockoutSatisfied, originGuessOf, originInstructionOf, originOf, originSchemaOf, proofreadInstructionOf,
+  proofreadOf, proofreadSchemaOf, qualityInstructionOf, resultSchemaOf, schemaFits, verdictsOf
 } from '../../../util/quality-check-request';
 import {
   AgentResult, AiAssistantScreenComponent, AssistantTask
@@ -35,11 +34,12 @@ type CheckStep = 'origin' | 'proofread' | 'quality' | 'enrichment' | 'done';
  * it stays out of the conversation (see {@link AssistantTask}), and this is what the person reads in its place:
  * the step, in the words the panel uses for it elsewhere.
  */
-const STEP_MESSAGE: Record<Exclude<CheckStep, 'done'>, string> = {
+const STEP_MESSAGE: Record<CheckStep, string> = {
   origin: 'Herkunft des Inhalts klären',
   proofread: 'Inhalt Korrektur lesen',
   quality: 'Qualität prüfen',
-  enrichment: 'Metadaten anreichern'
+  enrichment: 'Metadaten anreichern',
+  done: 'Prüfung abschließen'
 };
 
 /**
@@ -190,7 +190,9 @@ export class AiQualityScreenComponent implements OnDestroy {
    * somebody stood behind. Where they are in the check is therefore said in the conversation, by the one
    * thing on this screen that can talk; the panel does not narrate it a second time beside it.
    *
-   * `done` is the end of what the panel asks for; the person can carry the conversation on from there.
+   * `done` is the end of what the panel asks for, and it too is said in the chat: the closing word
+   * congratulates the person and points at the footer, which is the way on. Nothing is asked of them after
+   * it — they can carry the conversation on from there.
    */
   private readonly step = signal<CheckStep>('origin');
 
@@ -255,14 +257,16 @@ export class AiQualityScreenComponent implements OnDestroy {
   });
 
   /**
-   * What the assistant is asked to do. Only where the answer can be recorded: a task that asks for a
-   * structured verdict without a schema to submit it in produces prose about criteria, which looks like a
-   * check and records nothing.
+   * What the assistant is asked to do. A step that asks for something to be recorded is only put where the
+   * answer can be recorded: a task that asks for a structured verdict without a schema to submit it in
+   * produces prose about criteria, which looks like a check and records nothing.
+   *
+   * The closing word is the one task that is not such a step — it asks for nothing back — so it goes out
+   * whether or not a schema stands.
    */
   protected readonly task = computed<AssistantTask | null>(() => {
-    if (!this.resultSchema()) return null;
     const step = this.step();
-    if (step === 'done') return null;
+    if (step !== 'done' && !this.resultSchema()) return null;
     const text = this.curation.contentText();
     const subject = {
       title: this.curation.contentTitle(),
@@ -282,7 +286,9 @@ export class AiQualityScreenComponent implements OnDestroy {
           ? proofreadInstructionOf(subject, taskMax)
           : step === 'quality'
             ? qualityInstructionOf(this.criteria(), subject, taskMax)
-            : enrichmentInstructionOf(subject);
+            : step === 'enrichment'
+              ? enrichmentInstructionOf(subject)
+              : closingInstructionOf(subject);
     const quoted = step === 'quality' || step === 'proofread' ? text.length : 0;
     console.log(
       `${LOG_QUALITY} the assistant will be asked this (step ${step}, ${task.length} characters, ` +
@@ -291,7 +297,11 @@ export class AiQualityScreenComponent implements OnDestroy {
     return { text: task, message: STEP_MESSAGE[step] };
   });
 
-  /** What the open step offers as chips; nothing once the check is through — see {@link STEP_REPLIES}. */
+  /**
+   * What the open step offers as chips; nothing once the check is through, where there is no answer left for
+   * the panel to prescribe — the closing word asks nothing, and what the person says after it is their own
+   * conversation. See {@link STEP_REPLIES}.
+   */
   protected readonly quickReplies = computed<readonly string[]>(() => {
     const step = this.step();
     return step === 'done' ? [] : STEP_REPLIES[step];
@@ -346,6 +356,16 @@ export class AiQualityScreenComponent implements OnDestroy {
    */
   protected take(answer: AgentResult): void {
     const step = this.step();
+    // Past the last step there is nothing left to take over: the values are recorded, the confirmation is
+    // reported, and the schema of the enrichment still stands — so a turn that fills it in again (the
+    // closing word's own among them) would write an answer nobody was asked for over one that was.
+    if (step === 'done') {
+      console.log(`${LOG_QUALITY} ← a turn after the check — nothing left to take over`, {
+        stopReason: answer.stopReason,
+        result: answer.result
+      });
+      return;
+    }
     if (step === 'origin') {
       this.takeOrigin(answer);
       return;
@@ -507,7 +527,7 @@ export class AiQualityScreenComponent implements OnDestroy {
         stopReason: answer.stopReason,
         result: answer.result
       });
-      if (this.step() === 'enrichment') this.problem.set(STOPPED[answer.stopReason] ?? null);
+      this.problem.set(STOPPED[answer.stopReason] ?? null);
       return;
     }
     const properties = enrichmentPropertiesOf(metadata, this.curation.editorMetadata());

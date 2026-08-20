@@ -372,8 +372,8 @@ Each becomes a `QualityCriterion` with a short key, `k1`, `k2`, …: their own i
 and vocabulary URIs, and as schema keys they would spend the budget on addresses the model has no use
 for.
 
-**The check is up to four tasks, one after the other**, and none of them is put until the previous one
-has answered:
+**The check is up to four tasks and a closing word, one after the other**, and none of them is put until
+the previous one has answered:
 
 1. **Begrüßen und fragen, wem der Inhalt gehört** (`originInstructionOf()`) — the greeting, one sentence
    on what is about to happen, and the one question nothing here can answer for itself: is this the
@@ -451,6 +451,15 @@ has answered:
    looked up is left empty rather than formed. It asks for a released skill for this step too, and
    softly: there may not be one yet, and a skill that does not exist must not read as a step that
    failed — but where one appears it takes precedence over anything the model would do on its own.
+
+5. **Prüfung abschließen** (`closingInstructionOf()`) — no longer a request. Once the enrichment came
+   back confirmed, the panel puts one last instruction: congratulate the person, name what is behind them
+   and point at the footer's *„Abschließen und zur Inhaltsübersicht"*, which is the way on. Its own turn
+   rather than a closing sentence of step 4, because that message has to end on its question (the chips
+   are shown beneath it) and because "everything is done" is only true once the confirmation has arrived.
+   It asks nothing and forbids `submit_result`: the enrichment's schema still stands, and a run filling it
+   in again would write the confirmed values a second time — which the panel ignores in any case, as it
+   takes nothing over past the last step.
 
 **Every step ends with the person, not with the assistant.** Each task has it write its proposal into
 the chat, ask the person to go through it and confirm or correct it, and call `submit_result` only in

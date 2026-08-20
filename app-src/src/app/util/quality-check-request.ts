@@ -673,8 +673,8 @@ export function enrichmentSchemaOf(): Record<string, unknown> {
  * still in it.
  *
  * It ends the way the first task does — proposed in the chat, confirmed by the person, submitted only then —
- * and with the one sentence that says the check is through: both steps are done, and the panel's footer is
- * where it is closed.
+ * and on the question, with nothing after it. That the check is through is said in a turn of its own, once
+ * the confirmation has actually arrived; see {@link closingInstructionOf}.
  */
 export function enrichmentInstructionOf(subject: CheckSubject): string {
   // Dative: it reads "… die Metadaten VON <named> an".
@@ -710,12 +710,39 @@ export function enrichmentInstructionOf(subject: CheckSubject): string {
       'Bestätigung, und jede deiner Nachrichten endet deshalb mit dieser Frage.',
     'Rufe submit_result ERST auf, wenn sie bestätigt hat — mit ihren Korrekturen, falls sie welche hatte, und ' +
       'mit confirmed=true. In dem Zug, in dem du die Werte vorschlägst, rufst du es nicht auf: dieser Zug ' +
-      'endet mit der Frage. Ohne den Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.',
-    'Sag ihr danach, dass alle Schritte erledigt sind und sie unten im Panel mit „Abschließen und zur ' +
-      'Inhaltsübersicht“ fertig wird.'
+      'endet mit der Frage. Ohne den Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.'
   ]
     .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
     .join('\n');
+}
+
+/**
+ * The closing word, put once every step of the check has answered: congratulate the person, name what is
+ * done, and point at the way on — the panel's footer, which is where the check is closed and the flow's next
+ * step begins.
+ *
+ * A task of its own rather than a sentence appended to the enrichment, for two reasons. The enrichment's
+ * message has to end on its question, because the chips are shown beneath it and a message closing on
+ * something else leaves them answering nothing. And "everything is done" is only true once the confirmation
+ * has actually arrived — said in the turn that asks for it, it would be said to a person who has not yet
+ * confirmed anything.
+ *
+ * It asks for nothing and records nothing: no question, no further values, and expressly no
+ * `submit_result` — the schema of the previous step still stands, and a run that fills it in again would
+ * write the same values a second time over an answer that is already taken over.
+ */
+export function closingInstructionOf(subject: CheckSubject): string {
+  // Dative: it reads "… die Prüfung VON <named>".
+  const named = subject.title ? `„${subject.title}“` : 'diesem Inhalt';
+  return [
+    `Die Person hat die Metadaten bestätigt. Damit ist die Prüfung von ${named} vollständig abgeschlossen.`,
+    'Gratuliere ihr kurz und sag ihr, was geschafft ist: Herkunft geklärt, Qualität geprüft, Metadaten ' +
+      'angereichert und bestätigt.',
+    'Sag ihr, dass sie jetzt zum nächsten Schritt weitergehen kann — unten im Panel mit „Abschließen und ' +
+      'zur Inhaltsübersicht“.',
+    'Zwei bis drei Sätze genügen. Stell keine Frage mehr, schlag keine weiteren Werte vor und rufe ' +
+      'submit_result nicht auf: es ist nichts mehr zu bestätigen.'
+  ].join('\n');
 }
 
 /** The vocabularies to look up, quoted and enumerated for the task's sentence. */
