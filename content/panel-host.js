@@ -9,6 +9,11 @@
   const STORAGE_KEY = 'eduSharingPanelWidth';
   const DEFAULT_WIDTH = 440;
   const MIN_WIDTH = 340;
+  // The resize grip's three states. Grey rather than the panel's blue: it is furniture of the page
+  // edge, not part of the panel's own navigation.
+  const GRIP_IDLE = 'rgba(28,39,51,0.35)';
+  const GRIP_HOVER = 'rgba(28,39,51,0.65)';
+  const GRIP_ACTIVE = 'rgba(0,59,124,0.85)';
   const root = document.documentElement;
 
   // Largest width we allow, leaving a slice of the page visible.
@@ -129,33 +134,49 @@
     handle.setAttribute('title', 'Breite ziehen');
     handle.setAttribute('role', 'separator');
     handle.setAttribute('aria-orientation', 'vertical');
+    // Straddles the panel's left edge, mostly on the page side of it: what is grabbed here is the
+    // edge itself, and a handle lying inside the panel takes the clicks of the rows behind it.
     Object.assign(handle.style, {
       position: 'absolute',
       top: '0',
-      left: '0',
-      width: '8px',
+      left: '-12px',
+      width: '16px',
       height: '100%',
       cursor: 'col-resize',
       background: 'transparent',
       zIndex: '1',
       touchAction: 'none'
     });
-    // Subtle grip indicator, brightened on hover / while dragging.
+    // The grip: three dots outside the panel, in the neutral grey of a page furniture control.
+    // Dots rather than a bar, and outside rather than on the edge — a bar drawn along the panel's
+    // border reads as the marker of whichever row it happens to sit beside.
     const grip = document.createElement('div');
     Object.assign(grip.style, {
       position: 'absolute',
       top: '50%',
       left: '2px',
-      width: '4px',
-      height: '48px',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: '4px',
       transform: 'translateY(-50%)',
-      borderRadius: '4px',
-      background: 'rgba(0,59,124,0.25)',
-      transition: 'background 0.15s ease'
+      color: GRIP_IDLE,
+      transition: 'color 0.15s ease'
     });
+    // `currentColor`, so the three dots follow the one colour the grip is set to.
+    for (let i = 0; i < 3; i++) {
+      const dot = document.createElement('div');
+      Object.assign(dot.style, {
+        width: '4px',
+        height: '4px',
+        borderRadius: '50%',
+        background: 'currentColor'
+      });
+      grip.appendChild(dot);
+    }
     handle.appendChild(grip);
-    handle.addEventListener('mouseenter', () => { if (!dragging) grip.style.background = 'rgba(0,59,124,0.6)'; });
-    handle.addEventListener('mouseleave', () => { if (!dragging) grip.style.background = 'rgba(0,59,124,0.25)'; });
+    handle.addEventListener('mouseenter', () => { if (!dragging) grip.style.color = GRIP_HOVER; });
+    handle.addEventListener('mouseleave', () => { if (!dragging) grip.style.color = GRIP_IDLE; });
 
     container.appendChild(iframe);
     container.appendChild(handle);
@@ -197,7 +218,7 @@
       iframe.style.pointerEvents = '';
       if (dragShield) { dragShield.remove(); dragShield = null; }
       document.body && (document.body.style.userSelect = savedUserSelect);
-      grip.style.background = 'rgba(0,59,124,0.25)';
+      grip.style.color = GRIP_IDLE;
       window.removeEventListener('pointermove', onPointerMove, true);
       window.removeEventListener('pointerup', onPointerUp, true);
       // Let JS editors re-layout to the final width, then persist it.
@@ -207,7 +228,7 @@
     let savedUserSelect = '';
     handle.addEventListener('pointerdown', (e) => {
       dragging = true;
-      grip.style.background = 'rgba(0,59,124,0.8)';
+      grip.style.color = GRIP_ACTIVE;
       // During the drag: kill our iframe's pointer capture and text selection, and lay a
       // transparent full-viewport shield over the page so pointermove keeps reaching the top
       // document even when the pointer is over a host iframe (which would otherwise swallow the
