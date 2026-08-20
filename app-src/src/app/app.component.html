@@ -4,13 +4,16 @@
 
   <!-- The utility sections (Einstellungen): always reachable, so they sit here as icons next to
        the close button instead of in the main menu. The icon that opened one also closes it again —
-       it stays on screen while its section is shown, so it is the obvious way back out. -->
+       it stays on screen while its section is shown, so it is the obvious way back out.
+
+       Such a section is laid *over* the open step rather than entered in its place, which is why the
+       icon's state is the overlay's and not the step's — see NavigationService.overlaySection. -->
   @for (section of navigation.topbarSections(); track section.id) {
-    <button class="topbar-btn" [class.is-active]="navigation.section() === section.id"
+    <button class="topbar-btn" [class.is-active]="navigation.overlaySection() === section.id"
             [disabled]="busy.busy()"
-            [title]="busy.hint() ?? (navigation.section() === section.id ? 'Schließen' : section.label)"
+            [title]="busy.hint() ?? (navigation.overlaySection() === section.id ? 'Schließen' : section.label)"
             [attr.aria-label]="section.label"
-            [attr.aria-pressed]="navigation.section() === section.id"
+            [attr.aria-pressed]="navigation.overlaySection() === section.id"
             (click)="navigation.toggle(section.id)">
       <!-- Every section that reaches the topbar is named in OptionIconService.material; a new one has
            to be added there to carry an icon here. -->
@@ -50,39 +53,54 @@
 }
 
 <main class="content">
-  @if (navigation.section() === 'menu') {
-    <es-menu></es-menu>
-  } @else if (navigation.sessionGate()) {
-    <!-- The section needs a login this session does not have, so what it shows is that login rather
-         than its own screen — see AppSection.requiresSession. -->
-    <es-login-gate></es-login-gate>
-  } @else {
-    @switch (navigation.screen()) {
-      @case ('login') { <es-login></es-login> }
-      @case ('ai-assistant') { <es-ai-assistant-screen></es-ai-assistant-screen> }
-      @case ('add-content') { <es-add-content-screen></es-add-content-screen> }
-      @case ('new-document') { <es-new-document-screen></es-new-document-screen> }
-      @case ('add-material') { <es-add-material-screen></es-add-material-screen> }
-      @case ('search') { <es-search-screen></es-search-screen> }
-      @case ('curation') { <es-curation-screen></es-curation-screen> }
-      @case ('curation-preview') { <es-curation-preview-screen></es-curation-preview-screen> }
-      @case ('own-content') { <es-own-content-screen></es-own-content-screen> }
-      @case ('history') { <es-history-screen (open)="openFromHistory($event)"></es-history-screen> }
-      @case ('content-options') { <es-content-options-screen></es-content-options-screen> }
-      @case ('find-content') { <es-find-content-screen></es-find-content-screen> }
-      @case ('quality-check') { <es-quality-check-screen></es-quality-check-screen> }
-      @case ('metadata') { <es-metadata-screen></es-metadata-screen> }
-      @case ('editorial-forward') { <es-editorial-forward-screen></es-editorial-forward-screen> }
-      @case ('personal-storage') { <es-personal-storage-screen></es-personal-storage-screen> }
-      @case ('select-collection') { <es-select-collection-screen></es-select-collection-screen> }
-      @case ('flow-choice') { <es-flow-choice-screen></es-flow-choice-screen> }
-      @case ('ai-quality') { <es-ai-quality-screen></es-ai-quality-screen> }
-      @case ('preview') { <es-preview-screen></es-preview-screen> }
-      @case ('usages') { <es-usages-screen></es-usages-screen> }
-      @case ('share') { <es-share-screen></es-share-screen> }
-      @case ('interactions') { <es-interactions-screen></es-interactions-screen> }
-      @case ('settings') { <es-settings-screen></es-settings-screen> }
+  <!-- The open step, kept mounted while a utility covers it: taken off screen rather than torn down, so
+       what the step holds is still there when the utility is closed again — the KI check's dialogue above
+       all, which lives in the chat widget and would start over with a screen that mounts anew. The wrapper
+       itself stays out of the layout (see .step), so the screen inside is a box of the content area exactly
+       as it is without one. -->
+  <div class="step" [class.is-covered]="!!navigation.overlaySection()">
+    @if (navigation.section() === 'menu') {
+      <es-menu></es-menu>
+    } @else if (navigation.sessionGate()) {
+      <!-- The section needs a login this session does not have, so what it shows is that login rather
+           than its own screen — see AppSection.requiresSession. -->
+      <es-login-gate></es-login-gate>
+    } @else {
+      @switch (navigation.screen()) {
+        @case ('login') { <es-login></es-login> }
+        @case ('ai-assistant') { <es-ai-assistant-screen></es-ai-assistant-screen> }
+        @case ('add-content') { <es-add-content-screen></es-add-content-screen> }
+        @case ('new-document') { <es-new-document-screen></es-new-document-screen> }
+        @case ('add-material') { <es-add-material-screen></es-add-material-screen> }
+        @case ('search') { <es-search-screen></es-search-screen> }
+        @case ('curation') { <es-curation-screen></es-curation-screen> }
+        @case ('curation-preview') { <es-curation-preview-screen></es-curation-preview-screen> }
+        @case ('own-content') { <es-own-content-screen></es-own-content-screen> }
+        @case ('history') { <es-history-screen (open)="openFromHistory($event)"></es-history-screen> }
+        @case ('content-options') { <es-content-options-screen></es-content-options-screen> }
+        @case ('find-content') { <es-find-content-screen></es-find-content-screen> }
+        @case ('quality-check') { <es-quality-check-screen></es-quality-check-screen> }
+        @case ('metadata') { <es-metadata-screen></es-metadata-screen> }
+        @case ('editorial-forward') { <es-editorial-forward-screen></es-editorial-forward-screen> }
+        @case ('personal-storage') { <es-personal-storage-screen></es-personal-storage-screen> }
+        @case ('select-collection') { <es-select-collection-screen></es-select-collection-screen> }
+        @case ('flow-choice') { <es-flow-choice-screen></es-flow-choice-screen> }
+        @case ('ai-quality') { <es-ai-quality-screen></es-ai-quality-screen> }
+        @case ('preview') { <es-preview-screen></es-preview-screen> }
+        @case ('usages') { <es-usages-screen></es-usages-screen> }
+        @case ('share') { <es-share-screen></es-share-screen> }
+        @case ('interactions') { <es-interactions-screen></es-interactions-screen> }
+        <!-- A utility is normally the overlay below rather than the open step; it is still a section like
+             any other, so a stored state that names it as the step renders it here. -->
+        @case ('settings') { <es-settings-screen></es-settings-screen> }
+      }
     }
+  </div>
+
+  <!-- The utility on top of the step: reached from the topbar and closed there again. Its own switch,
+       since the step behind it keeps the one above. -->
+  @switch (navigation.overlayScreen()) {
+    @case ('settings') { <es-settings-screen></es-settings-screen> }
   }
 </main>
 

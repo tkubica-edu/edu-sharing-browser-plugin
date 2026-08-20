@@ -32,6 +32,9 @@ export class UserBarComponent {
       this.auth.authorized() &&
       // Not under the login gate: it brings the panel's bottom edge itself (LoginGateComponent).
       !this.navigation.sessionGate() &&
+      // Not under a utility either: the bottom edge is then the utility's, not the covered screen's
+      // (NavigationService.overlaySection).
+      !this.navigation.overlaySection() &&
       (this.navigation.section() === 'menu' || !!this.navigation.currentSection()?.plain),
   );
 

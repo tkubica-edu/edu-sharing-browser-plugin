@@ -118,3 +118,10 @@ $step-control: 28px;
   min-height: 0;
   overflow-y: auto;
 }
+
+// The wrapper around the open step's screen, which exists only so the step can be taken off screen in
+// one move while a utility covers it (see the template). `display: contents` keeps it out of the layout:
+// the screen inside is laid out as a child of .content, which is what its own `height: 100%` measures
+// against — a box in between would leave the chat screens without a height to fill.
+.step { display: contents; }
+.step.is-covered { display: none; }

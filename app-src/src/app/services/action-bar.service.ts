@@ -88,6 +88,10 @@ export class ActionBarService {
   }
 
   readonly actions = computed<FooterAction[]>(() => {
+    // A utility laid over the step (Einstellungen) covers the screen the step's actions belong to, so the
+    // footer offers none of them meanwhile: the way out of a utility is the icon that opened it, or the back
+    // button beside the heading — see NavigationService.overlaySection.
+    if (this.navigation.overlaySection()) return [];
     // Under the login gate the section's own actions belong to a screen that is not on display, and
     // the only way on the gate has is the login on it — so what the footer carries there is the way
     // back out, as on every other step (see NavigationService.sessionGate).

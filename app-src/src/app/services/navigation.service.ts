@@ -48,10 +48,10 @@ export interface NavState extends NavStep {
 /** How many steps back are kept. Deep enough for any flow, bounded so nothing accumulates. */
 const TRAIL_LIMIT = 20;
 
-// The single source of navigation truth: which section is open, which tab is selected, guarded
-// transitions, the title and the landing logic. Two levels deep and no deeper — the back button walks
-// the sections the user came through and ends at the main menu, while switching tabs within a section is
-// not a step of its own.
+// The single source of navigation truth: which section is open, which tab is selected, which utility is laid
+// over it, guarded transitions, the title and the landing logic. Two levels deep and no deeper — the back
+// button walks the sections the user came through and ends at the main menu, while switching tabs within a
+// section is not a step of its own.
 @Injectable({ providedIn: 'root' })
 export class NavigationService {
   private readonly conditions = inject(ConditionsService);
@@ -66,6 +66,24 @@ export class NavigationService {
 
   readonly section = signal<SectionId>('menu');
 
+  /**
+   * The utility laid over the open step, while one is shown — Einstellungen (see AppSection.topbar). A utility
+   * is not a step of the flow: it is opened from anywhere and closed again where it was opened, so it covers the
+   * open step rather than replacing it. The step stays where it is and stays mounted, which is what keeps what
+   * it holds — the KI check's dialogue above all, which lives in the chat widget and does not survive being
+   * torn down and rebuilt.
+   */
+  private readonly overlay = signal<SectionId | null>(null);
+
+  /** Which utility is laid over the open step, if any. Read by the shell, which draws it on top. */
+  readonly overlaySection = this.overlay.asReadonly();
+
+  /** The open utility's definition, while one is shown. */
+  private readonly overlayDefinition = computed<AppSection | undefined>(() => {
+    const id = this.overlay();
+    return id ? this.sectionOf(id) : undefined;
+  });
+
   /** The open step's guard, while one is registered — see {@link LeaveGuard} and {@link back}. */
   private readonly leaveGuard = signal<LeaveGuard | null>(null);
 
@@ -78,15 +96,20 @@ export class NavigationService {
   /** The steps behind the open one, for carrying them across a page change (SessionResumeService). */
   readonly trailOf = this.trail.asReadonly();
 
-  /** Back button is shown on every section except the menu. */
-  readonly showBack = computed(() => this.section() !== 'menu');
+  /** Back button is shown on every section except the menu, and wherever a utility can be closed. */
+  readonly showBack = computed(() => !!this.overlay() || this.section() !== 'menu');
 
   /** Where back goes, for the button's tooltip. */
   readonly backLabel = computed(() => {
+    // A utility is closed rather than walked out of: back lands on the step it was laid over.
+    if (this.overlay()) {
+      const beneath = this.currentSection();
+      return beneath ? `Zurück zu „${this.titleOf(beneath)}“` : 'Zurück zum Hauptmenü';
+    }
     const previous = this.previousStep();
     const section = previous && this.sectionOf(previous.section);
     return section && previous.section !== 'menu'
-      ? `Zurück zu „${section.title ?? sectionText(section.label, this.conditions.snapshot())}“`
+      ? `Zurück zu „${this.titleOf(section)}“`
       : 'Zurück zum Hauptmenü';
   });
 
@@ -130,8 +153,11 @@ export class NavigationService {
     );
   });
 
-  /** A tab bar only makes sense for a real choice. A disabled tab still counts — it is the hint. */
-  readonly showTabs = computed(() => this.tabs().length > 1);
+  /**
+   * A tab bar only makes sense for a real choice. A disabled tab still counts — it is the hint. Never while a
+   * utility covers the step: those tabs belong to the screen underneath, which is not the one on display.
+   */
+  readonly showTabs = computed(() => !this.overlay() && this.tabs().length > 1);
 
   /**
    * The screen to render: the requested tab while it is one of the section's open-able ones, else
@@ -143,6 +169,17 @@ export class NavigationService {
     const requested = this.requestedTab();
     if (requested && tabs.some((tab) => tab.id === requested && !tab.disabled)) return requested;
     return (tabs.find((tab) => !tab.disabled) ?? tabs[0])?.id ?? null;
+  });
+
+  /**
+   * The screen the open utility renders — its first sub step that applies. A utility is one view rather than a
+   * walk: nothing enters it at a later step, so it carries no tab bar either (see {@link showTabs}).
+   */
+  readonly overlayScreen = computed<ScreenId | null>(() => {
+    const conditions = this.conditions.snapshot();
+    const tabs =
+      this.overlayDefinition()?.tabs.filter((tab) => tab.visible?.(conditions) ?? true) ?? [];
+    return tabs.find((tab) => tab.enabled?.(conditions) ?? true)?.id ?? null;
   });
 
   /** The sub step following the open one, if the section has one. */
@@ -157,10 +194,12 @@ export class NavigationService {
    * than where it is open (see AppSection.title), so the title wins over the label.
    */
   readonly title = computed(() => {
+    // The utility on top is what the person is looking at, so it is what the heading names.
+    const overlay = this.overlayDefinition();
+    if (overlay) return this.titleOf(overlay);
     if (this.section() === 'menu') return 'Hauptmenü';
     const section = this.currentSection();
-    if (!section) return '';
-    return section.title ?? sectionText(section.label, this.conditions.snapshot());
+    return section ? this.titleOf(section) : '';
   });
 
   constructor() {
@@ -259,6 +298,12 @@ export class NavigationService {
    */
   back(): void {
     if (this.busy.busy()) return;
+    // A utility laid over the step is closed by the same button, and closing it leaves no step behind: the
+    // trail and the leave guard belong to the screen underneath, which is still exactly where it was.
+    if (this.overlay()) {
+      this.overlay.set(null);
+      return;
+    }
     // The one place both back buttons meet — the topbar's and every footer's — so a step that has something to
     // lose is asked about once, wherever the walk back was started from.
     if (this.leaveGuard()?.() === false) return;
@@ -278,17 +323,21 @@ export class NavigationService {
   }
 
   /**
-   * Enter a section, or leave it again where it is the one already open. For the topbar icons, which stay
-   * on screen while their own section is shown: a second click on the icon that opened it reads as closing
-   * it, rather than as doing nothing. Leaving is {@link back}, so it lands where the section was entered
-   * from and not blindly on the menu.
+   * Lay a utility over the open step, or take it off again where it is the one already shown. For the topbar
+   * icons, which stay on screen while their own section is shown: a second click on the icon that opened it
+   * reads as closing it, rather than as doing nothing. Neither direction navigates — the step underneath is
+   * not left, so nothing on it is asked about, restarted or lost (see {@link overlaySection}).
    */
   toggle(id: SectionId): void {
-    if (this.section() === id) {
-      this.back();
+    if (this.busy.busy()) return;
+    if (this.overlay() === id) {
+      this.overlay.set(null);
       return;
     }
-    this.go(id);
+    const conditions = this.conditions.snapshot();
+    const section = this.sectionOf(id);
+    if (!section?.visible(conditions) || !this.isEnabled(section, conditions)) return;
+    this.overlay.set(id);
   }
 
   /** Select one of the open section's sub steps, if it can be opened right now. */
@@ -393,6 +442,9 @@ export class NavigationService {
 
   /** Open a section without touching the trail — the one place section/tab are actually set. */
   private open(id: SectionId, tab: ScreenId | null): void {
+    // The step being entered is the one on display, so a utility that covered the previous step has nothing
+    // left to cover.
+    this.overlay.set(null);
     this.section.set(id);
     this.requestedTab.set(tab);
   }
@@ -412,6 +464,11 @@ export class NavigationService {
     if (section.visible(withoutContent) && this.isEnabled(section, withoutContent)) {
       this.curation.releaseChosenContent();
     }
+  }
+
+  /** How a section is headed while it is on display — see AppSection.title. */
+  private titleOf(section: AppSection): string {
+    return section.title ?? sectionText(section.label, this.conditions.snapshot());
   }
 
   /** A section resolved for one set of conditions — what the templates render directly. */

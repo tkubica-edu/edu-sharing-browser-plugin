@@ -220,8 +220,10 @@ this node. An explicitly loaded node (`PREVIEW_NODE`, a history entry) always wi
 ## Utilities
 
 Not actions on content, so they render as **icons in the topbar** next to the close button
-(`topbar: true`, `NavigationService.topbarOptions`) — otherwise ordinary options, with the same
-visibility, guards and view title.
+(`topbar: true`, `NavigationService.topbarSections`) — otherwise ordinary options, with the same
+visibility, guards and view title. Such an icon lays its view **over** the open step instead of
+navigating to it, and closes it again where it stands; the step keeps running behind it, see
+[UI-SHELL.md](UI-SHELL.md#chrome-topbar-status-bar-footer).
 
 - **Verlauf** *(with the entry count as a badge)* — the **saved nodes**, newest first. An entry is
   recorded only when a node is actually saved, so every row carries a `nodeId` (legacy pre-node

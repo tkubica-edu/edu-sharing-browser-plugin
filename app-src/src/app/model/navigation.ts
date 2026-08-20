@@ -166,6 +166,9 @@ export interface AppSection {
    * Offered as an icon in the topbar instead of as a menu entry — for Einstellungen, which is not
    * an action on content but an always-available utility. It stays in this registry, so visibility,
    * guards and the section title work exactly like for a menu entry.
+   *
+   * Such a section is *laid over* the open step rather than entered in its place, and it is one view: the
+   * first of its tabs that applies is what shows. See NavigationService.overlaySection.
    */
   topbar?: boolean;
   /**

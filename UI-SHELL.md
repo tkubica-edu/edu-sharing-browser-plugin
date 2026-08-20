@@ -26,10 +26,15 @@ that snapshot. The list order is the registry's, with one context rule in
 
 ## Chrome: topbar, status bar, footer
 
-- **Topbar.** The two options that are not actions on content but always-available utilities —
-  *Verlauf* and *Einstellungen* — are marked `topbar: true` and render as icons next to the close
-  button (`NavigationService.topbarOptions`). They are otherwise ordinary options, so visibility,
-  guards and the view title work the same.
+- **Topbar.** The option that is not an action on content but an always-available utility —
+  *Einstellungen* — is marked `topbar: true` and renders as an icon next to the close button
+  (`NavigationService.topbarSections`). Visibility, guards and the view title work as for any other
+  section, but it is **laid over the open step rather than entered in its place**
+  (`NavigationService.overlaySection`, set by `toggle`): the step is not navigated away from, so it
+  stays mounted behind the utility and keeps what it holds — the KI check's dialogue above all, which
+  lives in the chat widget and would start over with a screen that mounts anew. The shell takes the
+  covered step off screen instead of tearing it down (`.step.is-covered`), and the tab bar, the footer
+  and the session bar of that step give way to the utility while it is up.
 - **Status bar.** Shows the same facts as chips, so it is always visible why an option appears or
   disappears — and it can drop the active content again.
 - **Footer.** `ActionBarService` contributes the current view's next steps: *Erschließung starten*
@@ -47,6 +52,9 @@ A step that holds something the walk back would destroy **asks first**: it regis
 `NavigationService`, which `back()` consults before it moves, so one confirmation covers both back buttons —
 the topbar's and the footer's, which make the same walk. The KI-Qualitätsprüfung is the one step that does,
 because its dialogue lives in the chat widget and ends with the screen (see [chatbot.md](chatbot.md)).
+
+While a utility covers the step, back **closes the utility** and asks nothing: the step underneath was
+never left, so neither its guard nor its trail is involved.
 
 Stepping back to a view that does not need a content **releases a content the user picked** — going
 back into *Eigene Inhalte* from *Inhaltsoptionen* means picking again — while a *detected* one is
