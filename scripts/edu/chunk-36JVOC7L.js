@@ -1,2 +1,0 @@
-import{m as f}from"./chunk-PBVEVAUS.js";var i=class s{static fromArray(n,a,l){let o=n?n.map(r=>'"'+r+'"').join(";"):"";for(let r of a){o&&(o+=`
-`);let c=[];if(r instanceof Array)c=r;else for(let t of l||n)c.push(r[t]);o+=c.map(t=>'"'+(t!==null?(t+"").replace(/"/g,'""'):"")+'"').join(";")}return o}static download(n,a,l,o=null){f.downloadContent(n.replace(/[^a-z0-9 \-().]/gi,"_")+".csv",s.fromArray(a,l,o))}};export{i as a};
