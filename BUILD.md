@@ -18,6 +18,7 @@ npm run build          # ng build + assemble dist/{chrome,firefox,safari}
 Useful variants:
 
 - `npm run build:chrome` / `:firefox` / `:safari` — single target.
+- `npm run dev:firefox` / `dev:chrome` — watch mode, see [TESTING.md § Watch mode](TESTING.md#watch-mode-rebuild-on-every-change).
 - `npm run build:no-ng` — reuse the last Angular build (skip `ng build`).
 - `npm run lint:firefox` — `web-ext lint` on the Firefox build.
 

@@ -34,6 +34,33 @@ tab itself only shows up once *Advanced* → *Show features for web developers* 
 A rebuilt bundle or manifest needs an explicit *Reload* in the browser's extension page — neither
 browser picks up a changed package on its own.
 
+## Watch mode (rebuild on every change)
+
+```bash
+npm run dev:firefox    # ng build --watch + web-ext, Firefox reloads itself
+npm run dev:chrome     # ng build --watch only, reload by hand on chrome://extensions
+```
+
+One command holds the whole loop open: `ng build --watch` (development configuration, unminified,
+with source maps) rebuilds the sidebar app on every source change, and `scripts/build.mjs --watch`
+copies that output, the extension's own `background/`, `content/`, `icons/`, `vendor/`, `config.js`,
+`sw.js` and both manifests into `dist/<target>/` as they change. Nothing is zipped, and the committed
+`sidebar/` — which holds the production build — is left untouched, so a watch session never dirties
+the working tree.
+
+`dev:firefox` also runs `web-ext run`, which watches `dist/firefox` and reloads the extension in its
+temporary profile after each sync. Chrome has no such hook: press *Reload* on `chrome://extensions`.
+
+Two things it is not:
+
+- **Not HMR.** The panel is an extension-URL iframe (`content/panel-host.js`) under
+  `script-src 'self'`, so a bundle served from `localhost:4200` cannot load — Angular's dev server
+  and its hot module replacement are out of reach here by design of the manifest's CSP.
+- **Not a live panel refresh.** A reloaded extension does not re-render an already-open panel: close
+  it and click the toolbar icon again to see the new build.
+
+Since a watch build is unoptimized, measure size and check budgets with a normal `npm run build`.
+
 ## Dev mode (faked KI answers)
 
 *Einstellungen* → **Dev-Modus: KI-Antworten faken** (`DevModeService`). The slow, paid services answer

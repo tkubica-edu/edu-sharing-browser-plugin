@@ -11,6 +11,8 @@
     "build:firefox": "node scripts/build.mjs --target=firefox",
     "build:safari": "node scripts/build.mjs --target=safari",
     "build:no-ng": "node scripts/build.mjs --target=all --no-ng",
+    "dev:firefox": "node scripts/build.mjs --target=firefox --watch --run",
+    "dev:chrome": "node scripts/build.mjs --target=chrome --watch",
     "lint:firefox": "web-ext lint --source-dir dist/firefox",
     "start:firefox": "web-ext run --source-dir dist/firefox"
   },

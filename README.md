@@ -70,7 +70,10 @@ Click the toolbar icon on any normal `https://` page. Prebuilt zips for testers 
 tagged release — see [BUILD.md](BUILD.md#prebuilt-downloads).
 
 > Changes to the Angular app reach the loaded extension only through `npm run build:<target>` —
-> `ng build` inside `app-src/` alone does not refresh `sidebar/` or `dist/`.
+> `ng build` inside `app-src/` alone does not refresh `sidebar/` or `dist/`. While developing, use
+> `npm run dev:firefox` (or `dev:chrome`) instead: it keeps `dist/<target>/` in step with every edit
+> and, on Firefox, reloads the extension — see
+> [TESTING.md § Watch mode](TESTING.md#watch-mode-rebuild-on-every-change).
 
 ## Documentation
 

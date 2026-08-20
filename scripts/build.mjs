@@ -2,13 +2,15 @@
 // Cross-platform build: ng build the sidebar, merge per-browser manifests, copy
 // shared source, and zip each target into dist/.
 // Usage: node scripts/build.mjs [--target=chrome|firefox|safari|all] [--no-zip] [--no-ng]
+//        node scripts/build.mjs --target=<one> --watch [--run]
 
 import { parseArgs } from 'node:util';
 import * as fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'dist');
@@ -48,7 +50,10 @@ function parseCli() {
     options: { target: { type: 'string', default: 'all' } }
   });
   const argv = process.argv.slice(2);
-  const zip = !argv.includes('--no-zip');
+  const watch = argv.includes('--watch');
+  const run = argv.includes('--run');
+  // A watch run rebuilds on every keystroke-sized change; zipping that is pure waste.
+  const zip = !argv.includes('--no-zip') && !watch;
   const ng = !argv.includes('--no-ng');
 
   const target = String(values.target || 'all').toLowerCase();
@@ -59,7 +64,11 @@ function parseCli() {
       process.exit(1);
     }
   }
-  return { targets, zip, ng };
+  if (watch && targets.length !== 1) {
+    console.error('--watch builds a single target; pass --target=chrome|firefox|safari.');
+    process.exit(1);
+  }
+  return { targets, zip, ng, watch, run };
 }
 
 function isPlainObject(v) {
@@ -96,6 +105,22 @@ async function ensureVendorPolyfill() {
   }
 }
 
+// Angular CLI (application builder) writes the sidebar app here.
+const NG_OUT = path.join(APP_SRC, 'dist', 'sidebar', 'browser');
+
+// Replace sidebar/ with the Angular build output.
+async function refreshSidebar() {
+  if (!existsSync(NG_OUT)) {
+    console.error(`✗ Angular output not found at ${rel(NG_OUT)}.`);
+    return false;
+  }
+  await fs.rm(SIDEBAR, { recursive: true, force: true });
+  await fs.mkdir(SIDEBAR, { recursive: true });
+  await fs.cp(NG_OUT, SIDEBAR, { recursive: true });
+  log('✓ sidebar/ refreshed from Angular build');
+  return true;
+}
+
 // Build the Angular sidebar app and copy its dist into sidebar/.
 function buildAngular() {
   if (!existsSync(path.join(APP_SRC, 'angular.json'))) {
@@ -108,16 +133,7 @@ function buildAngular() {
   });
   if (r.status !== 0) { console.error('✗ ng build failed.'); process.exit(1); }
   return (async () => {
-    // Angular CLI (application builder) writes to dist/<name>/browser.
-    const distApp = path.join(APP_SRC, 'dist', 'sidebar', 'browser');
-    if (!existsSync(distApp)) {
-      console.error(`✗ Angular output not found at ${rel(distApp)}.`);
-      process.exit(1);
-    }
-    await fs.rm(SIDEBAR, { recursive: true, force: true });
-    await fs.mkdir(SIDEBAR, { recursive: true });
-    await fs.cp(distApp, SIDEBAR, { recursive: true });
-    log('✓ sidebar/ refreshed from Angular build');
+    if (!(await refreshSidebar())) process.exit(1);
   })();
 }
 
@@ -157,13 +173,19 @@ async function assembleTarget(target) {
     if (excludes.length) log(`  ↳ ${name}: left out ${excludes.join(', ')}`);
   }
 
+  const manifest = await writeManifest(target, outDir);
+
+  log(`✓ assembled ${rel(outDir)} (${manifest.background.service_worker ? 'service_worker' : 'scripts'} background)`);
+  return outDir;
+}
+
+// Merge manifest.base.json with the target's delta into outDir/manifest.json.
+async function writeManifest(target, outDir) {
   const base = await readJson(path.join(ROOT, 'manifest.base.json'));
   const delta = await readJson(path.join(ROOT, `manifest.${target}.json`));
   const manifest = deepMerge(base, delta);
   await fs.writeFile(path.join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
-
-  log(`✓ assembled ${rel(outDir)} (${manifest.background.service_worker ? 'service_worker' : 'scripts'} background)`);
-  return outDir;
+  return manifest;
 }
 
 async function zipDir(dir) {
@@ -188,9 +210,116 @@ async function zipDir(dir) {
   log(`✓ zipped → ${rel(zipPath)}`);
 }
 
+// Re-copy one shared dir or file from the repo root into an assembled target.
+async function syncShared(name, outDir) {
+  const src = path.join(ROOT, name);
+  const dest = path.join(outDir, name);
+  if (!existsSync(src)) return;
+  const stat = await fs.stat(src);
+  if (stat.isDirectory()) {
+    await fs.rm(dest, { recursive: true, force: true });
+    await fs.cp(src, dest, { recursive: true });
+  } else {
+    await fs.copyFile(src, dest);
+  }
+  log(`↻ ${name} → ${rel(outDir)}`);
+}
+
+// Put the running Angular build straight into the target's sidebar/, leaving the committed
+// sidebar/ — which holds the production build — untouched.
+async function syncNgOutput(outDir) {
+  if (!existsSync(path.join(NG_OUT, 'index.html'))) return;
+  const dest = path.join(outDir, 'sidebar');
+  await fs.rm(dest, { recursive: true, force: true });
+  await fs.cp(NG_OUT, dest, { recursive: true });
+  log(`↻ sidebar (ng watch) → ${rel(outDir)}`);
+}
+
+// Collapse a burst of file-system events into a single trailing call.
+function debounce(fn, ms) {
+  let timer = null;
+  return () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => { timer = null; void fn(); }, ms);
+  };
+}
+
+// Watch a path for changes; a missing path is skipped rather than fatal.
+function watchPath(target, handler) {
+  const p = path.join(ROOT, target);
+  if (!existsSync(p)) return;
+  const recursive = existsSync(p) && fsSync.statSync(p).isDirectory();
+  fsSync.watch(p, { recursive }, handler);
+}
+
+// Development loop: `ng build --watch` rebuilds the sidebar app on every source change, its output
+// and the extension's own source are copied into the assembled target as they change, and (with
+// --run) web-ext keeps a Firefox instance on that folder, reloading the extension whenever it moves.
+async function watchTarget(target, { ng, run }) {
+  await ensureVendorPolyfill();
+
+  let ngProc = null;
+  if (ng && existsSync(path.join(APP_SRC, 'angular.json'))) {
+    log(`▶ ng build --watch in ${rel(APP_SRC)} …`);
+    ngProc = spawn('npx', ['ng', 'build', '--watch', '--configuration=development'], {
+      cwd: APP_SRC, stdio: 'inherit', shell: process.platform === 'win32'
+    });
+    // The first watch build has to land before the target can be assembled from it.
+    log('… waiting for the first Angular build');
+    while (!existsSync(path.join(NG_OUT, 'index.html'))) await delay(500);
+    await delay(500);
+  }
+
+  const outDir = await assembleTarget(target);
+  if (ngProc) await syncNgOutput(outDir);
+
+  let webExtProc = null;
+  if (run) {
+    if (target === 'firefox') {
+      log('▶ web-ext run — Firefox reloads the extension on every rebuild');
+      webExtProc = spawn('npx', ['web-ext', 'run', '--source-dir', rel(outDir)], {
+        cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32'
+      });
+    } else {
+      log(`⚠ --run only drives Firefox; reload ${target} by hand on its extensions page.`);
+    }
+  }
+
+  if (ngProc) watchPath(path.relative(ROOT, NG_OUT), debounce(() => syncNgOutput(outDir), 400));
+
+  // The extension's own source, which no Angular build covers.
+  const shared = ngProc ? SHARED_DIRS.filter((d) => d !== 'sidebar') : SHARED_DIRS;
+  for (const name of [...shared, ...SHARED_FILES]) {
+    watchPath(name, debounce(() => syncShared(name, outDir), 200));
+  }
+  for (const name of ['manifest.base.json', `manifest.${target}.json`]) {
+    watchPath(name, debounce(async () => {
+      await writeManifest(target, outDir);
+      log(`↻ manifest.json → ${rel(outDir)}`);
+    }, 200));
+  }
+
+  log(`\n👀 watching — ${rel(outDir)} stays up to date. Ctrl-C to stop.`);
+  log(`   The committed ${rel(SIDEBAR)} is left alone; only ${rel(outDir)} follows the ng watch.`);
+  log('   A reloaded extension does not re-render an open panel: close and reopen it.');
+
+  const stop = () => {
+    ngProc?.kill();
+    webExtProc?.kill();
+    process.exit(0);
+  };
+  process.on('SIGINT', stop);
+  process.on('SIGTERM', stop);
+  await new Promise(() => {});
+}
+
+const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function main() {
-  const { targets, zip, ng } = parseCli();
+  const { targets, zip, ng, watch, run } = parseCli();
   log(`edu-sharing build — targets: ${targets.join(', ')}\n`);
+
+  if (watch) return watchTarget(targets[0], { ng, run });
 
   if (ng) await buildAngular();
   await ensureVendorPolyfill();
