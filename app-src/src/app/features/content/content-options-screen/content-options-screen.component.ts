@@ -114,14 +114,22 @@ export class ContentOptionsScreenComponent {
         label: 'Ablageort ändern',
         description: 'Inhalt in einer anderen persönlichen Ablage speichern',
         run: () => this.flow.showPersonalStorage()
-      },
-      {
+      }
+    );
+    // The guided walk through the criteria, which exists only where the Qualität view it opens does:
+    // the row is gated by that tab's own statement in the registry rather than by a second one here,
+    // so the two can never disagree about when this errand applies. Where the view is absent the
+    // section carries the Metadaten view alone, and describing the content is the one way on.
+    if (this.navigation.isTabVisible('quality', 'quality-check', conditions)) {
+      options.push({
         section: 'quality',
         icon: 'check_circle',
         label: 'Qualität prüfen',
         description: 'Qualitätskriterien kontrollieren und bestätigen',
         run: () => this.flow.showQuality()
-      },
+      });
+    }
+    options.push(
       // The other view of that same step, for a content that only needs describing — the walk through
       // the criteria is an errand of its own, and so is this. It carries the tab's own gate: where the
       // criteria decide whether the content may be published, they are answered before it is described.
