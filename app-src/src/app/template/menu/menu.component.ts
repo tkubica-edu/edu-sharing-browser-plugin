@@ -47,12 +47,24 @@ export class MenuComponent {
   protected readonly unsaved = this.curation.hasUnsavedWork;
 
   /**
-   * The step an unsaved draft belongs to, while there is one and it can be entered — `null` otherwise.
+   * An Erschließung whose content no node stands for: the run is all there is of it. Beside the
+   * unsaved draft, this is a content whose save left the panel without a node — the agent's route
+   * answers without one where it merely updated, and a dev-mode run writes nothing at all.
+   */
+  private readonly nodeless = computed(
+    () => this.curation.hasCuratedResult() && !this.curation.activeNode(),
+  );
+
+  /**
+   * The step such a content belongs to, while there is one and it can be entered — `null` otherwise.
    * Checked against the registry rather than assumed, so the card never offers a target
-   * {@link NavigationService.go} would refuse.
+   * {@link NavigationService.go} would refuse. It is the only way back into a content the
+   * Inhaltsoptionen cannot take: those work on a node, and this content has none.
    */
   private readonly draftStep = computed<SectionId | null>(() =>
-    this.unsaved() && this.navigation.isVisible('curation-preview') ? 'curation-preview' : null,
+    (this.unsaved() || this.nodeless()) && this.navigation.isVisible('curation-preview')
+      ? 'curation-preview'
+      : null,
   );
 
   /**
