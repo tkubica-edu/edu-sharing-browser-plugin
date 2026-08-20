@@ -658,9 +658,12 @@ it is the person's call. `qualityCriteriaMet` is still reported truthfully besid
 structured flow hangs its own Metadaten sub step off that.
 
 **The result is shown in the chat, by the assistant itself.** Nothing can inject a message into that
-conversation from outside — so the task asks for it: a line per criterion with ✓ or ✗, the criterion
-and the reason, then a short verdict on what stands in the way of a release, and then the question
-that ends the step. The person sees only the chat, so what is not written there is not known. The panel draws nothing beside it; a second rendering
+conversation from outside — so the task asks for it: a line per criterion with ✓, ✗ or ○ — met,
+violated, or nothing in the content to decide it by — the criterion and the reason, then a short
+verdict on what stands in the way of a release, and then the question that ends the step. The glyph
+and the criterion's name are coloured after it, from the sheet the panel puts into the widget's
+shadow root (`util/chat-overrides.ts`): green, red, and amber for the undecided one, which is a
+verdict to come back to rather than a missing one. The person sees only the chat, so what is not written there is not known. The panel draws nothing beside it; a second rendering
 of the same answer would only compete with the first. What the panel keeps goes to the console.
 
 ### Following a check in the console

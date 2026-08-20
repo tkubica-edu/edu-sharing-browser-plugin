@@ -12,6 +12,10 @@
   --es-muted: #63707e;
   --es-danger: #c0392b;
   --es-success: #1e8e5a;
+  // Neither of the two: a judgement that could not be made, a state still open. Amber rather than a
+  // grey, which would read as switched off — an undecided item is one to come back to. Dark enough
+  // to carry text (≈ 5:1 on white), since that is what it colours.
+  --es-warning: #9a6300;
 
   // Everything a machine put there rather than a person — a value it filled in, a judgement it made.
   // Contrast ≈ 4.5:1 on white, so it carries labels and bold notes; not the colour for fine print.

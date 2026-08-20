@@ -22,22 +22,29 @@
 /** Says which `<style>` in the shadow root is ours, so it is installed once per element. */
 const MARKER = 'data-es-chat-overrides';
 
-/** Marks the bold name of a criterion the answer found met, and one it found violated. */
+/**
+ * Marks the bold name of a criterion the answer found met, one it found violated, and one it could not
+ * decide — the third is a verdict of its own, not the absence of one: nothing is recorded for it and it
+ * is what the person is asked to look at again.
+ */
 const MET_CLASS = 'es-verdict-met';
 const VIOLATED_CLASS = 'es-verdict-violated';
+const UNCLEAR_CLASS = 'es-verdict-unclear';
 
 /** Says which span holds a line's verdict glyph, so a line already marked is recognised as marked. */
 const GLYPH_CLASS = 'es-verdict-glyph';
 
 /**
  * The verdict glyphs a criterion line can start with, each with the class its name is then given. Several
- * per verdict: the check asks for ✓ and ✗, and the assistant reaches for a neighbouring glyph often enough
- * that a line marked ✔ or ❌ is the same verdict and is coloured as one. An unclear verdict (`?`) is in
- * neither list and stays in the text colour.
+ * per verdict: the check asks for ✓, ✗ and ○, and the assistant reaches for a neighbouring glyph often
+ * enough that a line marked ✔ or ❌ is the same verdict and is coloured as one. The question mark the check
+ * asked for before an open circle counts as unclear too, since a conversation may still be holding it.
+ * A line starting with anything else — prose — is in no list and stays in the text colour.
  */
 const VERDICTS: ReadonlyArray<readonly [className: string, glyphs: readonly string[]]> = [
   [MET_CLASS, ['✓', '✔', '✅', '☑']],
   [VIOLATED_CLASS, ['✗', '✘', '❌', '×', '✕', '☒']],
+  [UNCLEAR_CLASS, ['○', '◯', '◌', '⚪', '◦', '–', '—', '?', '？']],
 ];
 
 /** How long to wait for the widget's shadow root, and how often to look for it. */
@@ -79,6 +86,7 @@ const CSS = `
    root may hold as an adopted one — those win a tie on order regardless of where this sheet sits. */
 .${MET_CLASS} { color: var(--es-success, #1e8e5a) !important; }
 .${VIOLATED_CLASS} { color: var(--es-danger, #c0392b) !important; }
+.${UNCLEAR_CLASS} { color: var(--es-warning, #9a6300) !important; }
 `;
 
 /**

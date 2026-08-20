@@ -950,7 +950,7 @@ export function qualityInstructionOf(
       'alle Dimensionen und alles, was die Anleitungen sonst noch prüfen.',
     '',
     'Schreib dein Urteil zuerst in den Chat: je Kriterium eine Zeile mit ✓ (erfolgreich), ✗ (Probleme ' +
-      'gefunden) oder ? (unklar), dem Namen des Kriteriums und dem Grund in einem Satz, darunter dein ' +
+      'gefunden) oder ○ (unklar), dem Namen des Kriteriums und dem Grund in einem Satz, darunter dein ' +
       'Gesamturteil, ob der Inhalt für Bildung geeignet ist, und ' +
       'ein kurzes Fazit, was einer Freigabe im Weg steht. Die Person sieht nur den Chat — was dort nicht ' +
       'steht, erfährt sie nicht.',
