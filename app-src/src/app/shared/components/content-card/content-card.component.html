@@ -33,7 +33,9 @@
          description. -->
     @if (action(); as action) {
       <span class="fc-action">
-        {{ action }}
+        <!-- The wording carries the underline, so it ends with the words instead of resuming as a
+             stub under the arrow beside them. -->
+        <span class="fc-action-label">{{ action }}</span>
         <i class="fc-chevron" esIcon="chevron_right"></i>
       </span>
     } @else if (note(); as note) {

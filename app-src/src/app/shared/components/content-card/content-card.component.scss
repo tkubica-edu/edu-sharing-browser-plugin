@@ -90,9 +90,8 @@
   color: var(--es-blue);
 }
 
-// The step the card leads to: the card itself is the button, so this line only says where pressing it
-// goes — carried by the panel's blue and the arrow behind it rather than by an underline, which on a
-// row that is wholly clickable marks nothing out.
+// The step the card leads to, written out as the link it stands for: the card itself is the button,
+// so this is what says where pressing it goes.
 .fc-action {
   display: inline-flex;
   align-items: center;
@@ -102,6 +101,13 @@
   font-weight: 600;
   line-height: 1.35;
   color: var(--es-blue);
+
+  // Only the wording is underlined: the line would otherwise span the whole row and pick up again
+  // under the arrow, which reads as a break in it rather than as one line.
+  .fc-action-label {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
 
   // As small as the line it follows: the arrow belongs to the label, it is not an icon of its own.
   .fc-chevron {
