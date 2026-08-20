@@ -204,6 +204,10 @@ async function main() {
     log('\nSafari: wrap the folder into an Xcode app project (macOS + Xcode):');
     log('  xcrun safari-web-extension-converter dist/safari');
     log('  → open the generated project in Xcode and Run.');
+    log('Or without Xcode (temporary, gone at the next Safari restart):');
+    log('  Safari → Settings → Developer → Extensions');
+    log('  → tick "Allow unsigned extensions"');
+    log('  → "Add Temporary Extension…" → pick dist/safari');
   }
   log('\nDone.');
 }

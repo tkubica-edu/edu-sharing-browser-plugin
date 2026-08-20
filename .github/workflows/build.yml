@@ -98,6 +98,7 @@ jobs:
           | `edu-sharing-chrome-*.zip` | Chrome, Edge | Unzip, then `chrome://extensions` → enable *Developer mode* → *Load unpacked* → select the folder. |
           | `edu-sharing-firefox-*.zip` | Firefox 128+ | Unzip, then `about:debugging` → *This Firefox* → *Load Temporary Add-on* → select `manifest.json`. |
           | `edu-sharing-safari-*.zip` | Safari | Unzip, run `xcrun safari-web-extension-converter <folder>` on macOS, then build the generated Xcode project. |
+          | `edu-sharing-safari-*.zip` | Safari (no Xcode) | Unzip, then *Settings* → *Developer* → *Extensions* → tick **Allow unsigned extensions** → **Add Temporary Extension…** → select the folder. Holds until Safari is restarted. |
           EOF
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
