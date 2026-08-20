@@ -391,10 +391,11 @@ export const SECTIONS: readonly AppSection[] = [
     label: 'Prüfprozess auswählen',
     description: 'Wählen, wie der Inhalt geprüft wird',
     // The junction the filing steps lead into: where the content goes is settled, and what is left to
-    // decide is how it is checked (see FlowChoiceScreenComponent). Every route through the flow
-    // passes it, so it applies wherever the steps around it do — for a content there is something to
-    // check about, saved or not.
-    visible: requiresLogin((c) => c.hasEditableMetadata),
+    // decide is how it is checked (see FlowChoiceScreenComponent). It applies wherever the steps around
+    // it do — for a content there is something to check about, saved or not — and only where there are
+    // two processes to choose between: both belong to the browser extension custom web component, so
+    // without it the one way on is the Metadaten view and the filing leads straight there.
+    visible: requiresLogin((c) => c.hasEditableMetadata && c.browserExtensionCustomWebComponent),
     tabs: [{ id: 'flow-choice', label: 'Prüfprozess' }]
   },
   {
@@ -404,7 +405,9 @@ export const SECTIONS: readonly AppSection[] = [
     // One of the two processes the choice above leads into; the other is the Qualitätsprüfung below,
     // which is the guided walk through criteria and metadata. This one is a dialogue with the
     // assistant about the content and the collection it was filed in — see AiQualityScreenComponent.
-    visible: requiresLogin((c) => c.hasEditableMetadata),
+    // The assistant belongs to the browser extension custom web component, as does the criteria view
+    // it judges against, so without it there is no such dialogue to hold.
+    visible: requiresLogin((c) => c.hasEditableMetadata && c.browserExtensionCustomWebComponent),
     tabs: [{ id: 'ai-quality', label: 'KI-Analyse' }]
   },
   {

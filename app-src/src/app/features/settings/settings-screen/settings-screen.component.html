@@ -22,68 +22,72 @@
   </div>
 </section>
 
-<!-- Korrekturen an der Darstellung des Chat-Widgets; das Panel setzt sie in dessen Shadow-DOM ein. -->
-<section class="es-card">
-  <label class="check">
-    <input type="checkbox" [ngModel]="chatStyle.overridesEnabled()"
-           (ngModelChange)="setChatStyleOverrides($event)" />
-    <span>Chat-Darstellung anpassen</span>
-  </label>
+<!-- Die Einstellungen zum KI-Chat und zur KI-Prüfung: beides gibt es nur im WLO-Panel, also
+     werden sie nur dort gezeigt. -->
+@if (wlo.enabled()) {
+  <!-- Korrekturen an der Darstellung des Chat-Widgets; das Panel setzt sie in dessen Shadow-DOM ein. -->
+  <section class="es-card">
+    <label class="check">
+      <input type="checkbox" [ngModel]="chatStyle.overridesEnabled()"
+             (ngModelChange)="setChatStyleOverrides($event)" />
+      <span>Chat-Darstellung anpassen</span>
+    </label>
 
-  <p class="desc">
-    Blendet im KI-Chat aus, was zu den Schritten des Panels nicht passt: die Begrüßung des Widgets, den
-    Hinweis „KI-generierte Antwort“ und die Antwortvorschläge nach einer selbst geschriebenen Nachricht
-    sowie die Schaltflächen „Mit WLO-Konto anmelden“ und „Neuer Chat“. Standardmäßig an — ausgeschaltet
-    zeigt sich der Chat so, wie das Widget ihn ausliefert. Gilt ab dem nächsten Öffnen des Chats.
-  </p>
-</section>
+    <p class="desc">
+      Blendet im KI-Chat aus, was zu den Schritten des Panels nicht passt: die Begrüßung des Widgets, den
+      Hinweis „KI-generierte Antwort“ und die Antwortvorschläge nach einer selbst geschriebenen Nachricht
+      sowie die Schaltflächen „Mit WLO-Konto anmelden“ und „Neuer Chat“. Standardmäßig an — ausgeschaltet
+      zeigt sich der Chat so, wie das Widget ihn ausliefert. Gilt ab dem nächsten Öffnen des Chats.
+    </p>
+  </section>
 
-<!-- Der Master-Skill des Chatbots: an, aus oder wie beim Betreiber eingestellt. -->
-<section class="es-card">
-  <h2 id="master-skill-label">Master-Skill des Chatbots</h2>
+  <!-- Der Master-Skill des Chatbots: an, aus oder wie beim Betreiber eingestellt. -->
+  <section class="es-card">
+    <h2 id="master-skill-label">Master-Skill des Chatbots</h2>
 
-  <div class="seg" role="group" aria-labelledby="master-skill-label">
-    @for (option of masterSkillOptions; track option.value) {
-      <button type="button" class="seg-btn"
-              [class.is-active]="chatSkill.masterSkill() === option.value"
-              [attr.aria-pressed]="chatSkill.masterSkill() === option.value"
-              (click)="setMasterSkill(option.value)">{{ option.label }}</button>
-    }
-  </div>
+    <div class="seg" role="group" aria-labelledby="master-skill-label">
+      @for (option of masterSkillOptions; track option.value) {
+        <button type="button" class="seg-btn"
+                [class.is-active]="chatSkill.masterSkill() === option.value"
+                [attr.aria-pressed]="chatSkill.masterSkill() === option.value"
+                (click)="setMasterSkill(option.value)">{{ option.label }}</button>
+      }
+    </div>
 
-  <p class="desc">
-    Ob der Chatbot in den Chats des Panels seinen Master-Skill ausführt. „Vorgabe des Betreibers“ sagt dazu
-    nichts und lässt es bei dem, was am Chatbot-Dienst konfiguriert ist (<code>MASTER_SKILL_ENABLED</code>);
-    „An“ und „Aus“ setzen es für diese Einbettung, unabhängig davon. Standardmäßig die Vorgabe des
-    Betreibers. Gilt ab dem nächsten Öffnen des Chats.
-  </p>
-</section>
+    <p class="desc">
+      Ob der Chatbot in den Chats des Panels seinen Master-Skill ausführt. „Vorgabe des Betreibers“ sagt dazu
+      nichts und lässt es bei dem, was am Chatbot-Dienst konfiguriert ist (<code>MASTER_SKILL_ENABLED</code>);
+      „An“ und „Aus“ setzen es für diese Einbettung, unabhängig davon. Standardmäßig die Vorgabe des
+      Betreibers. Gilt ab dem nächsten Öffnen des Chats.
+    </p>
+  </section>
 
-<!-- Wie viel Text eine Anfrage an die KI mitnimmt; der zitierte Inhalt wird darauf gekürzt. -->
-<section class="es-card">
-  <h2>Länge einer KI-Anfrage</h2>
+  <!-- Wie viel Text eine Anfrage an die KI mitnimmt; der zitierte Inhalt wird darauf gekürzt. -->
+  <section class="es-card">
+    <h2>Länge einer KI-Anfrage</h2>
 
-  <label class="es-field-label" for="assistant-request-max">Zeichen je Anfrage</label>
-  <input id="assistant-request-max" type="number" class="es-input"
-         [min]="requestMin" [max]="requestLimit" step="1000"
-         [ngModel]="assistantRequest.maxCharacters()"
-         (ngModelChange)="setAssistantRequestMax($event)" />
+    <label class="es-field-label" for="assistant-request-max">Zeichen je Anfrage</label>
+    <input id="assistant-request-max" type="number" class="es-input"
+           [min]="requestMin" [max]="requestLimit" step="1000"
+           [ngModel]="assistantRequest.maxCharacters()"
+           (ngModelChange)="setAssistantRequestMax($event)" />
 
-  <p class="desc">
-    Bei der Qualitätsprüfung wird der Inhalt im Auftrag an die KI wörtlich zitiert und auf diese Länge
-    gekürzt. Ein langer Inhalt, der nicht hineinpasst, wird nur an seinem Anfang beurteilt — die KI
-    antwortet dann bei Kriterien „unklar“, ohne dass der Grund dafür in ihrer Antwort zu sehen wäre. Mehr
-    Zeichen heißen also, dass mehr vom Inhalt beurteilt wird, kosten aber vom Zeit- und Token-Budget des
-    Durchlaufs. Standard {{ requestDefault }}, erlaubt sind {{ requestMin }} bis {{ requestLimit }}. Gilt ab
-    der nächsten Prüfung.
-  </p>
+    <p class="desc">
+      Bei der Qualitätsprüfung wird der Inhalt im Auftrag an die KI wörtlich zitiert und auf diese Länge
+      gekürzt. Ein langer Inhalt, der nicht hineinpasst, wird nur an seinem Anfang beurteilt — die KI
+      antwortet dann bei Kriterien „unklar“, ohne dass der Grund dafür in ihrer Antwort zu sehen wäre. Mehr
+      Zeichen heißen also, dass mehr vom Inhalt beurteilt wird, kosten aber vom Zeit- und Token-Budget des
+      Durchlaufs. Standard {{ requestDefault }}, erlaubt sind {{ requestMin }} bis {{ requestLimit }}. Gilt ab
+      der nächsten Prüfung.
+    </p>
 
-  <div class="es-row">
-    <button class="es-btn es-btn--text" (click)="resetAssistantRequestMax()">
-      Auf Standard zurücksetzen
-    </button>
-  </div>
-</section>
+    <div class="es-row">
+      <button class="es-btn es-btn--text" (click)="resetAssistantRequestMax()">
+        Auf Standard zurücksetzen
+      </button>
+    </div>
+  </section>
+}
 
 <!-- Entwicklung: ersetzt die Antworten der KI-Dienste durch Fixtures. -->
 <section class="es-card">
@@ -113,15 +117,18 @@
       fachliche Fehler im Text — damit hat eine Qualitätsprüfung etwas zu finden.
     </p>
 
-    <label class="es-field-label" for="dev-collection">Test-Sammlungs-ID</label>
-    <input id="dev-collection" type="text" class="es-input" placeholder="Sammlungs-ID"
-           [ngModel]="devMode.collectionId()" (ngModelChange)="setDevCollectionId($event)" />
-    <p class="desc">
-      Sammlung, in der der Inhalt als einsortiert gilt — ohne die Einsortier-Schritte durchlaufen zu
-      müssen. Die „Individuelle Qualitätsprüfung mit KI“ prüft gegen diese Sammlung, weil die KI ihre
-      Prüf-Anweisung darüber lädt. Der Inhalt wird nicht in sie einsortiert: sie ist der Prüfgegenstand,
-      keine Ablage-Entscheidung.
-    </p>
+    <!-- Prüfgegenstand der „Individuellen Qualitätsprüfung mit KI“, die es nur im WLO-Panel gibt. -->
+    @if (wlo.enabled()) {
+      <label class="es-field-label" for="dev-collection">Test-Sammlungs-ID</label>
+      <input id="dev-collection" type="text" class="es-input" placeholder="Sammlungs-ID"
+             [ngModel]="devMode.collectionId()" (ngModelChange)="setDevCollectionId($event)" />
+      <p class="desc">
+        Sammlung, in der der Inhalt als einsortiert gilt — ohne die Einsortier-Schritte durchlaufen zu
+        müssen. Die „Individuelle Qualitätsprüfung mit KI“ prüft gegen diese Sammlung, weil die KI ihre
+        Prüf-Anweisung darüber lädt. Der Inhalt wird nicht in sie einsortiert: sie ist der
+        Prüfgegenstand, keine Ablage-Entscheidung.
+      </p>
+    }
 
     <label class="check">
       <input type="checkbox" [ngModel]="devMode.skipWrites()"
@@ -168,118 +175,122 @@
   }
 </section>
 
-<!-- Woraus die Sammlung ermittelt wird, die „An Redaktionen weiterleiten“ vorschlägt. Eingeklappt:
-     Werte, die selten angefasst werden, sollen die Einstellungen nicht füllen. -->
-<section class="es-card">
-  <!-- Die ganze Zeile klappt auf, nicht nur der Pfeil — ein Ziel statt zweier, und die Überschrift
-       sagt ohnehin, was darunter liegt. -->
-  <button type="button" class="section-head" (click)="toggleSection('recommendation')"
-          [attr.aria-expanded]="openSection() === 'recommendation'">
-    <h2>Zugehörige Sammlungen empfehlen</h2>
-    <i class="section-chevron" [class.is-open]="openSection() === 'recommendation'"
-       esIcon="expand_more"></i>
-  </button>
+<!-- Die Sammlungs-Empfehlung gehört zu „An Redaktionen weiterleiten“, die Prüf-Dienste zur
+     Qualitätsprüfung — beide Schritte gibt es nur im WLO-Panel. -->
+@if (wlo.enabled()) {
+  <!-- Woraus die Sammlung ermittelt wird, die „An Redaktionen weiterleiten“ vorschlägt. Eingeklappt:
+       Werte, die selten angefasst werden, sollen die Einstellungen nicht füllen. -->
+  <section class="es-card">
+    <!-- Die ganze Zeile klappt auf, nicht nur der Pfeil — ein Ziel statt zweier, und die Überschrift
+         sagt ohnehin, was darunter liegt. -->
+    <button type="button" class="section-head" (click)="toggleSection('recommendation')"
+            [attr.aria-expanded]="openSection() === 'recommendation'">
+      <h2>Zugehörige Sammlungen empfehlen</h2>
+      <i class="section-chevron" [class.is-open]="openSection() === 'recommendation'"
+         esIcon="expand_more"></i>
+    </button>
 
-  @if (openSection() === 'recommendation') {
-    <p class="desc">
-      Die Schlagworte des Inhalts werden gegen seinen Text bewertet; mit den besten davon wird der
-      Themen-Assistent befragt, und die passendste Sammlung wird vorgeschlagen und ausgewählt.
-    </p>
+    @if (openSection() === 'recommendation') {
+      <p class="desc">
+        Die Schlagworte des Inhalts werden gegen seinen Text bewertet; mit den besten davon wird der
+        Themen-Assistent befragt, und die passendste Sammlung wird vorgeschlagen und ausgewählt.
+      </p>
 
-    <label class="es-field-label" for="rec-keywords">Anzahl Schlagworte</label>
-    <input id="rec-keywords" type="number" class="es-input" min="1" step="1"
-           [ngModel]="recommendations.maxKeywords()"
-           (ngModelChange)="setRecommendationKeywords($event)" />
-    <p class="desc">
-      Höchstens so viele Schlagworte gehen in die Anfrage. Jedes weitere verbreitert die Antwort eher,
-      als sie zu schärfen — der Assistent gewichtet ein Thema danach, wie viele Schlagworte es treffen.
-    </p>
+      <label class="es-field-label" for="rec-keywords">Anzahl Schlagworte</label>
+      <input id="rec-keywords" type="number" class="es-input" min="1" step="1"
+             [ngModel]="recommendations.maxKeywords()"
+             (ngModelChange)="setRecommendationKeywords($event)" />
+      <p class="desc">
+        Höchstens so viele Schlagworte gehen in die Anfrage. Jedes weitere verbreitert die Antwort eher,
+        als sie zu schärfen — der Assistent gewichtet ein Thema danach, wie viele Schlagworte es treffen.
+      </p>
 
-    <label class="es-field-label" for="rec-score">Mindest-Score</label>
-    <input id="rec-score" type="number" class="es-input" min="0" max="1" step="0.05"
-           [ngModel]="recommendations.minScore()"
-           (ngModelChange)="setRecommendationMinScore($event)" />
-    <p class="desc">
-      Diesen Wert muss ein Schlagwort erreichen, um überhaupt gefragt zu werden — 0 bis 1, gemessen am
-      bestbewerteten Schlagwort des Inhalts. Erreicht keines ihn, wird keine Sammlung vorgeschlagen.
-      Ohne Text zum Bewerten (etwa bei einem Inhalt ohne erschlossenen Volltext) greift nur die Anzahl.
-    </p>
+      <label class="es-field-label" for="rec-score">Mindest-Score</label>
+      <input id="rec-score" type="number" class="es-input" min="0" max="1" step="0.05"
+             [ngModel]="recommendations.minScore()"
+             (ngModelChange)="setRecommendationMinScore($event)" />
+      <p class="desc">
+        Diesen Wert muss ein Schlagwort erreichen, um überhaupt gefragt zu werden — 0 bis 1, gemessen am
+        bestbewerteten Schlagwort des Inhalts. Erreicht keines ihn, wird keine Sammlung vorgeschlagen.
+        Ohne Text zum Bewerten (etwa bei einem Inhalt ohne erschlossenen Volltext) greift nur die Anzahl.
+      </p>
 
-    <div class="es-row">
-      <button class="es-btn es-btn--text" (click)="resetRecommendation()">
-        Auf Standard zurücksetzen
-      </button>
-    </div>
-  }
-</section>
+      <div class="es-row">
+        <button class="es-btn es-btn--text" (click)="resetRecommendation()">
+          Auf Standard zurücksetzen
+        </button>
+      </div>
+    }
+  </section>
 
-<!-- Welche Dienste die Qualitätsprüfung befragt; eingeklappt wie die Empfehlung darüber. -->
-<section class="es-card">
-  <button type="button" class="section-head" (click)="toggleSection('quality')"
-          [attr.aria-expanded]="openSection() === 'quality'">
-    <h2>Qualitätsprüfung</h2>
-    <i class="section-chevron" [class.is-open]="openSection() === 'quality'"
-       esIcon="expand_more"></i>
-  </button>
+  <!-- Welche Dienste die Qualitätsprüfung befragt; eingeklappt wie die Empfehlung darüber. -->
+  <section class="es-card">
+    <button type="button" class="section-head" (click)="toggleSection('quality')"
+            [attr.aria-expanded]="openSection() === 'quality'">
+      <h2>Qualitätsprüfung</h2>
+      <i class="section-chevron" [class.is-open]="openSection() === 'quality'"
+         esIcon="expand_more"></i>
+    </button>
 
-  @if (openSection() === 'quality') {
-    <label class="check">
-      <input type="checkbox" [ngModel]="qualityJudge.metalookupEnabled()"
-             (ngModelChange)="setMetalookup($event)" />
-      <span>MetalookUp: Inhalt messen</span>
-    </label>
+    @if (openSection() === 'quality') {
+      <label class="check">
+        <input type="checkbox" [ngModel]="qualityJudge.metalookupEnabled()"
+               (ngModelChange)="setMetalookup($event)" />
+        <span>MetalookUp: Inhalt messen</span>
+      </label>
 
-    <p class="desc">
-      Ruft den Inhalt selbst ab und misst ihn. Abgeschaltet bleiben die Kriterien unbeantwortet, die
-      davon leben. Angefragt werden nur diese Prüfungen — was der Dienst sonst noch messen könnte,
-      läuft gar nicht erst:
-    </p>
+      <p class="desc">
+        Ruft den Inhalt selbst ab und misst ihn. Abgeschaltet bleiben die Kriterien unbeantwortet, die
+        davon leben. Angefragt werden nur diese Prüfungen — was der Dienst sonst noch messen könnte,
+        läuft gar nicht erst:
+      </p>
 
-    <ul class="desc-list">
-      @for (check of metalookupChecks; track check.propertyId) {
-        <li>{{ check.label }} — Feature „{{ check.feature }}“</li>
-      }
-    </ul>
+      <ul class="desc-list">
+        @for (check of metalookupChecks; track check.propertyId) {
+          <li>{{ check.label }} — Feature „{{ check.feature }}“</li>
+        }
+      </ul>
 
-    <!-- Der Zugang steht über dem Schalter, den er freigibt: ohne ihn ließe der sich nie setzen. -->
-    <label class="es-field-label" for="cj-auth">ContentJudge: Zugang</label>
-    <div class="reveal-field">
-      <input id="cj-auth" class="es-input" [type]="basicAuthVisible() ? 'text' : 'password'"
-             placeholder="Benutzer:Passwort" autocomplete="off"
-             [ngModel]="contentJudge.basicAuth()" (ngModelChange)="setContentJudgeAuth($event)" />
-      <button class="reveal" type="button" (click)="toggleBasicAuthVisible()"
-              [attr.aria-pressed]="basicAuthVisible()"
-              [title]="basicAuthVisible() ? 'Zugang verbergen' : 'Zugang anzeigen'"
-              [attr.aria-label]="basicAuthVisible() ? 'Zugang verbergen' : 'Zugang anzeigen'">
-        <i [esIcon]="basicAuthVisible() ? 'visibility_off' : 'visibility'"></i>
-      </button>
-    </div>
+      <!-- Der Zugang steht über dem Schalter, den er freigibt: ohne ihn ließe der sich nie setzen. -->
+      <label class="es-field-label" for="cj-auth">ContentJudge: Zugang</label>
+      <div class="reveal-field">
+        <input id="cj-auth" class="es-input" [type]="basicAuthVisible() ? 'text' : 'password'"
+               placeholder="Benutzer:Passwort" autocomplete="off"
+               [ngModel]="contentJudge.basicAuth()" (ngModelChange)="setContentJudgeAuth($event)" />
+        <button class="reveal" type="button" (click)="toggleBasicAuthVisible()"
+                [attr.aria-pressed]="basicAuthVisible()"
+                [title]="basicAuthVisible() ? 'Zugang verbergen' : 'Zugang anzeigen'"
+                [attr.aria-label]="basicAuthVisible() ? 'Zugang verbergen' : 'Zugang anzeigen'">
+          <i [esIcon]="basicAuthVisible() ? 'visibility_off' : 'visibility'"></i>
+        </button>
+      </div>
 
-    <p class="desc">
-      Zugangsdaten der Basic-Authentifizierung, die den Dienst absichert, als
-      <code>Benutzer:Passwort</code>. Sie werden nur lokal im Browser gespeichert; ohne sie lässt sich
-      die Bewertung nicht einschalten.
-    </p>
+      <p class="desc">
+        Zugangsdaten der Basic-Authentifizierung, die den Dienst absichert, als
+        <code>Benutzer:Passwort</code>. Sie werden nur lokal im Browser gespeichert; ohne sie lässt sich
+        die Bewertung nicht einschalten.
+      </p>
 
-    <label class="check">
-      <input type="checkbox" [ngModel]="qualityJudge.contentJudgeEnabled()"
-             (ngModelChange)="setContentJudge($event)"
-             [disabled]="!contentJudge.credentialSet()" />
-      <span>ContentJudge: Inhalt per LLM bewerten</span>
-    </label>
+      <label class="check">
+        <input type="checkbox" [ngModel]="qualityJudge.contentJudgeEnabled()"
+               (ngModelChange)="setContentJudge($event)"
+               [disabled]="!contentJudge.credentialSet()" />
+        <span>ContentJudge: Inhalt per LLM bewerten</span>
+      </label>
 
-    <p class="desc">
-      Beurteilt den Text des Inhalts gegen die Bewertungsschemata der Qualitätskriterien. Standardmäßig
-      aus: jedes Schema ist ein eigener LLM-Durchgang und dauert entsprechend. Angefragt werden nur
-      diese Schemata:
-    </p>
+      <p class="desc">
+        Beurteilt den Text des Inhalts gegen die Bewertungsschemata der Qualitätskriterien. Standardmäßig
+        aus: jedes Schema ist ein eigener LLM-Durchgang und dauert entsprechend. Angefragt werden nur
+        diese Schemata:
+      </p>
 
-    <ul class="desc-list">
-      @for (scheme of contentJudgeSchemes; track scheme) {
-        <li><code>{{ scheme }}</code></li>
-      } @empty {
-        <li>keines — kein Kriterium verweist derzeit auf ein Schema</li>
-      }
-    </ul>
-  }
-</section>
+      <ul class="desc-list">
+        @for (scheme of contentJudgeSchemes; track scheme) {
+          <li><code>{{ scheme }}</code></li>
+        } @empty {
+          <li>keines — kein Kriterium verweist derzeit auf ein Schema</li>
+        }
+      </ul>
+    }
+  </section>
+}

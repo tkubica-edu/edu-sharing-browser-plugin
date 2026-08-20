@@ -5,6 +5,7 @@ import { APP_CONFIG } from '../../../config';
 import { IconDirective } from '../../../directives/icon.directive';
 import { AssistantRequestService } from '../../../services/assistant-request.service';
 import { AuthService } from '../../../services/auth.service';
+import { BrowserExtensionCustomWebComponentService } from '../../../services/browser-extension-custom-web-component.service';
 import { ChatSkillService, MasterSkillSetting } from '../../../services/chat-skill.service';
 import { ChatStyleService } from '../../../services/chat-style.service';
 import { CollectionRecommendationService } from '../../../services/collection-recommendation.service';
@@ -27,6 +28,12 @@ import { configuredSchemes } from '../../../util/quality-schemes';
 })
 export class SettingsScreenComponent implements OnDestroy {
   protected readonly auth = inject(AuthService);
+  /**
+   * Whether this is a WLO panel: the settings that tune the chat, the KI check and the collection
+   * proposal configure steps that only exist there, so they are shown only where those steps are —
+   * the same statement the registry gates those steps by (see model/navigation.ts).
+   */
+  protected readonly wlo = inject(BrowserExtensionCustomWebComponentService);
   protected readonly debug = inject(DebugService);
   protected readonly devMode = inject(DevModeService);
   protected readonly chatStyle = inject(ChatStyleService);

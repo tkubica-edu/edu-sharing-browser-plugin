@@ -143,7 +143,10 @@ from outside).
 ### Prüfprozess auswählen
 
 The junction between the filing and the checking, entered from whichever filing step was the last to
-apply. Two cards, each with the button that starts its process: *Geführte Qualitätsprüfung*, which
+apply — and only where the repository config enables the browser extension custom web component:
+both processes belong to it (the criteria view and the assistant), so without it there is nothing to
+choose between and the filing leads straight into the Metadaten view. Two cards, each with the button
+that starts its process: *Geführte Qualitätsprüfung*, which
 is the *Qualitätsprüfung* as it stands (criteria, then metadata), and *Individuelle
 Qualitätsprüfung mit KI*, the analysis against the chosen collection's requirements as a dialogue with
 the assistant (see [chatbot.md](chatbot.md)). Clicking a card marks it and the footer's *Weiter* starts

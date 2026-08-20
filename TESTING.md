@@ -44,15 +44,18 @@ switched on — otherwise that finding would go on standing for the page. Neithe
 host, where the announced document stands for the page rather than a lookup, and neither throws away
 unsaved work.
 
-Three further settings appear while the mode is on, and hold only while it is:
+Three further settings appear while the mode is on, and hold only while it is (the middle one only in
+a WLO panel, see there):
 
 - **Gefakter Inhalt** — which erschlossener Inhalt `/generate` answers with. `dresden` is a sound
   content; `optik` carries factual errors in its text on purpose, so a quality check has something to
   find. The payloads live in `background/dev-fixtures.js` (the worker answers that call); the select's
   ids come from `GENERATE_FIXTURES` in `dev-mode.service.ts` and have to stay in step with that
   object's keys.
-- **Test-Sammlungs-ID** — the collection every step that works off one is to work off. It takes three
-  places at once, so no step has to be walked for it:
+- **Test-Sammlungs-ID** — the collection every step that works off one is to work off. Shown only in a
+  WLO panel (`browserExtensionCustomWebComponent`), since the steps it feeds — the KI check, the
+  collection proposal, the forwarding — exist only there. It takes three places at once, so no step has
+  to be walked for it:
   - it joins `CurationService.filedCollections`, which is what the KI check reads its collection from;
   - it *is* the „Empfohlene Sammlung" — `CollectionRecommendationService.recommend` answers with it
     and the topic assistant is not asked at all, so the proposal is the collection under test rather

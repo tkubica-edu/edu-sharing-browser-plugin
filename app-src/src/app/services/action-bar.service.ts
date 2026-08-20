@@ -126,7 +126,9 @@ export class ActionBarService {
               if (!(await this.curation.createContent())) return;
               // Where the content goes is asked before it is described, so the filing steps come
               // first — and where none of them applies, the choice of process behind them does.
-              this.navigation.go(this.nextSection('editorial-forward', 'personal-storage'));
+              this.navigation.go(
+                this.nextSection('editorial-forward', 'personal-storage', 'flow-choice'),
+              );
             }
           }
         ];
@@ -208,7 +210,7 @@ export class ActionBarService {
             disabled: this.curation.saving(),
             run: async () => {
               if (!(await this.curation.saveCollected())) return;
-              this.navigation.go(this.nextSection('personal-storage'));
+              this.navigation.go(this.nextSection('personal-storage', 'flow-choice'));
             }
           }
         ];
@@ -228,7 +230,7 @@ export class ActionBarService {
             run: async () => {
               if (handler?.canApply()) handler.apply();
               if (!(await this.curation.saveCollected())) return;
-              this.navigation.go('flow-choice');
+              this.navigation.go(this.nextSection('flow-choice'));
             }
           }
         ];
@@ -332,12 +334,13 @@ export class ActionBarService {
   }
 
   /**
-   * The first of the given steps that applies right now, falling back to the choice of process — the
-   * step every filing leads into. Both filings are optional, and a step that has nothing to offer is
+   * The first of the given steps that applies right now, falling back to the Qualitätsprüfung — the step
+   * every route through the flow ends in. The filings are optional and so is the choice of process, which
+   * only exists where there are two processes to choose between; a step that has nothing to offer is
    * walked past rather than shown empty (see the registry).
    */
   private nextSection(...candidates: readonly SectionId[]): SectionId {
-    return candidates.find((id) => this.navigation.isVisible(id)) ?? 'flow-choice';
+    return candidates.find((id) => this.navigation.isVisible(id)) ?? 'quality';
   }
 
   /**
