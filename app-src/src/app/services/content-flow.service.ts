@@ -3,7 +3,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { BrowserExtensionService } from './browser-extension.service';
 import { ConditionsService } from './conditions.service';
 import { CurationService } from './curation.service';
-import { NavState, NavStep, NavigationService } from './navigation.service';
+import { NavState, NavigationService } from './navigation.service';
 import { NodeConnectorService } from './node-connector.service';
 import { OnlyOfficeDocumentService } from './onlyoffice-document.service';
 import { SessionResumeService } from './session-resume.service';
@@ -63,12 +63,14 @@ export class ContentFlowService {
    * anywhere — this panel does not outlive that, so what is still to be done for the content waits for the one
    * that comes back (see CurationService.pendingExtraction).
    *
-   * `left` is the step the content was last worked on, where one is known: it is continued there instead of at
-   * the junction, and the junction stands in wherever that step cannot be re-entered.
+   * Always the junction, whichever step the content was last worked on: picking a content is choosing what to
+   * do with it next, and that choice is what the junction offers — being dropped straight back into the middle
+   * of the flow answers it for the person. Where the content was left is still said, on the main menu's card
+   * for it (see CurationService.leftAtStep).
    */
-  async showContentOptions(left?: NavStep | null): Promise<boolean> {
+  async showContentOptions(): Promise<boolean> {
     const target = this.curation.activeNode()?.link;
-    const state = this.navigation.resumableStep(left) ?? this.navigation.stateFor('content-options');
+    const state = this.navigation.stateFor('content-options');
     const ahead = target && target !== this.conditions.activeUrl() ? state : null;
     if (!target || !ahead) {
       this.navigation.go(state?.section ?? 'content-options', { tab: state?.tab ?? undefined });

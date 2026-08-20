@@ -83,6 +83,11 @@ its own page in the repository (`…/components/render/<id>`) and the panel come
 *Inhaltsoptionen*, working on that same node (`ContentFlowService.showContentOptions`). The page then
 shows the content the panel's steps act on.
 
+Always the junction, whatever step the entry remembers (`HistoryEntry.step`): picking a content is
+choosing what to work on, and what to do with it is the next choice rather than one the panel makes.
+Where a content was left is still said — on the main menu's card for an Erschließung that was left
+unfinished (`CurationService.leftAtStep`), which continues it there.
+
 The panel cannot survive the load — it is an iframe in the page — so the state is written to storage
 first and restored on boot, exactly as for the *Bearbeitungsmodus*, which takes the tab to the
 connector the same way. The step is **not entered before the load**: it is carried across in that

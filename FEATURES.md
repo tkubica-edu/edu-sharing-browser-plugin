@@ -228,9 +228,9 @@ navigating to it, and closes it again where it stands; the step keeps running be
 - **Verlauf** *(with the entry count as a badge)* — the **saved nodes**, newest first. An entry is
   recorded only when a node is actually saved, so every row carries a `nodeId` (legacy pre-node
   entries are dropped on load, and re-saving a node moves its row to the top instead of
-  duplicating). *In Vorschau öffnen* fetches the live node by id (`CurationService.openFromHistory` →
-  `RepositoryNodeService.get`) and opens it; if there is unsaved work the shell confirms first, and a
-  failed fetch is surfaced via an alert.
+  duplicating). *Inhalt öffnen* fetches the live node by id (`CurationService.openFromHistory` →
+  `RepositoryNodeService.get`) and takes the content up at the *Inhaltsoptionen*; if there is unsaved
+  work the shell confirms first, and a failed fetch is surfaced via an alert.
 - **Einstellungen** *(dotted while a change waits to be applied)* — the Repository-URL (used for
   login and every embedded element), the debug mode, the recommendation settings and the two chat
   settings: the corrections to the widget's display, and the chatbot's master skill as *Vorgabe des

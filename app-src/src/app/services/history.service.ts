@@ -29,9 +29,10 @@ export interface HistoryEntry {
    */
   run?: ParsedMetadata | null;
   /**
-   * Where the flow stood when this was written, so taking the content up again continues there rather
-   * than at the junction. Only ever *offered*: a step that no longer applies is passed over — see
-   * NavigationService.resumableStep.
+   * Where the flow stood when this was written. What an entry *opened from the Verlauf* leads to is the
+   * junction all the same — the choice of what to do with the content is the person's; this is what the main
+   * menu's card offers for an Erschließung left unfinished (CurationService.leftAtStep). Only ever *offered*:
+   * a step that no longer applies is passed over — see NavigationService.resumableStep.
    */
   step?: NavStep | null;
   /**
