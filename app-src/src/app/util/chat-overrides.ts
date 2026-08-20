@@ -14,10 +14,14 @@
 // `.host-bubble` marks a user row the panel wrote itself — the step's instruction — as against one the
 // person sent.
 //
-// One correction is not a rule but a mark: the verdict glyph an answer's criteria lines start with says
-// whether that criterion passed, and no selector can read text, so the classes below are put on the lines
-// from script and coloured by the sheet. The glyph itself arrives as a bare text node with nothing to
-// address, so it is wrapped in a span of its own to be coloured along with the name it introduces.
+// Two corrections are not rules but marks, put on from script and only styled by the sheet:
+//
+//   * the verdict glyph an answer's criteria lines start with says whether that criterion passed, and no
+//     selector can read text. The glyph itself arrives as a bare text node with nothing to address, so it is
+//     wrapped in a span of its own to be coloured along with the name it introduces.
+//   * whether an answer has been overtaken by the panel's next instruction. CSS *can* say this one
+//     (`:has(+ …)`), and it was said that way — but the condition turns true through a change in the
+//     following row, and Safari does not reliably re-style the earlier one for it. See markOvertaken.
 
 /** Says which `<style>` in the shadow root is ours, so it is installed once per element. */
 const MARKER = 'data-es-chat-overrides';
@@ -33,6 +37,13 @@ const UNCLEAR_CLASS = 'es-verdict-unclear';
 
 /** Says which span holds a line's verdict glyph, so a line already marked is recognised as marked. */
 const GLYPH_CLASS = 'es-verdict-glyph';
+
+/**
+ * Marks an answer the conversation has moved past: the row after it is the panel's own instruction, so what
+ * that answer noted and offered is no longer what the person is being asked. Put on from script rather than
+ * stated as a condition in the sheet — see {@link markOvertaken}.
+ */
+const OVERTAKEN_CLASS = 'es-overtaken';
 
 /**
  * The verdict glyphs a criterion line can start with, each with the class its name is then given. Several
@@ -53,17 +64,11 @@ const ROOT_POLL_MS = 50;
 
 const CSS = `
 /* TODO: Replace by updated chatbot version */
-/* The AI notice and the widget's suggested replies under an answer the check has already moved past: the row
-   after it is the panel's own instruction, so what that answer noted and offered is no longer what the
-   person is being asked. The condition is on the following row, which is what :has(+ …) states — an answer
-   keeps both for as long as it is the last thing said.
-
-   The row after is a .user-row and what marks it as the panel's is the .host-bubble inside it, so the
-   relative selector reaches that far down in one step. It has to: :has() may not be nested inside :has(),
-   and a nested one is a syntax error — which takes the whole rule with it, both lines included, so nothing
-   was hidden anywhere. Measured in the browser: 0 rules parsed, and querySelectorAll throws on it. */
-.messages-area > .message-row.bot-row:has(+ .message-row.user-row .host-bubble) .ai-notice,
-.messages-area > .message-row.bot-row:has(+ .message-row.user-row .host-bubble) boerdi-quick-replies {
+/* The AI notice and the widget's suggested replies under an answer the conversation has moved past — the
+   class says which answer that is, and markOvertaken is what puts it on. Plain descendant selectors, so the
+   rule holds the moment the class does, in every engine. */
+.message-row.${OVERTAKEN_CLASS} .ai-notice,
+.message-row.${OVERTAKEN_CLASS} boerdi-quick-replies {
   display: none;
 }
 
@@ -131,11 +136,47 @@ function attach(element: HTMLElement): boolean {
  * the tree it watches when the chat is destroyed.
  */
 function observeVerdicts(root: ShadowRoot): void {
-  markVerdicts(root);
-  new MutationObserver(() => markVerdicts(root)).observe(root, {
+  mark(root);
+  new MutationObserver(() => mark(root)).observe(root, {
     subtree: true,
     childList: true,
     characterData: true,
+    // `host-bubble` is a class the widget toggles on a bubble that is already there, so the row after an
+    // answer can become the panel's instruction without any node being added — see markOvertaken. Marking
+    // sets classes itself, which cannot chase its own tail: a class already set is not written again, so no
+    // record is queued for it and the second pass over a tree ends the run.
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+}
+
+/** Both marks the sheet works off, in one pass over the tree as it now stands. */
+function mark(root: ShadowRoot): void {
+  markVerdicts(root);
+  markOvertaken(root);
+}
+
+/**
+ * Mark every answer the conversation has moved past: one whose next row is an instruction the panel wrote —
+ * a `.user-row` with a `.host-bubble` in it. The last answer keeps its notice and its chips, being still
+ * what the person is being asked.
+ *
+ * Read here rather than stated as a selector, although CSS can say it: `:has(+ .message-row.user-row
+ * .host-bubble)` is exactly this condition, and Safari does not always re-style the earlier row when the
+ * condition turns true — which happens deep inside the *following* row, the weakest case of `:has()`
+ * invalidation. The notice and the chips then stayed on screen until something else forced a recalculation;
+ * re-entering the screen was one, which is how it looked intermittent. The observer above is told about the
+ * very changes that turn the condition true, so the mark is put on where CSS was asked to notice it.
+ */
+function markOvertaken(root: ShadowRoot): void {
+  const rows = Array.from(root.querySelectorAll('.messages-area > .message-row'));
+  rows.forEach((row, index) => {
+    const next = rows[index + 1];
+    const overtaken =
+      row.classList.contains('bot-row') &&
+      !!next?.classList.contains('user-row') &&
+      !!next.querySelector('.host-bubble');
+    row.classList.toggle(OVERTAKEN_CLASS, overtaken);
   });
 }
 
