@@ -16,7 +16,8 @@
 //
 // One correction is not a rule but a mark: the verdict glyph an answer's criteria lines start with says
 // whether that criterion passed, and no selector can read text, so the classes below are put on the lines
-// from script and coloured by the sheet.
+// from script and coloured by the sheet. The glyph itself arrives as a bare text node with nothing to
+// address, so it is wrapped in a span of its own to be coloured along with the name it introduces.
 
 /** Says which `<style>` in the shadow root is ours, so it is installed once per element. */
 const MARKER = 'data-es-chat-overrides';
@@ -24,6 +25,9 @@ const MARKER = 'data-es-chat-overrides';
 /** Marks the bold name of a criterion the answer found met, and one it found violated. */
 const MET_CLASS = 'es-verdict-met';
 const VIOLATED_CLASS = 'es-verdict-violated';
+
+/** Says which span holds a line's verdict glyph, so a line already marked is recognised as marked. */
+const GLYPH_CLASS = 'es-verdict-glyph';
 
 /**
  * The verdict glyphs a criterion line can start with, each with the class its name is then given. Several
@@ -65,8 +69,9 @@ const CSS = `
   display: none;
 }
 
-/* The name of a criterion in an answer's verdict list, in the colour of its verdict: the glyph the line
-   starts with says which one, and markVerdicts puts the class on the line's bold name.
+/* The glyph and the name of a criterion in an answer's verdict list, in the colour of its verdict: the
+   glyph the line starts with says which one, and markVerdicts puts the class on both the span it wraps that
+   glyph in and the line's bold name.
 
    The panel's own tokens carry through the shadow boundary — custom properties inherit — with the literal
    they hold as the fallback, so the colours also hold in a document that does not define them. Declared
@@ -127,21 +132,52 @@ function observeVerdicts(root: ShadowRoot): void {
 }
 
 /**
- * Give the bold criterion name in each of an answer's verdict lines the class of that line's verdict.
+ * Give the glyph and the bold criterion name in each of an answer's verdict lines the class of that line's
+ * verdict.
  *
  * The lines are what the check asks the assistant to write — a glyph, the name of the criterion in bold,
  * then the reason. Markdown renders each as a list item, or as a paragraph where the assistant wrote them
- * without a list, so both are looked at: the glyph at the start of the line's text decides, and the class
- * goes on its first bold run. A line beginning with anything else — `?` for an unclear verdict, prose — and
- * any other bold text in the answer keep the text colour.
+ * without a list, so both are looked at: the glyph at the start of the line's text decides, and the classes
+ * go on its first bold run and on the glyph itself. A line beginning with anything else — `?` for an unclear
+ * verdict, prose — and any other bold text in the answer keep the text colour.
  */
 function markVerdicts(root: ShadowRoot): void {
   for (const item of Array.from(root.querySelectorAll('.msg-content li, .msg-content p'))) {
     const name = item.querySelector('strong');
     if (!name) continue;
     const glyph = (item.textContent ?? '').trimStart().charAt(0);
-    for (const [className, glyphs] of VERDICTS) {
-      name.classList.toggle(className, glyphs.includes(glyph));
+    const verdict = VERDICTS.find(([, glyphs]) => glyphs.includes(glyph));
+    for (const [className] of VERDICTS) {
+      name.classList.toggle(className, className === verdict?.[0]);
     }
+    if (verdict) wrapGlyph(item, glyph, verdict[0]);
   }
+}
+
+/**
+ * Put the line's leading glyph into a span carrying the verdict's class, so the sheet can colour it.
+ *
+ * Idempotent, which the observer relies on: a line whose glyph is already wrapped only has the class
+ * corrected, and the wrapping itself is one more childList change under a tree that is watched for them —
+ * were it repeated, marking would set off the observer that set it off. The glyph is looked for in the
+ * line's first text node with something in it, since markdown may open the line with whitespace.
+ */
+function wrapGlyph(item: Element, glyph: string, className: string): void {
+  const marked = item.querySelector(`.${GLYPH_CLASS}`);
+  if (marked) {
+    for (const [name] of VERDICTS) marked.classList.toggle(name, name === className);
+    return;
+  }
+  const walker = document.createTreeWalker(item, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode() as Text | null;
+  while (node && !node.data.trim()) node = walker.nextNode() as Text | null;
+  const at = node?.data.search(/\S/) ?? -1;
+  if (!node || at < 0 || node.data.charAt(at) !== glyph) return;
+  // Cut the glyph out of the text node and put the span where it stood.
+  const rest = node.splitText(at);
+  rest.splitText(glyph.length);
+  const span = item.ownerDocument.createElement('span');
+  span.className = `${GLYPH_CLASS} ${className}`;
+  span.textContent = glyph;
+  rest.replaceWith(span);
 }
