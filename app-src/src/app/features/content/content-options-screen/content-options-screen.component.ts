@@ -149,15 +149,20 @@ export class ContentOptionsScreenComponent {
         label: 'Inhalt teilen',
         description: 'Link oder QR-Code erstellen und weitergeben',
         run: () => this.flow.showShare()
-      },
-      {
+      }
+    );
+    // The exchange with the editorial teams, which only exists where a content is forwarded to them
+    // at all: the row is gated by the tab's own statement in the registry rather than by a second one
+    // here, so the two can never disagree about when this errand applies.
+    if (this.navigation.isTabVisible('overview', 'interactions', conditions)) {
+      options.push({
         section: 'overview',
         icon: 'forum',
         label: 'Interaktionen anzeigen',
-        description: 'Rückmeldungen und Beiträge zum Inhalt ansehen',
+        description: 'Rückmeldungen der Redaktionen zum Inhalt ansehen',
         run: () => this.flow.showInteractions()
-      }
-    );
+      });
+    }
     return options.filter((option) => this.navigation.isVisible(option.section, conditions));
   });
 }

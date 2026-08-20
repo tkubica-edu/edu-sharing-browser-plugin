@@ -212,6 +212,16 @@ export class NavigationService {
   }
 
   /**
+   * Whether one of a section's sub steps applies right now, for the screens that offer a *tab* as an
+   * errand of its own (see the Inhaltsoptionen): such a row and the tab it leads to are then gated by
+   * the same statement in the registry. A tab that does not exist counts as absent.
+   */
+  isTabVisible(id: SectionId, tab: ScreenId, conditions = this.conditions.snapshot()): boolean {
+    const step = this.sectionOf(id)?.tabs.find((candidate) => candidate.id === tab);
+    return !!step && (step.visible?.(conditions) ?? true);
+  }
+
+  /**
    * Whether one of a section's sub steps is locked right now, for the screens that offer a *tab* as an
    * errand of its own (see the Inhaltsoptionen). Read from the registry rather than restated by the
    * caller, so such a row and the tab it leads to are gated by the same statement. A tab that does not

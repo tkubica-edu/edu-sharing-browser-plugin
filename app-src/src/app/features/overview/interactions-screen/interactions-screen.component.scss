@@ -1,3 +1,142 @@
-// "Interaktionen" — nothing of its own yet; the host is a block so the screen body lays out the way
-// it does in the sibling tabs of the Inhaltsübersicht.
+// "Interaktionen" — one card per editorial team the content was proposed to: the team as its own head
+// row, and under it the exchange as a timeline of steps.
+@use 'mixins' as m;
+
 :host { display: block; }
+
+// The head card's own line: what the screen shows, and the mark that it is not live data yet.
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--es-space-2);
+  margin: 0 0 var(--es-space-2);
+}
+
+.head-title { font-size: 12px; font-weight: 700; color: var(--es-blue); text-transform: uppercase; letter-spacing: 0.04em; }
+
+// The draft mark: the amber of the panel's notices, so an unfinished view is flagged in the colour
+// the rest of the panel flags things needing attention in.
+.draft {
+  @include m.badge;
+
+  flex: 0 0 auto;
+  background: #fff7e6;
+  border: 1px solid #f0d492;
+  color: #7a5b00;
+}
+
+.exchanges {
+  @include m.list-reset;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--es-space-3);
+}
+
+.exchange {
+  @include m.list-item;
+
+  margin-bottom: 0;
+}
+
+.head-row {
+  display: flex;
+  align-items: center;
+  gap: var(--es-space-3);
+  padding: var(--es-space-3);
+}
+
+// The team's picture, in a fixed box so the names line up whatever shape the logos have — the same
+// box the forwarding step draws them in.
+.logo {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 40px;
+  overflow: hidden;
+  background: var(--es-surface);
+  border: 1px solid var(--es-border);
+  border-radius: 6px;
+
+  img { max-width: 100%; max-height: 100%; object-fit: contain; }
+}
+
+// Stand-in for a team whose collection has no picture of its own.
+.logo-glyph { font-size: 22px; line-height: 1; color: var(--es-blue); }
+
+.group { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+
+.group-name { font-weight: 700; font-size: 15px; overflow-wrap: anywhere; }
+
+.group-folder {
+  @include m.muted;
+
+  overflow-wrap: anywhere;
+
+  strong { color: var(--es-text); }
+}
+
+// What the exchange amounts to right now, as a chip beside the team — readable off the list as a
+// whole, which is what a user scanning several teams reads it for.
+.state {
+  @include m.chip;
+
+  flex: 0 0 auto;
+  align-self: flex-start;
+  background: var(--es-blue-tint);
+  border-color: transparent;
+  color: var(--es-blue);
+  font-weight: 600;
+}
+
+// The exchange itself: a hairline apart from the head, since it is what happened rather than who it
+// happened with.
+.steps {
+  @include m.list-reset;
+
+  border-top: 1px solid var(--es-border);
+  background: var(--es-hint-bg);
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--es-space-2);
+  padding: var(--es-space-2) var(--es-space-3);
+
+  & + .step { border-top: 1px solid var(--es-border); }
+}
+
+.step-icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+  line-height: 18px;
+  color: var(--es-success);
+}
+
+.step-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+
+.step-label { font-size: 13px; font-weight: 600; }
+
+.step-detail { @include m.muted; }
+
+.step-at {
+  @include m.muted;
+
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+// The step the exchange stands at: the amber of the draft mark and of the panel's notices, so the
+// one thing still outstanding is what the eye lands on.
+.step.is-pending {
+  background: #fff7e6;
+
+  .step-icon { color: #b07d00; }
+  .step-label { color: #7a5b00; }
+}

@@ -444,7 +444,14 @@ export const SECTIONS: readonly AppSection[] = [
       { id: 'preview', label: 'Vorschau' },
       { id: 'usages', label: 'Nutzung' },
       { id: 'share', label: 'Inhalt teilen' },
-      { id: 'interactions', label: 'Interaktionen' }
+      {
+        id: 'interactions',
+        label: 'Interaktionen',
+        // What the editorial teams answered to a forwarded content, so the view belongs to the
+        // browser extension custom web component exactly as the forwarding itself does: without it
+        // no content is proposed to a Redaktion and there is no exchange to show.
+        visible: (c) => c.browserExtensionCustomWebComponent
+      }
     ]
   },
 

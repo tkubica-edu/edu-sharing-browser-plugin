@@ -1,11 +1,74 @@
 <div class="es-screen-body">
-  <!-- The tab exists before what it shows does, so the screen says so rather than standing empty —
-       a blank page under a tab reads as a failure to load. -->
+  <!-- The head names the content the exchange is about, as the sibling tabs of this section do, and
+       marks the view as a draft: the forwardings below are the real ones, what came back from the
+       editorial teams cannot be read from the repository yet. -->
   <section class="es-hint-card">
-    <h2 class="es-content-title">Interaktionen</h2>
-    <p class="es-muted">
-      Dieser Bereich ist noch nicht implementiert. Hier werden später die Interaktionen zum Inhalt
-      angezeigt.
+    <p class="head">
+      <span class="head-title">Rückmeldungen der Redaktionen</span>
+      <span class="draft">Entwurf</span>
     </p>
+    @if (curation.contentTitle(); as title) {
+      <h2 class="es-content-title">{{ title }}</h2>
+    }
+    <p class="es-muted">
+      Der Kommunikationsverlauf kann derzeit nicht abgerufen werden. Die Karten zeigen die
+      Redaktionen, an die dieser Inhalt weitergeleitet wurde; der Verlauf darunter ist ein Beispiel.
+    </p>
+    <es-details-link></es-details-link>
   </section>
+
+  @if (exchanges().length) {
+    <ul class="exchanges">
+      @for (exchange of exchanges(); track exchange.id) {
+        <li class="exchange">
+          <!-- The team as itself: its picture, its name, and the state the exchange stands in — one
+               line that says who is being waited for. -->
+          <div class="head-row">
+            <span class="logo">
+              @if (exchange.logoUrl; as logo) {
+                <img [src]="logo" alt="" />
+              } @else {
+                <i class="logo-glyph" esIcon="collections_bookmark"></i>
+              }
+            </span>
+            <span class="group">
+              <span class="group-name">{{ exchange.group }}</span>
+              <!-- Where inside the team the content was proposed — the same statement the forwarding
+                   step's row makes, read back here. -->
+              <span class="group-folder">
+                @if (exchange.folder) {
+                  Sammlung: <strong>{{ exchange.folder }}</strong>
+                } @else {
+                  Direkt an die Redaktion
+                }
+              </span>
+            </span>
+            <span class="state">Offen</span>
+          </div>
+
+          <ol class="steps">
+            @for (step of exchange.steps; track step.label) {
+              <li class="step" [class.is-pending]="step.pending">
+                <i class="step-icon" [esIcon]="step.icon"></i>
+                <span class="step-main">
+                  <span class="step-label">{{ step.label }}</span>
+                  <span class="step-detail">{{ step.detail }}</span>
+                </span>
+                @if (step.at) {
+                  <time class="step-at">{{ step.at | date: 'dd.MM.yyyy' }}</time>
+                }
+              </li>
+            }
+          </ol>
+        </li>
+      }
+    </ul>
+  } @else {
+    <!-- Nothing was forwarded, or the forwarding was made in a session this panel does not carry:
+         either way there is no exchange, and the step that starts one is named. -->
+    <p class="es-muted">
+      Für diesen Inhalt sind keine Redaktionen hinterlegt. Über „An Redaktionen weiterleiten“ kann er
+      einer oder mehreren Redaktionen vorgeschlagen werden.
+    </p>
+  }
 </div>

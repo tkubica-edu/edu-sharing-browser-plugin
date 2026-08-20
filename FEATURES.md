@@ -62,6 +62,16 @@ Which editor renders that screen, and which route the save takes, is
   downloads, plays, and the embeddings/collections the node is used in). Its `nodes` input is a
   *selection*, so the hydrated node goes in as a single-element array; the element fetches the
   numbers itself through the repository session. Shown for an active node, like the preview.
+- **Interaktionen** — what became of the content at the editorial teams it was proposed to: one card
+  per forwarding (`CurationService.editorialTargets`, so the team plus the collection picked inside
+  it; the *Persönliche Ablage*'s own collections are no part of it), with the exchange under it as a
+  timeline. Offered only where the browser extension custom web component is enabled, exactly as *An
+  Redaktionen weiterleiten* is — without that step no content is proposed to a Redaktion. Marked
+  **Entwurf**: the repository hands out no communication history yet, so the cards name the real
+  forwardings while the steps under them are an example ending in „Noch keine Entscheidung
+  erhalten". The teams' logos come from the groups the forwarding step loaded
+  (`EditorialGroupsService`), and the submission date is the node's creation — the forwarding is
+  carried out by the very save that creates it.
 - **Neues OnlyOffice-Dokument** — mounts `edu-sharing-add-with-connector`, which opens the
   OnlyOffice create dialog; the new node is hydrated into the flow and opens in the preview.
 
