@@ -181,6 +181,14 @@ export class AiAssistantScreenComponent implements OnDestroy {
   readonly quickReplies = input<readonly string[]>([]);
 
   /**
+   * How many chips a turn may show at all, where the ones above are to be *joined* by the widget's own rather
+   * than to replace them: the stated ones come first and the widget fills the rest from the assistant's answer,
+   * up to this many. `null` — the default — is what keeps the stated chips the only ones offered, which is what
+   * a step whose way on is a tap needs. Without stated chips it says nothing.
+   */
+  readonly quickRepliesMax = input<number | null>(null);
+
+  /**
    * What the assistant submitted, one per turn — including the turns that submitted nothing, so that a run cut
    * off by a cap is not indistinguishable from one that had nothing to add.
    */
@@ -215,6 +223,9 @@ export class AiAssistantScreenComponent implements OnDestroy {
 
   /** The chips last set on the element, compared as text for the same reason. */
   private replies: string | null = null;
+
+  /** The chip cap last set on the element, as the attribute states it — empty for none. */
+  private repliesMax = '';
 
   /** The timer holding a follow-up task, while one is waiting — see {@link FOLLOW_UP_DELAY_MS}. */
   private followUp: number | null = null;
@@ -268,7 +279,7 @@ export class AiAssistantScreenComponent implements OnDestroy {
     effect(() => this.ask(this.task(), this.resultSchema()));
     // Independent of the task: a step may change what it offers without asking anything new, and the chips
     // apply to whichever turn comes next.
-    effect(() => this.offer(this.quickReplies()));
+    effect(() => this.offer(this.quickReplies(), this.quickRepliesMax()));
     // Registered for as long as the screen is open, not only once a schema is stated: the widget dispatches
     // on `window` because its own view sits in a shadow root, and the listener has to be there before the
     // task goes out — the first turn is the one that answers it.
@@ -321,11 +332,18 @@ export class AiAssistantScreenComponent implements OnDestroy {
       // configuration. See ChatSkillService.
       ...(masterSkill ? { 'master-skill': masterSkill } : {}),
       // The chips the embedding screen wants offered; left out where it names none, so the widget composes
-      // its own. See {@link AiAssistantScreenComponent.offer}.
-      ...(this.quickReplies().length ? { 'quick-replies': JSON.stringify(this.quickReplies()) } : {})
+      // its own. The cap goes with them and only with them — it says how far the widget may fill up *past*
+      // stated chips, so on its own it has nothing to cap. See {@link AiAssistantScreenComponent.offer}.
+      ...(this.quickReplies().length
+        ? {
+            'quick-replies': JSON.stringify(this.quickReplies()),
+            ...(this.quickRepliesMax() ? { 'quick-replies-max': String(this.quickRepliesMax()) } : {})
+          }
+        : {})
     };
     this.schema = schema ? JSON.stringify(schema) : null;
     this.replies = this.quickReplies().length ? JSON.stringify(this.quickReplies()) : null;
+    this.repliesMax = this.capOf(this.quickReplies(), this.quickRepliesMax());
     // One line per attribute, and the values whole rather than abbreviated: every one of them is read once
     // as the element connects and never again, so what stands here is what this conversation runs on for as
     // long as it lasts. Cut short, the one that was wrong would be the one that was cut.
@@ -432,16 +450,28 @@ export class AiAssistantScreenComponent implements OnDestroy {
    * with a generator nothing here can reach, which answers a question about the content with offers about the
    * collection.
    */
-  private offer(replies: readonly string[]): void {
+  private offer(replies: readonly string[], max: number | null): void {
     const element = this.element;
     if (!element) return;
     const stated = replies.length ? JSON.stringify(replies) : null;
-    if (stated === this.replies) return;
+    const cap = this.capOf(replies, max);
+    if (stated === this.replies && cap === this.repliesMax) return;
     this.replies = stated;
-    // Emptied rather than removed: the attribute is read as it changes, and an empty array is what hands the
-    // chips back to the widget.
+    this.repliesMax = cap;
+    // Emptied rather than removed: both attributes are read as they change, an empty array is what hands the
+    // chips back to the widget, and an empty cap is what makes the stated chips the whole offer again.
     element.setAttribute('quick-replies', stated ?? '[]');
-    this.trace(`→ quick-replies = ${stated ?? '[]'}`);
+    element.setAttribute('quick-replies-max', cap);
+    this.trace(`→ quick-replies = ${stated ?? '[]'}, quick-replies-max = ${cap || 'none'}`);
+  }
+
+  /**
+   * The cap as the attribute states it: the number, or empty where there is none to state — which the widget
+   * reads as "no cap" and answers by offering the stated chips alone. Empty without stated chips as well,
+   * since a cap over chips nobody stated caps nothing.
+   */
+  private capOf(replies: readonly string[], max: number | null): string {
+    return replies.length && max ? String(max) : '';
   }
 
   /**

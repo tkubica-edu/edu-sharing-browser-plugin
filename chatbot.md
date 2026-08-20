@@ -136,7 +136,9 @@ version of the widget only.
 `quick-replies` takes a JSON array of strings and prescribes the chips under the assistant's answers, for as
 long as it stands: the widget sends them along as `forced_quick_replies`, and its own generator is out of it.
 Set per step by the KI check, see [the chips](#the-ki-quality-check--about-the-curated-content); an empty
-array hands the chips back to the widget.
+array hands the chips back to the widget. `quick-replies-max` (`quick_replies_max`) is the ceiling for a
+turn where the widget is to fill up *past* the stated chips: they stay in front and unshortened, and it
+composes the rest from the answer. Empty — the default — leaves the stated chips the whole offer.
 
 Two more are set where a screen wants an answer it can record — `result-schema` and, with it,
 `engine="agent"`. They belong together: under the default engine a schema takes no effect at all, and
@@ -504,9 +506,26 @@ is offered exactly what the panel names until the panel names something else. Th
 | judgement | *„Qualität bestätigen"* / *„Anpassungen vornehmen"* |
 | enrichment | *„Metadaten bestätigen"* / *„Anpassungen vornehmen"* |
 
-They stand for the whole step, which is what carries the check to an end: a person who asks for changes is
-offered the same pair again in the turn after, and the way to confirm never leaves the screen. The tasks are
-correspondingly free of chip engineering — they name the two answers so the wording of the question matches
+They stand for the whole step, which is what carries the check to an end: the way to confirm never leaves
+the screen.
+
+**Once changes are being worked on, the pair gives way to one chip plus the widget's own.** On the two steps
+whose second chip asks for changes rather than answering — the judgement and the enrichment — offering that
+chip again says nothing: it is what the person taps. So once the step's proposal is on screen
+(`ADJUSTING_STEPS`, `AiQualityScreenComponent.adjusting`) the panel states the confirmation alone and caps the
+turn at `ADJUSTING_REPLIES_MAX` = 3, which lets the widget add up to two chips of its own from what the
+assistant writes next — one that repeats ours is dropped, so a turn may arrive one short. The way on stays
+where it was; what stands beside it follows the conversation the person is actually in. The next step's task
+resets both — its two answers are prescribed again, cap cleared. On `whose content` and the `language pass`
+nothing changes: both chips there are answers, not a fork between confirming and revising.
+
+The switch happens a turn earlier than it reads, and has to: the chips of a turn are settled when it is
+*sent*, since the widget carries them in the request's environment. What is offered under an answer is
+therefore what stood before that answer was asked for — switched when the proposal comes back, the reduced
+offer reaches the turn the person starts from it; switched when that turn comes back, it arrives one answer
+late.
+
+The tasks are correspondingly free of chip engineering — they name the two answers so the wording of the question matches
 the buttons, and they still have to **end on the question**, because a message that closes on something else
 leaves the buttons answering nothing.
 

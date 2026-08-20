@@ -115,10 +115,18 @@ Set imperatively **before** `appendChild`, because the widget resolves its conte
 | `engine` | `agent` | set **together with** the schema; under the default engine a schema takes no effect at all |
 | `master-skill` | `on` / `off` / *absent* | three states: absent leaves it to the operator (`MASTER_SKILL_ENABLED`), see `ChatSkillService` |
 | `quick-replies` | JSON array of strings | the chips, prescribed per step; `[]` hands them back to the widget |
+| `quick-replies-max` | a positive number, or empty | how many chips a turn may show where the widget is to fill up *past* the stated ones; empty leaves the stated chips the whole offer |
 
-`result-schema` and `quick-replies` are the two the panel changes **mid-conversation**: the widget
-applies a changed schema from the next turn on, and carries the chips into every turn it sends until
-they are replaced. Everything else above is read once.
+`result-schema`, `quick-replies` and `quick-replies-max` are the ones the panel changes
+**mid-conversation**: the widget applies a changed schema from the next turn on, and carries the chips
+and their cap into every turn it sends until they are replaced. Everything else above is read once.
+
+**The cap is what mixes prescribed chips with the widget's own.** Stated chips always come first and are
+never shortened; the cap is the ceiling for the turn (the service clamps it to 1–6) and the widget fills
+the rest from the assistant's answer, dropping a duplicate of a stated chip — so a cap of 3 over one
+stated chip can arrive as 2. Without stated chips the cap says nothing, which is why the panel writes it
+only together with them (`AiAssistantScreenComponent.quickRepliesMax`). Over the REST API the two are
+`environment.forced_quick_replies` and `environment.quick_replies_max`.
 
 **A screen with a task gives up the `page-context` attribute.** A context set as an attribute is one
 the widget greets over the network as the element connects — and it is still busy answering that
@@ -275,15 +283,24 @@ without the closing question.
 
 ### The chips
 
-Two per step, prescribed rather than hoped for, standing for the whole step so a person who asks for
-changes is offered the same way on again (`STEP_REPLIES`):
+Two per step, prescribed rather than hoped for, so the way on is always there to be tapped
+(`STEP_REPLIES`):
 
-| step | chips |
-|---|---|
-| `origin` | *Inhalt selbst erstellt* / *Fremder Inhalt* |
-| `proofread` | *Ich bestätige die Korrekturen* / *Korrekturen überspringen* |
-| `quality` | *Qualität bestätigen* / *Anpassungen vornehmen* |
-| `enrichment` | *Metadaten bestätigen* / *Anpassungen vornehmen* |
+| step | chips | while changes are being worked on |
+|---|---|---|
+| `origin` | *Inhalt selbst erstellt* / *Fremder Inhalt* | unchanged — both chips are an answer |
+| `proofread` | *Ich bestätige die Korrekturen* / *Korrekturen überspringen* | unchanged — both are a way on |
+| `quality` | *Qualität bestätigen* / *Anpassungen vornehmen* | *Qualität bestätigen* + up to 2 from the widget (cap 3) |
+| `enrichment` | *Metadaten bestätigen* / *Anpassungen vornehmen* | *Metadaten bestätigen* + up to 2 from the widget (cap 3) |
+
+The right-hand column holds **as soon as the step's proposal is on screen** — one turn earlier than it reads,
+because the chips of a turn are settled when the turn is *sent*: the widget carries them in the request, so
+what is offered under an answer is what stood before that answer was asked for. Switched when the proposal
+comes back, the reduced offer reaches the very turn the person starts from it; switched when *that* turn comes
+back, it would be one answer late. From there *Anpassungen vornehmen* is what the person taps rather than what
+they are offered, and `quick-replies-max` lets the widget compose the rest from what the assistant writes next
+(`ADJUSTING_STEPS`, `ADJUSTING_REPLIES_MAX` = 3). The next step's task states its own two again and clears the
+cap.
 
 Once the check is through the panel prescribes none: the closing word asks nothing, and what the person
 says after it is their own conversation, so the chips go back to the widget (`[]`).

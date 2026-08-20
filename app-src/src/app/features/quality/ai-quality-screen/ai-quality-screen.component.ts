@@ -57,6 +57,23 @@ const STEP_REPLIES: Record<Exclude<CheckStep, 'done'>, readonly string[]> = {
 };
 
 /**
+ * The steps whose second chip asks for *changes* rather than answering the question — as against `origin`,
+ * where both chips are an answer, and `proofread`, where both are a way on. Once changes are being worked on,
+ * offering that chip again says nothing: it is what the person just tapped, and the way on is the other one.
+ */
+const ADJUSTING_STEPS: readonly CheckStep[] = ['quality', 'enrichment'];
+
+/**
+ * How many chips a turn about changes may show: the confirmation, plus up to two the widget composes from what
+ * the assistant just wrote. The step's own way on therefore stays where it was, and what is offered beside it
+ * follows the conversation — which is what the person is in at that point, rather than at a fork of two.
+ *
+ * It is the whole offer, not the number added to ours: the widget puts the stated chips in front and fills the
+ * rest up to this many. One of its own that repeats one of ours is dropped, so a turn may arrive one short.
+ */
+const ADJUSTING_REPLIES_MAX = 3;
+
+/**
  * Asked before the step is walked back out of: the dialogue lives in the chat widget, which is destroyed with
  * this screen, and the check cannot be picked up halfway — the next entry opens a new conversation.
  */
@@ -196,6 +213,13 @@ export class AiQualityScreenComponent implements OnDestroy {
    */
   private readonly step = signal<CheckStep>('origin');
 
+  /**
+   * How many turns have been answered since the open step was put. Its task is the first of them, so a count
+   * above zero means the step's proposal is on screen and whatever comes next is the person answering it —
+   * see {@link AiQualityScreenComponent.adjusting}.
+   */
+  private readonly turnsInStep = signal(0);
+
   /** Whose content this is, as the person answered the opening question; null until they have. */
   private readonly origin = signal<ContentOrigin | null>(null);
 
@@ -298,14 +322,41 @@ export class AiQualityScreenComponent implements OnDestroy {
   });
 
   /**
+   * Whether what comes next is a turn about changes rather than the step's own proposal — on a step whose
+   * second chip is what the person asks for them with ({@link ADJUSTING_STEPS}).
+   *
+   * True as soon as that proposal has come back, which is a turn earlier than it reads: the chips of a turn
+   * are settled when it is *sent*, since the widget carries them in its request — so what is offered under an
+   * answer is what stood before that answer was asked for. Switched here, the reduced offer reaches the very
+   * turn the person starts from the proposal; waiting for that turn to come back put it one answer late.
+   */
+  private readonly adjusting = computed(
+    () => this.turnsInStep() > 0 && ADJUSTING_STEPS.includes(this.step()),
+  );
+
+  /**
    * What the open step offers as chips; nothing once the check is through, where there is no answer left for
    * the panel to prescribe — the closing word asks nothing, and what the person says after it is their own
-   * conversation. See {@link STEP_REPLIES}.
+   * conversation. Once the step's proposal is on screen it is the confirmation alone: the other chip is what
+   * the person answers it *with*, and the widget fills the rest of the offer from what the assistant writes
+   * next ({@link quickRepliesMax}). See {@link STEP_REPLIES}.
    */
   protected readonly quickReplies = computed<readonly string[]>(() => {
     const step = this.step();
-    return step === 'done' ? [] : STEP_REPLIES[step];
+    if (step === 'done') return [];
+    const replies = STEP_REPLIES[step];
+    return this.adjusting() ? replies.slice(0, 1) : replies;
   });
+
+  /**
+   * How many chips the widget may show, where it is to fill up past the one the panel states — only once the
+   * step's proposal is out. Null everywhere else, which is what keeps a step's two answers the whole offer:
+   * a proposal is answered by a tap, and a third chip from the assistant's own generator is an offer the
+   * check cannot act on.
+   */
+  protected readonly quickRepliesMax = computed<number | null>(() =>
+    this.adjusting() ? ADJUSTING_REPLIES_MAX : null,
+  );
 
   constructor() {
     // What the check is about, before any of it goes out: the chat's own trace then says when it went.
@@ -356,6 +407,7 @@ export class AiQualityScreenComponent implements OnDestroy {
    */
   protected take(answer: AgentResult): void {
     const step = this.step();
+    this.turnsInStep.update((turns) => turns + 1);
     // Past the last step there is nothing left to take over: the values are recorded, the confirmation is
     // reported, and the schema of the enrichment still stands — so a turn that fills it in again (the
     // closing word's own among them) would write an answer nobody was asked for over one that was.
@@ -428,7 +480,16 @@ export class AiQualityScreenComponent implements OnDestroy {
     this.curation.reportQualityJudged();
     // Only now: the enrichment is a run of its own, and it starts from a content whose quality is
     // established. Flipping the step re-states task and schema, which the chat then puts as a further turn.
-    this.step.set('enrichment');
+    this.goTo('enrichment');
+  }
+
+  /**
+   * Move the check on to `step`: its task goes out as the next turn, and the count starts again with it — what
+   * the person said about the step just left says nothing about the one now open (see {@link turnsInStep}).
+   */
+  private goTo(step: CheckStep): void {
+    this.turnsInStep.set(0);
+    this.step.set(step);
   }
 
   /**
@@ -466,7 +527,7 @@ export class AiQualityScreenComponent implements OnDestroy {
     });
     this.problem.set(null);
     this.origin.set(origin);
-    this.step.set(next);
+    this.goTo(next);
   }
 
   /**
@@ -509,7 +570,7 @@ export class AiQualityScreenComponent implements OnDestroy {
     }
     // Taken on or skipped, the step is done either way: nothing was written to the content in either case,
     // and a person who cannot edit the text right now must be able to walk on (see ProofreadResult.decision).
-    this.step.set('quality');
+    this.goTo('quality');
   }
 
   /**
@@ -541,7 +602,7 @@ export class AiQualityScreenComponent implements OnDestroy {
       console.log(`${LOG_QUALITY} … the metadata are not confirmed yet — the step stays open`);
       return;
     }
-    this.step.set('done');
+    this.goTo('done');
     // The other half of what the way on out of this step waits for; the judgement reported the first.
     this.curation.reportMetadataEnriched();
     // The finished result, both halves in one line: what the content is worth, and what it is about.
