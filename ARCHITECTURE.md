@@ -96,8 +96,10 @@ The session decides which route a save takes, not the WLO flag (`CurationService
   *Persönliche Ablage* picked (`…/nodes/-home-/{parent}/children/_move`, a move because the content
   already exists by then), the WLO **extended fields** in a write of their own —
   `POST …/nodes/-home-/{id}/metadata?versionComment=EXTENDED_DATA&obeyMds=false` with
-  `ccm:oeh_extendedType`, `ccm:oeh_lrt`, `ccm:oeh_extendedData` (the whole payload as JSON, in the
-  canvas' export shape) and `ccm:oeh_extendedText` (the raw text), because the metadata set defines
+  `ccm:oeh_extendedType` (one value — what kind of thing the content is, out of `contentTypes`),
+  `ccm:oeh_lrt` and `ccm:oeh_lrt_aggregated` (the material types, each a list out of its own
+  vocabulary), `ccm:oeh_extendedData` (the whole payload as JSON, in the canvas' export shape) and
+  `ccm:oeh_extendedText` (the raw text), because the metadata set defines
   none of them and a write that obeys it drops them silently; a bulk write the repository refuses is
   retried field by field (`RepositoryNodeService.writeExtendedData`) — then the **workflow steps**
   (`200_tocheck`, addressed to `GROUP_ORG_WLO-Uploadmanager` in a WLO panel, then

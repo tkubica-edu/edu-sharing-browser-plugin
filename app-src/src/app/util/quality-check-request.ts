@@ -10,7 +10,7 @@
 import type { MdsDefinition, MdsValue, MdsWidget } from 'ngx-edu-sharing-api';
 
 import type { CriteriaProperties } from '../features/quality/quality-criteria/quality-criteria.component';
-import { EXTENDED_TYPE_FIELD, LRT_FIELD } from './agent-payload';
+import { LRT_AGGREGATED_FIELD, LRT_FIELD } from './agent-payload';
 import { AI_PROMPTS } from './ai-prompts';
 import { OUTCOMES, VOCABULARY_FIELD_NAMES } from './ai-schemas';
 import type { VocabularyField } from './ai-schemas';
@@ -364,6 +364,11 @@ const KEYWORD_PROPERTY = 'cclom:general_keyword';
  * node those are two separate fields. A URI from any other vocabulary is not recorded at all: it would sit in
  * a field whose valuespace does not contain it, where the editor shows a blank and no search finds it. That
  * split is why one answered field can feed two properties: the values are handed out by where they came from.
+ *
+ * Every property here holds a **list**. `ccm:oeh_extendedType` is emphatically not one of them: it says what
+ * kind of thing the content is, out of the `contentTypes` vocabulary and as a single value — a material type
+ * written there is refused by the metadata set („Multiple values given for a non-multivalue widget") and would
+ * be the wrong statement even if it were not (see EXTENDED_TYPE_FIELD).
  */
 const ENRICHED_PROPERTIES: readonly {
   field: VocabularyField;
@@ -373,7 +378,7 @@ const ENRICHED_PROPERTIES: readonly {
   { field: 'discipline', vocabulary: 'discipline', property: 'ccm:taxonid' },
   { field: 'educationalContext', vocabulary: 'educationalContext', property: 'ccm:educationalcontext' },
   { field: 'lrt', vocabulary: 'new_lrt', property: LRT_FIELD },
-  { field: 'lrt', vocabulary: 'new_lrt_aggregated', property: EXTENDED_TYPE_FIELD },
+  { field: 'lrt', vocabulary: 'new_lrt_aggregated', property: LRT_AGGREGATED_FIELD },
   {
     field: 'intendedEndUserRole',
     vocabulary: 'intendedEndUserRole',

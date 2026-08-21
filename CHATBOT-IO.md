@@ -521,13 +521,18 @@ was answered under: each property holds the values of exactly one vocabulary.
 | `discipline` | `discipline` | `ccm:taxonid` |
 | `educationalContext` | `educationalContext` | `ccm:educationalcontext` |
 | `lrt` | `new_lrt` | `ccm:oeh_lrt` |
-| `lrt` | `new_lrt_aggregated` | `ccm:oeh_extendedType` |
+| `lrt` | `new_lrt_aggregated` | `ccm:oeh_lrt_aggregated` |
 | `intendedEndUserRole` | `intendedEndUserRole` | `ccm:educationalintendedenduserrole` |
 | `keywords` | — | `cclom:general_keyword` |
 
 *Materialtyp* is why it has to work that way: asked for `lrt`, `lookup_wlo_vocabulary` answers out of
 either vocabulary — measured, `…/vocabs/new_lrt_aggregated/…` for *Arbeitsblatt* — and on the node those
-are two separate fields. So one answered field feeds two properties, and a URI out of any other
+are two separate fields, both of them lists. `ccm:oeh_extendedType` is **not** one of them, however much
+an aggregated material type looks like it belongs there: it says what kind of thing the content is, out
+of `contentTypes` (`…/vocabs/contentTypes/education_offer`), and the metadata set describes it as a
+`singleoption` widget. A list written there is refused outright — `DAOValidationException: Multiple
+values given for a non-multivalue widget … oeh_extendedType, widget type singleoption` — which is what
+the whole confirming write failed with while the aggregated types were sent there. So one answered field feeds two properties, and a URI out of any other
 vocabulary is **not recorded at all**: it would sit in a field whose valuespace does not contain it,
 where the editor shows a blank and no search finds it.
 

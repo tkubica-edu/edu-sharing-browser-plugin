@@ -24,13 +24,24 @@ export const ENVELOPE_KEYS = [
 export const SOURCE_TEXT_KEY = '_source_text';
 
 /**
- * The content type the payload was read against, as a vocabulary URI
- * (`…/vocabs/new_lrt_aggregated/event`). A field of the core schema, so it travels with the values.
+ * What kind of thing the content is, as one URI of the `contentTypes` vocabulary
+ * (`…/vocabs/contentTypes/education_offer`). **A single value**: the metadata set describes it as a
+ * `singleoption` widget, so a list is refused outright — „Multiple values given for a non-multivalue
+ * widget". Not a material type either; those are the two fields below.
  */
 export const EXTENDED_TYPE_FIELD = 'ccm:oeh_extendedType';
 
-/** The content type as a learning resource type — the repository's own vocabulary for it. */
+/**
+ * The material types of the content, as URIs of the `new_lrt` vocabulary
+ * (`…/vocabs/new_lrt/03ab835b-…`). A list: a content is an Arbeitsblatt and a Video at once.
+ */
 export const LRT_FIELD = 'ccm:oeh_lrt';
+
+/**
+ * The same statement out of the aggregated vocabulary — `…/vocabs/new_lrt_aggregated/6b6786df-…`, its
+ * own field because its own valuespace. A list, like {@link LRT_FIELD}.
+ */
+export const LRT_AGGREGATED_FIELD = 'ccm:oeh_lrt_aggregated';
 
 /** The whole payload as JSON, so the metadata is on the node as the agent stated it. */
 export const EXTENDED_DATA_FIELD = 'ccm:oeh_extendedData';
@@ -71,9 +82,10 @@ export function toExportPayload(
 }
 
 /**
- * The WLO extended fields for a node: content type, the whole payload as JSON and the raw text the metadata was read
- * from. The metadata set does not define them, hence a call of its own that does not obey it. A field is stated only
- * where there is something to state, and `ccm:oeh_lrt` only where the payload names it.
+ * The WLO extended fields for a node: content type, the material types, the whole payload as JSON and the raw text
+ * the metadata was read from. The metadata set does not define them, hence a call of its own that does not obey it.
+ * A field is stated only where there is something to state, and each one with as many values as it holds — one for
+ * the content type, every one there is for the material types (see {@link LRT_FIELD}).
  */
 export function toExtendedFields(
   values: MdsValues,
@@ -83,18 +95,28 @@ export function toExtendedFields(
   const state = (field: string, value: string | undefined) => {
     if (value) fields[field] = [value];
   };
+  const stateAll = (field: string) => {
+    const stated = values[field]?.length ? values[field] : listOf(payload?.[field]);
+    if (stated.length) fields[field] = [...stated];
+  };
 
   const contentType = values[EXTENDED_TYPE_FIELD]?.[0] ?? stringOf(payload?.[EXTENDED_TYPE_FIELD]);
-  const lrt = values[LRT_FIELD]?.[0] ?? stringOf(payload?.[LRT_FIELD]);
   const text = stringOf(payload?.[SOURCE_TEXT_KEY]);
 
   state(EXTENDED_TYPE_FIELD, contentType);
-  state(LRT_FIELD, lrt);
+  stateAll(LRT_FIELD);
+  stateAll(LRT_AGGREGATED_FIELD);
   state(EXTENDED_TEXT_FIELD, text);
   // Last, and never conditional on the others: the payload is what the node is described by, and it
   // is stated for every content — the envelope alone is already a description of one.
   fields[EXTENDED_DATA_FIELD] = [JSON.stringify(toExportPayload(values, payload))];
   return fields;
+}
+
+/** A payload value as the list of strings it stands for, for the fields that hold several. */
+function listOf(value: unknown): readonly string[] {
+  const stated = Array.isArray(value) ? value : [value];
+  return stated.filter((entry): entry is string => typeof entry === 'string' && !!entry.trim());
 }
 
 /** A payload value as one string, for the fields that hold exactly one. */
