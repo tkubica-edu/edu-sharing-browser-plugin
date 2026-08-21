@@ -68,10 +68,19 @@ A pushed `v*` tag is the whole trigger — CI builds, zips and publishes on its 
 prerequisite: *Settings → Actions → General → Workflow permissions* must be **Read and write**,
 otherwise `gh release create` fails with a 403.
 
-1. Raise `"version"` in **both** `package.json` and `manifest.base.json` — they are maintained by
-   hand and are not synced. The workflow only warns when the tag and `manifest.base.json` disagree,
-   it does not stop. Bumping the manifest matters: Chrome and Firefox refuse to install an unchanged
-   version number as an update.
+1. Set the new version:
+   ```bash
+   npm run version:set -- 0.2.0
+   ```
+   `scripts/version.mjs` takes one `x.y.z` argument and writes `"version"` in **both**
+   `package.json` and `manifest.base.json` — they are maintained by hand and are not synced — then
+   runs `npm install` so `package-lock.json` follows. It touches no git state; it ends by printing
+   the tag commands for step 3. Bumping the manifest matters: Chrome and Firefox refuse to install
+   an unchanged version number as an update. The workflow only warns when the tag and
+   `manifest.base.json` disagree, it does not stop.
+
+   The per-browser `manifest.<target>.json` overlays carry no `version` of their own — they inherit
+   it from the base manifest at assembly time.
 2. Commit the bump and push it.
 3. Tag and push the tag:
    ```bash

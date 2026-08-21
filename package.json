@@ -14,7 +14,8 @@
     "dev:firefox": "node scripts/build.mjs --target=firefox --watch --run",
     "dev:chrome": "node scripts/build.mjs --target=chrome --watch",
     "lint:firefox": "web-ext lint --source-dir dist/firefox",
-    "start:firefox": "web-ext run --source-dir dist/firefox"
+    "start:firefox": "web-ext run --source-dir dist/firefox",
+    "version:set": "node scripts/version.mjs"
   },
   "devDependencies": {
     "archiver": "^7.0.1",

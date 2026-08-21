@@ -124,5 +124,5 @@ flat.
 - Build after every change (`npm run build:chrome`) and reload the extension — the loaded package is
   what runs, not the sources.
 - Comments and documentation are written in English; the UI is German.
-- Keep `package.json` and `manifest.base.json` versions in step when releasing
-  ([BUILD.md](BUILD.md#cutting-a-release)).
+- Bump the version with `npm run version:set -- <x.y.z>`, which keeps `package.json`,
+  `manifest.base.json` and `package-lock.json` in step ([BUILD.md](BUILD.md#cutting-a-release)).
