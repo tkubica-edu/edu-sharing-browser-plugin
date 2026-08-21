@@ -19,11 +19,12 @@ top of it.
 - [The limits](#the-limits)
 
 **Keeping this file current.** It describes `app-src/src/app/util/page-context.ts`,
-`app-src/src/app/util/quality-check-request.ts`,
+`app-src/src/app/util/quality-check-request.ts`, `app-src/src/app/util/ai-prompts.ts`,
 `app-src/src/app/features/assistant/ai-assistant-screen/ai-assistant-screen.component.ts`,
 `app-src/src/app/features/quality/ai-quality-screen/ai-quality-screen.component.ts` and
-`app-src/src/app/services/chat-skill.service.ts`. Every prompt line, schema field and property mapping
-lives in one of those two `util/` files — a change to either belongs here as well.
+`app-src/src/app/services/chat-skill.service.ts`. Every task text lives in `util/ai-prompts.ts`, one entry
+per task; every schema field and property mapping in `util/quality-check-request.ts`, which is also where
+the tasks are assembled and put — a change to either belongs here as well.
 
 ---
 

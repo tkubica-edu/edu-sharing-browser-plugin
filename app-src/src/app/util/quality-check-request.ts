@@ -11,6 +11,7 @@ import type { MdsDefinition, MdsValue, MdsWidget } from 'ngx-edu-sharing-api';
 import { APP_CONFIG } from '../config';
 import type { CriteriaProperties } from '../features/quality/quality-criteria/quality-criteria.component';
 import { EXTENDED_TYPE_FIELD, LRT_FIELD } from './agent-payload';
+import { AI_PROMPTS } from './ai-prompts';
 import type { MdsValues } from './mds-values';
 import {
   CRITERION_MET, CRITERION_VIOLATED, EDITORIAL_CRITERIA_PROPERTY, KNOCKOUT_CRITERIA_WIDGET, autoMetValue,
@@ -273,29 +274,7 @@ export function originSchemaOf(): Record<string, unknown> {
  * still owes them is a message that ends on the question they answer, and nothing after it.
  */
 export function originInstructionOf(subject: CheckSubject): string {
-  // Accusative: it reads "… dass ihr jetzt gemeinsam <named> prüft".
-  const named = subject.title ? `den Inhalt „${subject.title}“` : 'diesen Inhalt';
-  return [
-    `Begrüße die Person und sag ihr, dass ihr jetzt gemeinsam ${named} prüft.`,
-    'Sag in einem Satz, was ansteht: erst die Qualitätsprüfung, danach das Anreichern der Metadaten. Bei ' +
-      'einem eigenen Inhalt schaust du vorher noch auf Rechtschreibung und Sprache.',
-    'Sag ihr dann, wovon du ausgehst, in einem Satz und mit dem Grund. Was dafür bekannt ist:',
-    `- Quelle: ${subject.url ?? 'nicht bekannt'}`,
-    `- als Urheber genannt: ${subject.author ?? 'niemand'}`,
-    `- angemeldet ist: ${subject.signedIn ?? 'unbekannt'}`,
-    'Eine fremde Website als Quelle spricht für einen fremden Inhalt; ein Urheber, der der angemeldeten ' +
-      'Person entspricht, für einen eigenen. Sag ausdrücklich, dass das deine Vermutung ist.',
-    'Stell ihr dann genau eine Frage: ob sie den Inhalt selbst erstellt beziehungsweise verantwortet oder ob ' +
-      'es ein fremder ist, den sie nur einordnet. Ihre Antwort gilt, auch wenn sie deiner Vermutung ' +
-      'widerspricht.',
-    'Unter deiner Nachricht werden ihr die beiden Antworten als Buttons angeboten: „Inhalt selbst erstellt“ ' +
-      'und „Fremder Inhalt“. Du musst sie nicht ausschreiben und keine Antwortvorschläge auflisten — deine ' +
-      'Nachricht endet mit der Frage, danach kommt kein Satz mehr. Sie darf auch mit eigenen Worten antworten.',
-    'Beurteile in diesem Zug nichts und lies den Inhalt nicht. Es geht allein um diese Frage.',
-    'Warte ihre Antwort ab. Rufe submit_result ERST auf, wenn sie geantwortet hat — mit origin="own" ' +
-      'oder origin="external" und deiner Vermutung in guess. Setz origin nicht auf deine Vermutung.',
-    'Ist die Antwort unklar, frag nach, statt dich selbst zu entscheiden.'
-  ].join('\n');
+  return AI_PROMPTS.origin(subject).join('\n');
 }
 
 /** Whose content the opening question established; null where the turn did not say. */
@@ -432,49 +411,7 @@ export function proofreadSchemaOf(): Record<string, unknown> {
  * the node rather than its text.
  */
 export function proofreadInstructionOf(subject: CheckSubject, taskMax: number): string {
-  // Genitive: it reads "… die Sprache VON <named> durch".
-  const named = subject.title ? `„${subject.title}“` : 'diesem Inhalt';
-  const head = [
-    `Das ist ein eigener Inhalt. Geh deshalb zuerst die Sprache von ${named} durch: Rechtschreibung, ` +
-      'Grammatik und Zeichensetzung. Der Schritt ist fertig, wenn die Person deine Korrekturen ' +
-      'durchgegangen ist und gesagt hat, was sie damit macht.',
-    'Du selbst änderst am Inhalt nichts und kannst es auch nicht: die Korrekturen sind eine Liste für die ' +
-      'Person, die sie in ihrem Text selbst einträgt. Es wird dadurch nichts gespeichert, nichts überarbeitet ' +
-      'und nichts weitergegeben. Behaupte also nie, du hättest etwas korrigiert, übernommen oder ' +
-      'weitergegeben, und stell auch die Zustimmung der Person nicht so dar.',
-    subject.collection
-      ? 'Nutze dafür die Skills der Sammlung, die zu Sprache oder Rechtschreibung etwas sagen: ' +
-        'hol dir mit get_skill_registry die Liste und mit get_skill jede Anleitung, die dazu passt, und halte ' +
-        'dich an sie. Gibt es dazu keine, korrigiere nach den Regeln der deutschen Rechtschreibung.'
-      : '',
-    'Zitiere jede beanstandete Stelle wörtlich, wie sie im Text steht, und stell die Korrektur daneben. ' +
-      'Erfinde keine Stelle, die dort nicht steht.',
-    'Ist sprachlich nichts zu beanstanden, sag das und gib eine leere Liste ab — auch das ist ein Ergebnis.',
-    'Es geht allein um die Sprache. Sag in diesem Schritt nichts zur Sachrichtigkeit: nicht, ob eine Aussage, ' +
-      'eine Formel, eine Zahl oder eine Quelle fachlich stimmt, und auch nichts zu Vollständigkeit, Niveau, ' +
-      'Didaktik oder Aufbau. Das bewerten wir später anhand der Qualitätskriterien. Ein fachlicher Fehler ist ' +
-      'hier also kein Befund, solange die Stelle sprachlich richtig geschrieben ist.',
-    '',
-    'Nenne die Stellen zuerst im Chat, je Stelle eine Zeile mit dem Wortlaut und der Korrektur darunter. ' +
-      'Die Person sieht nur den Chat — was dort nicht steht, erfährt sie nicht.',
-    'Bitte sie danach ausdrücklich zu entscheiden, was mit den Stellen passieren soll, und lass ihr beide Wege ' +
-      'offen: Sie kann die Korrekturen annehmen und selbst in ihren Text eintragen — oder sie überspringen, ' +
-      'wenn sie den Text gerade nicht ändern kann; dann bleibt er, wie er ist. Beides ist in Ordnung, und der ' +
-      'Schritt ist mit beidem fertig. Dräng sie nicht zur Korrektur.',
-    'Unter deiner Nachricht werden ihr beide Antworten als Buttons angeboten: „Ich bestätige die Korrekturen“ ' +
-      'und „Korrekturen überspringen“. Du musst sie nicht ausschreiben. Deine Nachricht endet mit der Frage, ' +
-      'danach kommt kein Satz mehr — was du nicht prüfen konntest, sagst du davor.',
-    'Hast du nichts gefunden, sag das in einem Satz und frag, ob es weitergehen soll: sie beendet den Schritt ' +
-      'dann mit einem der beiden Buttons, und beide bedeuten hier dasselbe, weil es nichts zu korrigieren gibt.',
-    'Rufe submit_result ERST auf, wenn sie geantwortet hat — mit den gefundenen Stellen und mit ' +
-      'decision="accepted" oder decision="skipped", je nachdem, was sie gesagt hat. In dem ' +
-      'Zug, in dem du die Korrekturen nennst, rufst du es nicht auf: dieser Zug endet mit der Frage. Ohne den ' +
-      'Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.',
-    'Sag ihr danach in einem Satz, wie es steht — bei „accepted“, dass sie die Stellen in ihrem Text ' +
-      'nachziehen kann, bei „skipped“, dass der Text unverändert bleibt — und dass als Nächstes die ' +
-      'Qualitätsprüfung folgt. Sag in keinem der beiden Fälle, der Text sei geändert worden.',
-    ''
-  ]
+  const head = AI_PROMPTS.proofread(subject)
     .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
     .join('\n');
   const tail = PROOFREAD_REMINDER;
@@ -488,22 +425,7 @@ export function proofreadInstructionOf(subject: CheckSubject, taskMax: number): 
  * (measured: a physics page full of wrong figures came back as a list of factual corrections, in one turn and
  * without the closing question). Repeated here, they are what the run reads last.
  */
-const PROOFREAD_REMINDER = [
-  '',
-  '---',
-  'Zur Erinnerung, bevor du antwortest:',
-  '- Es geht allein um die Sprache: Rechtschreibung, Grammatik, Zeichensetzung. Kein Wort zur Sachrichtigkeit, ' +
-    'auch wenn im Text fachlich etwas falsch ist — Aussagen, Formeln, Zahlen und Quellen bewerten wir im ' +
-    'nächsten Schritt anhand der Qualitätskriterien. Eine fachlich falsche, aber korrekt geschriebene Stelle ' +
-    'ist hier kein Befund.',
-  '- Zitiere jede Stelle wörtlich, wie sie oben steht, und stell die Korrektur daneben.',
-  '- Der letzte Satz deiner Nachricht ist die Frage, was mit den Stellen passieren soll — auch dann, wenn du ' +
-    'nichts gefunden hast. Die Antworten dazu werden ihr als Buttons angeboten; du listest keine ' +
-    'Antwortvorschläge auf und schreibst nach der Frage keinen Satz mehr.',
-  '- Du änderst den Text nicht und gibst nichts weiter. Sag nie, etwas sei korrigiert oder übernommen worden.',
-  '- Rufe submit_result in diesem Zug nicht auf. Erst wenn die Person geantwortet hat, und dann mit ' +
-    'decision="accepted" oder decision="skipped".'
-].join('\n');
+const PROOFREAD_REMINDER = AI_PROMPTS.proofreadReminder.join('\n');
 
 /**
  * What the language pass found; null where the turn answered something else. The list is what says a pass
@@ -677,41 +599,7 @@ export function enrichmentSchemaOf(): Record<string, unknown> {
  * the confirmation has actually arrived; see {@link closingInstructionOf}.
  */
 export function enrichmentInstructionOf(subject: CheckSubject): string {
-  // Dative: it reads "… die Metadaten VON <named> an".
-  const named = subject.title ? `„${subject.title}“` : 'diesem Inhalt';
-  return [
-    `Letzter Schritt: Reichere jetzt die Metadaten von ${named} an — demselben Inhalt, den du gerade ` +
-      'geprüft hast. Der Schritt ist fertig, wenn die Person deine Werte bestätigt hat.',
-    ...(subject.collection
-      ? [
-          'Falls die Sammlung für das Anreichern von Metadaten eine Anleitung freigegeben hat, hol sie dir ' +
-            '(get_skill_registry, dann get_skill) und halte dich an sie. Gibt es dazu keine, reichere nach ' +
-            'den folgenden Vorgaben an.'
-        ]
-      : []),
-    'Hol dir Fach, Bildungsstufe, Materialtyp und Zielgruppe aus den vorgegebenen Vokabularen: ' +
-      `lookup_wlo_vocabulary mit vocabulary=${askedVocabularies()}. ` +
-      'Gib zu jedem Wert die Bezeichnung UND die vollständige URI an, wie das Vokabular sie zurückgibt.',
-    'Jedes dieser vier Felder ist eine Liste: nenne alle zutreffenden Werte, nicht nur den ersten. Ein Fach ' +
-      'ist es oft, eine Zielgruppe meist mehrere — etwa Lehrende und Lernende zugleich.',
-    'Bilde keine URI selbst — eine geratene trifft still nichts. Gibt der Inhalt zu einem Feld nichts her, ' +
-      'lass die Liste leer, statt zu raten.',
-    'Nenne dazu fünf bis zehn Schlagworte aus dem Inhalt selbst.',
-    '',
-    'Nenne die Werte zuerst im Chat, je Wert eine Zeile mit Bezeichnung und URI, darunter die Schlagworte. ' +
-      'Die Person sieht nur den Chat.',
-    'Bitte sie danach ausdrücklich, die Werte durchzugehen und zu bestätigen oder zu korrigieren. Führe sie ' +
-      'zu dieser Bestätigung: frag direkt, ob die Metadaten so übernommen werden sollen.',
-    'Unter deiner Nachricht werden ihr die beiden Antworten als Buttons angeboten: „Metadaten bestätigen“ und ' +
-      '„Anpassungen vornehmen“. Du musst sie nicht ausschreiben. Deine Nachricht endet mit der Frage, danach ' +
-      'kommt kein Satz mehr.',
-    'Wählt sie „Anpassungen vornehmen“: nimm ihre Änderungen auf, zeig die Werte, wie sie damit lauten, und ' +
-      'stell dieselbe Frage erneut. So oft, wie sie Anpassungen will — der Schritt endet erst mit ihrer ' +
-      'Bestätigung, und jede deiner Nachrichten endet deshalb mit dieser Frage.',
-    'Rufe submit_result ERST auf, wenn sie bestätigt hat — mit ihren Korrekturen, falls sie welche hatte, und ' +
-      'mit confirmed=true. In dem Zug, in dem du die Werte vorschlägst, rufst du es nicht auf: dieser Zug ' +
-      'endet mit der Frage. Ohne den Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.'
-  ]
+  return AI_PROMPTS.enrichment(subject, VOCABULARY_FIELD_NAMES)
     .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
     .join('\n');
 }
@@ -732,23 +620,7 @@ export function enrichmentInstructionOf(subject: CheckSubject): string {
  * write the same values a second time over an answer that is already taken over.
  */
 export function closingInstructionOf(subject: CheckSubject): string {
-  // Dative: it reads "… die Prüfung VON <named>".
-  const named = subject.title ? `„${subject.title}“` : 'diesem Inhalt';
-  return [
-    `Die Person hat die Metadaten bestätigt. Damit ist die Prüfung von ${named} vollständig abgeschlossen.`,
-    'Gratuliere ihr kurz und sag ihr, was geschafft ist: Herkunft geklärt, Qualität geprüft, Metadaten ' +
-      'angereichert und bestätigt.',
-    'Sag ihr, dass sie jetzt zum nächsten Schritt weitergehen kann — unten im Panel mit „Abschließen und ' +
-      'zur Inhaltsübersicht“.',
-    'Zwei bis drei Sätze genügen. Stell keine Frage mehr, schlag keine weiteren Werte vor und rufe ' +
-      'submit_result nicht auf: es ist nichts mehr zu bestätigen.'
-  ].join('\n');
-}
-
-/** The vocabularies to look up, quoted and enumerated for the task's sentence. */
-function askedVocabularies(): string {
-  const quoted = VOCABULARY_FIELD_NAMES.map((vocabulary) => `"${vocabulary}"`);
-  return [quoted.slice(0, -1).join(', '), quoted[quoted.length - 1]].join(' und ');
+  return AI_PROMPTS.closing(subject).join('\n');
 }
 
 /** What the enrichment answered; null where the turn submitted nothing usable. */
@@ -917,63 +789,12 @@ export function qualityInstructionOf(
   subject: CheckSubject,
   taskMax: number
 ): string {
-  const { title, url, collection } = subject;
   const text = subject.text.trim();
-  // Dative: the one place it is used reads "… bei der Erschließung VON <named>".
-  const named = title ? `dem Inhalt „${title}“` : 'dem Inhalt der aktuellen Seite';
-  const forCollection = collection ? ` für die Sammlung „${collection}“` : '';
-  const head = [
-    `Bewerte die Qualität von ${named}${forCollection}.`,
-    'Gemeint ist genau dieser eine Inhalt. Beurteile NICHT die übrigen Inhalte der Sammlung und nicht die ' +
-      'Sammlung als Ganzes.',
-    'Danach folgt noch ein Schritt: das Anreichern der Metadaten. Dieser hier ist fertig, wenn die Person ' +
-      'deine Bewertung durchgegangen ist und sie bestätigt hat.',
-    '',
-    'Das sind unsere Prüfdimensionen. Beurteile jede einzeln:',
-    criteria.map((item) => `${item.key}: ${item.caption}`).join('\n'),
-    collection
-      ? 'Nutze dafür alle zur Sammlung verfügbaren Qualitätssicherungsskills und ihre Prüfdimensionen: hol ' +
-        'dir mit get_skill_registry die Liste und mit get_skill jede Anleitung, die zu einer dieser ' +
-        'Dimensionen etwas sagt, und urteile danach.'
-      : '',
-    collection
-      ? 'Prüft eine Anleitung etwas, wofür es oben keine Dimension gibt, dann ordne es der nächstliegenden ' +
-        'zu, wenn es dorthin gehört. Gehört es nirgends hin, lass es in dein Gesamturteil (suitable) ' +
-        'einfließen und sag es in der Zusammenfassung — als eigenes Kriterium können wir es nicht führen.'
-      : '',
-    'Zu jedem Kriterium gibt es drei mögliche Ergebnisse: „met“, wenn der Inhalt es erfüllt, ' +
-      '„violated“, wenn er es verletzt, und „unclear“, wenn der Inhalt nichts hergibt, woran sich das ' +
-      'entscheiden ließe.',
-    'Rate nicht: sag „unclear“, statt dich für eine der beiden Seiten zu entscheiden. Bei „unclear“ tragen wir ' +
-      'zu diesem Kriterium nichts ein — die Begründung sagt dann, was zum Prüfen gefehlt hat.',
-    'Sag am Ende außerdem, ob der Inhalt für den Einsatz in Bildung geeignet ist — dein Gesamturteil über ' +
-      'alle Dimensionen und alles, was die Anleitungen sonst noch prüfen.',
-    '',
-    'Schreib dein Urteil zuerst in den Chat: je Kriterium eine Zeile mit ✓ (erfolgreich), ✗ (Probleme ' +
-      'gefunden) oder ○ (unklar), dem Namen des Kriteriums und dem Grund in einem Satz, darunter dein ' +
-      'Gesamturteil, ob der Inhalt für Bildung geeignet ist, und ' +
-      'ein kurzes Fazit, was einer Freigabe im Weg steht. Die Person sieht nur den Chat — was dort nicht ' +
-      'steht, erfährt sie nicht.',
-    'Bitte sie danach ausdrücklich, dein Urteil durchzugehen und zu bestätigen oder Anpassungen vorzunehmen. ' +
-      'Führe sie zu dieser Entscheidung: frag direkt, ob es so stehen bleiben soll, und geh auf ihre Einwände ein.',
-    'Unter deiner Nachricht werden ihr die beiden Antworten als Buttons angeboten: „Qualität bestätigen“ und ' +
-      '„Anpassungen vornehmen“. Du musst sie nicht ausschreiben. Deine Nachricht endet mit der Frage, danach ' +
-      'kommt kein Satz mehr.',
-    'Wählt sie „Anpassungen vornehmen“: nimm ihre Änderungen auf, zeig das Urteil, wie es damit lautet, und ' +
-      'stell dieselbe Frage erneut. So oft, wie sie Anpassungen will — der Schritt endet erst mit ihrer ' +
-      'Bestätigung, und jede deiner Nachrichten endet deshalb mit dieser Frage.',
-    'Rufe submit_result ERST auf, wenn sie bestätigt hat — vorher nicht, auch wenn dein Urteil längst fertig ' +
-      'ist.',
-    'Sobald sie bestätigt: Rufe submit_result in genau diesem Zug auf, mit ihren Korrekturen, falls sie welche ' +
-      'hatte, mit confirmed=true und zu jedem Kriterium outcome und reason. Eine Bestätigung im Chat ' +
-      'allein reicht nicht — ohne diesen Werkzeugaufruf ist das Ergebnis für uns nicht da und es geht nicht ' +
-      'weiter. Sag ihr dann, dass als Nächstes die Metadaten angereichert werden.',
-    ''
-  ]
+  const head = AI_PROMPTS.quality(criteria, subject)
     .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
     .join('\n');
   const tail = QUALITY_REMINDER;
-  return head + contentBlock(text, url, taskMax, taskMax - head.length - tail.length) + tail;
+  return head + contentBlock(text, subject.url, taskMax, taskMax - head.length - tail.length) + tail;
 }
 
 /**
@@ -983,16 +804,7 @@ export function qualityInstructionOf(
  * repetition are the ones a run that is done judging drops first: end on the question, and submit only once
  * it has been answered.
  */
-const QUALITY_REMINDER = [
-  '',
-  '---',
-  'Zur Erinnerung, bevor du antwortest:',
-  '- Rufe submit_result in diesem Zug nicht auf. Erst wenn die Person bestätigt hat, und dann mit ' +
-    'confirmed=true. Wählt sie „Anpassungen vornehmen“, arbeitest du sie ein und fragst erneut.',
-  '- Schreib dein Urteil in den Chat, und der letzte Satz deiner Nachricht ist die Frage, ob es so stehen ' +
-    'bleiben soll. Die Antworten dazu werden ihr als Buttons angeboten; du listest keine Antwortvorschläge ' +
-    'auf und schreibst nach der Frage keinen Satz mehr.'
-].join('\n');
+const QUALITY_REMINDER = AI_PROMPTS.qualityReminder.join('\n');
 
 /**
  * The content itself, appended to the task and cut to what is left of the request's length.
@@ -1009,18 +821,14 @@ function contentBlock(text: string, url: string | null, taskMax: number, room: n
         (url ? ', so the assistant is asked to fetch it' : ' and no address to fetch it from'),
     );
     return (
-      '\nDer Volltext dieses Inhalts liegt hier nicht vor.' +
-      (url
-        ? '\nHol ihn dir mit get_url_text von der Adresse der Seite, bevor du urteilst. Erst wenn auch das ' +
-          'nichts hergibt, gilt ein Kriterium mangels Text als nicht prüfbar.'
-        : '\nBeurteile, was der Seitenkontext hergibt, und sag bei jedem Kriterium ausdrücklich, wenn es ' +
-          'mangels Text nicht prüfbar war.')
+      AI_PROMPTS.content.missing +
+      (url ? AI_PROMPTS.content.missingFetch : AI_PROMPTS.content.missingNoFetch)
     );
   }
-  const opening = '\nHier ist der Inhalt im Wortlaut:\n---\n';
+  const opening = AI_PROMPTS.content.opening;
   // The closing fence only where something follows it — it is there to say where the quoted text ends, and
   // where the text runs to the end of the task there is nothing for it to separate.
-  const closing = '\n---';
+  const closing = AI_PROMPTS.content.closing;
   const budget = room - opening.length - closing.length - 200;
   const fits = text.length <= budget;
   const quoted = fits ? text : text.slice(0, Math.max(budget, 0));
@@ -1039,8 +847,8 @@ function contentBlock(text: string, url: string | null, taskMax: number, room: n
     opening +
     quoted +
     closing +
-    '\nDieser Wortlaut ist abgeschnitten.' +
-    (url ? ' Den vollständigen Text bekommst du mit get_url_text von der Adresse der Seite.' : '')
+    AI_PROMPTS.content.truncated +
+    (url ? AI_PROMPTS.content.truncatedFetch : '')
   );
 }
 

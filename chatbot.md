@@ -24,7 +24,7 @@ properties an answer is recorded in — is [CHATBOT-IO.md](CHATBOT-IO.md).
 
 **Keeping this file current.** It describes `app-src/src/app/features/assistant/`,
 `app-src/src/app/features/quality/ai-quality-screen/`, `app-src/src/app/util/page-context.ts`,
-`app-src/src/app/util/quality-check-request.ts`, the
+`app-src/src/app/util/quality-check-request.ts`, `app-src/src/app/util/ai-prompts.ts`, the
 `boerdi` branch of `app-src/src/app/services/web-component-bundle.service.ts`, `scripts/boerdi/` and
 `scripts/fetch-widget.mjs`. A change to any of those belongs here as well. Where
 [FEATURES.md](FEATURES.md) and this file disagree about the assistant, this file is the newer one —
@@ -366,7 +366,8 @@ Nothing is asked before the widget has a session of its own: there is no dialogu
 The dialogue ends in the same record the structured check produces. That is what the criteria of the
 metadata set are read for, and they travel to the assistant twice over: as the task, so it knows what
 it is judging, and as the shape of its answer, so what comes back can be recorded rather than read.
-`util/quality-check-request.ts` is the whole of that translation.
+`util/quality-check-request.ts` is the whole of that translation; the task texts it puts stand in
+`util/ai-prompts.ts`, one entry per step.
 
 **The criteria.** `criteriaOf()` takes them from the same two widgets the structured check uses —
 `virtual:unmetLegalCriteria` for the knock-out ones, `ccm:oeh_buffet_criteria` for the editorial ones.
@@ -756,7 +757,7 @@ that containing block the chat covers the whole panel.
 |---|---|---|
 | **Strukturierte Qualitätsprüfung** (`quality`) | fixed steps: work through the criteria, confirm, then metadata; writes the quality workflow onto the node; KI only proposes | `features/quality/quality-check-screen/`, `features/quality/quality-criteria/` |
 | The machine judges underneath | no chat at all, plain HTTP scoring: MetaLookUp measures (on by default), ContentJudge runs an LLM pass per scheme (off by default, needs a credential); started right after the content was analysed and read steps later | `services/quality-judge.service.ts`, `metalookup.service.ts`, `content-judge.service.ts`, `util/quality-schemes.ts` |
-| **Individuelle Qualitätsprüfung mit KI** (`ai-quality`) | a dialogue with the assistant about the content and its collection, opened with the criteria as its task and answered in a schema built from them; a greeting that asks whose content it is, a language pass on one's own content, then judgement and enrichment, each confirmed by the person in the chat, ending in the same record and the same confirmation as the structured check | `features/quality/ai-quality-screen/`, `util/quality-check-request.ts` |
+| **Individuelle Qualitätsprüfung mit KI** (`ai-quality`) | a dialogue with the assistant about the content and its collection, opened with the criteria as its task and answered in a schema built from them; a greeting that asks whose content it is, a language pass on one's own content, then judgement and enrichment, each confirmed by the person in the chat, ending in the same record and the same confirmation as the structured check | `features/quality/ai-quality-screen/`, `util/quality-check-request.ts`, `util/ai-prompts.ts` |
 
 What separates the first from the last is exactly that it runs through fixed steps — which is why it
 is called the structured one rather than the guided one.
