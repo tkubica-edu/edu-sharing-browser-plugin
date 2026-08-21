@@ -46,7 +46,7 @@ export const AI_REPLIES = {
   origin: ['Inhalt selbst erstellt', 'Inhalt nicht selbst erstellt'],
   proofread: ['Ich bestätige die Korrekturen', 'Korrekturen überspringen'],
   quality: ['Qualitätsbewertung bestätigen', 'Anpassungen vornehmen'],
-  enrichment: ['Metadaten bestätigen', 'Anpassungen vornehmen']
+  enrichment: ['Metadatenvorschlag akzeptieren', 'Anpassungen vornehmen']
 } as const;
 
 export const AI_PROMPTS = {
@@ -224,6 +224,8 @@ export const AI_PROMPTS = {
     return [
       `Letzter Schritt: Reichere jetzt die Metadaten von ${named} an — demselben Inhalt, den du gerade ` +
         'geprüft hast. Der Schritt ist fertig, wenn die Person deine Werte bestätigt hat.',
+      'Anreichern heißt hier: Werte vorschlagen und sie mit submit_result abgeben. Eintragen tut sie das ' +
+        'Panel, auf diesen Aufruf hin.',
       ...(subject.collection
         ? [
             'Falls die Sammlung für das Anreichern von Metadaten eine Anleitung freigegeben hat, hol sie dir ' +
@@ -244,9 +246,9 @@ export const AI_PROMPTS = {
         'Die Person sieht nur den Chat.',
       'Bitte sie danach ausdrücklich, die Werte durchzugehen und zu bestätigen oder zu korrigieren. Führe sie ' +
         'zu dieser Bestätigung: frag direkt, ob die Metadaten so übernommen werden sollen.',
-      'Unter deiner Nachricht werden ihr die beiden Antworten als Buttons angeboten: „Metadaten bestätigen“ und ' +
-        '„Anpassungen vornehmen“. Du musst sie nicht ausschreiben. Deine Nachricht endet mit der Frage, danach ' +
-        'kommt kein Satz mehr.',
+      'Unter deiner Nachricht werden ihr die beiden Antworten als Buttons angeboten: ' +
+        '„Metadatenvorschlag akzeptieren“ und „Anpassungen vornehmen“. Du musst sie nicht ausschreiben. ' +
+        'Deine Nachricht endet mit der Frage, danach kommt kein Satz mehr.',
       'Wählt sie „Anpassungen vornehmen“: nimm ihre Änderungen auf, zeig die Werte, wie sie damit lauten, und ' +
         'stell dieselbe Frage erneut. So oft, wie sie Anpassungen will — der Schritt endet erst mit ihrer ' +
         'Bestätigung, und jede deiner Nachrichten endet deshalb mit dieser Frage.',
@@ -256,7 +258,11 @@ export const AI_PROMPTS = {
       'Speichern musst du nichts und kannst es auch nicht: die Werte trägt das Panel selbst am Inhalt ein, und ' +
         'zwar auf deinen submit_result-Aufruf hin. Dieser Aufruf IST das Speichern, soweit es dich angeht. ' +
         'Warte also nicht darauf, dass jemand speichert, frag uns nicht um eine Freigabe und kündige kein ' +
-        'Speichern an, das noch kommt — mit dem Aufruf ist dein Teil getan, und der Schritt ist fertig.'
+        'Speichern an, das noch kommt — mit dem Aufruf ist dein Teil getan, und der Schritt ist fertig.',
+      'Dass du kein Werkzeug hast, mit dem sich Datensätze schreiben oder aktualisieren lassen, ist Absicht ' +
+        'und kein Mangel: hier schreibt niemand außer dem Panel. Sag der Person deshalb nicht, eine Übernahme ' +
+        'sei dir nicht möglich oder dir fehle dafür ein Werkzeug — sie liest das als gescheiterten Schritt, ' +
+        'obwohl ihre Metadaten übernommen sind.'
     ];
   },
 
@@ -270,6 +276,10 @@ export const AI_PROMPTS = {
         'angereichert und bestätigt.',
       'Sag ihr, dass sie jetzt zum nächsten Schritt weitergehen kann — unten im Panel mit „Abschließen und ' +
         'zur Inhaltsübersicht“.',
+      'Die bestätigten Werte sind übernommen — das Panel hat sie am Inhalt eingetragen. Sag deshalb nichts ' +
+        'darüber, was du selbst nicht schreiben, speichern oder in einen Bestand übernehmen kannst, und nenne ' +
+        'kein Werkzeug, das dir dafür fehlt: es fehlt nichts, und ein solcher Satz liest sich als Fehler am ' +
+        'Ende einer Prüfung, die vollständig durch ist.',
       'Zwei bis drei Sätze genügen. Stell keine Frage mehr, schlag keine weiteren Werte vor und rufe ' +
         'submit_result nicht auf: es ist nichts mehr zu bestätigen.'
     ];

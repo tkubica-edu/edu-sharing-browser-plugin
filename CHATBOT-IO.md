@@ -259,7 +259,12 @@ must not read as a step that failed. The task also says outright that the assist
 itself**: the panel records the values on the strength of the `submit_result` call, so that call is the
 saving as far as the assistant is concerned. Without that sentence a run waits for a save it is not the
 one to make, announces one that is still to come, or asks the panel for a go-ahead — and the step hangs
-on a confirmation that has already been given.
+on a confirmation that has already been given. It also says that having **no tool for writing records**
+is deliberate, and forbids reporting one as missing: measured, a run that confirmed the metadata went on
+to say „eine Übernahme in den WLO-Bestand konnte ich nicht ausführen, weil mir kein Werkzeug zum
+Schreiben zur Verfügung steht" — true of the assistant, false about the step, and read by the person as
+a failure at the end of a check that was complete. The closing word carries the same guard, since that
+is the turn such a sentence tends to appear in.
 
 **5 — The closing word.** Not a request: it states that the check is complete, congratulates the person,
 names the four steps behind them and points at the footer — *Abschließen und zur Inhaltsübersicht*, the
@@ -330,7 +335,7 @@ Two per step, prescribed rather than hoped for, so the way on is always there to
 | `origin` | *Inhalt selbst erstellt* / *Inhalt nicht selbst erstellt* | unchanged — both chips are an answer |
 | `proofread` | *Ich bestätige die Korrekturen* / *Korrekturen überspringen* | unchanged — both are a way on |
 | `quality` | *Qualitätsbewertung bestätigen* / *Anpassungen vornehmen* | *Qualitätsbewertung bestätigen* + up to 2 from the widget (cap 3) |
-| `enrichment` | *Metadaten bestätigen* / *Anpassungen vornehmen* | *Metadaten bestätigen* + up to 2 from the widget (cap 3) |
+| `enrichment` | *Metadatenvorschlag akzeptieren* / *Anpassungen vornehmen* | *Metadatenvorschlag akzeptieren* + up to 2 from the widget (cap 3) |
 
 The right-hand column holds **as soon as the step's proposal is on screen** — one turn earlier than it reads,
 because the chips of a turn are settled when the turn is *sent*: the widget carries them in the request, so
