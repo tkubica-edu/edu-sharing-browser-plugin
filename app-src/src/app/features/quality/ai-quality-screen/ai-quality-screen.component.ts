@@ -587,6 +587,9 @@ export class AiQualityScreenComponent implements OnDestroy {
     this.problem.set(null);
     this.metadata.set(metadata);
     this.curation.recordValues(properties);
+    // There are values on the table from here on, which is what the way out of the step is offered on where
+    // the dialogue never gets to a confirming turn (see CurationService.qualityMetadataProposed).
+    this.curation.reportMetadataProposed();
     // The values are the assistant's until the person says otherwise: proposed and submitted in one turn,
     // they are a suggestion nobody has been through, and the way out of the check must not open on one. The
     // proposal is kept — a confirming turn submits it again, and then it counts.

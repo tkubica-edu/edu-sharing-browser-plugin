@@ -16,6 +16,16 @@ const AI_CHECK_UNFINISHED =
   'wurde. Trotzdem abschließen?';
 
 /**
+ * Asked instead, where the only thing missing is the assistant's own report that the metadata are confirmed:
+ * it proposed values, and the person is the one who decides whether they count. Tapping through this question
+ * is that decision — the values are recorded either way, and this says so rather than warning about a step
+ * that stalled on the assistant's side (see CurationService.qualityMetadataProposed).
+ */
+const AI_CHECK_PROPOSAL_UNCONFIRMED =
+  'Der Assistent hat Metadaten vorgeschlagen, sie aber nicht als bestätigt zurückgemeldet. Die ' +
+  'vorgeschlagenen Werte übernehmen und die Prüfung abschließen?';
+
+/**
  * What the metadata screen hands to the footer: how to save, and whether saving is possible right now.
  * `canSave` is a signal, so the footer derives its state instead of being pushed to. `save` answers whether the
  * write succeeded, since the footer's action continues on the back of it.
@@ -269,13 +279,25 @@ export class ActionBarService {
         if (this.curation.qualityConfirmed()) return [this.backAction()];
         const answered =
           this.curation.qualityCriteriaJudged() && this.curation.qualityMetadataEnriched();
+        // Everything the check needed is in, and only the assistant's closing report is missing: the values
+        // are proposed and recorded, the judgement is through. Then the question is about taking the proposal
+        // over rather than about an unfinished check, and answering it is what takes it over.
+        const takeProposal =
+          !answered &&
+          this.curation.qualityCriteriaJudged() &&
+          this.curation.qualityMetadataProposed();
         return [
           this.backAction(),
           {
             label: this.curation.saving() ? 'Speichern…' : 'Abschließen und zur Inhaltsübersicht',
             disabled: this.curation.saving(),
             run: async () => {
-              if (!answered && !confirm(AI_CHECK_UNFINISHED)) return;
+              if (!answered && !confirm(takeProposal ? AI_CHECK_PROPOSAL_UNCONFIRMED : AI_CHECK_UNFINISHED)) {
+                return;
+              }
+              // The person stood behind the proposal just now, which is what the confirmation waited for —
+              // the assistant's report of it is the one thing that never came.
+              if (takeProposal) this.curation.reportMetadataEnriched();
               // The same write as in the structured check: the criteria go onto the content and the
               // quality workflow is started with them (CurationService.confirmQuality).
               await this.curation.confirmQuality();

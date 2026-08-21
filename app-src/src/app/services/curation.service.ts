@@ -434,6 +434,16 @@ export class CurationService {
   readonly qualityMetadataEnriched = this.metadataEnriched.asReadonly();
 
   /**
+   * Whether the assistant put metadata values on the table at all — proposed, whether or not it ever reported
+   * them back as confirmed. Held apart from {@link qualityMetadataEnriched} because the two answer different
+   * questions: that one says the dialogue closed the step, this one says there are values to close it with.
+   * What it is for is the way out: a proposal the assistant will not submit a second time is still a proposal
+   * the person can stand behind, and the footer is where they do that (see ActionBarService).
+   */
+  private readonly metadataProposed = signal(false);
+  readonly qualityMetadataProposed = this.metadataProposed.asReadonly();
+
+  /**
    * Whether a machine check on this content is still out. Exposed for the confirmation, which waits for it: the
    * checks tick criteria of their own, so a confirmation given while one is running would record an answer the
    * user never saw.
@@ -697,6 +707,11 @@ export class CurationService {
   /** Take over that the KI check enriched the metadata — see {@link qualityMetadataEnriched}. */
   reportMetadataEnriched(): void {
     this.metadataEnriched.set(true);
+  }
+
+  /** Take over that the KI check proposed metadata — see {@link qualityMetadataProposed}. */
+  reportMetadataProposed(): void {
+    this.metadataProposed.set(true);
   }
 
   /**
@@ -1538,6 +1553,7 @@ export class CurationService {
     this.criteriaSatisfied.set(false);
     this.criteriaJudged.set(false);
     this.metadataEnriched.set(false);
+    this.metadataProposed.set(false);
     // Nothing is known about the next content's Erschließung until it says so itself, and it was left
     // nowhere yet.
     this.curationFinished.set(null);

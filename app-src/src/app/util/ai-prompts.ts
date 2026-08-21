@@ -46,7 +46,7 @@ export const AI_REPLIES = {
   origin: ['Inhalt selbst erstellt', 'Inhalt nicht selbst erstellt'],
   proofread: ['Ich bestätige die Korrekturen', 'Korrekturen überspringen'],
   quality: ['Qualitätsbewertung bestätigen', 'Anpassungen vornehmen'],
-  enrichment: ['Metadatenvorschlag akzeptieren', 'Anpassungen vornehmen']
+  enrichment: ['Ich bestätige die Metadaten', 'Anpassungen vornehmen']
 } as const;
 
 export const AI_PROMPTS = {
@@ -247,8 +247,8 @@ export const AI_PROMPTS = {
       'Bitte sie danach ausdrücklich, die Werte durchzugehen und zu bestätigen oder zu korrigieren. Führe sie ' +
         'zu dieser Bestätigung: frag direkt, ob die Metadaten so übernommen werden sollen.',
       'Unter deiner Nachricht werden ihr die beiden Antworten als Buttons angeboten: ' +
-        '„Metadatenvorschlag akzeptieren“ und „Anpassungen vornehmen“. Du musst sie nicht ausschreiben. ' +
-        'Deine Nachricht endet mit der Frage, danach kommt kein Satz mehr.',
+        '„Ich bestätige die Metadaten“ und „Anpassungen vornehmen“. Du musst sie nicht ausschreiben. Deine ' +
+        'Nachricht endet mit der Frage, danach kommt kein Satz mehr.',
       'Wählt sie „Anpassungen vornehmen“: nimm ihre Änderungen auf, zeig die Werte, wie sie damit lauten, und ' +
         'stell dieselbe Frage erneut. So oft, wie sie Anpassungen will — der Schritt endet erst mit ihrer ' +
         'Bestätigung, und jede deiner Nachrichten endet deshalb mit dieser Frage.',
@@ -262,7 +262,11 @@ export const AI_PROMPTS = {
       'Dass du kein Werkzeug hast, mit dem sich Datensätze schreiben oder aktualisieren lassen, ist Absicht ' +
         'und kein Mangel: hier schreibt niemand außer dem Panel. Sag der Person deshalb nicht, eine Übernahme ' +
         'sei dir nicht möglich oder dir fehle dafür ein Werkzeug — sie liest das als gescheiterten Schritt, ' +
-        'obwohl ihre Metadaten übernommen sind.'
+        'obwohl ihre Metadaten übernommen sind.',
+      'Und was du über deine Werkzeuge auch zu sagen hast: submit_result wird davon nicht berührt. Fehlt dir ' +
+        'eines, konntest du eine URI nicht gegenprüfen oder bist du dir über die Übernahme unsicher, dann sag ' +
+        'es in einem Satz — und rufe submit_result trotzdem in demselben Zug auf, sobald die Person bestätigt ' +
+        'hat. Ein ausgelassener Aufruf hält die Person in einem Schritt fest, den sie längst beendet hat.'
     ];
   },
 

@@ -266,6 +266,14 @@ Schreiben zur Verfügung steht" — true of the assistant, false about the step,
 a failure at the end of a check that was complete. The closing word carries the same guard, since that
 is the turn such a sentence tends to appear in.
 
+The sentence survives the guard, though — measured across seven runs it came back in seven wordings,
+several of them also reporting that the vocabulary URIs could not be verified. That reads like a session
+whose tool set does not match what the assistant believes it is for, which no wording of ours settles. So
+the **prompt no longer tries to suppress it**: it separates the report from the call — say in one sentence
+whatever is missing, *and* call `submit_result` all the same. And the way on does not depend on the call
+at all any more: see [The way out when the assistant will not
+close](#the-way-out-when-the-assistant-will-not-close).
+
 **5 — The closing word.** Not a request: it states that the check is complete, congratulates the person,
 names the four steps behind them and points at the footer — *Abschließen und zur Inhaltsübersicht*, the
 way on into the next step of the flow. It is a turn of its own rather than a sentence at the end of the
@@ -335,7 +343,31 @@ Two per step, prescribed rather than hoped for, so the way on is always there to
 | `origin` | *Inhalt selbst erstellt* / *Inhalt nicht selbst erstellt* | unchanged — both chips are an answer |
 | `proofread` | *Ich bestätige die Korrekturen* / *Korrekturen überspringen* | unchanged — both are a way on |
 | `quality` | *Qualitätsbewertung bestätigen* / *Anpassungen vornehmen* | *Qualitätsbewertung bestätigen* + up to 2 from the widget (cap 3) |
-| `enrichment` | *Metadatenvorschlag akzeptieren* / *Anpassungen vornehmen* | *Metadatenvorschlag akzeptieren* + up to 2 from the widget (cap 3) |
+| `enrichment` | *Ich bestätige die Metadaten* / *Anpassungen vornehmen* | *Ich bestätige die Metadaten* + up to 2 from the widget (cap 3) |
+
+Every one of them is written in the **person's** voice, or as the thing they are doing — never as an
+instruction the assistant could read as addressed to itself. A chip goes into the conversation as their
+message, so *Metadaten bestätigen* / *Metadatenvorschlag akzeptieren* arrived as an order to accept the
+proposal into the repository, which the assistant then reported it had no tool for. *Ich bestätige die
+Metadaten* cannot be read that way — the same reason *Fremder Inhalt* became *Inhalt nicht selbst
+erstellt*.
+
+### The way out when the assistant will not close
+
+`submit_result` with `confirmed=true` is what ends a step, and a run that keeps talking about tools it
+does not have never sends it. The person is then in a step they have finished. So the panel holds the two
+halves apart (`CurationService`):
+
+| | set by | says |
+|---|---|---|
+| `qualityMetadataProposed` | the first turn that carries values, confirmed or not | there are values to close the step with |
+| `qualityMetadataEnriched` | a turn with `confirmed=true` | the dialogue closed the step itself |
+
+Where the judgement is through and values are on the table but that confirming turn never came,
+*Abschließen und zur Inhaltsübersicht* asks about **taking the proposal over** instead of warning about an
+unfinished check — and answering that question is what takes it over (`reportMetadataEnriched`). Nothing
+is invented by it: the values were recorded the moment they arrived, and what was missing was only the
+assistant's word for what the person had already said.
 
 The right-hand column holds **as soon as the step's proposal is on screen** — one turn earlier than it reads,
 because the chips of a turn are settled when the turn is *sent*: the widget carries them in the request, so
