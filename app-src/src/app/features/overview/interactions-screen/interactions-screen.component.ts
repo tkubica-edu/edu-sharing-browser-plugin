@@ -63,11 +63,13 @@ export class InteractionsScreenComponent {
   /**
    * One exchange per editorial team the content was forwarded to, in the order the forwarding step listed
    * them. The user's own filing has no part in it: "Persönliche Ablage" is where a content is kept, not a
-   * team that judges it.
+   * team that judges it. Read off the forwardings the content stands in rather than off the step's own
+   * picks, so a content taken up from the Verlauf names its teams too (see
+   * CurationService.contentForwardings).
    */
   protected readonly exchanges = computed<readonly EditorialExchange[]>(() => {
     const submitted = this.submittedAt();
-    return this.curation.editorialTargets().map((target) => ({
+    return this.curation.contentForwardings().map((target) => ({
       id: target.group.id,
       group: target.group.name,
       folder: target.folder?.name ?? null,

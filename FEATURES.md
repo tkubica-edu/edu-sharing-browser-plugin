@@ -63,9 +63,11 @@ Which editor renders that screen, and which route the save takes, is
   *selection*, so the hydrated node goes in as a single-element array; the element fetches the
   numbers itself through the repository session. Shown for an active node, like the preview.
 - **Interaktionen** — what became of the content at the editorial teams it was proposed to: one card
-  per forwarding (`CurationService.editorialTargets`, so the team plus the collection picked inside
+  per forwarding (`CurationService.contentForwardings`, so the team plus the collection picked inside
   it; the *Persönliche Ablage*'s own collections are no part of it), with the exchange under it as a
-  timeline. Offered only where the browser extension custom web component is enabled, exactly as *An
+  timeline. The forwardings a save carried out are kept in the *Verlauf* entry, so a content taken up
+  again names its teams too instead of reading as one that was never forwarded — the picks of the
+  forwarding step and the recorded ones are shown as one list, each team once. Offered only where the browser extension custom web component is enabled, exactly as *An
   Redaktionen weiterleiten* is — without that step no content is proposed to a Redaktion. Marked
   **Entwurf**: the repository hands out no communication history yet, so the cards name the real
   forwardings while the steps under them are an example ending in „Noch keine Entscheidung
@@ -230,7 +232,12 @@ navigating to it, and closes it again where it stands; the step keeps running be
   entries are dropped on load, and re-saving a node moves its row to the top instead of
   duplicating). *Inhaltsoptionen öffnen* fetches the live node by id (`CurationService.openFromHistory` →
   `RepositoryNodeService.get`) and takes the content up at the *Inhaltsoptionen*; if there is unsaved
-  work the shell confirms first, and a failed fetch is surfaced via an alert.
+  work the shell confirms first, and a failed fetch is surfaced via an alert. Beside the metadata an
+  entry carries what the flow needs to go on with the content: the Erschließung it was written from,
+  how far the Qualitätsprüfung got, the step it was left on, whether it was handed over, and the
+  editorial teams it was forwarded to (`HistoryEntry.forwardings`, read back by the *Interaktionen*
+  view). All of them optional — an entry written before one of them was kept says nothing about it,
+  which is not the same as saying no.
 - **Einstellungen** *(dotted while a change waits to be applied)* — the Repository-URL (used for
   login and every embedded element) at the top, and below it four folded groups, one open at a time:
   *Entwickler-Optionen* (the dev and the debug mode, see [TESTING.md](TESTING.md)), *KI- und

@@ -3,6 +3,7 @@ import { Injectable, computed, inject, signal, untracked } from '@angular/core';
 import { APP_CONFIG } from '../config';
 import { AuthService } from './auth.service';
 import { BrowserExtensionService } from './browser-extension.service';
+import type { EditorialTarget } from './curation.service';
 import { ParsedMetadata } from './metadata-agent.service';
 import type { SectionId } from '../model/navigation';
 import type { NavStep } from './navigation.service';
@@ -44,6 +45,16 @@ export interface HistoryEntry {
    * it as state of the flow rather than reading it back off the node.
    */
   quality?: { criteriaMet: boolean; confirmed: boolean } | null;
+  /**
+   * The editorial teams this content was proposed to, and the collection inside each one it went into:
+   * a relation of the node rather than a property of it, so it can only be read back from here where
+   * the repository does not hand the relation out. It is what the Interaktionen view names the exchange
+   * per team from, and it stands for a forwarding a save already carried out — which is why a content
+   * taken up again is never filed into these collections a second time (see
+   * CurationService.savedForwardings). Absent for an entry written before it was kept, and for a
+   * content that was proposed to no team.
+   */
+  forwardings?: readonly EditorialTarget[] | null;
   /**
    * Whether the Erschließung was carried to its end — the handover to the editorial queue, which is the
    * last thing the flow does. Absent for an entry written before this was kept, which is not the same
@@ -179,6 +190,7 @@ export class HistoryService {
       // What the entry carries beyond the node's own fields, since that is what a reopening stands on.
       step: added.step,
       quality: added.quality,
+      forwardings: added.forwardings?.map((target) => target.group.name) ?? 'none',
       run: added.run ? `${added.run.fields.length} fields` : 'none',
       storedFields: added.parsed?.fields?.length ?? 0,
       replacesPrevious: known

@@ -228,6 +228,31 @@ export class CurationService {
   readonly editorialTargets = this.editorialTargetsState.asReadonly();
 
   /**
+   * The forwardings a save already carried out, as the history holds them for this content — read back
+   * when it is taken up again, since where a content was proposed is a relation the repository does not
+   * hand out with the node (see HistoryEntry.forwardings). Kept apart from {@link editorialTargets}: a
+   * picked forwarding is still to be filed, a recorded one has been, and only the pending ones are what
+   * a save files (see {@link filedCollections}).
+   */
+  private readonly savedForwardingsState = signal<readonly EditorialTarget[]>([]);
+  readonly savedForwardings = this.savedForwardingsState.asReadonly();
+
+  /**
+   * Every editorial team this content stands proposed to: the ones a save recorded and the ones the
+   * forwarding step has just picked, each team once — a team picked again outranks its record, since the
+   * pick is the more recent statement of which collection inside it the content goes to. This is what
+   * the exchange per team is shown for, and what is written back to the history, so a content proposed
+   * to a further team on a second pass keeps the teams of the first.
+   */
+  readonly contentForwardings = computed<readonly EditorialTarget[]>(() => {
+    const picked = this.editorialTargetsState();
+    const recorded = this.savedForwardingsState().filter(
+      (target) => !picked.some((pick) => pick.group.id === target.group.id),
+    );
+    return [...recorded, ...picked];
+  });
+
+  /**
    * Where the forwarding actually files the content: the picked folder per group, else the group's own
    * collection — one collection per group, never both (see {@link EditorialTarget}).
    */
@@ -900,7 +925,8 @@ export class CurationService {
       savedAt: new Date(entry.timestamp).toISOString(),
       run: entry.run ? `${entry.run.fields.length} fields` : "none — the node's own fields stand in",
       quality: entry.quality ?? 'unknown',
-      step: entry.step ?? 'none'
+      step: entry.step ?? 'none',
+      forwardings: entry.forwardings?.map((target) => target.group.name) ?? 'none'
     });
     this.metadataAgent.restore({
       ok: true,
@@ -917,6 +943,9 @@ export class CurationService {
     this.curationFinished.set(entry.finished ?? null);
     // Where it was left, for whatever takes the content further (see {@link leftAtStep}).
     this.leftAtStepState.set(entry.step ?? null);
+    // The teams it was proposed to, so the exchange with them is shown for a content taken up again
+    // rather than reading as one that was never forwarded (see {@link savedForwardings}).
+    this.savedForwardingsState.set(entry.forwardings ?? []);
   }
 
   /** The history's account of a node, for a node whose own properties are out of reach; else null. */
@@ -1400,6 +1429,9 @@ export class CurationService {
       run,
       // How far the check had got, for the same reason: it is what the steps behind it are unlocked by.
       quality: { criteriaMet: this.criteriaSatisfied(), confirmed: this.quality() },
+      // The teams the content stands proposed to — the ones this save filed it with and the ones an
+      // earlier one did, since the repository hands the relation back with neither.
+      forwardings: this.contentForwardings(),
       // Whether this save was the one that ended the flow, so the content can be offered to be taken
       // further where it was not (see {@link curationUnfinished}).
       finished: this.curationFinished() === true
@@ -1520,8 +1552,9 @@ export class CurationService {
     this.assignError.set(null);
     this.assignedCollections.set([]);
     // Where a content was to be forwarded and filed is a statement about that content; the next one
-    // starts without it rather than inheriting it.
+    // starts without it rather than inheriting it — the forwardings it already stands in included.
     this.editorialTargetsState.set([]);
+    this.savedForwardingsState.set([]);
     this.storageParentState.set(null);
     this.personalCollectionsState.set([]);
     // Which process a content is checked in is a statement about that content, not a standing preference.
