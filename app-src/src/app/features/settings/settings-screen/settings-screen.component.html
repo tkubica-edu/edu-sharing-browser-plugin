@@ -84,6 +84,21 @@
           lässt sich eine Prüfung beliebig oft wiederholen, ohne bei jedem Durchlauf einen Node
           zurückzulassen. Zum Testen des Speicherns ausgeschaltet lassen.
         </p>
+
+        <!-- Der Node, den der Prüfgegenstand ohne Speichern hat: ohne ihn steht nur die Sammlung im
+             Kontext, und die KI prüft dann sie statt den Inhalt. -->
+        @if (devMode.skipWrites()) {
+          <label class="es-field-label" for="dev-node">Node-ID des Prüfinhalts</label>
+          <input id="dev-node" type="text" class="es-input" placeholder="Node-ID"
+                 [ngModel]="devMode.nodeId()" (ngModelChange)="setDevNodeId($event)" />
+          <p class="desc">
+            Node, als der der Inhalt bei der KI gilt, solange nichts geschrieben wird. Ohne ihn bekommt die
+            KI nur die Test-Sammlung genannt, löst diese als „aktuelle Seite“ auf und antwortet, der zu
+            prüfende Inhalt liege nicht vor. Eine echte, lesbare Node-ID des Repositoriums eintragen — am
+            besten eine, deren Inhalt zum gefakten Inhalt oben passt, denn die KI liest Metadaten und
+            Volltext von ihr.
+          </p>
+        }
       }
     </div>
 

@@ -191,6 +191,11 @@ export const APP_CONFIG = {
     devModeCollectionId: 'eduSharingDevModeCollectionId',
     devModeSkipWrites: 'eduSharingDevModeSkipWrites',
     /**
+     * The node a run stands in for while nothing is written — what gives the KI-Qualitätsprüfung a content
+     * the assistant can resolve, in place of the node the skipped write never created (see DevModeService).
+     */
+    devModeNodeId: 'eduSharingDevModeNodeId',
+    /**
      * Which faked erschlossener Inhalt a run answers with. Read by the background worker, which owns those
      * fixtures — the literal there has to stay in step with this one
      * (`DEV_MODE_GENERATE_STORAGE_KEY` in background/background.js).

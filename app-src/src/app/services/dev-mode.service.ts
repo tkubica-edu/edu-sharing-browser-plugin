@@ -66,6 +66,14 @@ export class DevModeService {
   /** What there is to choose between, for the settings' select. */
   readonly generateFixtures = GENERATE_FIXTURES;
 
+  private readonly nodeIdState = signal('');
+
+  /**
+   * The node the checks are to treat the content as, while the run writes nothing. Empty while none is set,
+   * which is the ordinary state.
+   */
+  readonly nodeId = this.nodeIdState.asReadonly();
+
   private readonly skipWritesState = signal(false);
 
   /**
@@ -82,6 +90,16 @@ export class DevModeService {
   readonly writesSkipped = computed(() => this.enabledState() && this.skipWritesState());
 
   /**
+   * The node a run stands in for, or empty where it stands in for none.
+   *
+   * Bound to {@link writesSkipped} rather than to the mode alone: with the writes made, the run has a node of
+   * its own and a second id would be a claim about a different content. It matters because the assistant
+   * resolves the content by this id — without one it is handed the collection instead, and a check whose
+   * subject is the collection answers about the wrong thing (see `contentContextOf`).
+   */
+  readonly fakedNodeId = computed(() => (this.writesSkipped() ? this.nodeIdState().trim() : ''));
+
+  /**
    * Load the persisted switch. Must run before anything asks one of the faked services, so a boot
    * that starts an Erschließung of its own does not send out the request the mode is there to spare.
    */
@@ -90,6 +108,7 @@ export class DevModeService {
     this.enabledState.set(await this.browserExtension.storageGet(keys.devMode, DEFAULT_ENABLED));
     this.collectionIdState.set(await this.browserExtension.storageGet(keys.devModeCollectionId, ''));
     this.skipWritesState.set(await this.browserExtension.storageGet(keys.devModeSkipWrites, false));
+    this.nodeIdState.set(await this.browserExtension.storageGet(keys.devModeNodeId, ''));
     this.generateState.set(
       toFixtureId(await this.browserExtension.storageGet(keys.devModeGenerate, DEFAULT_FIXTURE)),
     );
@@ -97,7 +116,8 @@ export class DevModeService {
       console.log(`${LOG} aktiv — KI-Antworten werden gefakt`, {
         generate: this.generateState(),
         collectionId: this.fakedCollectionId() || null,
-        writesSkipped: this.writesSkipped()
+        writesSkipped: this.writesSkipped(),
+        nodeId: this.fakedNodeId() || null
       });
     }
   }
@@ -119,6 +139,13 @@ export class DevModeService {
     const fixture = toFixtureId(id);
     this.generateState.set(fixture);
     await this.browserExtension.storageSet(APP_CONFIG.storageKeys.devModeGenerate, fixture);
+  }
+
+  /** Take over the node a run without writes stands in for — see {@link nodeId}. */
+  async setNodeId(id: string): Promise<void> {
+    const trimmed = id.trim();
+    this.nodeIdState.set(trimmed);
+    await this.browserExtension.storageSet(APP_CONFIG.storageKeys.devModeNodeId, trimmed);
   }
 
   /** Take over whether the flow's writes are made — see {@link skipWrites}. */

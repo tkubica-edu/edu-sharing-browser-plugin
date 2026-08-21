@@ -276,6 +276,20 @@ export class CurationService {
   });
 
   /**
+   * The node the checks work off: the one the run wrote, or the one the dev mode names while it writes
+   * nothing (see DevModeService). `null` where there is neither.
+   *
+   * It is what the KI-Qualitätsprüfung hands the assistant as the content's node, and that is what the
+   * fallback is for: the assistant resolves whichever id it is given, and given only a collection it
+   * describes the collection — a run without a node then produces a check about the wrong subject. Not the
+   * node the flow itself writes to: nothing is written while it applies, and a stand-in id must never
+   * become the target of a save.
+   */
+  readonly subjectNodeId = computed<string | null>(
+    () => this.activeNode()?.nodeId ?? (this.devMode.fakedNodeId() || null),
+  );
+
+  /**
    * The filed collections the content is not in yet. The save works off this rather than off
    * {@link filedCollections}, so a second save does not add the content to the same collection
    * again — the flow's own steps are re-enterable, and only the first pass has anything to file.

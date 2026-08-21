@@ -150,7 +150,7 @@ export class AiQualityScreenComponent implements OnDestroy {
       text: this.curation.contentText(),
       url: this.curation.contentUrl(),
       collectionId: this.collection()?.id ?? null,
-      nodeId: this.curation.activeNode()?.nodeId ?? null
+      nodeId: this.curation.subjectNodeId()
     }),
   );
 
@@ -363,7 +363,7 @@ export class AiQualityScreenComponent implements OnDestroy {
     effect(() =>
       console.log(`${LOG_QUALITY} the check is about`, {
         title: this.curation.contentTitle(),
-        nodeId: this.curation.activeNode()?.nodeId ?? null,
+        nodeId: this.curation.subjectNodeId(),
         collection: this.collection(),
         url: this.curation.contentUrl(),
         textLength: this.curation.contentText().length,
@@ -448,7 +448,7 @@ export class AiQualityScreenComponent implements OnDestroy {
     // The whole outcome in one line, since it is not on screen anywhere: what was judged this turn, what the
     // record now says, and whether the confirmation is open.
     console.log(`${LOG_QUALITY} ← the assistant judged ${verdicts.length} criteria this turn`, {
-      subject: { title: this.curation.contentTitle(), nodeId: this.curation.activeNode()?.nodeId ?? null },
+      subject: { title: this.curation.contentTitle(), nodeId: this.curation.subjectNodeId() },
       collection: this.collection(),
       thisTurn: verdicts.map(({ criterion, met, reason }) => ({ criterion: criterion.caption, met, reason })),
       standing: judged.map(({ criterion, met }) => `${met ? '✓' : '✗'} ${criterion.caption}`),
@@ -607,7 +607,7 @@ export class AiQualityScreenComponent implements OnDestroy {
     this.curation.reportMetadataEnriched();
     // The finished result, both halves in one line: what the content is worth, and what it is about.
     console.log(`${LOG_QUALITY} ✔ the check is complete`, {
-      subject: { title: this.curation.contentTitle(), nodeId: this.curation.activeNode()?.nodeId ?? null },
+      subject: { title: this.curation.contentTitle(), nodeId: this.curation.subjectNodeId() },
       collection: this.collection(),
       origin: this.origin(),
       // Null where the pass was not run at all, which is what someone else's content means here — a text

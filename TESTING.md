@@ -81,8 +81,8 @@ the panel currently holds — it came out of the run those settings shaped, and 
 would otherwise go on naming the old fixture while *Inhalt erschließen* stays disabled for the page.
 This one does drop unsaved work: a faked run's result is a test result.
 
-Three further settings appear while the mode is on, and hold only while it is (the middle one only in
-a WLO panel, see there):
+Three further settings appear while the mode is on, and hold only while it is (the second one only in
+a WLO panel, see there); ticking the last one adds a fourth:
 
 - **Gefakter Inhalt** — which erschlossener Inhalt `/generate` answers with. `dresden` is a sound
   content; `optik` carries factual errors in its text on purpose, so a quality check has something to
@@ -107,19 +107,27 @@ a WLO panel, see there):
   (`CurationService.leaveUnwritten`). No node is created and none is updated, so a step behind the
   first save can be repeated without leaving a node behind each time. Off by default, because the
   saving is itself worth testing.
+- **Node-ID des Prüfinhalts** — shown while the writes are skipped, and the node the content counts as
+  for the KI check (`DevModeService.fakedNodeId`, read through `CurationService.subjectNodeId`). Without
+  it the assistant is handed the test collection alone, resolves *that* as the current page and answers
+  that the content to be checked is not available — the collection describes itself, and the content's
+  own text is dropped from the prompt on the way. Put a real, readable node id of the repository in,
+  ideally one whose content matches the **Gefakter Inhalt** above: the assistant reads its metadata and
+  full text from it. It never becomes the target of a save — while it applies, nothing is written.
 
 ### Reaching „Individuelle Qualitätsprüfung mit KI" quickly
 
 1. Switch the dev mode on, put a real collection id into **Test-Sammlungs-ID**, tick **Nichts ins
-   Repositorium schreiben**.
+   Repositorium schreiben** and put a real node id into **Node-ID des Prüfinhalts**.
 2. *Inhalt erschließen* on any page → the faked run answers at once.
 3. *Weiter* through Vorschau and whichever filing steps apply — none of them writes now.
 4. *Prüfprozess auswählen* → **Individuelle Qualitätsprüfung mit KI** → the dialogue runs against the
    collection from the settings.
 
-The check needs no node of its own (the section asks for `hasEditableMetadata`, which the faked run
-satisfies), so the run ends on the menu rather than the Inhaltsübersicht — that step is about a node,
-and this run wrote none. To test the writing instead, untick the checkbox and walk the same path.
+The check needs no node of its own to be *reached* (the section asks for `hasEditableMetadata`, which
+the faked run satisfies), so the run ends on the menu rather than the Inhaltsübersicht — that step is
+about a node, and this run wrote none. The dialogue itself does need one, which is what **Node-ID des
+Prüfinhalts** is for. To test the writing instead, untick the checkbox and walk the same path.
 
 ## Debug mode (OnlyOffice without OnlyOffice)
 

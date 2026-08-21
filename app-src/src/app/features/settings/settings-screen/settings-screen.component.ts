@@ -250,4 +250,9 @@ export class SettingsScreenComponent implements OnDestroy {
     this.changed = true;
     void this.devMode.setSkipWrites(skip);
   }
+
+  protected setDevNodeId(id: string): void {
+    this.changed = true;
+    void this.devMode.setNodeId(id);
+  }
 }
