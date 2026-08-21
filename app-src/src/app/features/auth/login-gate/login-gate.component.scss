@@ -1,17 +1,24 @@
 // Fills the screen's place like every other view; the way back is the footer's (ActionBarService).
+// The panel scrolls when the form is taller than it is, so no row is cut off.
 :host {
-  display: block;
+  display: flex;
+  flex-direction: column;
   height: 100%;
+  overflow-y: auto;
 }
 
 // The card takes the height it is given, so the form sits in the panel rather than in a box at the
-// top of it — what is asked for here is the whole screen's business.
+// top of it — what is asked for here is the whole screen's business. Below the form's own height it
+// stops following the panel: growing into the free space is allowed, shrinking under the rows is not.
 es-login {
-  height: 100%;
+  flex: 1 0 auto;
 
   // Centred in the height it now has: the form is the whole screen here, not a card at the top of one.
   ::ng-deep .login {
     height: 100%;
+    // `safe` keeps the rows at the top edge instead of centring them out of view; the plain value in
+    // front of it is what browsers that do not know it fall back to.
     justify-content: center;
+    justify-content: safe center;
   }
 }
