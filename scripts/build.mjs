@@ -334,7 +334,9 @@ async function main() {
     log('  xcrun safari-web-extension-converter dist/safari');
     log('  → open the generated project in Xcode and Run.');
     log('Or without Xcode (temporary, gone at the next Safari restart):');
-    log('  Safari → Settings → Developer → Extensions');
+    log('  Safari → Settings → Advanced → tick "Show features for web developers"');
+    log('  → that is what makes the Developer tab appear');
+    log('  → Developer → Extensions');
     log('  → tick "Allow unsigned extensions"');
     log('  → "Add Temporary Extension…" → pick dist/safari');
   }

@@ -26,10 +26,11 @@ xcrun safari-web-extension-converter dist/safari
 
 Open the generated Xcode project and Run.
 
-**Safari without Xcode** (temporary, gone at the next Safari restart): *Settings* → *Developer* →
-*Extensions* → tick **Allow unsigned extensions** → **Add Temporary Extension…** → pick the unzipped
-`safari` folder (`dist/safari`, or the unpacked `edu-sharing-safari-<version>.zip`). The *Developer*
-tab itself only shows up once *Advanced* → *Show features for web developers* is on.
+**Safari without Xcode** (temporary, gone at the next Safari restart): *Settings* → *Advanced* →
+tick **Show features for web developers** — that is what makes the *Developer* tab appear at all, so
+it comes first — then *Developer* → *Extensions* → tick **Allow unsigned extensions** → **Add
+Temporary Extension…** → pick the unzipped `safari` folder (`dist/safari`, or the unpacked
+`edu-sharing-safari-<version>.zip`).
 
 A rebuilt bundle or manifest needs an explicit *Reload* in the browser's extension page — neither
 browser picks up a changed package on its own.

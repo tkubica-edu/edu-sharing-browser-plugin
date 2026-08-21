@@ -64,7 +64,7 @@ Then load it:
 | Chrome / Edge | `chrome://extensions` → *Developer mode* → *Load unpacked* → `dist/chrome` |
 | Firefox | `npm run start:firefox`, or `about:debugging` → *Load Temporary Add-on* → `dist/firefox/manifest.json` |
 | Safari | `xcrun safari-web-extension-converter dist/safari`, then run the generated Xcode project |
-| Safari (no Xcode) | *Settings* → *Developer* → *Extensions* → **Allow unsigned extensions** → **Add Temporary Extension…** → `dist/safari` |
+| Safari (no Xcode) | *Settings* → *Advanced* → **Show features for web developers** (this reveals the *Developer* tab) → *Developer* → *Extensions* → **Allow unsigned extensions** → **Add Temporary Extension…** → `dist/safari` |
 
 Click the toolbar icon on any normal `https://` page. Prebuilt zips for testers hang off every
 tagged release — see [BUILD.md](BUILD.md#prebuilt-downloads).
