@@ -10,14 +10,18 @@ import { AssistantRequestService } from '../../../services/assistant-request.ser
 import { AuthService } from '../../../services/auth.service';
 import { CurationService } from '../../../services/curation.service';
 import { LeaveGuard, NavigationService } from '../../../services/navigation.service';
+import {
+  enrichmentSchemaOf, originSchemaOf, proofreadSchemaOf, resultSchemaOf, schemaFits
+} from '../../../util/ai-schemas';
+import { AI_REPLIES } from '../../../util/ai-prompts';
 import { chatSession, resetChatSession } from '../../../util/chat-session';
 import { firstString } from '../../../util/mds-values';
 import { PageContext, contentContextOf } from '../../../util/page-context';
 import {
   ContentOrigin, CriterionVerdict, EnrichedMetadata, ProofreadResult, closingInstructionOf, criteriaOf,
-  criteriaPropertiesOf, enrichmentInstructionOf, enrichmentOf, enrichmentPropertiesOf, enrichmentSchemaOf,
-  knockoutSatisfied, originGuessOf, originInstructionOf, originOf, originSchemaOf, proofreadInstructionOf,
-  proofreadOf, proofreadSchemaOf, qualityInstructionOf, resultSchemaOf, schemaFits, verdictsOf
+  criteriaPropertiesOf, enrichmentInstructionOf, enrichmentOf, enrichmentPropertiesOf, knockoutSatisfied,
+  originGuessOf, originInstructionOf, originOf, proofreadInstructionOf, proofreadOf, qualityInstructionOf,
+  verdictsOf
 } from '../../../util/quality-check-request';
 import {
   AgentResult, AiAssistantScreenComponent, AssistantTask
@@ -43,18 +47,11 @@ const STEP_MESSAGE: Record<CheckStep, string> = {
 };
 
 /**
- * The two answers each step offers as chips, in the order they are shown. Handed to the widget rather than left
- * to it: its own generator composes the chips from the assistant's answer and regularly offers something else
- * entirely — *„Was bedeuten die Lizenzen?"* under the question whose content this is — and a step whose way on
- * is a tap needs that tap to be there. They stand for the whole step, so a person who asks for changes is
- * offered the same two again in the turn after, which is what eventually carries the check to its end.
+ * The chips of each step, as this screen offers them; the labels themselves stand beside the tasks that quote
+ * them (see {@link AI_REPLIES}). Bound as a record over the steps, so a step left without chips does not
+ * compile.
  */
-const STEP_REPLIES: Record<Exclude<CheckStep, 'done'>, readonly string[]> = {
-  origin: ['Inhalt selbst erstellt', 'Fremder Inhalt'],
-  proofread: ['Ich bestätige die Korrekturen', 'Korrekturen überspringen'],
-  quality: ['Qualität bestätigen', 'Anpassungen vornehmen'],
-  enrichment: ['Metadaten bestätigen', 'Anpassungen vornehmen']
-};
+const STEP_REPLIES: Record<Exclude<CheckStep, 'done'>, readonly string[]> = AI_REPLIES;
 
 /**
  * The steps whose second chip asks for *changes* rather than answering the question — as against `origin`,

@@ -8,22 +8,21 @@
 // only the ones whose predecessor is filled. An entry that is switched off by its condition therefore reads as
 // `''` in one task and as a dropped array element in another, and the two are not interchangeable.
 //
-// Where the line runs: what is here is what goes out as the turn's `host_instruction`. The German that goes
-// out as the *schema* of the answer — the `description` texts of the four schema builders — stays in
-// `quality-check-request.ts`, bound to the shape it describes. The two overlap in content on purpose: the
-// instruction says a rule where the person reads it, the description says it again where the model fills the
-// answer in. Why a task is worded the way it is stays in the docblock of its builder over there, which is also
-// where each of these entries is called.
+// Where the line runs: what is here is what goes out as the turn's `host_instruction`, together with the chip
+// labels the texts quote. The German that goes out as the *schema* of the answer — the `description` texts of
+// the four schemas — stands in `ai-schemas.ts`, bound to the shape it describes. The two overlap in content on
+// purpose: the instruction says a rule where the person reads it, the description says it again where the
+// model fills the answer in. Why a task is worded the way it is stays in the docblock of its builder in
+// `quality-check-request.ts`, which is also where each of these entries is called.
 //
 // Four couplings to hold in mind when a wording changes here:
-//   * the chip labels are quoted verbatim in these texts, while the chips themselves are set in the check
-//     screen's STEP_REPLIES — a task that names other buttons than the ones offered leaves the person
-//     answering nothing;
+//   * the chip labels in `AI_REPLIES` are quoted verbatim in these texts — a task that names other buttons
+//     than the ones offered leaves the person answering nothing;
 //   * the glyphs the verdict is asked for in (✓ ✗ ○) are what `chat-overrides.ts` colours the assistant's
 //     lines by, so asking for another glyph leaves the verdicts uncoloured;
 //   * the footer the closing word points at is labelled in `action-bar.service.ts`, and the task names that
 //     label in words;
-//   * the schema `description` texts say the same rules a second time, as described above.
+//   * the schema `description` texts in `ai-schemas.ts` say the same rules a second time, as described above.
 
 import type { CheckSubject, QualityCriterion } from './quality-check-request';
 
@@ -32,6 +31,23 @@ function askedVocabularies(names: readonly string[]): string {
   const quoted = names.map((vocabulary) => `"${vocabulary}"`);
   return [quoted.slice(0, -1).join(', '), quoted[quoted.length - 1]].join(' und ');
 }
+
+/**
+ * The two answers each step offers as chips, in the order they are shown. Handed to the widget rather than left
+ * to it: its own generator composes the chips from the assistant's answer and regularly offers something else
+ * entirely — *„Was bedeuten die Lizenzen?"* under the question whose content this is — and a step whose way on
+ * is a tap needs that tap to be there. They stand for the whole step, so a person who asks for changes is
+ * offered the same two again in the turn after, which is what eventually carries the check to its end.
+ *
+ * They stand here rather than in the screen that offers them because the tasks name them word for word: the
+ * label and the sentence that points at it are one text, and a change to either is a change to both.
+ */
+export const AI_REPLIES = {
+  origin: ['Inhalt selbst erstellt', 'Fremder Inhalt'],
+  proofread: ['Ich bestätige die Korrekturen', 'Korrekturen überspringen'],
+  quality: ['Qualität bestätigen', 'Anpassungen vornehmen'],
+  enrichment: ['Metadaten bestätigen', 'Anpassungen vornehmen']
+} as const;
 
 export const AI_PROMPTS = {
   /** Step 1: greet, state what is coming, guess whose content this is and ask. */

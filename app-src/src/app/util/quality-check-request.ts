@@ -3,8 +3,9 @@
 // through a schema is that the dialogue ends in the same record the structured check produces — a prose answer
 // about a content is not a quality check, however good it reads.
 //
-// The assistant fills the schema with `submit_result`; the schema's `description` texts travel verbatim into
-// that tool's parameters and are read by the model as instructions, which is why they are written as such.
+// The shapes those answers are asked in stand in `util/ai-schemas.ts`, the texts of the tasks that carry them
+// in `util/ai-prompts.ts`; what is here is the way between them and the record — the tasks as they are built,
+// the readers that take an answer apart, and the node properties each part is written to.
 
 import type { MdsDefinition, MdsValue, MdsWidget } from 'ngx-edu-sharing-api';
 
@@ -12,18 +13,13 @@ import { APP_CONFIG } from '../config';
 import type { CriteriaProperties } from '../features/quality/quality-criteria/quality-criteria.component';
 import { EXTENDED_TYPE_FIELD, LRT_FIELD } from './agent-payload';
 import { AI_PROMPTS } from './ai-prompts';
+import { OUTCOMES, VOCABULARY_FIELD_NAMES } from './ai-schemas';
+import type { VocabularyField } from './ai-schemas';
 import type { MdsValues } from './mds-values';
 import {
   CRITERION_MET, CRITERION_VIOLATED, EDITORIAL_CRITERIA_PROPERTY, KNOCKOUT_CRITERIA_WIDGET, autoMetValue,
   valueFor, widgetOf
 } from './quality-criteria-values';
-
-/**
- * How much of a schema the backend accepts (`result-schema`, 10 000 characters); beyond it the request is
- * refused outright rather than half applied. Ours is far below it — this is what says so, and what makes an
- * unexpectedly long list of criteria a reported problem instead of a chat that silently answers nothing.
- */
-const SCHEMA_MAX = 10_000;
 
 /** Log prefix of what the request says about itself, as everywhere else in the check. */
 const LOG = '[edu-sharing][quality]';
@@ -91,17 +87,6 @@ export interface QualityCriterion {
   kind: 'knockout' | 'editorial';
 }
 
-/**
- * The three answers a criterion can get, as the schema states them. Two of them are a judgement; the third is
- * the absence of one, and it is offered on purpose — a check that may only say yes or no answers no wherever
- * the content is silent, which reads as a finding about the content instead of one about the check.
- */
-const OUTCOMES = {
-  met: true,
-  violated: false,
-  unclear: null
-} as const satisfies Record<string, boolean | null>;
-
 /** The assistant's answer about one criterion. */
 export interface CriterionVerdict {
   criterion: QualityCriterion;
@@ -146,111 +131,11 @@ export function criteriaOf(mds: MdsDefinition | null | undefined): readonly Qual
 }
 
 /**
- * The shape the assistant has to answer in: one entry per criterion, each a verdict with its reasoning. An
- * object with every key required rather than a list, because a list invites an answer about the criteria that
- * were easy to judge — and a check that quietly skipped half of them reads exactly like a complete one.
- *
- * The verdict is one of three words rather than a yes-or-no, so that a criterion the content does not settle
- * has an answer of its own — see {@link OUTCOMES}. Every criterion is still answered; what changes is that
- * "I cannot tell" is one of the answers instead of being pressed into "not met".
- */
-export function resultSchemaOf(criteria: readonly QualityCriterion[]): Record<string, unknown> {
-  const properties: Record<string, unknown> = {};
-  for (const item of criteria) {
-    properties[item.key] = {
-      type: 'object',
-      description: item.caption,
-      properties: {
-        outcome: {
-          type: 'string',
-          enum: Object.keys(OUTCOMES),
-          description: 'Das Urteil zu diesem Kriterium.'
-        },
-        reason: {
-          type: 'string',
-          description:
-            'Ein bis zwei Sätze, worauf sich das Urteil stützt. Nenne die Stelle im Inhalt, und wo die ' +
-            'Anleitung der Sammlung etwas zu diesem Kriterium sagt, beziehe dich darauf.'
-        }
-      },
-      required: ['outcome', 'reason']
-    };
-  }
-  return {
-    type: 'object',
-    description: 'Das Ergebnis der Qualitätsprüfung: zu jedem Kriterium ein Urteil mit Begründung.',
-    properties: {
-      criteria: {
-        type: 'object',
-        description:
-          'Zu jedem Kriterium genau ein Urteil. Kein Kriterium darf fehlen. Das Urteil ist eines von drei ' +
-          'Worten: „met“, wenn der Inhalt das Kriterium erfüllt, „violated“, wenn er es verletzt, ' +
-          'und „unclear“, wenn der Inhalt nichts hergibt, woran sich das entscheiden ließe — dann tragen ' +
-          'wir zu diesem Kriterium nichts ein. Rate nicht: „unclear“ ist die richtige Antwort, wo du ' +
-          'weder das eine noch das andere belegen kannst.',
-        properties,
-        required: criteria.map((item) => item.key)
-      },
-      suitable: {
-        type: 'boolean',
-        description:
-          'Dein Gesamturteil: true, wenn der Inhalt für den Einsatz in Bildung geeignet ist. Über alle ' +
-          'Kriterien hinweg und einschließlich dessen, was die Anleitungen der Sammlung sonst noch prüfen ' +
-          'und wofür es hier kein eigenes Kriterium gibt.'
-      },
-      summary: {
-        type: 'string',
-        description:
-          'Zwei bis drei Sätze: Was steht der Freigabe im Weg, und was wäre als Nächstes zu tun? Nenne ' +
-          'hier auch, was eine Anleitung geprüft hat, wofür es kein eigenes Kriterium gibt.'
-      },
-      confirmed: {
-        type: 'boolean',
-        description:
-          'Nur true, wenn die Person deine Bewertung im Chat durchgegangen ist und ihr zugestimmt hat. ' +
-          'Solange sie nicht geantwortet hat: false — dann gilt der Schritt als offen und es geht nicht weiter.'
-      }
-    },
-    required: ['criteria', 'suitable', 'confirmed']
-  };
-}
-
-/**
  * Whose content is being checked, as the opening question answers it. It decides one thing: whether a pass
  * over spelling and wording is worth doing. On one's own content its findings are something the person can go
  * and fix; on someone else's they are a list of complaints about a text nobody here can touch.
  */
 export type ContentOrigin = 'own' | 'external';
-
-/**
- * The shape the opening question is answered in: one word, and expressly not one the assistant works out for
- * itself. Whether a content is the person's own is not a property of its text, and a check that guessed it
- * would send half of them through a step that is not theirs.
- */
-export function originSchemaOf(): Record<string, unknown> {
-  return {
-    type: 'object',
-    description: 'Wem der Inhalt gehört — so, wie die Person es beantwortet hat.',
-    properties: {
-      origin: {
-        type: 'string',
-        enum: ['own', 'external'],
-        description:
-          '„own“, wenn die Person den Inhalt selbst erstellt hat oder für ihn verantwortlich ist. ' +
-          '„external“, wenn er von jemand anderem stammt und sie ihn nur einordnet. Trag nur ein, was sie ' +
-          'geantwortet hat — rate nicht und leite es nicht aus dem Inhalt ab.'
-      },
-      guess: {
-        type: 'string',
-        enum: ['own', 'external'],
-        description:
-          'Wovon du selbst ausgegangen bist, bevor die Person geantwortet hat. Ihre Antwort steht in ' +
-          'origin und gilt — auch dann, wenn sie deiner Vermutung widerspricht.'
-      }
-    },
-    required: ['origin']
-  };
-}
 
 /**
  * The check's opening: greet the person, say what is about to happen, and ask the one question the rest of the
@@ -327,65 +212,6 @@ export interface ProofreadResult {
 export type ProofreadDecision = 'accepted' | 'skipped';
 
 /**
- * The shape the language pass is answered in: the passages to change, each quoted and each with what it is to
- * say instead. A quoted passage is what makes a finding actionable — the person has to find the place in their
- * own text, and "einige Kommafehler" is not a place.
- *
- * The list may come back empty, and the schema says so twice over: a text with nothing to correct is the good
- * outcome, and it must not read as a step that failed to answer.
- */
-export function proofreadSchemaOf(): Record<string, unknown> {
-  return {
-    type: 'object',
-    description: 'Das Ergebnis der sprachlichen Durchsicht: jede Stelle, die zu korrigieren ist.',
-    properties: {
-      findings: {
-        type: 'array',
-        description:
-          'Eine Stelle je Eintrag, in der Reihenfolge, in der sie im Text vorkommen. Leere Liste, wenn ' +
-          'sprachlich nichts zu beanstanden ist — das ist ein Ergebnis, kein fehlendes.',
-        items: {
-          type: 'object',
-          properties: {
-            passage: {
-              type: 'string',
-              description: 'Der Wortlaut der Stelle, wörtlich wie im Inhalt, damit sie wiederzufinden ist.'
-            },
-            correction: { type: 'string', description: 'Wie die Stelle stattdessen lauten soll.' },
-            kind: {
-              type: 'string',
-              // Closed on purpose: these three are the whole of what this step looks at, and a finding
-              // that fits none of them is one about the subject matter — which the criteria judge, not
-              // this pass (see {@link proofreadInstructionOf}).
-              enum: ['spelling', 'grammar', 'punctuation'],
-              description:
-                'Was daran zu ändern ist: „spelling“ für die Rechtschreibung, „grammar“ für die ' +
-                'Grammatik, „punctuation“ für die Zeichensetzung.'
-            }
-          },
-          required: ['passage', 'correction', 'kind']
-        }
-      },
-      summary: {
-        type: 'string',
-        description: 'Ein bis zwei Sätze zum Text als Ganzem: Wie steht es um Sprache und Rechtschreibung?'
-      },
-      decision: {
-        type: 'string',
-        enum: ['open', 'accepted', 'skipped'],
-        description:
-          'Was die Person entschieden hat: „accepted“, wenn sie die Korrekturen annimmt und selbst in ' +
-          'ihren Text einträgt, „skipped“, wenn der Text vorerst so bleiben soll. Solange sie nicht ' +
-          'geantwortet hat: „open“ — dann gilt der Schritt als offen und es geht nicht weiter. Du selbst ' +
-          'änderst den Text nicht und gibst die Korrekturen auch nirgends weiter; beide Antworten sind ' +
-          'nur ihre Entscheidung, was sie damit vorhat.'
-      }
-    },
-    required: ['findings', 'decision']
-  };
-}
-
-/**
  * The step that runs on one's own content and only there: read the text for spelling, grammar and punctuation,
  * and name the places to change.
  *
@@ -459,42 +285,6 @@ export function proofreadOf(result: unknown): ProofreadResult | null {
 }
 
 /**
- * The vocabulary-valued fields of the enrichment: each is named after the vocabulary it is looked up in — the
- * name `lookup_wlo_vocabulary` is asked with — and carries the German the task and the schema describe it in.
- * Naming the vocabulary in both is what a value has to be looked up for: one formed from memory does not fail
- * loudly, a guessed URI simply matches nothing.
- *
- * Every one of them is a **list**, because every property they are recorded in holds one: a content can be
- * about two subjects, fit two education levels, be an Arbeitsblatt and a Video at once, and be meant for
- * teachers and learners together. `many` is what says so in the field's own terms — asked for one value, a
- * model answers one and the rest is lost before it is ever written.
- */
-const VOCABULARY_FIELDS = {
-  discipline: {
-    what: 'Die Schulfächer, um die es im Inhalt geht',
-    many: 'Oft eines, mehrere wo der Inhalt fächerübergreifend ist.'
-  },
-  educationalContext: {
-    what: 'Die Bildungsstufen, für die der Inhalt gedacht ist',
-    many: 'Mehrere, wo er über eine Stufe hinaus passt.'
-  },
-  lrt: {
-    what: 'Die Materialtypen, die der Inhalt hat',
-    many: 'Mehrere, wo er mehreres davon ist — etwa Arbeitsblatt und Video.'
-  },
-  intendedEndUserRole: {
-    what: 'Die Zielgruppen, für die der Inhalt gedacht ist',
-    many: 'Meist mehrere — etwa Lehrende und Lernende zugleich.'
-  }
-} as const;
-
-/** A field the enrichment answers vocabulary values under; the field name is the vocabulary's own. */
-type VocabularyField = keyof typeof VOCABULARY_FIELDS;
-
-/** The vocabulary-valued fields, for the passes that treat all of them alike. */
-const VOCABULARY_FIELD_NAMES = Object.keys(VOCABULARY_FIELDS) as readonly VocabularyField[];
-
-/**
  * What the enrichment answered; every list empty where the content did not give it. The fields carry the names
  * of the vocabularies and of the node properties they end up in, not the German of the task.
  */
@@ -526,54 +316,6 @@ export interface CheckOutcome {
   summary: string;
   suitable: boolean | null;
   metadata: EnrichedMetadata | null;
-}
-
-/**
- * The shape the enrichment is answered in: a list per vocabulary, and the keywords. Every field required, none
- * of them allowed to be invented — a field the content does not give is answered as an empty list, which is a
- * statement, while a missing field would be indistinguishable from one the assistant forgot.
- */
-export function enrichmentSchemaOf(): Record<string, unknown> {
-  // One entry of a vocabulary list: what it is called, and the URI that is the value itself.
-  const entry = (vocabulary: string) => ({
-    type: 'object',
-    description: `Ein Eintrag aus dem Vokabular „${vocabulary}“.`,
-    properties: {
-      label: { type: 'string', description: 'Die Bezeichnung, wie sie im Vokabular steht.' },
-      uri: { type: 'string', description: 'Die vollständige URI des Eintrags, wie lookup_wlo_vocabulary sie zurückgibt. Niemals selbst gebildet.' }
-    },
-    required: ['label', 'uri']
-  });
-  return {
-    type: 'object',
-    description: 'Die angereicherten Metadaten des Inhalts, jeder Wert aus dem vorgegebenen Vokabular.',
-    properties: {
-      ...Object.fromEntries(
-        Object.entries(VOCABULARY_FIELDS).map(([field, { what, many }]) => [
-          field,
-          {
-            type: 'array',
-            description:
-              `${what}, aus dem Vokabular „${field}“. ${many} ` +
-              'Leere Liste, wenn der Inhalt nichts davon hergibt.',
-            items: entry(field)
-          }
-        ])
-      ),
-      keywords: {
-        type: 'array',
-        description: 'Schlagworte, mit denen der Inhalt gefunden werden soll. Fünf bis zehn, aus dem Inhalt selbst.',
-        items: { type: 'string' }
-      },
-      confirmed: {
-        type: 'boolean',
-        description:
-          'Nur true, wenn die Person die Werte im Chat durchgegangen ist und ihnen zugestimmt hat. Solange ' +
-          'sie nicht geantwortet hat: false — dann gilt der Schritt als offen und der Vorschlag steht noch aus.'
-      }
-    },
-    required: [...VOCABULARY_FIELD_NAMES, 'keywords', 'confirmed']
-  };
 }
 
 /**
@@ -719,11 +461,6 @@ export function enrichmentPropertiesOf(
   }
   if (kept.size) properties[KEYWORD_PROPERTY] = [...kept.values()];
   return properties;
-}
-
-/** Whether a schema fits what the backend accepts — see {@link SCHEMA_MAX}. */
-export function schemaFits(schema: Record<string, unknown>): boolean {
-  return JSON.stringify(schema).length <= SCHEMA_MAX;
 }
 
 /** The content a check is about, as the task has to describe it. */
