@@ -319,7 +319,7 @@ Two per step, prescribed rather than hoped for, so the way on is always there to
 
 | step | chips | while changes are being worked on |
 |---|---|---|
-| `origin` | *Inhalt selbst erstellt* / *Fremder Inhalt* | unchanged — both chips are an answer |
+| `origin` | *Inhalt selbst erstellt* / *Inhalt nicht selbst erstellt* | unchanged — both chips are an answer |
 | `proofread` | *Ich bestätige die Korrekturen* / *Korrekturen überspringen* | unchanged — both are a way on |
 | `quality` | *Qualität bestätigen* / *Anpassungen vornehmen* | *Qualität bestätigen* + up to 2 from the widget (cap 3) |
 | `enrichment` | *Metadaten bestätigen* / *Anpassungen vornehmen* | *Metadaten bestätigen* + up to 2 from the widget (cap 3) |

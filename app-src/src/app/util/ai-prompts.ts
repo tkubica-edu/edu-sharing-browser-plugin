@@ -43,7 +43,7 @@ function askedVocabularies(names: readonly string[]): string {
  * label and the sentence that points at it are one text, and a change to either is a change to both.
  */
 export const AI_REPLIES = {
-  origin: ['Inhalt selbst erstellt', 'Fremder Inhalt'],
+  origin: ['Inhalt selbst erstellt', 'Inhalt nicht selbst erstellt'],
   proofread: ['Ich bestätige die Korrekturen', 'Korrekturen überspringen'],
   quality: ['Qualität bestätigen', 'Anpassungen vornehmen'],
   enrichment: ['Metadaten bestätigen', 'Anpassungen vornehmen']
@@ -68,8 +68,9 @@ export const AI_PROMPTS = {
         'es ein fremder ist, den sie nur einordnet. Ihre Antwort gilt, auch wenn sie deiner Vermutung ' +
         'widerspricht.',
       'Unter deiner Nachricht werden ihr die beiden Antworten als Buttons angeboten: „Inhalt selbst erstellt“ ' +
-        'und „Fremder Inhalt“. Du musst sie nicht ausschreiben und keine Antwortvorschläge auflisten — deine ' +
-        'Nachricht endet mit der Frage, danach kommt kein Satz mehr. Sie darf auch mit eigenen Worten antworten.',
+        'und „Inhalt nicht selbst erstellt“. Du musst sie nicht ausschreiben und keine Antwortvorschläge ' +
+        'auflisten — deine Nachricht endet mit der Frage, danach kommt kein Satz mehr. Sie darf auch mit ' +
+        'eigenen Worten antworten.',
       'Beurteile in diesem Zug nichts und lies den Inhalt nicht. Es geht allein um diese Frage.',
       'Warte ihre Antwort ab. Rufe submit_result ERST auf, wenn sie geantwortet hat — mit origin="own" ' +
         'oder origin="external" und deiner Vermutung in guess. Setz origin nicht auf deine Vermutung.',
