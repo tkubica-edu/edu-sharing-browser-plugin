@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 
 import { APP_CONFIG } from '../config';
 import { BrowserExtensionService } from './browser-extension.service';
@@ -45,9 +45,20 @@ export class ChatSkillService {
     this.settingState.set(isSetting(stored) ? stored : DEFAULT_SETTING);
   }
 
+  /**
+   * Whether the setting stands away from what the panel ships with — see
+   * ChatStyleService.changedSettings, which the settings count alongside it.
+   */
+  readonly changedSettings = computed(() => (this.settingState() === DEFAULT_SETTING ? 0 : 1));
+
   async setMasterSkill(setting: MasterSkillSetting): Promise<void> {
     this.settingState.set(setting);
     await this.browserExtension.storageSet(APP_CONFIG.storageKeys.chatMasterSkill, setting);
+  }
+
+  /** Put the setting back to what it is without anybody setting it — the operator's configuration. */
+  async resetToDefault(): Promise<void> {
+    await this.setMasterSkill(DEFAULT_SETTING);
   }
 
   /**

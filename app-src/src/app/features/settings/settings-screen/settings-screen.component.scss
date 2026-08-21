@@ -1,3 +1,5 @@
+@use 'mixins' as m;
+
 :host { display: block; padding: var(--es-space-4); }
 
 // Component-specific: descriptive helper text under the field.
@@ -79,7 +81,18 @@
   text-align: left;
   cursor: pointer;
 
-  h2 { margin: 0; }
+  // Takes the width the pill and the chevron leave, so both sit at the end of the row.
+  h2 { margin: 0; flex: 1 1 auto; }
+}
+
+// How many of the section's settings stand away from their default, in the folded head: shown only where
+// there are any, so a card without it is one holding nothing but defaults.
+.section-count {
+  flex: 0 0 auto;
+  @include m.badge;
+  background: var(--es-blue-tint);
+  color: var(--es-blue);
+  white-space: nowrap;
 }
 
 // Points down while the card is folded and turns over when it opens — where the content went.

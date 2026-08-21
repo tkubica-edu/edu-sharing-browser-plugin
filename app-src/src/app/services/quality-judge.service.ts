@@ -104,6 +104,18 @@ export class QualityJudgeService {
   );
 
   /**
+   * How many of the two judges stand away from what the panel ships with — see
+   * ChatStyleService.changedSettings for what the settings do with it. ContentJudge is counted as the
+   * settings show it, which is with the credential taken into account: a switch that is on without one
+   * judges nothing, and the checkbox is unticked and disabled while it is missing.
+   */
+  readonly changedSettings = computed(
+    () =>
+      (this.metalookupEnabledState() === DEFAULT_METALOOKUP_ENABLED ? 0 : 1) +
+      (this.contentJudgeEnabled() === DEFAULT_CONTENT_JUDGE_ENABLED ? 0 : 1),
+  );
+
+  /**
    * Load the persisted switches and the credential they depend on. Before anything is judged, so a content
    * is judged the way the settings say — a judgement takes a minute of a service's work, which is not
    * something to spend against them.

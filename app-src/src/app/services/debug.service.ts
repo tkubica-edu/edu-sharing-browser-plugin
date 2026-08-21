@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 
 import { APP_CONFIG } from '../config';
 import {
@@ -75,6 +75,16 @@ export class DebugService {
 
   /** Node id the simulated document reports (editable in the settings). */
   readonly documentNodeId = this.documentNodeIdState.asReadonly();
+
+  /**
+   * How much of this mode stands away from what the panel ships with — see
+   * ChatStyleService.changedSettings for what the settings do with it. The node id only counts while the
+   * mode is on: with it off nothing reports that node, and the settings do not even show the field.
+   */
+  readonly changedSettings = computed(() => {
+    if (!this.enabledState()) return 0;
+    return 1 + (this.documentNodeIdState() === DEFAULT_DOCUMENT_NODE_ID ? 0 : 1);
+  });
 
   /**
    * Load the persisted debug settings. Must run **before** anything reads

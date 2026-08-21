@@ -28,6 +28,11 @@
   <button type="button" class="section-head" (click)="toggleSection('developer')"
           [attr.aria-expanded]="openSection() === 'developer'">
     <h2>Entwickler-Optionen</h2>
+    <!-- What was changed in this section, so a folded one says whether it holds anything but the
+         defaults; absent where it holds only those. -->
+    @if (changedPerSection().developer; as changed) {
+      <span class="section-count">{{ changed }} geändert</span>
+    }
     <i class="section-chevron" [class.is-open]="openSection() === 'developer'" esIcon="expand_more"></i>
   </button>
 
@@ -144,6 +149,11 @@
     <button type="button" class="section-head" (click)="toggleSection('ai')"
             [attr.aria-expanded]="openSection() === 'ai'">
       <h2>KI- und Chatbot-Optionen</h2>
+      <!-- What was changed in this section, so a folded one says whether it holds anything but the
+           defaults; absent where it holds only those. -->
+      @if (changedPerSection().ai; as changed) {
+        <span class="section-count">{{ changed }} geändert</span>
+      }
       <i class="section-chevron" [class.is-open]="openSection() === 'ai'" esIcon="expand_more"></i>
     </button>
 
@@ -203,12 +213,14 @@
           Durchlaufs. Standard {{ requestDefault }}, erlaubt sind {{ requestMin }} bis {{ requestLimit }}. Gilt ab
           der nächsten Prüfung.
         </p>
+      </div>
 
-        <div class="es-row">
-          <button class="es-btn es-btn--text" (click)="resetAssistantRequestMax()">
-            Auf Standard zurücksetzen
-          </button>
-        </div>
+      <!-- Setzt zurück, was die Karte hält — nicht nur die Länge darüber, unter der der Knopf früher stand.
+           Am Ende der Karte, weil er für sie gilt. -->
+      <div class="es-row">
+        <button class="es-btn es-btn--text" (click)="resetAiOptions()">
+          Auf Standard zurücksetzen
+        </button>
       </div>
     }
   </section>
@@ -225,6 +237,11 @@
     <button type="button" class="section-head" (click)="toggleSection('recommendation')"
             [attr.aria-expanded]="openSection() === 'recommendation'">
       <h2>Zugehörige Sammlungen empfehlen</h2>
+      <!-- What was changed in this section, so a folded one says whether it holds anything but the
+           defaults; absent where it holds only those. -->
+      @if (changedPerSection().recommendation; as changed) {
+        <span class="section-count">{{ changed }} geändert</span>
+      }
       <i class="section-chevron" [class.is-open]="openSection() === 'recommendation'"
          esIcon="expand_more"></i>
     </button>
@@ -267,6 +284,11 @@
     <button type="button" class="section-head" (click)="toggleSection('quality')"
             [attr.aria-expanded]="openSection() === 'quality'">
       <h2>Qualitätsprüfung</h2>
+      <!-- What was changed in this section, so a folded one says whether it holds anything but the
+           defaults; absent where it holds only those. -->
+      @if (changedPerSection().quality; as changed) {
+        <span class="section-count">{{ changed }} geändert</span>
+      }
       <i class="section-chevron" [class.is-open]="openSection() === 'quality'"
          esIcon="expand_more"></i>
     </button>

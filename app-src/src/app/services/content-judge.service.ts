@@ -257,6 +257,15 @@ export class ContentJudgeService {
    */
   readonly credentialSet = computed(() => !!basicCredential(this.basicAuth()));
 
+  /**
+   * Whether the credential stands away from the checked-in one — see ChatStyleService.changedSettings for
+   * what the settings do with it. A credential is the one setting here that is typed rather than switched,
+   * so what counts is that it was typed at all, not what it says.
+   */
+  readonly changedSettings = computed(() =>
+    this.basicAuth() === APP_CONFIG.contentJudgeBasicAuth ? 0 : 1,
+  );
+
   /** True while a judgement is in flight. */
   readonly running = signal(false);
   /** The last answer; null until one arrived. */

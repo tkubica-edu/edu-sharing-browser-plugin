@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { Node } from 'ngx-edu-sharing-api';
 
 import { APP_CONFIG, toTopicAssistantUrl } from '../config';
@@ -122,6 +122,16 @@ export class CollectionRecommendationService {
 
   /** What a keyword has to score to be asked with — see {@link DEFAULT_MIN_SCORE}. Persisted. */
   readonly minScore = this.minScoreState.asReadonly();
+
+  /**
+   * How many of the two numbers stand away from what the panel ships with — see
+   * ChatStyleService.changedSettings for what the settings do with it.
+   */
+  readonly changedSettings = computed(
+    () =>
+      (this.maxKeywordsState() === DEFAULT_MAX_KEYWORDS ? 0 : 1) +
+      (this.minScoreState() === DEFAULT_MIN_SCORE ? 0 : 1),
+  );
 
   /**
    * Load the persisted settings. Before the first proposal, so it is made the way the settings say and

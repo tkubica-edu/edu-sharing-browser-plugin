@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 
 import { APP_CONFIG } from '../config';
 import { DEFAULT_TASK_MAX, boundedTaskMax } from '../util/quality-check-request';
@@ -24,6 +24,14 @@ export class AssistantRequestService {
 
   /** How long a request may be — see {@link boundedTaskMax}. Persisted, so it survives a reload. */
   readonly maxCharacters = this.maxCharactersState.asReadonly();
+
+  /**
+   * Whether the length stands away from what the panel ships with — see
+   * ChatStyleService.changedSettings, which the settings count alongside it.
+   */
+  readonly changedSettings = computed(() =>
+    this.maxCharactersState() === DEFAULT_TASK_MAX ? 0 : 1,
+  );
 
   /**
    * Load the persisted setting. Before anything reports against it: a resumed session may start an

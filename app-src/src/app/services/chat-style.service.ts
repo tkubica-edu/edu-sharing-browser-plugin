@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 
 import { APP_CONFIG } from '../config';
 import { BrowserExtensionService } from './browser-extension.service';
@@ -34,8 +34,20 @@ export class ChatStyleService {
     );
   }
 
+  /**
+   * Whether the switch stands away from what the panel ships with — counted where the settings say per
+   * section how much was changed in it, which is why it is answered here rather than there: the default
+   * is this service's own.
+   */
+  readonly changedSettings = computed(() => (this.overridesState() === DEFAULT_ENABLED ? 0 : 1));
+
   async setOverridesEnabled(enabled: boolean): Promise<void> {
     this.overridesState.set(enabled);
     await this.browserExtension.storageSet(APP_CONFIG.storageKeys.chatStyleOverrides, enabled);
+  }
+
+  /** Put the switch back to what it is without anybody setting it — the checked-in configuration. */
+  async resetToDefault(): Promise<void> {
+    await this.setOverridesEnabled(DEFAULT_ENABLED);
   }
 }

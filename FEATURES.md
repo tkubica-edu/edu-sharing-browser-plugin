@@ -245,7 +245,11 @@ navigating to it, and closes it again where it stands; the step keeps running be
   *Vorgabe des Betreibers* / *An* / *Aus* — see
   [chatbot.md](chatbot.md#the-attributes-set-on-mount) — and the *Länge einer KI-Anfrage*),
   *Zugehörige Sammlungen empfehlen* and *Qualitätsprüfung*. Everything but the Entwickler-Optionen
-  belongs to the WLO panel and is shown only there (`browserExtensionCustomWebComponent`).
+  belongs to the WLO panel and is shown only there (`browserExtensionCustomWebComponent`). Each group's
+  head carries a pill counting the settings inside it that stand away from their default (`… geändert`),
+  so a folded group says whether anything in it was touched; a group holding nothing but defaults carries
+  none. Every default is compared where it is defined — each service answers for its own settings
+  (`changedSettings`), the screen only sums them per group.
 - **WLO Metadaten-Agent** — only when the repository config enables it, see
   [WEB-COMPONENTS.md](WEB-COMPONENTS.md#the-optional-wlo-metadata-editor).
 - **Boerdi — KI-Assistent** — the assistant's chat widget, offered as a row above the session bar

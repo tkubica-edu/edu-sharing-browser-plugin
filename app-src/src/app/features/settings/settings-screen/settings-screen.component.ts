@@ -87,6 +87,23 @@ export class SettingsScreenComponent implements OnDestroy {
    */
   protected readonly openSection = signal<SettingsSection | null>(null);
 
+  /**
+   * How many settings of each section stand away from what the panel ships with, so a folded section says
+   * whether anything in it was touched. Summed from the services rather than compared here: which value a
+   * setting has without anybody setting it is the knowledge of whoever holds the setting (see
+   * ChatStyleService.changedSettings). Stated per section of this screen, since the sections are how they
+   * are grouped for the reader and not how the services are split.
+   */
+  protected readonly changedPerSection = computed<Record<SettingsSection, number>>(() => ({
+    developer: this.devMode.changedSettings() + this.debug.changedSettings(),
+    ai:
+      this.chatStyle.changedSettings() +
+      this.chatSkill.changedSettings() +
+      this.assistantRequest.changedSettings(),
+    recommendation: this.recommendations.changedSettings(),
+    quality: this.qualityJudge.changedSettings() + this.contentJudge.changedSettings()
+  }));
+
   protected toggleSection(section: SettingsSection): void {
     this.openSection.update((open) => (open === section ? null : section));
   }
@@ -186,7 +203,14 @@ export class SettingsScreenComponent implements OnDestroy {
     }
   }
 
-  protected resetAssistantRequestMax(): void {
+  /**
+   * Put every setting of the KI section back to its default. The button offering it stands at the end of
+   * the card and is read as the card's, so it resets what the card holds rather than the one group it is
+   * written under — which is also what makes the section's pill go to zero when it is used.
+   */
+  protected resetAiOptions(): void {
+    void this.chatStyle.resetToDefault();
+    void this.chatSkill.resetToDefault();
     void this.assistantRequest.resetToDefault();
   }
 

@@ -100,6 +100,23 @@ export class DevModeService {
   readonly fakedNodeId = computed(() => (this.writesSkipped() ? this.nodeIdState().trim() : ''));
 
   /**
+   * How much of this mode stands away from what the panel ships with — see
+   * ChatStyleService.changedSettings for what the settings do with it. What the mode holds is only
+   * counted while the mode is on, which is also the only state those settings say anything in (see
+   * {@link fakedCollectionId}, {@link writesSkipped}) and the only one the settings show them in.
+   */
+  readonly changedSettings = computed(() => {
+    if (!this.enabledState()) return 0;
+    return (
+      1 +
+      (this.generateState() === DEFAULT_FIXTURE ? 0 : 1) +
+      (this.fakedCollectionId() ? 1 : 0) +
+      (this.writesSkipped() ? 1 : 0) +
+      (this.fakedNodeId() ? 1 : 0)
+    );
+  });
+
+  /**
    * Load the persisted switch. Must run before anything asks one of the faked services, so a boot
    * that starts an Erschließung of its own does not send out the request the mode is there to spare.
    */
