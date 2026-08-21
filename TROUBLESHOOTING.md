@@ -16,16 +16,6 @@ What is known not to work, known to be unverified, or known to look wrong at fir
   the repository session cookie in the injected-panel context. Guest Erschließung (via the background
   worker) is unaffected; logged-in auth needs verification on Safari and may require a background
   auth fallback.
-- **Safari: „Der Hintergrunddienst der Extension hat nicht geantwortet." on the first Erschließung.**
-  Safari stops the background service worker between messages and starts it again for the next one —
-  but the answer to *that* message is dropped rather than held, so the panel's first send after an idle
-  spell comes back empty. It reads as a worker that ignored the action, which is what the message says.
-  The pattern is unmistakable: *Erschließung starten* fails, *Erschließung wiederholen* right after it
-  works (the worker is now up), and after a page change the first run fails again. Handled in
-  `BrowserExtensionService.ask`: a send that comes back with nothing is asked once more where the action
-  writes nothing (`REPEATABLE_ACTIONS` — the two `analyze.*` runs, the tab reads), and everything else —
-  `metadata.saveNode` above all, which would write a second node — is preceded by a `runtime.ping` whose
-  lost answer costs nothing (`wake`).
 - **Firefox: „Could not establish connection. Receiving end does not exist."** The panel's message
   to the background worker occasionally finds no receiver, most often on a page the panel was
   restored onto after a navigation. It is not the event page having been suspended — it happens with

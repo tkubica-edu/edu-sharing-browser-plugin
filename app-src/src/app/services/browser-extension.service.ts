@@ -22,28 +22,6 @@ const NOT_DELIVERED = /receiving end does not exist|could not establish connecti
 const SEND_ATTEMPTS = 4;
 const SEND_RETRY_MS = 150;
 
-/**
- * How often a send that came back with nothing at all is repeated — see {@link REPEATABLE_ACTIONS}.
- * Once: what it works around is a worker that had stopped and has been started by this very message, and
- * a worker that is running answers. Kept apart from {@link SEND_ATTEMPTS} because the action may already
- * have run behind the lost answer, so every repeat can cost its whole work again.
- */
-const ANSWER_ATTEMPTS = 2;
-
-/**
- * The actions whose lost answer may be asked for again: none of them writes anything, so a repeat costs
- * at worst the work of the first send. Everything else is sent once — a second `metadata.saveNode` would
- * write a second node — and is preceded by a ping instead (see `ask`).
- */
-const REPEATABLE_ACTIONS = new Set([
-  'runtime.ping',
-  'tabs.self',
-  'tabs.getActive',
-  'tabs.extractPageData',
-  'analyze.run',
-  'analyze.url'
-]);
-
 /** The error a caller gets when every attempt went undelivered — see {@link NOT_DELIVERED}. */
 export const WORKER_UNREACHABLE = 'WORKER_UNREACHABLE';
 
@@ -189,14 +167,13 @@ export class BrowserExtensionService {
    * page itself, so no tab is involved at all.
    */
   async analyzeUrl(url: string, language: string, title?: string | null, apiUrl?: string): Promise<AnalyzeResponse> {
-    const response = await this.ask<AnalyzeResponse>({
+    const response = (await browser.runtime.sendMessage({
       action: 'analyze.url',
       url,
       title,
       language,
       apiUrl,
-    });
-    if (response === UNREACHABLE) return { success: false, error: WORKER_UNREACHABLE };
+    })) as AnalyzeResponse | null;
     return response ?? { success: false, error: 'NO_RESPONSE' };
   }
 
@@ -215,52 +192,23 @@ export class BrowserExtensionService {
    * is repeated ({@link NOT_DELIVERED}), since that is the panel's connection settling rather than a
    * refusal, and answered with {@link UNREACHABLE} once the attempts are used up. Every other
    * rejection is the worker's own and is passed on to the caller.
-   *
-   * A send that comes back with *nothing* is the other failure this handles: the worker stops between
-   * messages, and where the browser starts it up again for a message it drops the answer to that one
-   * message instead of holding it (Safari does this to every first send after the worker went idle). It
-   * reads as if the worker had ignored the action, so it is asked again where the action allows it and the
-   * worker is started with a ping first where it does not — see {@link REPEATABLE_ACTIONS}, {@link wake}.
    */
   private async ask<T>(message: Record<string, unknown>): Promise<T | null | typeof UNREACHABLE> {
     if (!this.available) return UNREACHABLE;
-    const action = String(message['action'] ?? '');
-    const repeatable = REPEATABLE_ACTIONS.has(action);
-    if (!repeatable) await this.wake();
     for (let attempt = 1; ; attempt++) {
-      let answer: T | null;
       try {
-        answer = ((await browser.runtime.sendMessage(message)) ?? null) as T | null;
+        return ((await browser.runtime.sendMessage(message)) ?? null) as T | null;
       } catch (cause: unknown) {
         const reason = errorMessage(cause);
         if (!NOT_DELIVERED.test(reason)) throw cause;
         if (attempt >= SEND_ATTEMPTS) {
-          console.warn(`${LOG} «${action}» not delivered in ${attempt} attempts:`, reason);
+          console.warn(`${LOG} «${message['action']}» not delivered in ${attempt} attempts:`, reason);
           return UNREACHABLE;
         }
-        console.warn(`${LOG} «${action}» not delivered (attempt ${attempt}), retrying:`, reason);
-        await this.pause(attempt);
-        continue;
+        console.warn(`${LOG} «${message['action']}» not delivered (attempt ${attempt}), retrying:`, reason);
+        await new Promise((resolve) => setTimeout(resolve, SEND_RETRY_MS * attempt));
       }
-      if (answer !== null || !repeatable || attempt >= ANSWER_ATTEMPTS) return answer;
-      console.warn(`${LOG} «${action}» went unanswered (attempt ${attempt}), asking again`);
-      await this.pause(attempt);
     }
-  }
-
-  /** The wait before the next attempt, growing with the attempts as the connection settles. */
-  private pause(attempt: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, SEND_RETRY_MS * attempt));
-  }
-
-  /**
-   * Get the worker running, ahead of a message that must not be sent twice. The ping is the send whose
-   * answer is dropped where the worker had to be started for it — which is the whole point of sending
-   * it rather than the real message: it carries no action, so losing its answer costs nothing, and it
-   * is repeated until one arrives.
-   */
-  private async wake(): Promise<void> {
-    await this.ask({ action: 'runtime.ping' }).catch(() => null);
   }
 
   /** Same, for a caller to which an unreachable worker and an answer of `null` are the same thing. */

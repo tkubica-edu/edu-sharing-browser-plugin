@@ -542,14 +542,12 @@ async function callSaveNode(body, apiUrl) {
 // MESSAGE ROUTER (from the Angular sidebar app)
 
 const ALLOWED_ACTIONS = new Set([
-  'runtime.ping',
   'panel.state',
   'tabs.self',
   'tabs.getActive',
   'tabs.extractPageData',
   'tabs.navigate',
   'analyze.run',
-  'analyze.url',
   'metadata.saveNode'
 ]);
 
@@ -560,14 +558,6 @@ browser.runtime.onMessage.addListener((message, sender) => {
   return (async () => {
     try {
       switch (message.action) {
-        // Nothing but an answer, for a caller that wants to know there is a worker listening. The
-        // browser stops this worker between messages and starts it again for the next one; a message
-        // that must not be sent twice is preceded by this one, whose answer may be dropped for free
-        // (see BrowserExtensionService.wake).
-        case 'runtime.ping': {
-          return { success: true };
-        }
-
         // panel-host.js reporting what it just did. The tab comes from the SENDER, never from the
         // message: which tab a content script speaks for is not its own to claim.
         case 'panel.state': {
