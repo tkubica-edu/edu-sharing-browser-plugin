@@ -161,12 +161,17 @@ function extractAlternateLanguages() {
     return alternates.length > 0 ? { source: 'link[rel=alternate][hreflang]', items: alternates } : null;
 }
 
+// How much of the page's readable text is taken along. It is the body of the formatted extraction, which
+// travels on as the content's text and reaches the KI assistant as `page_text` — so the budget that field
+// has at the chatbot backend is what bounds it here (see app-src/src/app/util/page-context.ts).
+const MAIN_CONTENT_MAX = 20000;
+
 function extractMainContent() {
     for (const selector of ['main', 'article', '[role="main"]', '.main-content', '#content']) {
         const el = document.querySelector(selector);
-        if (el) return (el.innerText || el.textContent).substring(0, 5000);
+        if (el) return (el.innerText || el.textContent).substring(0, MAIN_CONTENT_MAX);
     }
-    return document.body.innerText.substring(0, 5000);
+    return document.body.innerText.substring(0, MAIN_CONTENT_MAX);
 }
 
 function extractMainHTML() {

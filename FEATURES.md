@@ -243,7 +243,7 @@ navigating to it, and closes it again where it stands; the step keeps running be
   *Entwickler-Optionen* (the dev and the debug mode, see [TESTING.md](TESTING.md)), *KI- und
   Chatbot-Optionen* (the corrections to the chat widget's display, the chatbot's master skill as
   *Vorgabe des Betreibers* / *An* / *Aus* — see
-  [chatbot.md](chatbot.md#the-attributes-set-on-mount) — and the *Länge einer KI-Anfrage*),
+  [chatbot.md](chatbot.md#the-attributes-set-on-mount)),
   *Zugehörige Sammlungen empfehlen* and *Qualitätsprüfung*. Everything but the Entwickler-Optionen
   belongs to the WLO panel and is shown only there (`browserExtensionCustomWebComponent`). Each group's
   head carries a pill counting the settings inside it that stand away from their default (`… geändert`),

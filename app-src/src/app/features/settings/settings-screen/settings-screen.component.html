@@ -195,28 +195,7 @@
         </p>
       </div>
 
-      <!-- Wie viel Text eine Anfrage an die KI mitnimmt; der zitierte Inhalt wird darauf gekürzt. -->
-      <div class="group-item">
-        <h2>Länge einer KI-Anfrage</h2>
-
-        <label class="es-field-label" for="assistant-request-max">Zeichen je Anfrage</label>
-        <input id="assistant-request-max" type="number" class="es-input"
-               [min]="requestMin" [max]="requestLimit" step="1000"
-               [ngModel]="assistantRequest.maxCharacters()"
-               (ngModelChange)="setAssistantRequestMax($event)" />
-
-        <p class="desc">
-          Bei der Qualitätsprüfung wird der Inhalt im Auftrag an die KI wörtlich zitiert und auf diese Länge
-          gekürzt. Ein langer Inhalt, der nicht hineinpasst, wird nur an seinem Anfang beurteilt — die KI
-          antwortet dann bei Kriterien „unklar“, ohne dass der Grund dafür in ihrer Antwort zu sehen wäre. Mehr
-          Zeichen heißen also, dass mehr vom Inhalt beurteilt wird, kosten aber vom Zeit- und Token-Budget des
-          Durchlaufs. Standard {{ requestDefault }}, erlaubt sind {{ requestMin }} bis {{ requestLimit }}. Gilt ab
-          der nächsten Prüfung.
-        </p>
-      </div>
-
-      <!-- Setzt zurück, was die Karte hält — nicht nur die Länge darüber, unter der der Knopf früher stand.
-           Am Ende der Karte, weil er für sie gilt. -->
+      <!-- Resets what this card holds, which is what a button at the end of the card is read as. -->
       <div class="es-row">
         <button class="es-btn es-btn--text" (click)="resetAiOptions()">
           Auf Standard zurücksetzen

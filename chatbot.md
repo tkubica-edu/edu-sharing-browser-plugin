@@ -269,7 +269,7 @@ from a host list rather than sent from here.
 - Title and text travel together in **`page_text`**, joined by a blank line with the title first so
   it survives the cut.
 - Two limits bound what a page can put in front of the model: `TEXT_MAX` of 300 characters for a tab
-  title, `CONTENT_TEXT_MAX` of 8000 for a curated content — that text *is* the subject of the
+  title, `CONTENT_TEXT_MAX` of 20 000 for a curated content — that text *is* the subject of the
   dialogue.
 
 ### Which id is sent decides what gets judged
@@ -412,10 +412,10 @@ the previous one has answered:
    **Two things enforce that, because the task's opening lines alone did not.** Measured on a physics page
    whose figures were wrong throughout: the pass came back as a list of factual corrections (*„Die
    Lichtgeschwindigkeit beträgt ungefähr 300.000 Kilometer pro Sekunde, nicht pro Stunde"*), in a single
-   turn, without the closing question — the quoted text is the longest part of the task and the last thing
-   read before the answer, and a text that argues for itself beats a rule standing thousands of characters
-   above it. So the rules are repeated **behind the quoted text** (`PROOFREAD_REMINDER`), where they are what
-   the run reads last, and `kind` is a **closed enum** — `spelling` / `grammar` / `punctuation` —
+   turn, without the closing question — the content is longer than anything the task says and it is read
+   right before the answer, so a text that argues for itself beats a rule standing thousands of characters
+   above it. So the rules are repeated **at the very end of the task** (`PROOFREAD_REMINDER`), where they are
+   what the run reads last, and `kind` is a **closed enum** — `spelling` / `grammar` / `punctuation` —
    so a factual finding has no category to be filed under.
 
    **The step ends on a decision, and skipping is one of them.** The schema carries `decision` —
@@ -432,8 +432,9 @@ the previous one has answered:
    An empty list is an answer and is taken as one. The step is bound to the ownership question because a
    correction is worth having only where somebody can carry it out: the author of a content can go and
    fix what this finds, while whoever files someone else's can do nothing with a list of its typos but
-   read it. This task **quotes the content's own text in full** — what it judges is the wording itself,
-   down to the character. Measured on a text with three planted errors: all three found and classified
+   read it. What it judges is the wording itself, down to the character, and that wording reaches it as
+   `page_text` in the turn's context — the task names the place rather than quoting it. Measured on a text
+   with three planted errors: all three found and classified
    (Rechtschreibung, Zeichensetzung, Zeichensetzung), the confirmation turn `submit`. Nothing of it is
    recorded on the node — there is no property that holds a correction — so it is logged and left where
    it is of use, in the chat next to the person's own text.
@@ -443,8 +444,8 @@ the previous one has answered:
    instruction that speaks to one of those dimensions (`get_skill`). Naming the dimensions is what lets
    it pick — asked for "the collection's instruction" it fetches one, or none. What a skill checks that
    we hold no criterion for is not dropped and not invented as one either: it goes into the single
-   overall verdict, `suitable`, and is named in the summary. This task **quotes the content's own text
-   in full**.
+   overall verdict, `suitable`, and is named in the summary. The content's own text reaches it as
+   `page_text` in the turn's context, which the task points at.
 4. **Metadaten anreichern** (`enrichmentInstructionOf()`) — subject, education level, resource type
    and intended target groups, each looked up in its WLO vocabulary (`lookup_wlo_vocabulary` with
    `discipline`, `educationalContext`, `lrt`, `intendedEndUserRole`) and answered **with the URI**,
@@ -493,9 +494,9 @@ the panel walks on only where it came back `true`: measured, a task that ends in
 its own — the judgement arrived proposed and submitted in one turn, and the panel moved to the enrichment
 past a person who had said nothing. Unconfirmed answers are kept, recorded where they belong and logged, and
 the step stays open; the schema stands for every turn, so the assistant submits the same answer again once
-the person has replied. The two tasks that quote the content also repeat their closing rules **behind the
-quoted text** (`PROOFREAD_REMINDER`, `QUALITY_REMINDER`) — the text is the last thing read before the answer,
-and rules thousands of characters above it lose to it.
+the person has replied. The two tasks that judge the content also repeat their closing rules **at the very
+end of the task** (`PROOFREAD_REMINDER`, `QUALITY_REMINDER`) — what stands closest to the answer is what the
+run holds to, and rules thousands of characters above the content lose to it.
 
 **The chips are prescribed, not hoped for.** The widget takes a `quick-replies` attribute — a JSON array of
 strings — and carries it into every turn it sends (`forced_quick_replies` in the environment), so the person
@@ -547,8 +548,8 @@ answered with.
 
 They are asked in turn rather than together because both run under the same iteration and token caps:
 asked at once they compete for them, and whichever the model reaches last is the one that suffers.
-Split, each gets a run and a schema of its own, and the second does not repeat the content — it is
-the same conversation, and what the first task quoted is still in it. Measured against the deployed
+Split, each gets a run and a schema of its own, and the second needs nothing said about the content
+again — it is the same conversation, and the context it carries is the same one. Measured against the deployed
 backend, twelve criteria: judgement `submit` with 12 of 12 answered in ~27 s, classification `submit`
 in ~10 s with three vocabulary lookups. The classification is the faster half precisely because the
 first turn established the subject.
@@ -571,22 +572,23 @@ in the switched shape. The prompt carries only the *titles* of a collection's sk
 assistant has to fetch the one it checks against itself, and an unspecific task lets it answer from
 memory instead.
 
-Quoting the text is not redundant with `page_text`, and leaving it out is the second way this check
-fails quietly. The backend renders the page context from whatever it resolved about the node, and the
-block carrying the panel's own `page_text` is read **only where nothing resolved at all** — so the
-better the node resolves, the more surely the text is dropped. What comes back then is a check that
-knows the content's title, licence and thumbnail and answers every single criterion with "der
-vollständige Text war nicht abrufbar". Measured on one content, three criteria, the same task:
+A check the content's own text never reached is the second way this fails quietly. Measured on one
+content, three criteria, the same task:
 
 | | verdicts |
 |---|---|
-| task without the text | all `false` — "der zugängliche Text enthält mehrere unvollständige bzw. abgebrochene Sätze" |
-| task with the text quoted | all `true`, reasoned against the collection's compendium text |
+| the text out of reach | all `false` — "der zugängliche Text enthält mehrere unvollständige bzw. abgebrochene Sätze" |
+| the text in front of the model | all `true`, reasoned against the collection's compendium text |
 
-The request is the one channel that always reaches the model, so the content travels in it, cut to fit
-the 10 000 characters a message may hold. Where the panel holds no text at all — a node it did not
-erschließen itself — the address takes its place, with the instruction to fetch it (`get_url_text`)
-before judging; a check made on a title alone is worthless.
+The text travels as `page_text` in the chat context, title first, capped at `CONTENT_TEXT_MAX` (20 000
+characters, the backend's budget for the field), and the two judging tasks append the one line that says where it is — one copy per turn
+rather than two of a content the size of a page. What that costs is a dependency worth watching: the
+backend renders the page context from whatever it resolved about the node, and the block carrying the
+panel's own `page_text` is read **only where nothing resolved at all**. An answer that judges every
+criterion by the *zugänglicher Text*, or that reaches for `get_url_text` on its own, is one where the
+wording never arrived. Where the panel holds no text at all — a node it did not erschließen itself —
+the task says so and asks for the address to be fetched (`get_url_text`) before judging; a check made
+on a title alone is worthless.
 
 **The shape** (`resultSchemaOf()`) is an object with one entry per criterion, each `{outcome,
 reason}`, every key required, plus `suitable` — one boolean over the whole content — and a
@@ -594,7 +596,7 @@ summary. `outcome` is one of three words rather than a yes-or-no: `met`, `violat
 `unclear` for a criterion the content does not settle — which records nothing at all, holds the
 confirmation back, and keeps its reasoning. Without that third word a check may only answer no where it
 cannot tell, which reads as a finding about the content instead of one about the check; measured on a
-content quoted in excerpt, the assistant answered six of twelve criteria `unclear`, licence and
+content the assistant read only in excerpt, it answered six of twelve criteria `unclear`, licence and
 accessibility among them. `suitable` is required too, and it is the only place a collection's own requirements can land
 where the metadata set holds no field for them: the criteria are what the repository can record, and
 *für Bildung geeignet / ungeeignet* is what is left to say about everything else. An object rather than a list, because a list invites an answer

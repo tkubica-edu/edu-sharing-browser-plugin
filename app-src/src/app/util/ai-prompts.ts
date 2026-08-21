@@ -1,8 +1,8 @@
 // The German task texts the panel puts to the KI assistant, one entry per task: the five steps of the quality
-// check, the two reminders that follow the quoted content, and the building blocks of the quote block itself.
+// check, the two reminders that close two of them, and the lines that say where the content's own text stands.
 // Every entry holds the lines of one task in the order they are sent, with the runtime values already put in.
 // What stays with the caller in `quality-check-request.ts` is the assembly around them — collapsing the blank
-// lines, the length budget, and the quoted text itself.
+// lines and choosing which line about the text the content's state calls for.
 //
 // The empty entries are part of the text: they are the blank lines of the outgoing task, and the caller keeps
 // only the ones whose predecessor is filled. An entry that is switched off by its condition therefore reads as
@@ -77,7 +77,7 @@ export const AI_PROMPTS = {
     ];
   },
 
-  /** Step 2, on one's own content: the language pass, ahead of the quoted text. */
+  /** Step 2, on one's own content: the language pass, ahead of the line about where the text stands. */
   proofread: (subject: CheckSubject): readonly string[] => {
     // Genitive: it reads "… die Sprache VON <named> durch".
     const named = subject.title ? `„${subject.title}“` : 'diesem Inhalt';
@@ -124,7 +124,7 @@ export const AI_PROMPTS = {
     ];
   },
 
-  /** The rules of the language pass again, behind the quoted text — the last thing read. */
+  /** The rules of the language pass again at the end of the task — the last thing read before the answer. */
   proofreadReminder: [
     '',
     '---',
@@ -133,7 +133,7 @@ export const AI_PROMPTS = {
       'auch wenn im Text fachlich etwas falsch ist — Aussagen, Formeln, Zahlen und Quellen bewerten wir im ' +
       'nächsten Schritt anhand der Qualitätskriterien. Eine fachlich falsche, aber korrekt geschriebene Stelle ' +
       'ist hier kein Befund.',
-    '- Zitiere jede Stelle wörtlich, wie sie oben steht, und stell die Korrektur daneben.',
+    '- Zitiere jede Stelle wörtlich, wie sie im Text steht, und stell die Korrektur daneben.',
     '- Der letzte Satz deiner Nachricht ist die Frage, was mit den Stellen passieren soll — auch dann, wenn du ' +
       'nichts gefunden hast. Die Antworten dazu werden ihr als Buttons angeboten; du listest keine ' +
       'Antwortvorschläge auf und schreibst nach der Frage keinen Satz mehr.',
@@ -142,7 +142,7 @@ export const AI_PROMPTS = {
       'decision="accepted" oder decision="skipped".'
   ],
 
-  /** Step 3: the verdict over the criteria, ahead of the quoted text. */
+  /** Step 3: the verdict over the criteria, ahead of the line about where the text stands. */
   quality: (criteria: readonly QualityCriterion[], subject: CheckSubject): readonly string[] => {
     const { title, collection } = subject;
     // Dative: the one place it is used reads "… bei der Erschließung VON <named>".
@@ -198,7 +198,7 @@ export const AI_PROMPTS = {
     ];
   },
 
-  /** The rules of the verdict again, behind the quoted text. */
+  /** The rules of the verdict again at the end of the task. */
   qualityReminder: [
     '',
     '---',
@@ -265,20 +265,20 @@ export const AI_PROMPTS = {
   },
 
   /**
-   * The quote block around the content's own text. `opening` and `closing` are the fences; their lengths are
-   * part of the budget the caller computes, which is why they are text here and arithmetic there.
+   * Where the content's own text stands. The task names it rather than quoting it — the wording travels in the
+   * turn's page context — so these lines point at it and say what to do where it is cut short or missing.
    */
   content: {
-    missing: '\nDer Volltext dieses Inhalts liegt hier nicht vor.',
+    inContext:
+      '\nDen Wortlaut dieses Inhalts findest du im Seitenkontext dieses Gesprächs, als Text der Seite.',
+    truncated: '\nDort ist er abgeschnitten.',
+    truncatedFetch: ' Den vollständigen Text bekommst du mit get_url_text von der Adresse der Seite.',
+    missing: '\nDer Volltext dieses Inhalts liegt dem Gespräch nicht bei.',
     missingFetch:
       '\nHol ihn dir mit get_url_text von der Adresse der Seite, bevor du urteilst. Erst wenn auch das ' +
       'nichts hergibt, gilt ein Kriterium mangels Text als nicht prüfbar.',
     missingNoFetch:
       '\nBeurteile, was der Seitenkontext hergibt, und sag bei jedem Kriterium ausdrücklich, wenn es ' +
-      'mangels Text nicht prüfbar war.',
-    opening: '\nHier ist der Inhalt im Wortlaut:\n---\n',
-    closing: '\n---',
-    truncated: '\nDieser Wortlaut ist abgeschnitten.',
-    truncatedFetch: ' Den vollständigen Text bekommst du mit get_url_text von der Adresse der Seite.'
+      'mangels Text nicht prüfbar war.'
   }
 } as const;

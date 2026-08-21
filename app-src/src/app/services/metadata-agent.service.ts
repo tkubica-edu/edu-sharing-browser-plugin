@@ -11,8 +11,8 @@ import { MetadataAgentApiService } from './metadata-agent-api.service';
 import { SOURCE_TEXT_KEY } from '../util/agent-payload';
 import { EXTRACT_FIELD_ANSWER } from '../util/dev-fixtures';
 import { errorMessage } from '../util/errors';
+import { CONTENT_TEXT_MAX } from '../util/page-context';
 import { withoutQualityCriteria } from '../util/quality-criteria-values';
-import { AssistantRequestService } from './assistant-request.service';
 
 /** Reserved (non-metadata) top-level keys in the metadata-agent response. */
 const ENVELOPE_KEYS = new Set([
@@ -87,7 +87,6 @@ interface ExtractFieldAnswer {
 export class MetadataAgentService {
   private readonly browserExtension = inject(BrowserExtensionService);
   private readonly agentApi = inject(MetadataAgentApiService);
-  private readonly assistantRequest = inject(AssistantRequestService);
   private readonly devMode = inject(DevModeService);
 
   private readonly lastRunState = signal<AnalyzeOutcome | null>(null);
@@ -213,16 +212,14 @@ export class MetadataAgentService {
   }
 
   /**
-   * How long the page's own text is, against how much of it a request to the KI assistant can carry.
+   * How long the page's own text is, against how much of it the KI assistant is handed.
    *
    * Said here because this is where the text arrives and where it can still be acted on: a page far over the
    * bound is one the assistant will judge by an excerpt, and it says so per criterion in a way that reads as a
-   * finding about the content rather than about the check. By the time the check quotes it the run is paid for.
+   * finding about the content rather than about the check. By the time the check runs, the run is paid for.
    *
-   * The bound is the whole request, so the instruction and its reminder take their share of it; how much is
-   * left for the text differs per task and is stated by the check's own line as it builds one. It is a
-   * setting, which is the other half of why this is worth saying: a page over it can be judged whole by
-   * raising it (see AssistantRequestService).
+   * The bound is the one the page context carries the text under ({@link CONTENT_TEXT_MAX}) — the tasks
+   * themselves quote nothing, so that field is the whole of what reaches the model of the wording.
    */
   private reportTextLength(payload: Record<string, unknown> | null): void {
     const text = payload?.[SOURCE_TEXT_KEY];
@@ -231,10 +228,9 @@ export class MetadataAgentService {
       console.log(`${LOG} the run carries no page text — a KI check would have to fetch the page itself`);
       return;
     }
-    const supported = this.assistantRequest.maxCharacters();
     console.log(
-      `${LOG} the erschlossene page has ${length} characters; ${supported} are supported per assistant ` +
-        `request${length > supported ? ` — ${length - supported} over the bound, so it cannot be quoted whole` : ''}`,
+      `${LOG} the erschlossene page has ${length} characters; ${CONTENT_TEXT_MAX} of them are handed to the ` +
+        `assistant${length > CONTENT_TEXT_MAX ? ` — ${length - CONTENT_TEXT_MAX} over the bound, so it is cut` : ''}`,
     );
   }
 

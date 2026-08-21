@@ -6,7 +6,6 @@ import { HOME_REPOSITORY, MdsDefinition, MdsService } from 'ngx-edu-sharing-api'
 
 import { APP_CONFIG } from '../../../config';
 import { AuthorityNamePipe } from '../../../pipes/authority-name.pipe';
-import { AssistantRequestService } from '../../../services/assistant-request.service';
 import { AuthService } from '../../../services/auth.service';
 import { CurationService } from '../../../services/curation.service';
 import { LeaveGuard, NavigationService } from '../../../services/navigation.service';
@@ -115,7 +114,6 @@ const STOPPED: Record<string, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AiQualityScreenComponent implements OnDestroy {
-  private readonly assistantRequest = inject(AssistantRequestService);
   private readonly auth = inject(AuthService);
   private readonly authorityName = inject(AuthorityNamePipe);
   private readonly curation = inject(CurationService);
@@ -288,32 +286,29 @@ export class AiQualityScreenComponent implements OnDestroy {
   protected readonly task = computed<AssistantTask | null>(() => {
     const step = this.step();
     if (step !== 'done' && !this.resultSchema()) return null;
-    const text = this.curation.contentText();
     const subject = {
       title: this.curation.contentTitle(),
-      text,
+      text: this.curation.contentText(),
       url: this.curation.contentUrl(),
       collection: this.collection()?.name ?? null,
       author: this.author(),
       signedIn: this.signedIn()
     };
-    // Only the two tasks that quote the content are bounded: the other two state a few hundred characters of
-    // instruction and nothing that could grow with the page.
-    const taskMax = this.assistantRequest.maxCharacters();
     const task =
       step === 'origin'
         ? originInstructionOf(subject)
         : step === 'proofread'
-          ? proofreadInstructionOf(subject, taskMax)
+          ? proofreadInstructionOf(subject)
           : step === 'quality'
-            ? qualityInstructionOf(this.criteria(), subject, taskMax)
+            ? qualityInstructionOf(this.criteria(), subject)
             : step === 'enrichment'
               ? enrichmentInstructionOf(subject)
               : closingInstructionOf(subject);
-    const quoted = step === 'quality' || step === 'proofread' ? text.length : 0;
+    // The content's own text is not in here — it travels in the page context (see contentContextOf), and
+    // every task states a few hundred to a few thousand characters of instruction and nothing that grows
+    // with the page.
     console.log(
-      `${LOG_QUALITY} the assistant will be asked this (step ${step}, ${task.length} characters, ` +
-        `${quoted} of them the content's own text)\n${task}`,
+      `${LOG_QUALITY} the assistant will be asked this (step ${step}, ${task.length} characters)\n${task}`,
     );
     return { text: task, message: STEP_MESSAGE[step] };
   });

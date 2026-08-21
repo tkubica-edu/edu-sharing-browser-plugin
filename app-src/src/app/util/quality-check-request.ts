@@ -9,13 +9,13 @@
 
 import type { MdsDefinition, MdsValue, MdsWidget } from 'ngx-edu-sharing-api';
 
-import { APP_CONFIG } from '../config';
 import type { CriteriaProperties } from '../features/quality/quality-criteria/quality-criteria.component';
 import { EXTENDED_TYPE_FIELD, LRT_FIELD } from './agent-payload';
 import { AI_PROMPTS } from './ai-prompts';
 import { OUTCOMES, VOCABULARY_FIELD_NAMES } from './ai-schemas';
 import type { VocabularyField } from './ai-schemas';
 import type { MdsValues } from './mds-values';
+import { CONTENT_TEXT_MAX, contentTextRoom } from './page-context';
 import {
   CRITERION_MET, CRITERION_VIOLATED, EDITORIAL_CRITERIA_PROPERTY, KNOCKOUT_CRITERIA_WIDGET, autoMetValue,
   valueFor, widgetOf
@@ -23,50 +23,6 @@ import {
 
 /** Log prefix of what the request says about itself, as everywhere else in the check. */
 const LOG = '[edu-sharing][quality]';
-
-/**
- * The shortest request worth building. Below this nothing of the content fits beside the instruction, and a
- * check on the title alone is worthless — so a field somebody is halfway through typing does not become a
- * request that quotes nothing.
- */
-export const TASK_MIN = 1_000;
-
-/**
- * The longest request the panel will build, whatever it is asked for. A bound on the bound, because the number
- * decides how much of a content is carried into every single turn of the check: past this the run spends its
- * token budget on the quotation and answers with what is left, which reads as a check that went wrong rather
- * than as a request that was too large.
- */
-export const TASK_LIMIT = 100_000;
-
-/**
- * How long a request may be where nobody set it: the checked-in configuration, brought into range. It needs no
- * fallback of its own — the configuration types it as a number, so the only thing that can be wrong with it is
- * its size.
- */
-export const DEFAULT_TASK_MAX = Math.min(
-  Math.max(Math.floor(APP_CONFIG.assistantRequestMaxCharacters), TASK_MIN),
-  TASK_LIMIT
-);
-
-/**
- * A request length as it can be used: a whole number between {@link TASK_MIN} and {@link TASK_LIMIT}, and the
- * configured default for anything that is no number at all — a stored value from another version of the panel,
- * or none.
- *
- * What the bound is for: the content travels inside the request, so this is what the quoted text is cut to fit.
- * It is a bound of ours rather than the API's — the instruction is handed over as `host_instruction` in the
- * request's environment (see AiAssistantScreenComponent) and that field is declared without a length limit,
- * while the 10 000-character cap the chat endpoint enforces applies to the visible `message`, which here is a
- * few words. So what it protects is the prompt the model reads: the whole instruction goes into it, beside the
- * page context and the conversation so far. Raising it buys a longer excerpt of a long content at the price of
- * the run's token budget, which is why it is a setting rather than a constant (see AssistantRequestService).
- */
-export function boundedTaskMax(value: unknown): number {
-  const stated = Math.floor(Number(value));
-  if (!Number.isFinite(stated)) return DEFAULT_TASK_MAX;
-  return Math.min(Math.max(stated, TASK_MIN), TASK_LIMIT);
-}
 
 /** One criterion the assistant is to judge, as the metadata set defines it. */
 export interface QualityCriterion {
@@ -232,24 +188,21 @@ export type ProofreadDecision = 'accepted' | 'skipped';
  * content can do nothing with a list of its typos but read it — the text is not theirs to touch, and the step
  * would cost them a turn of the dialogue for nothing.
  *
- * It quotes the content again, although the conversation has been running since the greeting: what it judges
- * is the wording itself, down to the character, and the page context the backend renders is a description of
- * the node rather than its text.
+ * What it judges is the wording itself, down to the character, and that wording reaches it as the page's own
+ * text in the turn's context. The task points at it rather than quoting it — see {@link contentSource}.
  */
-export function proofreadInstructionOf(subject: CheckSubject, taskMax: number): string {
+export function proofreadInstructionOf(subject: CheckSubject): string {
   const head = AI_PROMPTS.proofread(subject)
     .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
     .join('\n');
-  const tail = PROOFREAD_REMINDER;
-  return head + contentBlock(subject.text.trim(), subject.url, taskMax, taskMax - head.length - tail.length) + tail;
+  return head + contentSource(subject) + PROOFREAD_REMINDER;
 }
 
 /**
- * The rules of the language pass again, behind the quoted text. The text is the longest part of the task by far
- * and the last thing read before the answer is written — a text riddled with subject-matter errors then makes
- * its own case for what to answer, and the rules that stand thousands of characters above it lose to it
- * (measured: a physics page full of wrong figures came back as a list of factual corrections, in one turn and
- * without the closing question). Repeated here, they are what the run reads last.
+ * The rules of the language pass again, at the very end of the task. What stands closest to the answer is what
+ * a run holds to, and the content it reads argues its own case in between — a text riddled with subject-matter
+ * errors turns the pass into a list of factual corrections, in one turn and without the closing question
+ * (measured on a physics page full of wrong figures). Repeated here, the rules are what the run reads last.
  */
 const PROOFREAD_REMINDER = AI_PROMPTS.proofreadReminder.join('\n');
 
@@ -467,11 +420,15 @@ export function enrichmentPropertiesOf(
 export interface CheckSubject {
   /** What the content is called. */
   title: string | null;
-  /** What it says — the text the panel holds for it; empty where it holds none. */
+  /**
+   * What it says — the text the panel holds for it; empty where it holds none. Not put into the task: it
+   * travels in the page context, and what it decides here is which line the task carries about it — that the
+   * wording stands in the context, that it is cut short there, or that there is none.
+   */
   text: string;
   /**
-   * Where it came from. Not stated in the task — the page context and the quoted text both carry it — but it
-   * decides whether reading the page is worth asking for at all; see {@link contentBlock}.
+   * Where it came from. Not stated in the task — the page context and the text it carries both name it — but
+   * it decides whether reading the page is worth asking for at all; see {@link contentSource}.
    */
   url: string | null;
   /** The collection whose requirements it is measured against. */
@@ -494,14 +451,11 @@ export interface CheckSubject {
  * collection in the context invites exactly that confusion, and the assistant then reports on a stock nobody
  * asked about.
  *
- * **What it says**: the content's own text, quoted in full inside the task. This is not redundant with the
- * page context. The assistant's backend renders the page context from whatever it could resolve about the
- * node, and the block that would carry the text the panel holds is read **only where nothing resolved at
- * all** — so the better the node resolves, the more surely the text is dropped. The result is a check that
- * knows the content's title, licence and thumbnail, and answers every single criterion with "der vollständige
- * Text war nicht abrufbar". The request itself is the one channel that always reaches the model.
+ * **Where its text stands**: in the turn's page context, as the page's own text, and not in the task — the
+ * task names it and no more, so a content the size of a page travels once per turn rather than twice (see
+ * {@link contentSource} and `page-context.ts`).
  *
- * **How to get the rest**: the address, where the text is missing or had to be cut. Reading it is something
+ * **How to get the rest**: the address, where that text is missing or had to be cut. Reading it is something
  * the assistant can do, and doing it beats declaring twelve criteria unprovable.
  *
  * **What to judge it by**: every quality-assurance skill the collection has released, fetched outright and by
@@ -523,67 +477,62 @@ export interface CheckSubject {
  */
 export function qualityInstructionOf(
   criteria: readonly QualityCriterion[],
-  subject: CheckSubject,
-  taskMax: number
+  subject: CheckSubject
 ): string {
-  const text = subject.text.trim();
   const head = AI_PROMPTS.quality(criteria, subject)
     .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
     .join('\n');
-  const tail = QUALITY_REMINDER;
-  return head + contentBlock(text, subject.url, taskMax, taskMax - head.length - tail.length) + tail;
+  return head + contentSource(subject) + QUALITY_REMINDER;
 }
 
 /**
- * The rules of the judgement again, behind the quoted text — for the same reason the language pass repeats
- * its own ({@link PROOFREAD_REMINDER}): the content is the longest part of the task and the last thing read
- * before the answer, and what stands closest to the answer is what the run holds to. The two rules worth the
+ * The rules of the judgement again, at the very end of the task — for the same reason the language pass
+ * repeats its own ({@link PROOFREAD_REMINDER}): what stands closest to the answer is what the run holds to,
+ * and the content it reads in between is longer than anything the task says. The two rules worth the
  * repetition are the ones a run that is done judging drops first: end on the question, and submit only once
  * it has been answered.
  */
 const QUALITY_REMINDER = AI_PROMPTS.qualityReminder.join('\n');
 
 /**
- * The content itself, appended to the task and cut to what is left of the request's length.
+ * Where the content's own text stands, appended to the task ahead of its reminder.
  *
- * The page's address is deliberately NOT stated here: the assistant is given it in the page context, and the
- * text quoted below carries it in its own header (the extraction opens with `URL:` and `Canonical URL:`). A
- * third copy in the task only spends the budget the text needs. `url` therefore decides what is worth
- * ASKING for — reading the page is only an instruction where there is a page to read.
+ * The text itself is not in the task. It travels in the turn's page context as the page's own text, capped at
+ * {@link CONTENT_TEXT_MAX} — one copy per turn instead of two, and the same copy every step of the check reads.
+ * What is added here is the line that points at it, so a run does not answer from the node's description while
+ * the wording sits unread beside it.
+ *
+ * The page's address is deliberately NOT stated: the assistant is given it in the page context, and the text it
+ * points at carries it in its own header (the extraction opens with `URL:` and `Canonical URL:`). What `url`
+ * decides is what is worth ASKING for — reading the page is only an instruction where there is a page to read.
  */
-function contentBlock(text: string, url: string | null, taskMax: number, room: number): string {
+function contentSource(subject: CheckSubject): string {
+  const text = subject.text.trim();
+  const url = subject.url;
   if (!text) {
     console.log(
-      `${LOG} the page has no text here — 0 of the ${taskMax} characters a request supports are quoted` +
-        (url ? ', so the assistant is asked to fetch it' : ' and no address to fetch it from'),
+      `${LOG} the panel holds no text for this content, so the context carries none` +
+        (url ? ' — the assistant is asked to fetch it' : ' and there is no address to fetch it from'),
     );
     return (
       AI_PROMPTS.content.missing +
       (url ? AI_PROMPTS.content.missingFetch : AI_PROMPTS.content.missingNoFetch)
     );
   }
-  const opening = AI_PROMPTS.content.opening;
-  // The closing fence only where something follows it — it is there to say where the quoted text ends, and
-  // where the text runs to the end of the task there is nothing for it to separate.
-  const closing = AI_PROMPTS.content.closing;
-  const budget = room - opening.length - closing.length - 200;
-  const fits = text.length <= budget;
-  const quoted = fits ? text : text.slice(0, Math.max(budget, 0));
-  // How much of the page reaches the model, against what a request holds at all. A cut text is the one thing
-  // that makes a criterion unanswerable for a reason nobody can see in the answer: the assistant then judges
-  // an excerpt and says so per criterion, which reads as a finding about the content. `taskMax` is the whole
-  // request, `budget` what is left of it for the text once the instruction and its reminder have their share.
+  // What is left for the text beside the title, both of which the context carries under CONTENT_TEXT_MAX.
+  const room = contentTextRoom(subject.title);
+  const cut = text.length > room;
+  // How much of the page reaches the model. A cut text is the one thing that makes a criterion unanswerable
+  // for a reason nobody can see in the answer: the assistant then judges an excerpt and says so per criterion,
+  // which reads as a finding about the content.
   console.log(
-    `${LOG} the page has ${text.length} characters; ${taskMax} are supported per request, of which ` +
-      `${Math.max(budget, 0)} are left for the text — ${
-        fits ? 'it is quoted whole' : `cut, ${text.length - Math.max(budget, 0)} characters are not quoted`
-      }`,
+    `${LOG} the page has ${text.length} characters and the context carries ${room} of them beside the title ` +
+      `(${CONTENT_TEXT_MAX} for both together) — ` +
+      (cut ? `cut, ${text.length - room} characters do not reach the assistant` : 'it reaches the assistant whole'),
   );
-  if (fits) return opening + quoted;
+  if (!cut) return AI_PROMPTS.content.inContext;
   return (
-    opening +
-    quoted +
-    closing +
+    AI_PROMPTS.content.inContext +
     AI_PROMPTS.content.truncated +
     (url ? AI_PROMPTS.content.truncatedFetch : '')
   );

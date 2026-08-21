@@ -54,6 +54,14 @@ What is known not to work, known to be unverified, or known to look wrong at fir
   the app runs Angular 21, so installing needs `legacy-peer-deps=true` (set in `app-src/.npmrc`). It
   is used for login, node create/update/read, and adding collection references; the last one goes
   through `CollectionServiceUnwrapped`, since the exported `CollectionService` wrapper is read-only.
+- **A resolved node can hide the panel's own text.** The KI check hands the content's wording over as
+  `page_text` in the chat context and no longer quotes it in the instruction, while the chatbot backend
+  renders "the current page" from whatever `node_id` / `collection_id` resolves to and reads `page_text`
+  **only where nothing resolved at all**. A saved content therefore reaches the model as the backend's
+  own block — title, licence, thumbnail, compendium text — and how much of the wording that block carries
+  is the backend's business, not the panel's. Watch for an answer that judges every criterion by what it
+  calls the *zugänglicher Text*, or one that calls `get_url_text` on the source page; both say the text
+  never arrived. See [CHATBOT-IO.md § Where the content's text stands](CHATBOT-IO.md#where-the-contents-text-stands).
 - **The repository URL cannot be changed at runtime** without reloading the sidebar — the library
   freezes `rootUrl` at bootstrap and does not export its config classes.
 - **The agent may only edit its own node for two hours.** Along the guest route the repository

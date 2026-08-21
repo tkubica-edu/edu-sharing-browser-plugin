@@ -10,7 +10,6 @@ import { AuthService } from './services/auth.service';
 import { BrowserExtensionService } from './services/browser-extension.service';
 import { ContentFlowService } from './services/content-flow.service';
 import { BusyService } from './services/busy.service';
-import { AssistantRequestService } from './services/assistant-request.service';
 import { ChatSkillService } from './services/chat-skill.service';
 import { ChatStyleService } from './services/chat-style.service';
 import { CollectionRecommendationService } from './services/collection-recommendation.service';
@@ -113,7 +112,6 @@ export class AppComponent implements OnInit {
   private readonly qualityJudge = inject(QualityJudgeService);
   private readonly chatStyle = inject(ChatStyleService);
   private readonly chatSkill = inject(ChatSkillService);
-  private readonly assistantRequest = inject(AssistantRequestService);
   private readonly sessionResume = inject(SessionResumeService);
 
   /** A node received while logged out — opened once the user logs in. */
@@ -187,9 +185,6 @@ export class AppComponent implements OnInit {
     // Before the assistant screen can mount its chat element, which reads both switches as it creates it.
     await this.chatStyle.load();
     await this.chatSkill.load();
-    // Before a page is erschlossen — the run reports its text length against this bound — and before a check
-    // builds a task, which is cut to fit it.
-    await this.assistantRequest.load();
     await this.auth.init();
     await this.history.load();
     const tab = await this.browserExtension.getActiveTab().catch(() => null);

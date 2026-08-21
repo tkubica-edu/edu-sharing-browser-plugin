@@ -69,7 +69,7 @@ whole of what the assistant knows about where it is.
 | `collection_id` | the collection shown, or the one a topic page is built on | `/components/collections?id`, `/components/topic-pages`, `?collection`, or the collection the content was filed in |
 | `topic_page_slug`, `subject_slug` | `/themenseite/<slug>`, `/fachportal/<slug>[/<slug>]` | the path |
 | `search_query` | the term, 2–200 characters | `?q`, `?search`, `?query` |
-| `page_text` | what the page says it is about | the tab title (≤ 300 chars), or the content's **title + blank line + text** (≤ 8 000 chars) |
+| `page_text` | what the page says it is about | the tab title (≤ 300 chars), or the content's **title + blank line + text** (≤ 20 000 chars) |
 | `detection_source` | which rule recognised the page | `url:components/render`, `url:?node`, `url:/fachportal`, …, `panel:content` |
 
 Two builders, two situations:
@@ -155,9 +155,9 @@ things the panel holds and the content's text does not carry:
 The last two exist for one purpose: the opening question guesses whose content this is before it asks,
 and a named author matching the signed-in person is the one clear sign of one's own content.
 
-`url` is deliberately **not** printed in the task. The context carries it, and the quoted text opens with
-its own `URL:` header — a third copy would only spend the budget the text needs. What `url` decides is
-whether *asking to fetch the page* is worth it at all.
+`url` is deliberately **not** printed in the task. The context carries it, and the page text it points at
+opens with its own `URL:` header — a third copy would only spend the prompt on an address twice over. What
+`url` decides is whether *asking to fetch the page* is worth it at all.
 
 ### 4. The criteria of the metadata set
 
@@ -187,7 +187,9 @@ Not ours, but part of what the model reads, so worth knowing when a task seems t
   prefetches the collection's released instructions into the prompt — **titles only, no `nodeId`s**,
   capped at 100 entries and ~3 500 characters. The model has to walk `get_skill_registry` →
   `get_skill` itself, which is why every task that depends on a skill names those tools outright.
-- **Our `page_text`** — only where nothing resolved.
+- **Our `page_text`** — only where nothing resolved. It is the one channel the content's own wording
+  travels in (see *Where the content's text stands* below), so a node that resolves well decides how much
+  of that wording the model actually reads.
 
 ---
 
@@ -196,7 +198,7 @@ Not ours, but part of what the model reads, so worth knowing when a task seems t
 Four requests and one closing word, in order, and **none of them is put until the previous one has
 answered**: they run under the same iteration and token caps, and asked together they compete for them.
 
-| # | Step | Instruction | Runs | Bubble | Quotes the text | Tools it names |
+| # | Step | Instruction | Runs | Bubble | Points at the text | Tools it names |
 |---|---|---|---|---|---|---|
 | 1 | `origin` | `originInstructionOf()` | always | *Herkunft des Inhalts klären* | no | — |
 | 2 | `proofread` | `proofreadInstructionOf()` | only where step 1 answered `own` | *Inhalt Korrektur lesen* | **yes** | `get_skill_registry`, `get_skill` |
@@ -254,35 +256,35 @@ turn submits anyway (`take()` returns on `done`).
 - **Its last sentence is the question**, with nothing after it, because the chips are shown under the
   message and a message closing on something else leaves them answering nothing.
 
-### The content block
+### Where the content's text stands
 
-Both text-quoting tasks append the content verbatim, cut to what is left of the request bound after head,
-tail and a 200-character reserve:
+No task carries the text. The content's wording travels in the context as `page_text` — title, blank
+line, text, capped at `CONTENT_TEXT_MAX` — and the two tasks that judge it append one line naming that
+place (`contentSource()` in `util/quality-check-request.ts`):
 
 ```
-Hier ist der Inhalt im Wortlaut:
----
-<text>
----
-Dieser Wortlaut ist abgeschnitten. Den vollständigen Text bekommst du mit get_url_text …
+Den Wortlaut dieses Inhalts findest du im Seitenkontext dieses Gesprächs, als Text der Seite.
+Dort ist er abgeschnitten. Den vollständigen Text bekommst du mit get_url_text …
 ```
 
-The closing fence and the truncation note appear only where the text was actually cut. Where the panel
-holds **no** text, the address takes its place with the instruction to fetch it (`get_url_text`) — or,
-with no address either, the instruction to say per criterion that it was not checkable.
+The second line appears only where the text does not fit beside the title: `contentTextRoom(title)` is
+what `CONTENT_TEXT_MAX` leaves for it, and `page-context.ts` cuts against the same number. Where the
+panel holds **no** text, the line says so and the address takes its place with the instruction to fetch
+it (`get_url_text`) — or, with no address either, the instruction to say per criterion that it was not
+checkable.
 
-Quoting is not redundant with `page_text`: the better the node resolves, the more surely the backend
-drops our block. Measured on one content, three criteria — the task without the text answered all three
-`false` ("der zugängliche Text enthält mehrere unvollständige Sätze"), the task with it answered all
-three `true`, reasoned against the collection's compendium.
+One copy per turn is the point: a content the size of a page in the instruction *and* in the context
+spends the run's token budget twice on the same characters. What it costs is a dependency on the
+backend reading `page_text` at all — see *What the backend adds by itself* above, and
+[TROUBLESHOOTING.md § Dependencies and runtime limits](TROUBLESHOOTING.md#dependencies-and-runtime-limits).
 
 ### The reminder tails
 
-`PROOFREAD_REMINDER` and `QUALITY_REMINDER` repeat the closing rules **behind** the quoted text. The
-text is by far the longest part of the task and the last thing read before the answer is written, and a
-text that argues for itself beats a rule standing thousands of characters above it — measured, a physics
-page full of wrong figures turned the language pass into a list of factual corrections, in one turn and
-without the closing question.
+`PROOFREAD_REMINDER` and `QUALITY_REMINDER` repeat the closing rules at the **end** of the task, behind
+everything else it says. What stands closest to the answer is what a run holds to, and the content it
+reads in between is longer than the whole instruction — measured, a physics page full of wrong figures
+turned the language pass into a list of factual corrections, in one turn and without the closing
+question.
 
 ### The chips
 
@@ -358,8 +360,8 @@ the panel writes none, and the content is often not editable at that moment. Bot
 
 `unclear` is the point of the third word: without it a check may only answer *no* where it cannot tell,
 which reads as a finding about the content instead of one about the check. It records nothing, holds the
-confirmation back, and keeps its reasoning. Measured on a content quoted in excerpt, six of twelve
-criteria came back `unclear`, licence and accessibility among them.
+confirmation back, and keeps its reasoning. Measured on a content the assistant read only in excerpt, six
+of twelve criteria came back `unclear`, licence and accessibility among them.
 
 What the outcomes mean is stated **once for the whole list** rather than per criterion — said twelve
 times over it would cost 3 000 of the 10 000 available characters. Twelve criteria measure about 6 550;
@@ -520,8 +522,8 @@ and opens it.
 | Constant | Value | Bounds |
 |---|---|---|
 | `SCHEMA_MAX` | 10 000 chars | what the backend accepts as `result-schema`; beyond it the request is refused outright |
-| the request bound | a **setting** — *Länge einer KI-Anfrage*; default `APP_CONFIG.assistantRequestMaxCharacters` = 10 000, range `TASK_MIN` 1 000 … `TASK_LIMIT` 100 000 | our own bound on the instruction, which is what the quoted text is cut to fit |
-| `CONTENT_TEXT_MAX` | 8 000 chars | the content's text in `page_text` |
+| `CONTENT_TEXT_MAX` | 20 000 chars | the content's title **and** text in `page_text`, against the backend's budget for the field; `contentTextRoom(title)` is what the text itself gets |
+| `MAIN_CONTENT_MAX` | 20 000 chars | the page's readable text as `content/content.js` reads it — the body of the extraction that becomes that text in the first place |
 | `TEXT_MAX` | 300 chars | a tab title in `page_text` |
 | `QUERY_MIN` / `QUERY_MAX` | 2 / 200 chars | a search term worth passing on |
 | skill overview | 100 titles, ~3 500 chars | the backend's prefetch, titles only |
@@ -529,12 +531,10 @@ and opens it.
 | a run | 90 s, 12 iterations | the backend's caps, reported as `deadline` / `max_iterations` |
 
 The instruction travels as `host_instruction` in the request's environment, a field declared without a
-length limit — the bound protects the *prompt* the model reads, not the API. That is why it is the one
-limit here that is set rather than fixed: the settings screen offers it as *Länge einer KI-Anfrage*
-(`AssistantRequestService`, persisted), and a longer request buys a longer excerpt of a long content at
-the price of the run's token budget. `boundedTaskMax()` brings whatever is entered or stored into
-`TASK_MIN` … `TASK_LIMIT`, falling back to the checked-in default; the two tasks that quote the content
-take it as an argument, so a change reaches the next check rather than a running one.
+length limit, and nothing bounds it here: a task is a few hundred to a few thousand characters of
+instruction — 12 criteria measure about 4 600 — and none of it grows with the page. What decides how much
+of a long content the assistant sees is `CONTENT_TEXT_MAX`, and how much of the page became that content
+in the first place is `MAIN_CONTENT_MAX`.
 
 ---
 
@@ -547,14 +547,12 @@ back. Three prefixes, one sequence:
   context of every hand-over, the instruction verbatim at the moment it goes out, and every answer with
   its `stopReason`.
 - `[edu-sharing][quality]` — the check: what it is about, how many criteria were read and under which
-  keys, each schema with its character count, each task with how much of it is the content's own text,
-  how many characters the page has against the 10 000 a request supports and how many of them are left
-  for the text, and every answer with what it changed.
+  keys, each schema with its character count, each task with its length, how many characters the page has
+  against the room the context leaves for it beside the title, and every answer with what it changed.
 - `[edu-sharing][agent]` — said as a `/generate` answers, long before a check is opened: how many characters
-  the erschlossene page has against the bound the setting states (10 000 by default), and by how much it is
-  over — which is the moment to raise the setting, since by the time a check quotes the text the run is paid
-  for. `[edu-sharing][quality]` then says how many of them are actually left for the text once an
-  instruction has its share.
+  the erschlossene page has against the `CONTENT_TEXT_MAX` the context hands over, and by how much it is
+  over — a page past it is judged by its opening, and the assistant says so per criterion in a way that
+  reads as a finding about the content.
 - `[edu-sharing][write]` — what reaches the node.
 
 **How to tell a check ran against the collection's skill:** not by reading the answer — a fluent answer

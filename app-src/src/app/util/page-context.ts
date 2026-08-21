@@ -63,11 +63,13 @@ const QUERY_MAX = 200;
 const TEXT_MAX = 300;
 
 /**
- * Cap on the text of a content handed over to be checked. Far above {@link TEXT_MAX}, because this text IS the
- * subject of the dialogue rather than a hint about it — but bounded all the same: what is passed on travels in
- * the assistant's prompt.
+ * Cap on the text of a content handed over to be checked, the field's own budget at the chatbot backend. Far
+ * above {@link TEXT_MAX}, because this text IS the subject of the dialogue rather than a hint about it — and
+ * it is the one channel that carries the content's wording at all, since the tasks name it rather than
+ * quoting it (see `util/quality-check-request.ts`). Bounded all the same: what is passed on travels in the
+ * assistant's prompt.
  */
-const CONTENT_TEXT_MAX = 8000;
+export const CONTENT_TEXT_MAX = 20_000;
 
 /**
  * What the page is about, or `null` for an address that is none — `about:`, a blank tab, nothing at all. The title
@@ -150,6 +152,17 @@ function addressOf(url: string | null | undefined): Pick<PageContext, 'page_url'
   } catch {
     return {};
   }
+}
+
+/**
+ * How many characters of a content's own text reach the context beside its title: what is left of
+ * {@link CONTENT_TEXT_MAX} once the title and the blank line behind it have taken their share. A text longer
+ * than this is cut off by {@link contentContextOf}, and the assistant is told so where it matters (see
+ * `util/quality-check-request.ts`).
+ */
+export function contentTextRoom(title: string | null | undefined): number {
+  const named = title?.trim();
+  return Math.max(CONTENT_TEXT_MAX - (named ? named.length + 2 : 0), 0);
 }
 
 /**
