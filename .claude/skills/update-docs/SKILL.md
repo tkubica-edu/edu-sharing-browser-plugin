@@ -30,7 +30,7 @@ guessed identifier is worse than no sentence.
 | `scripts/build.mjs`, `manifest.*.json`, `.github/workflows/**`, packaging, versioning, release steps | `BUILD.md` |
 | `services/debug.service.ts`, loading the extension, test steps, which console shows what | `TESTING.md` |
 | A limitation, a browser quirk, a permission that needs explaining, an unverified assumption | `TROUBLESHOOTING.md` |
-| `content/panel-host.js`, `model/onlyoffice-events.ts`, the `window:message` listener, any host-page event | `content/CLAUDE.md` |
+| `content/panel-host.js`, `model/onlyoffice-events.ts`, the `window:message` listener, any host-page event | `content/HOST-EVENTS.md` |
 | `<metadata-agent-canvas>` attributes, layouts, events | `WIDGET-REFERENZ.md` |
 
 Nothing fits? Add a section to the closest file. A new **file** is justified only when a subject

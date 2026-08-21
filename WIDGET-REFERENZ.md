@@ -2,6 +2,13 @@
 
 Stand: verifiziert gegen `src/static/widget/dist/main.js` (Build vom 20.03.) und `src/main.py`.
 
+**Eine fremde Momentaufnahme.** Diese Datei beschreibt das Widget des Metadaten-Agent-Projekts,
+nicht Code dieses Repositorys — die beiden Pfade oben liegen dort, nicht hier. Sie ist deshalb
+deutsch wie die Quelle, die sie prüft, sie trägt ein Datum, weil sie gegen genau einen Build gemessen
+ist, und § 9 hält fest, wo dessen eigene Doku vom Build abweicht. Wie das Bündel hier eingebettet wird, steht in
+[WEB-COMPONENTS.md](WEB-COMPONENTS.md); wohin die Aufrufe des Agenten gehen, in
+[ARCHITECTURE.md](ARCHITECTURE.md).
+
 ---
 
 ## 1. Einbindung

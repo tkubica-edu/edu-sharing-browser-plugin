@@ -2,7 +2,7 @@
 
 What the panel puts **into** the KI assistant, what it **asks** of it, in which **shape** it wants the
 answer, and what it does with what comes **back**. How the widget is embedded at all — the bundle, the
-element, the shadow root, the backend — is [chatbot.md](chatbot.md); this file is the data contract on
+element, the shadow root, the backend — is [CHATBOT.md](CHATBOT.md); this file is the data contract on
 top of it.
 
 - [The channels](#the-channels)
@@ -81,9 +81,11 @@ Two builders, two situations:
   actual text, which is the subject of the dialogue rather than a hint about it, hence the far higher
   cap. `detection_source: 'panel:content'`.
 
-**Which id is sent decides what gets judged.** The backend resolves whichever id the context carries as
-"the current page" (`target_id = node_id or collection_id`) and renders a block from what it finds —
-and the block that would carry our own `page_text` is read **only where nothing resolved at all**. So:
+**Which id is sent decides what gets judged**, because the backend renders "the current page" from
+whichever id the context carries, and the block that would carry our own `page_text` is read **only
+where nothing resolved at all** (the mechanism, and what it was measured to do, is
+[CHATBOT.md § Which id is sent decides what gets judged](CHATBOT.md#which-id-is-sent-decides-what-gets-judged)).
+So:
 
 | the content | `page_kind` | ids sent | what the model sees as "the page" |
 |---|---|---|---|
@@ -93,7 +95,7 @@ and the block that would carry our own `page_text` is read **only where nothing 
 The collection is stated either way, because it is not an answer to "which page is this": it is what the
 assistant looks the collection's skills up by. Only the *page identity* is withheld where there is no
 node. Handing over the collection as the page instead produces a check **of the collection**, however
-plainly the task asks about the one content — measured, see [chatbot.md](chatbot.md#which-id-is-sent-decides-what-gets-judged).
+plainly the task asks about the one content — measured, see [CHATBOT.md](CHATBOT.md#which-id-is-sent-decides-what-gets-judged).
 
 `sameSubject()` compares `page_kind`, `node_id`, `collection_id`, `topic_page_slug`, `subject_slug` and
 `search_query`. Equal means the same page under a changed address, which is merged (`updateContext`);
@@ -103,7 +105,9 @@ of a step.
 
 ### 2. The configuration attributes
 
-Set imperatively **before** `appendChild`, because the widget resolves its context as it connects.
+Set imperatively before `appendChild`; when each of them is actually read, and which may be changed
+mid-conversation, is
+[CHATBOT.md § The attributes set on mount](CHATBOT.md#the-attributes-set-on-mount).
 
 | Attribute | Value | Why |
 |---|---|---|
@@ -131,12 +135,11 @@ stated chip can arrive as 2. Without stated chips the cap says nothing, which is
 only together with them (`AiAssistantScreenComponent.quickRepliesMax`). Over the REST API the two are
 `environment.forced_quick_replies` and `environment.quick_replies_max`.
 
-**A screen with a task gives up the `page-context` attribute.** A context set as an attribute is one
-the widget greets over the network as the element connects — and it is still busy answering that
-greeting when the conversation appears, which is exactly when the task would be put. A message put to a
-busy widget is dropped without a word. So such a screen hands the page over with `replaceContext()`
-once the conversation is on screen and puts the task **in the same turn of the event loop**: the task is
-then the turn that runs, and the greeting is the one that gives way.
+**A screen with a task gives up the `page-context` attribute** and hands the page over with
+`replaceContext()` instead, once the conversation is on screen. The attribute would have the widget
+greet the page over the network as the element connects, and a widget busy with that greeting drops the
+task without a word — see
+[CHATBOT.md § The third method: putting a task](CHATBOT.md#the-third-method-putting-a-task).
 
 ### 3. The facts inside a task
 
@@ -186,7 +189,8 @@ Not ours, but part of what the model reads, so worth knowing when a task seems t
 - **The skill overview.** `page_kind: 'collection'` or `'topic'` *together with* `collection_id`
   prefetches the collection's released instructions into the prompt — **titles only, no `nodeId`s**,
   capped at 100 entries and ~3 500 characters. The model has to walk `get_skill_registry` →
-  `get_skill` itself, which is why every task that depends on a skill names those tools outright.
+  `get_skill` itself, which is why every task that depends on a skill names those tools outright; what a
+  skill is and where it lives is [CHATBOT.md § Skills](CHATBOT.md#skills--what-collectionid-sets-off).
 - **Our `page_text`** — only where nothing resolved. It is the one channel the content's own wording
   travels in (see *Where the content's text stands* below), so a node that resolves well decides how much
   of that wording the model actually reads.
@@ -196,7 +200,12 @@ Not ours, but part of what the model reads, so worth knowing when a task seems t
 ## The tasks
 
 Four requests and one closing word, in order, and **none of them is put until the previous one has
-answered**: they run under the same iteration and token caps, and asked together they compete for them.
+answered**: they run under the same iteration and token caps, and asked together they compete for them —
+whichever the model reaches last is the one that suffers. Split, each gets a run and a schema of its own,
+and a later task does not repeat the content: it is the same conversation, and what an earlier task
+quoted is still in it. Measured against the deployed backend with twelve criteria, the judgement came
+back `submit` with 12 of 12 answered in ~27 s and the enrichment `submit` in ~10 s with three vocabulary
+lookups — the second is the faster half precisely because the first established the subject.
 
 | # | Step | Instruction | Runs | Bubble | Points at the text | Tools it names |
 |---|---|---|---|---|---|---|
@@ -228,6 +237,15 @@ dropped nor invented as one: it goes into the single overall verdict `suitable` 
 summary. The task also insists it is **this one content** and expressly not the collection's other
 contents.
 
+It is also the one task that prescribes **how the answer is to be written**, because the person sees
+only the chat and nothing can inject a message into it from outside: a line per criterion starting with
+✓, ✗ or ○ — met, violated, or nothing in the content to decide it by — then the criterion and the
+reason, then a short verdict on what stands in the way of a release, and then the question that ends the
+step. Those glyphs are what the panel colours the lines by
+([CHATBOT.md § Correcting the widget from outside it](CHATBOT.md#correcting-the-widget-from-outside-it));
+the panel draws nothing beside the chat, since a second rendering of the same answer would only compete
+with the first.
+
 **4 — The enrichment.** Subject, education level, resource type and target groups, each looked up in its
 WLO vocabulary and answered **with the URI**, plus five to ten keywords. Every field is a **list**,
 because the properties they land in hold lists — asked for a single value the rest is lost before it is
@@ -249,7 +267,15 @@ turn submits anyway (`take()` returns on `done`).
 - **It ends with the person, not with the assistant.** Each task has it write its proposal into the
   chat, ask the person to go through it, and call `submit_result` only in the turn where they answer. The
   panel narrates none of it beside the chat — the assistant is the one thing on this screen that can
-  talk, the closing word included.
+  talk, the closing word included. Measured end to end for the judgement and the enrichment, one
+  session, four turns:
+
+  | turn | message | `result` |
+  |---|---|---|
+  | 1 | the quality task | none — twelve verdicts in the chat, ending in *„Soll es so stehen bleiben, oder möchtest du einzelne Bewertungen korrigieren?"* |
+  | 2 | *„Ich bestätige das Urteil zur Linsengleichung."* | `submit`, all twelve criteria |
+  | 3 | the enrichment task | none — the values in the chat, ending in *„Sollen diese Metadaten so übernommen werden?"* |
+  | 4 | *„Ja, die Metadaten passen so."* | `submit`, subject, level, type and keywords |
 - **It names `submit_result` outright**, twice: not before the confirmation, and then in that very
   turn. Measured, the enrichment task without it came back `stop_reason: "text"` — a perfect answer in
   prose, and `result: null`.
@@ -414,8 +440,8 @@ put a line above the chat (`STOPPED`).
 | `boerdi:page-action` | `{action, payload}` — `navigate`, `show_results`, `canvas_show_cards` | where it would send the person |
 | `boerdi:guide-suggestion` | `{url, title, node_id, node_type, query, alternatives[]}` | what it would recommend |
 
-Every event is dispatched **twice**, first `boerdi:…` then `badboerdi:…` for the predecessor system.
-Only the first name is listened to; listening to both would process and log every answer twice.
+Every event is dispatched **twice**, under two names, of which only one is listened to — see
+[CHATBOT.md § What the widget reports back](CHATBOT.md#what-the-widget-reports-back).
 
 ### Reading the answers back
 

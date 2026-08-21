@@ -80,7 +80,7 @@ Which editor renders that screen, and which route the save takes, is
 A node double-clicked in the OnlyOffice plugin arrives as a `PREVIEW_NODE` message (relayed by
 `content/panel-host.js`, or replayed from storage if the sidebar was closed) and opens in the
 preview; while logged out it is held until the login succeeds. The message contract is
-[content/CLAUDE.md](content/CLAUDE.md).
+[content/HOST-EVENTS.md](content/HOST-EVENTS.md).
 
 ---
 
@@ -148,10 +148,10 @@ The junction between the filing and the checking, entered from whichever filing 
 apply — and only where the repository config enables the browser extension custom web component:
 both processes belong to it (the criteria view and the assistant), so without it there is nothing to
 choose between and the filing leads straight into the Metadaten view. Two cards, each with the button
-that starts its process: *Geführte Qualitätsprüfung*, which
+that starts its process: *Strukturierte Qualitätsprüfung*, which
 is the *Qualitätsprüfung* as it stands (criteria, then metadata), and *Individuelle
 Qualitätsprüfung mit KI*, the analysis against the chosen collection's requirements as a dialogue with
-the assistant (see [chatbot.md](chatbot.md)). Clicking a card marks it and the footer's *Weiter* starts
+the assistant (see [CHATBOT.md](CHATBOT.md)). Clicking a card marks it and the footer's *Weiter* starts
 the marked one, so the two ways on say the same thing (`FlowChoiceScreenComponent`, which registers the
 choice as the footer's `ApplyHandler`).
 
@@ -163,8 +163,8 @@ instead of on the previous one; walking back out of it asks before that dialogue
 ## OnlyOffice-only options
 
 Both need the page-side edu-sharing plugin; the round trips they use are specified in
-[content/CLAUDE.md](content/CLAUDE.md). Without an OnlyOffice page they can still be exercised —
-see [TESTING.md § Debug mode](TESTING.md#debug-mode-onlyoffice-without-onlyoffice).
+[content/HOST-EVENTS.md](content/HOST-EVENTS.md). Without an OnlyOffice page they can still be
+exercised — see [TESTING.md § Debug mode](TESTING.md#debug-mode-onlyoffice-without-onlyoffice).
 
 - **Metadaten anreichern** — the same erschließen flow, but the content comes from the **edited
   document** instead of the page. The sidebar asks the page-side plugin for the document content
@@ -243,7 +243,7 @@ navigating to it, and closes it again where it stands; the step keeps running be
   *Entwickler-Optionen* (the dev and the debug mode, see [TESTING.md](TESTING.md)), *KI- und
   Chatbot-Optionen* (the corrections to the chat widget's display, the chatbot's master skill as
   *Vorgabe des Betreibers* / *An* / *Aus* — see
-  [chatbot.md](chatbot.md#the-attributes-set-on-mount)),
+  [CHATBOT.md](CHATBOT.md#the-attributes-set-on-mount)),
   *Zugehörige Sammlungen empfehlen* and *Qualitätsprüfung*. Everything but the Entwickler-Optionen
   belongs to the WLO panel and is shown only there (`browserExtensionCustomWebComponent`). Each group's
   head carries a pill counting the settings inside it that stand away from their default (`… geändert`),
@@ -252,12 +252,15 @@ navigating to it, and closes it again where it stands; the step keeps running be
   (`changedSettings`), the screen only sums them per group.
 - **WLO Metadaten-Agent** — only when the repository config enables it, see
   [WEB-COMPONENTS.md](WEB-COMPONENTS.md#the-optional-wlo-metadata-editor).
-- **Boerdi — KI-Assistent** — the assistant's chat widget, offered as a row above the session bar
-  and embedded as the real `<boerdi-chat>` element the packaged `boerdi/` bundle defines. On the
-  same condition as the WLO canvas (`browserExtensionCustomWebComponent`), since it comes with that
-  bundle. The panel is not the page, so the widget's own context detection is off and the open tab's
-  page is handed over explicitly — including to a chat session that outlived a page change
-  (`AiAssistantScreenComponent`).
+- **Boerdi — KI-Assistent** — the assistant's chat widget, embedded as the real `<boerdi-chat>`
+  element the packaged `boerdi/` bundle defines. On the same condition as the WLO canvas
+  (`browserExtensionCustomWebComponent`), since it comes with that bundle. The panel is not the page,
+  so the widget's own context detection is off and the page is handed over explicitly — including to a
+  chat session that outlived a page change. One component (`AiAssistantScreenComponent`) serves two
+  screens, which differ only in the context they state and in whether they put a task with it: *Frage
+  stellen* above the session bar states the open tab, and *Individuelle Qualitätsprüfung mit KI* states
+  the curated content and leads through the check. Both are [CHATBOT.md](CHATBOT.md); what the check
+  asks and records is [CHATBOT-IO.md](CHATBOT-IO.md).
 
 ---
 

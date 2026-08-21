@@ -83,10 +83,10 @@ tagged release — see [BUILD.md](BUILD.md#prebuilt-downloads).
 | [UI-SHELL.md](UI-SHELL.md) | Options and conditions, navigation and the back trail, busy state, login and the guest gate |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | The parts, the metadata agent's address, network legs & CORS, which route a save takes |
 | [WEB-COMPONENTS.md](WEB-COMPONENTS.md) | The packaged `edu` / `wlo` / `boerdi` bundles, and the optional WLO metadata editor |
-| [content/CLAUDE.md](content/CLAUDE.md) | The extension ↔ host-page event contract (`INSERT_NODE`, `PREVIEW_NODE`, `DOCUMENT_*`) |
-| [chatbot.md](chatbot.md) | The KI assistant: where the `boerdi` widget comes from, how it is embedded, the contract surface |
+| [content/HOST-EVENTS.md](content/HOST-EVENTS.md) | The extension ↔ host-page event contract (`INSERT_NODE`, `PREVIEW_NODE`, `DOCUMENT_*`) |
+| [CHATBOT.md](CHATBOT.md) | The KI assistant: where the `boerdi` widget comes from, how it is embedded, the contract surface |
 | [CHATBOT-IO.md](CHATBOT-IO.md) | What the assistant is given, asked and answers: contexts, tasks, result schemas, recorded properties |
-| [WIDGET-REFERENZ.md](WIDGET-REFERENZ.md) | `<metadata-agent-canvas>`: layouts, attributes, events |
+| [WIDGET-REFERENZ.md](WIDGET-REFERENZ.md) | `<metadata-agent-canvas>`: layouts, attributes, events — a snapshot of the metadata-agent project's own widget, in German |
 | [BUILD.md](BUILD.md) | Building, what goes into the package, CI artifacts, cutting a release |
 | [TESTING.md](TESTING.md) | Loading the extension, the OnlyOffice debug mode, the manual test checklist |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Known issues, permission quirks, bundle size, lint output |

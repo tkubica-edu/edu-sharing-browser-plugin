@@ -22,8 +22,10 @@ DOCS = [
     "BUILD.md",
     "TESTING.md",
     "TROUBLESHOOTING.md",
-    "content/CLAUDE.md",
+    "content/HOST-EVENTS.md",
     "WIDGET-REFERENZ.md",
+    "CHATBOT.md",
+    "CHATBOT-IO.md",
 ]
 
 LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")

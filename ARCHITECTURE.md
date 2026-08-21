@@ -36,7 +36,7 @@ Browser tab (any https page)
 - **Panel host** (`content/panel-host.js`) — injected on toolbar click; mounts the sidebar as a
   docked, resizable `<iframe>` (drag the left edge; width persists). This is the cross-browser
   replacement for the Chromium-only side-panel API. It is also the relay hub for the host-page
-  events ([content/CLAUDE.md](content/CLAUDE.md)).
+  events ([content/HOST-EVENTS.md](content/HOST-EVENTS.md)).
 - **Background** (`background/background.js` via `sw.js`) — toggles the panel, extracts the active
   tab's content (`content/content.js`), and **proxies the `/generate` call** so it runs from the
   service worker (portable across browsers, avoids page-CSP/CORS pitfalls).

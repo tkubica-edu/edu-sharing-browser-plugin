@@ -4,7 +4,7 @@
 // wants a fresh dialogue has to say so: nothing else ends a session, and the previous one is otherwise still
 // on screen when the next check opens.
 //
-// The keys belong to the other project; see chatbot.md.
+// The keys belong to the other project; see CHATBOT.md.
 
 /** Where the widget keeps the session it resumes; a stored id means the chat comes back mid-conversation. */
 const SESSION_KEY = 'boerdi_session_id';

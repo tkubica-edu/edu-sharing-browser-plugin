@@ -134,8 +134,8 @@ Prüfinhalts** is for. To test the writing instead, untick the checkbox and walk
 *Einstellungen* → *Entwickler-Optionen* → **Debug-Modus: OnlyOffice-Events simulieren**. With it on, the sidebar behaves as
 if it ran on an OnlyOffice page with the edu-sharing plugin active:
 
-- every page counts as an insert host, so *Metadaten anreichern*, *Passende Inhalte finden* and
-  *Inhalt suchen* are reachable anywhere;
+- every page counts as an insert host (`ConditionsService.onlyOfficePresent` is true throughout), so
+  *Metadaten anreichern*, *Passende Inhalte finden* and *Inhalt suchen* are reachable anywhere;
 - each `REQUEST_DOCUMENT_CONTENT` / `REQUEST_DOCUMENT_INFO` is answered immediately with a
   hard-coded test document (`app-src/src/app/services/debug.service.ts`) instead of being broadcast
   to a page that would never reply;
@@ -145,13 +145,16 @@ if it ran on an OnlyOffice page with the edu-sharing plugin active:
 
 The answers are injected through the **real** inbound path (a window message carrying the plugin's
 source marker), so `requestId` correlation, identity handling and node hydration run exactly as in
-production. Only the inbound direction is faked — `INSERT_NODE` still goes to the host page as usual.
+production. Only the inbound direction is faked — `INSERT_NODE` still goes to the host page as usual;
+why that makes the simulation faithful to the contract is
+[content/HOST-EVENTS.md § Debug mode](content/HOST-EVENTS.md#debug-mode--simulating-the-host-side).
 
 **Test-Node-ID** is what the simulated document reports as the edited node. The default is a fake id
 (the repository load fails silently and the UI falls back to that id); put a real node id in to
-exercise the whole flow including *Speichern*. The flag is persisted in `storage.local`, so it
-survives reloads inside the extension — in a plain `ng serve` there is no extension storage and it
-resets per session.
+exercise the whole flow including *Speichern*. The flag is persisted in `storage.local`
+(`eduSharingDebugMode`) and read in `AppComponent.ngOnInit` **before** anything evaluates
+`onlyOfficePresent()`, so it survives reloads inside the extension — in a plain `ng serve` there is no
+extension storage and it resets per session.
 
 ## Manual test checklist
 

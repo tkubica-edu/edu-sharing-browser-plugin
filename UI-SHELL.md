@@ -51,7 +51,7 @@ own.
 A step that holds something the walk back would destroy **asks first**: it registers a `LeaveGuard` with
 `NavigationService`, which `back()` consults before it moves, so one confirmation covers both back buttons —
 the topbar's and the footer's, which make the same walk. The KI-Qualitätsprüfung is the one step that does,
-because its dialogue lives in the chat widget and ends with the screen (see [chatbot.md](chatbot.md)).
+because its dialogue lives in the chat widget and ends with the screen (see [CHATBOT.md](CHATBOT.md)).
 
 While a utility covers the step, back **closes the utility** and asks nothing: the step underneath was
 never left, so neither its guard nor its trail is involved.
@@ -101,7 +101,7 @@ left alone, and the panel only switches into the mode.
 
 The mechanics of putting the panel back and restoring what it was doing (background worker,
 `storage.session`, `SessionResumeService`) are documented in
-[content/CLAUDE.md § Direction 4](content/CLAUDE.md).
+[content/HOST-EVENTS.md § Direction 4](content/HOST-EVENTS.md#direction-4--extension--browser-staying-open-across-page-changes).
 
 ## Login, session restore and the guest gate
 

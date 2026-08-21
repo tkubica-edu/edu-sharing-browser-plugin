@@ -1,6 +1,6 @@
 /**
  * The inbound half of the host plugin's wire contract (OnlyOffice): the source marker every envelope carries and the
- * payloads this app reads out of it; see `content/CLAUDE.md` for the full event documentation. It lives apart from
+ * payloads this app reads out of it; see `content/HOST-EVENTS.md` for the full event documentation. It lives apart from
  * `OnlyOfficeDocumentService` because the debug simulator fabricates the same envelopes.
  */
 

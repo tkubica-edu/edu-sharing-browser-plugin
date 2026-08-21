@@ -283,18 +283,10 @@ on the node's own page (`…/components/render/<id>`, see `ContentFlowService`):
 ## Debug mode — simulating the host side
 
 `DebugService` (`app-src/src/app/services/debug.service.ts`) stands in for the host-side plugin, so
-the OnlyOffice flows can be developed without an editor. Enabled in *Einstellungen* and persisted in
-`storage.local` (`eduSharingDebugMode`).
-
-| What | Behaviour with debug mode on |
-|---|---|
-| `ConditionsService.onlyOfficePresent` | always true → the OnlyOffice-only options are reachable on any page |
-| `REQUEST_DOCUMENT_CONTENT` | never leaves the sidebar; answered with a `DOCUMENT_CONTENT` envelope carrying a hard-coded German test document (`markdown` + `text`, long enough for the agent's 50-character guard) |
-| `REQUEST_DOCUMENT_INFO` | answered with a `DOCUMENT_INFO` envelope carrying the configured test node id |
-| `PREVIEW_NODE` | nothing requests it → a button in the settings fires one for the test node |
-| `INSERT_NODE` | **unchanged** — only the inbound direction is simulated; the outbound broadcast still goes to the host page |
-
-Two properties make the simulation faithful:
+the OnlyOffice flows can be developed without an editor. What it fakes, how it is switched on and what
+the test node id is for is
+[TESTING.md § Debug mode](../TESTING.md#debug-mode-onlyoffice-without-onlyoffice); what belongs here are
+the two properties that make it a simulation of *this contract* rather than a shortcut around it:
 
 - **Same route.** The answers are not returned from the call: they are posted to the sidebar's own
   window with the plugin's `edu-sharing-onlyoffice-plugin` marker, so `AppComponent`'s single
@@ -305,10 +297,8 @@ Two properties make the simulation faithful:
   `app-src/src/app/model/onlyoffice-events.ts` — the file both the service and the simulator import
   (that split exists to keep them free of an import cycle).
 
-The switch is read in `AppComponent.ngOnInit` **before** anything evaluates `onlyOfficePresent()`
-(option visibility, the boot's `REQUEST_DOCUMENT_INFO`). The test node id is editable in the
-settings: the default is deliberately fake, a real id makes even *Speichern* run through.
-Simulated events are logged with the `[edu-sharing][debug]` prefix.
+Only the **inbound** direction is simulated: `INSERT_NODE` still goes to the host page as usual, so
+nothing in Direction 1 is bypassed.
 
 ---
 
