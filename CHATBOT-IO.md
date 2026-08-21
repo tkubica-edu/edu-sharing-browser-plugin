@@ -241,7 +241,11 @@ It is also the one task that prescribes **how the answer is to be written**, bec
 only the chat and nothing can inject a message into it from outside: a line per criterion starting with
 ✓, ✗ or ○ — met, violated, or nothing in the content to decide it by — then the criterion and the
 reason, then a short verdict on what stands in the way of a release, and then the question that ends the
-step. Those glyphs are what the panel colours the lines by
+step. What the person confirms is the **judgement**, not the content — which is why the chip is labelled
+*Qualitätsbewertung bestätigen* and why the task states that a verdict of „not suitable" is submitted
+just like any other (`confirmed=true`, `suitable=false`). Read as a confirmation of the content, an
+assistant that judged it unfit refuses to close the step, and the check stops on a judgement it has
+already made; what follows from an unsuitable content is the flow's decision, not the assistant's. Those glyphs are what the panel colours the lines by
 ([CHATBOT.md § Correcting the widget from outside it](CHATBOT.md#correcting-the-widget-from-outside-it));
 the panel draws nothing beside the chat, since a second rendering of the same answer would only compete
 with the first.
@@ -251,7 +255,11 @@ WLO vocabulary and answered **with the URI**, plus five to ten keywords. Every f
 because the properties they land in hold lists — asked for a single value the rest is lost before it is
 ever written. A guessed URI does not fail loudly; it quietly matches nothing, so the task forbids
 forming one. It asks for a skill *softly*: there may not be one yet, and a skill that does not exist
-must not read as a step that failed.
+must not read as a step that failed. The task also says outright that the assistant **writes nothing
+itself**: the panel records the values on the strength of the `submit_result` call, so that call is the
+saving as far as the assistant is concerned. Without that sentence a run waits for a save it is not the
+one to make, announces one that is still to come, or asks the panel for a go-ahead — and the step hangs
+on a confirmation that has already been given.
 
 **5 — The closing word.** Not a request: it states that the check is complete, congratulates the person,
 names the four steps behind them and points at the footer — *Abschließen und zur Inhaltsübersicht*, the
@@ -321,7 +329,7 @@ Two per step, prescribed rather than hoped for, so the way on is always there to
 |---|---|---|
 | `origin` | *Inhalt selbst erstellt* / *Inhalt nicht selbst erstellt* | unchanged — both chips are an answer |
 | `proofread` | *Ich bestätige die Korrekturen* / *Korrekturen überspringen* | unchanged — both are a way on |
-| `quality` | *Qualität bestätigen* / *Anpassungen vornehmen* | *Qualität bestätigen* + up to 2 from the widget (cap 3) |
+| `quality` | *Qualitätsbewertung bestätigen* / *Anpassungen vornehmen* | *Qualitätsbewertung bestätigen* + up to 2 from the widget (cap 3) |
 | `enrichment` | *Metadaten bestätigen* / *Anpassungen vornehmen* | *Metadaten bestätigen* + up to 2 from the widget (cap 3) |
 
 The right-hand column holds **as soon as the step's proposal is on screen** — one turn earlier than it reads,

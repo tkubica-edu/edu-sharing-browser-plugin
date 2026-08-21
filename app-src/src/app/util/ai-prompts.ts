@@ -45,7 +45,7 @@ function askedVocabularies(names: readonly string[]): string {
 export const AI_REPLIES = {
   origin: ['Inhalt selbst erstellt', 'Inhalt nicht selbst erstellt'],
   proofread: ['Ich bestätige die Korrekturen', 'Korrekturen überspringen'],
-  quality: ['Qualität bestätigen', 'Anpassungen vornehmen'],
+  quality: ['Qualitätsbewertung bestätigen', 'Anpassungen vornehmen'],
   enrichment: ['Metadaten bestätigen', 'Anpassungen vornehmen']
 } as const;
 
@@ -183,9 +183,13 @@ export const AI_PROMPTS = {
         'steht, erfährt sie nicht.',
       'Bitte sie danach ausdrücklich, dein Urteil durchzugehen und zu bestätigen oder Anpassungen vorzunehmen. ' +
         'Führe sie zu dieser Entscheidung: frag direkt, ob es so stehen bleiben soll, und geh auf ihre Einwände ein.',
-      'Unter deiner Nachricht werden ihr die beiden Antworten als Buttons angeboten: „Qualität bestätigen“ und ' +
-        '„Anpassungen vornehmen“. Du musst sie nicht ausschreiben. Deine Nachricht endet mit der Frage, danach ' +
-        'kommt kein Satz mehr.',
+      'Unter deiner Nachricht werden ihr die beiden Antworten als Buttons angeboten: ' +
+        '„Qualitätsbewertung bestätigen“ und „Anpassungen vornehmen“. Du musst sie nicht ausschreiben. ' +
+        'Deine Nachricht endet mit der Frage, danach kommt kein Satz mehr.',
+      'Bestätigt wird dein Urteil, nicht der Inhalt: die Person lässt es so stehen — auch ein Urteil, das den ' +
+        'Inhalt für Bildung nicht geeignet hält. Ein solches Urteil ist ein vollständiges Ergebnis und kein ' +
+        'Grund, den Schritt offen zu halten: gib es genauso ab, mit confirmed=true und suitable=false. Was mit ' +
+        'einem ungeeigneten Inhalt geschieht, entscheiden wir danach.',
       'Wählt sie „Anpassungen vornehmen“: nimm ihre Änderungen auf, zeig das Urteil, wie es damit lautet, und ' +
         'stell dieselbe Frage erneut. So oft, wie sie Anpassungen will — der Schritt endet erst mit ihrer ' +
         'Bestätigung, und jede deiner Nachrichten endet deshalb mit dieser Frage.',
@@ -206,6 +210,8 @@ export const AI_PROMPTS = {
     'Zur Erinnerung, bevor du antwortest:',
     '- Rufe submit_result in diesem Zug nicht auf. Erst wenn die Person bestätigt hat, und dann mit ' +
       'confirmed=true. Wählt sie „Anpassungen vornehmen“, arbeitest du sie ein und fragst erneut.',
+    '- Auch ein Urteil „nicht geeignet“ wird bestätigt und abgegeben: confirmed=true sagt, dass die Person ' +
+      'dein Urteil so stehen lässt, nicht dass der Inhalt gut ist.',
     '- Schreib dein Urteil in den Chat, und der letzte Satz deiner Nachricht ist die Frage, ob es so stehen ' +
       'bleiben soll. Die Antworten dazu werden ihr als Buttons angeboten; du listest keine Antwortvorschläge ' +
       'auf und schreibst nach der Frage keinen Satz mehr.'
@@ -246,7 +252,11 @@ export const AI_PROMPTS = {
         'Bestätigung, und jede deiner Nachrichten endet deshalb mit dieser Frage.',
       'Rufe submit_result ERST auf, wenn sie bestätigt hat — mit ihren Korrekturen, falls sie welche hatte, und ' +
         'mit confirmed=true. In dem Zug, in dem du die Werte vorschlägst, rufst du es nicht auf: dieser Zug ' +
-        'endet mit der Frage. Ohne den Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.'
+        'endet mit der Frage. Ohne den Aufruf ist das Ergebnis für uns nicht da, auch wenn es im Chat steht.',
+      'Speichern musst du nichts und kannst es auch nicht: die Werte trägt das Panel selbst am Inhalt ein, und ' +
+        'zwar auf deinen submit_result-Aufruf hin. Dieser Aufruf IST das Speichern, soweit es dich angeht. ' +
+        'Warte also nicht darauf, dass jemand speichert, frag uns nicht um eine Freigabe und kündige kein ' +
+        'Speichern an, das noch kommt — mit dem Aufruf ist dein Teil getan, und der Schritt ist fertig.'
     ];
   },
 
