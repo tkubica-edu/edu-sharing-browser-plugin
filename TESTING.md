@@ -62,7 +62,10 @@ Two rules a new spec has to obey:
   timers, and `TestBed.tick()` to flush an `effect()`.
 
 Console logs are silenced per test so a report stays readable; `warn` and `error` are not. Set
-`TEST_LOGS=1` to see the `[edu-sharing][…]` lines of the run you are debugging.
+`TEST_LOGS=1` to see the `[edu-sharing][…]` lines of the run you are debugging. `quiet-logs.setup.ts`
+reads that variable through `process.env`, which is why `@types/node` is a devDependency of `app-src`
+itself: `tsconfig.spec.json` inherits the default type resolution, and the CI `test` job installs the
+sidebar's lockfile alone — nothing there may lean on the root install's transitive copy.
 
 `npm run test:coverage` prints a summary and writes the report to `app-src/coverage/sidebar/`:
 `index.html` to open in a browser and drill into a file's uncovered lines, `lcov.info` for an IDE or a
