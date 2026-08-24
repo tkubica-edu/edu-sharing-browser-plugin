@@ -50,10 +50,18 @@ What is known not to work, known to be unverified, or known to look wrong at fir
 
 ## Dependencies and runtime limits
 
-- **`ngx-edu-sharing-api`** (10.0.10) is Angular-only and declares a peer dep of Angular >= 18, while
+- **`ngx-edu-sharing-api`** (11.0.2) is Angular-only and declares a peer dep of Angular >= 18, while
   the app runs Angular 21, so installing needs `legacy-peer-deps=true` (set in `app-src/.npmrc`). It
   is used for login, node create/update/read, and adding collection references; the last one goes
   through `CollectionServiceUnwrapped`, since the exported `CollectionService` wrapper is read-only.
+- **`ngx-edu-sharing-api` imports `lodash` without declaring it.** `omit` is pulled in by its
+  `fesm2022` bundle while the library's `package.json` lists neither a dependency nor a peer
+  dependency for it, so `app-src/package.json` carries `lodash` itself. Without that entry nothing
+  in `app-src/node_modules` resolves the import: the repo root's copy — hoisted out of `web-ext` —
+  covers it only for a checkout that installed the root dependencies too, which the CI `test` job
+  does not. The same import is what makes the Angular build report `Module 'lodash' … is not ESM`,
+  and it is what `app-src/vitest.config.ts` inlines the library for, see
+  [TESTING.md § Unit tests](TESTING.md#unit-tests).
 - **A resolved node can hide the panel's own text.** The KI check hands the content's wording over as
   `page_text` in the chat context and no longer quotes it in the instruction, while the chatbot backend
   renders "the current page" from whatever `node_id` / `collection_id` resolves to and reads `page_text`
