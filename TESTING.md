@@ -76,6 +76,10 @@ default `npm test` path on purpose — a break in the coverage provider then can
 build and imports `lodash`, a CommonJS package Node cannot take named exports from, so the library is
 inlined to be routed through Vite instead.
 
+Ten of the panel's 34 services are covered, and `src/app/util/**` is measured but has no spec at all.
+What is still uncovered, which kind of test each part of it needs and in which order to work is
+[TEST-PLAN.md](TEST-PLAN.md).
+
 ## Load the extension
 
 **Chrome / Edge**: `chrome://extensions` → enable *Developer mode* → *Load unpacked* → select

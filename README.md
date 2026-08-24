@@ -89,6 +89,7 @@ tagged release — see [BUILD.md](BUILD.md#prebuilt-downloads).
 | [WIDGET-REFERENZ.md](WIDGET-REFERENZ.md) | `<metadata-agent-canvas>`: layouts, attributes, events — a snapshot of the metadata-agent project's own widget, in German |
 | [BUILD.md](BUILD.md) | Building, what goes into the package, CI artifacts, cutting a release |
 | [TESTING.md](TESTING.md) | The service unit tests, loading the extension, the OnlyOffice debug mode, the manual test checklist |
+| [TEST-PLAN.md](TEST-PLAN.md) | What is not covered yet, which kind of test each area needs, in which order |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Known issues, permission quirks, bundle size, lint output |
 
 ## Project layout
