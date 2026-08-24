@@ -14,6 +14,7 @@
     "@angular/forms": "^21.0.0",
     "@angular/platform-browser": "^21.0.0",
     "ngx-edu-sharing-api": "^11.0.2",
+    "onnxruntime-web": "^1.27.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.6.0",
     "uuid": "^3.4.0",

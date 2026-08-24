@@ -37,6 +37,24 @@ of what the options *do*.
   for an active node or a fresh result that was never saved. Extracted fields and the raw JSON
   stay in collapsibles.
 
+- **In 3D umwandeln** — under the picture that `MdsPreviewWidgetComponent` renders, on the metadata
+  screen and on the curation preview alike. It estimates a depth per pixel of the preview picture and
+  displaces a grid over it by that depth, giving a relief that is shown in a turnable WebGL viewer
+  (`ImageTo3dComponent`, `util/relief-viewer.ts`) and can be filed as its own material — a glTF binary
+  written by `util/glb.ts` and created through `MaterialUploadService` in the inbox, named after the
+  content with a `-3d.glb` suffix. Filing it needs a repository session of the panel's own
+  (`AuthService.loggedIn`, not `authorized()` — the same requirement as *Datei oder Link*, since the
+  node is created under the user's account and a host-provided guest session may write nothing); where
+  there is none, the offer is replaced by the reason for it. Converting and turning the relief need no
+  session at all. The estimate runs on the device: the picture is read through the
+  extension's own `host_permissions` and reaches no server. What comes out is a relief and not a body —
+  a single picture says nothing about the far side of what it shows — so it reads as a scene with depth
+  seen from roughly the camera that took it. The button is left out entirely where the browser cannot
+  draw the result (`reliefViewerSupported`). The model and the runtime it needs are fetched once and
+  cached; see [ARCHITECTURE.md § Network legs & CORS](ARCHITECTURE.md#network-legs--cors) for what is
+  fetched and [TROUBLESHOOTING.md § Dependencies and runtime limits](TROUBLESHOOTING.md#dependencies-and-runtime-limits)
+  for what it costs.
+
 Which editor renders that screen, and which route the save takes, is
 [WEB-COMPONENTS.md](WEB-COMPONENTS.md) and [ARCHITECTURE.md § Saving a content](ARCHITECTURE.md#saving-a-content).
 

@@ -9,4 +9,10 @@
 
   <!-- Created imperatively into #host: `embedded` must be a property before the element connects. -->
   <div #host class="pw-host"></div>
+
+  <!-- Under the picture, so it reads as an offer about the picture above it. Inside the wrapper, so a
+       locked group locks the conversion with it. -->
+  @if (ready()) {
+    <es-image-to-3d [source]="previewSource" [contentName]="contentName()"></es-image-to-3d>
+  }
 </div>

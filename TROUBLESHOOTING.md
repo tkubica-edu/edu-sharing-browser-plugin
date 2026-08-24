@@ -62,6 +62,20 @@ What is known not to work, known to be unverified, or known to look wrong at fir
   is the backend's business, not the panel's. Watch for an answer that judges every criterion by what it
   calls the *zugänglicher Text*, or one that calls `get_url_text` on the source page; both say the text
   never arrived. See [CHATBOT-IO.md § Where the content's text stands](CHATBOT-IO.md#where-the-contents-text-stands).
+- **The 3D conversion downloads ~40 MB before its first run.** `DepthModelService` fetches the
+  Depth-Anything-V2-Small model (uint8, ~27 MB) and the onnxruntime-web WASM (~13 MB) and keeps both in
+  Cache storage. A browser that hands out no cache for extension pages (a private window, cleared site
+  data) costs that download again on the next run and nothing else — the failures are swallowed. The
+  estimate itself runs single-threaded on the main thread, roughly one to three seconds for a 518 px
+  input, during which the panel does not repaint; the wait is announced but not interruptible.
+- **The 3D result is a relief, not a solid.** One picture carries no information about what is behind
+  what it shows, so the mesh is a displaced surface: convincing near the angle the picture was taken
+  from, and plainly flat-backed when turned right around. `ReliefViewer` limits the turn to about 80°
+  for that reason. Depth Anything's values are inverse depth on an arbitrary scale — comparable within
+  one picture, meaningless between two — so only their order carries into the geometry.
+- **The 3D button is hidden where WebGL is missing.** `reliefViewerSupported()` requires WebGL plus
+  `OES_element_index_uint`; a relief of any useful resolution exceeds the 65 536 vertices a draw call
+  can address without it. The probe costs a WebGL context, so it is answered once and remembered.
 - **The repository URL cannot be changed at runtime** without reloading the sidebar — the library
   freezes `rootUrl` at bootstrap and does not export its config classes.
 - **The agent may only edit its own node for two hours.** Along the guest route the repository

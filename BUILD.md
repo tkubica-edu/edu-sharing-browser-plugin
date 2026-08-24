@@ -29,6 +29,13 @@ The manifest is assembled per target from `manifest.base.json` plus `manifest.<t
 is where the targets differ: Chrome and Safari get a `service_worker` (`sw.js`), Firefox gets
 `background.scripts` (an event page) and its `browser_specific_settings`.
 
+The base manifest's `extension_pages` CSP keeps `script-src` at `'self'` and adds
+`'wasm-unsafe-eval'`, which is what lets the sidebar compile the ONNX runtime the 3D conversion runs
+on (`DepthModelService`). It permits compiling WebAssembly and nothing else — scripts still have to
+come from the package. The runtime's WASM binary is therefore fetched as data and handed over as
+`env.wasm.wasmBinary` rather than loaded by URL, and it runs single-threaded, since its worker pool
+would start from a `blob:` URL that `script-src 'self'` forbids.
+
 Changes to the Angular app only reach the loaded extension through a build — `ng build` in
 `app-src/` alone is not enough, since `scripts/build.mjs` is what refreshes `sidebar/` and assembles
 `dist/`.

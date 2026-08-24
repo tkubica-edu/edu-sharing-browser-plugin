@@ -12,6 +12,7 @@ import {
 import { MdsSuggestion, NodeSuggestions, aiFieldsOf, aiSuggestionsFor } from '../../../util/mds-suggestions';
 import { LICENSE_FIELDS, mapAgentFields } from '../../../util/agent-fields';
 import { loadWebComponentBundle } from '../../../services/web-component-bundle.service';
+import { ImageTo3dComponent } from '../image-to-3d/image-to-3d.component';
 
 const EDITOR_TAG = 'edu-sharing-mds-editor-wrapper';
 
@@ -54,6 +55,7 @@ interface MdsEditorElement extends HTMLElement {
  */
 @Component({
   selector: 'es-mds-preview-widget',
+  imports: [ImageTo3dComponent],
   templateUrl: './mds-preview-widget.component.html',
   styleUrl: './mds-preview-widget.component.scss',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -119,6 +121,19 @@ export class MdsPreviewWidgetComponent implements OnDestroy {
   /** The picture the group's preview widget currently shows — see {@link previewSrcOf}. */
   currentPreviewSrc(): string | null {
     return previewSrcOf(this.element);
+  }
+
+  /**
+   * Hands the picture's address to the 3D conversion below the widget, as a function rather than a
+   * value: the widget draws the picture itself, so there is an address only once it has, and it changes
+   * again with every redraw.
+   */
+  protected readonly previewSource = (): string | null => this.currentPreviewSrc();
+
+  /** The content's name, which the 3D model is named after. */
+  protected contentName(): string | null {
+    const node = this.node();
+    return node.name ?? firstString(node.properties?.[NAME_FIELD]);
   }
 
   constructor() {

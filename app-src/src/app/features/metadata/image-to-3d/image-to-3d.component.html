@@ -1,0 +1,75 @@
+<!-- Nothing at all where the browser could not draw the result: an offer that ends in an error message
+     is worse than no offer. -->
+@if (supported) {
+  <div class="i3-wrap">
+    @if (!relief()) {
+      <div class="i3-offer">
+        <button type="button" class="es-btn es-btn--tonal es-btn--small"
+                [disabled]="converting()" (click)="convert()">
+          <i esIcon="deployed_code"></i>
+          <span>In 3D umwandeln</span>
+        </button>
+        @if (!converting()) {
+          <p class="es-muted i3-note">
+            Rechnet auf diesem Gerät — das Bild wird an keinen Server gesendet.
+            @if (!depthModel.loaded()) {
+              Der erste Aufruf lädt einmalig das Modell (rund 40 MB).
+            }
+          </p>
+        }
+      </div>
+    }
+
+    @if (converting()) {
+      <div class="i3-wait">
+        <es-spinner />
+        <p class="es-muted">{{ waitLabel() }}</p>
+        @if (depthModel.progress() !== null) {
+          <div class="i3-bar"><span [style.width.%]="(depthModel.progress() ?? 0) * 100"></span></div>
+        }
+      </div>
+    }
+
+    @if (relief(); as result) {
+      <!-- `touch-action: none` in the stylesheet: the canvas takes the drag itself, so the panel
+           underneath must not scroll along with it. -->
+      <canvas #canvas class="i3-canvas" aria-label="3D-Ansicht des Vorschaubilds"></canvas>
+      <p class="es-muted i3-note">
+        Ziehen dreht die Ansicht, das Mausrad zoomt. Ein Relief aus einem einzelnen Bild — was hinter
+        dem Sichtbaren liegt, kann es nicht kennen.
+      </p>
+
+      <div class="es-row i3-actions">
+        @if (auth.loggedIn()) {
+          <button type="button" class="es-btn es-btn--primary es-btn--small"
+                  [disabled]="saving()" (click)="save()">
+            <i esIcon="save"></i>
+            <span>{{ saving() ? 'Wird gespeichert …' : 'Als 3D-Material ablegen' }}</span>
+          </button>
+        }
+        <button type="button" class="es-btn es-btn--text" (click)="reset()">Ansicht zurücksetzen</button>
+        <button type="button" class="es-btn es-btn--text" (click)="discard()">Verwerfen</button>
+        @if (fileSize(); as size) {
+          <span class="es-chip">{{ result.file.name }} · {{ size }}</span>
+        }
+      </div>
+
+      <!-- Stated where the offer is missing, so its absence reads as a requirement and not as a
+           feature that is gone. The relief itself stays turnable without any session. -->
+      @if (!auth.loggedIn()) {
+        <p class="es-muted i3-note">
+          Zum Ablegen im Repository ist eine Anmeldung erforderlich — das 3D-Material wird unter deinem
+          Konto angelegt.
+        </p>
+      }
+
+      @if (savedAs(); as name) {
+        <p class="i3-saved"><i esIcon="check_circle"></i> Als „{{ name }}“ abgelegt.</p>
+      }
+    }
+
+    @if (error(); as message) {
+      <p class="es-error">3D-Umwandlung fehlgeschlagen: {{ message }}</p>
+    }
+  </div>
+}

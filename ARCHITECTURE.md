@@ -76,6 +76,8 @@ precedes every `/generate` rather than as a failed extraction a minute later.
 | `POST /extract-field` (Metadata-Agent) | sidebar document (`MetadataAgentService`) | same context the WLO canvas calls `/generate` from, so the request is visible in the panel's own DevTools and there is no worker build that can fall out of sync with the app. Relies on `host_permissions` for the cross-origin call, like the repository login |
 | Page content extraction | `scripting.executeScript` (background) | no cross-origin fetch |
 | Repository login | Angular `HttpClient` (library) | the library owns the call; relies on `host_permissions` bypassing CORS on Chrome/Edge/Firefox |
+| Preview picture for the 3D conversion | sidebar document (`ImageTo3dComponent`) | `fetch` with `credentials: 'include'`; the repository shares the picture with no other origin, so this reads it through `host_permissions` rather than through the page. The pixels stay in the document — nothing is uploaded |
+| Depth model + ONNX runtime WASM | sidebar document (`DepthModelService`) | the two public files the on-device estimate needs, from `huggingface.co` and `cdn.jsdelivr.net`; both are kept in Cache storage under `es-image-to-3d-v1`, so only the first conversion waits for them. The WASM address is derived from `env.versions.web`, so runtime and binary can never drift apart |
 
 Every message to the worker goes through one send path (`BrowserExtensionService.ask`). A rejection
 saying the message found **no receiver** is retried a few times with a short backoff instead of being
