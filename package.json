@@ -6,6 +6,7 @@
   "description": "Cross-browser (Chrome/Edge/Firefox/Safari) edu-sharing Erschließung extension with an Angular sidebar.",
   "scripts": {
     "install:app": "npm --prefix app-src install",
+    "test": "npm --prefix app-src run test",
     "build": "npm run install:app && node scripts/build.mjs --target=all",
     "build:chrome": "node scripts/build.mjs --target=chrome",
     "build:firefox": "node scripts/build.mjs --target=firefox",
@@ -14,8 +15,9 @@
     "dev:firefox": "node scripts/build.mjs --target=firefox --watch --run",
     "dev:chrome": "node scripts/build.mjs --target=chrome --watch",
     "lint:firefox": "web-ext lint --source-dir dist/firefox",
-    "start:firefox": "web-ext run --source-dir dist/firefox",
-    "version:set": "node scripts/version.mjs"
+    "start:firefox": "web-ext run --source-di/r dist/firefox",
+    "version:set": "node scripts/version.mjs",
+    "test:coverage": "npm --prefix app-src run test:coverage"
   },
   "devDependencies": {
     "archiver": "^7.0.1",

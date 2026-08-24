@@ -1,5 +1,6 @@
 # Load & test
 
+- [Unit tests](#unit-tests)
 - [Load the extension](#load-the-extension)
 - [Dev mode (faked KI answers)](#dev-mode-faked-ki-answers)
 - [Debug mode (OnlyOffice without OnlyOffice)](#debug-mode-onlyoffice-without-onlyoffice)
@@ -9,6 +10,68 @@
 Building first: [BUILD.md](BUILD.md).
 
 ---
+
+## Unit tests
+
+```bash
+npm test                  # once, from the repo root
+npm --prefix app-src run test:watch
+npm --prefix app-src run test:coverage
+npm --prefix app-src run test -- --include app/services/history.service.spec.ts
+```
+
+`ng test` runs the `@angular/build:unit-test` builder with the Vitest runner in a Node process with
+jsdom — no browser and no extension. The target's `include` is `src/app/services/**/*.spec.ts`: the
+services own the panel's logic, and each spec drives one of them through `TestBed` with its
+dependencies replaced. `--include` patterns are relative to `src`, and `--list-tests` prints what the
+builder discovered without running it.
+
+**No test reaches a real service.** Three things stand in the way, in `app-src/src/testing/`:
+
+- `no-network.setup.ts` replaces `fetch` per test with a function that *records* the address and then
+  throws, and fails the test in `afterEach` if anything was recorded. The recording is the load-bearing
+  half — `fetchJson` in `util/json-api.ts` turns any `fetch` rejection into its own
+  „&lt;service&gt; nicht erreichbar", which a test could otherwise assert on and pass. The same hook calls
+  `HttpTestingController.verify()`, so an unanswered `HttpClient` request is named rather than left to
+  time out. A spec that exercises a `fetch` of its own (`metalookup.service.spec.ts`) stubs the global
+  again in its own `beforeEach`, which runs later and wins.
+- `test-providers.ts` is the builder's `providersFile` and supplies `provideHttpClient()` plus
+  `provideHttpClientTesting()` for every `TestBed`, so anything going through `ngx-edu-sharing-api`
+  answers from the testing backend. `ApiConfiguration` is deliberately **not** provided: constructing a
+  real library service fails with a `NullInjectorError` naming the token, which reads as "fake this".
+- `extension-globals.setup.ts` installs `globalThis.chrome` and `globalThis.browser` whose only
+  answering member is `runtime.id`; every other member throws and names
+  `fakeBrowserExtension()`. See [TROUBLESHOOTING.md § Dependencies and runtime
+  limits](TROUBLESHOOTING.md#dependencies-and-runtime-limits) for why that global has to exist at all.
+
+Fakes live in `app-src/src/testing/fakes/`, one file per faked service, each a factory returning the
+fake and the knobs a spec drives it with. They are checked against the real surface with
+`satisfies Partial<TheRealService>` and handed to DI through `provideFake()`, which holds the single
+cast in the whole test setup — renaming a member of a real service turns every stale fake into a
+compile error instead of leaving specs that pass against a surface the app no longer has.
+
+Two rules a new spec has to obey:
+
+- **`vi.mock()` on a relative import throws.** The builder injects an `angular:vitest-mock-patch`
+  entry that refuses any specifier starting with `.` or `/`. Replace a dependency through
+  `TestBed` providers instead — every service uses `inject()` field injection, so there is nothing else
+  to work around.
+- **`fakeAsync()` and `tick()` are unavailable.** The app is zoneless (`provideZonelessChangeDetection`
+  in `app-src/src/app/app.config.ts`, `polyfills: []` in `angular.json`), so `zone.js/testing` is never
+  loaded and those helpers throw. Use `vi.useFakeTimers()` with `await vi.advanceTimersByTimeAsync(ms)` for
+  timers, and `TestBed.tick()` to flush an `effect()`.
+
+Console logs are silenced per test so a report stays readable; `warn` and `error` are not. Set
+`TEST_LOGS=1` to see the `[edu-sharing][…]` lines of the run you are debugging.
+
+`npm run test:coverage` prints a summary and writes the report to `app-src/coverage/sidebar/`:
+`index.html` to open in a browser and drill into a file's uncovered lines, `lcov.info` for an IDE or a
+CI service. The directory is wiped at the start of each run and is gitignored. Coverage is off the
+default `npm test` path on purpose — a break in the coverage provider then cannot fail CI.
+
+`app-src/vitest.config.ts` exists for one reason: `ngx-edu-sharing-api` is left external by the test
+build and imports `lodash`, a CommonJS package Node cannot take named exports from, so the library is
+inlined to be routed through Vite instead.
 
 ## Load the extension
 
@@ -158,6 +221,10 @@ exercise the whole flow including *Speichern*. The flag is persisted in `storage
 extension storage and it resets per session.
 
 ## Manual test checklist
+
+What the unit tests above cannot answer, and what this list is therefore for: anything that needs a
+real browser, a real repository or a real host page — the panel's own docking and resizing, the
+embedded web components, the repository's answers, and the OnlyOffice event exchange.
 
 1. **Panel.** Toolbar click → the sidebar docks on the right; drag its left edge to resize; the ✕
    button closes it — and the page must take the freed width back immediately (no empty strip), also

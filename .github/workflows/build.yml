@@ -38,6 +38,12 @@ jobs:
       - name: Install sidebar dependencies
         run: npm ci --prefix app-src
 
+      # Before the build, so a broken contract is reported in seconds rather than
+      # after three extension targets have been packaged. Vitest in jsdom, no
+      # browser and no network — every outbound call is faked, see app-src/src/testing/.
+      - name: Test sidebar services
+        run: npm --prefix app-src run test
+
       # Called directly rather than via `npm run build`, which would re-run an
       # unpinned `npm install` in app-src on top of the lockfile install above.
       - name: Build all targets

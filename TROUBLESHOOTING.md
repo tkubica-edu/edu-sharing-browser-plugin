@@ -62,6 +62,22 @@ What is known not to work, known to be unverified, or known to look wrong at fir
   is the backend's business, not the panel's. Watch for an answer that judges every criterion by what it
   calls the *zugänglicher Text*, or one that calls `get_url_text` on the source page; both say the text
   never arrived. See [CHATBOT-IO.md § Where the content's text stands](CHATBOT-IO.md#where-the-contents-text-stands).
+- **`webextension-polyfill` throws when it is merely imported** outside an extension: its first
+  statement is `if (!globalThis.chrome?.runtime?.id) throw`. Almost every service reaches it
+  transitively — a DI token pulls in the class, the class pulls in `BrowserExtensionService`, and that
+  imports the polyfill — so a unit test cannot avoid it by not touching the extension.
+  `app-src/src/testing/extension-globals.setup.ts` therefore installs a `globalThis.browser` that
+  already carries a `runtime.id`, which makes the polyfill skip its own wrapper construction and
+  re-export that object unchanged. **That last part rests on the shape of `dist/browser-polyfill.js`
+  rather than on a documented contract**; should a version drop the `else module.exports =
+  globalThis.browser` branch, every spec would fail at import with *"This script should only be loaded
+  in a browser extension."* The setup file also depends on Vitest running setup files before the test
+  module is imported. See [TESTING.md § Unit tests](TESTING.md#unit-tests).
+- **`@angular/build:unit-test` is marked `[EXPERIMENTAL]`** by its own builder description, and
+  `providersFile`, `setupFiles` and the generated `angular:test-bed-init` are outside semver. The
+  lockfile pins the builder; treat a minor bump as a change that needs `npm test` run before it is
+  merged. Everything that moves lives in `app-src/src/testing/`, so a builder change touches one
+  directory.
 - **The repository URL cannot be changed at runtime** without reloading the sidebar — the library
   freezes `rootUrl` at bootstrap and does not export its config classes.
 - **The agent may only edit its own node for two hours.** Along the guest route the repository

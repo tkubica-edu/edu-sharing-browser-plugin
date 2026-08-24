@@ -5,7 +5,10 @@
   "description": "Angular sidebar app for the edu-sharing extension.",
   "scripts": {
     "build": "ng build --configuration=production",
-    "watch": "ng build --watch --configuration=development"
+    "watch": "ng build --watch --configuration=development",
+    "test": "ng test --no-watch",
+    "test:watch": "ng test --watch",
+    "test:coverage": "ng test --no-watch --coverage"
   },
   "dependencies": {
     "@angular/common": "^21.0.0",
@@ -25,6 +28,9 @@
     "@angular/cli": "^21.0.0",
     "@angular/compiler-cli": "^21.0.0",
     "@types/webextension-polyfill": "^0.12.5",
-    "typescript": "~5.9.0"
+    "@vitest/coverage-v8": "^4.1.11",
+    "jsdom": "^29.1.1",
+    "typescript": "~5.9.0",
+    "vitest": "^4.1.11"
   }
 }

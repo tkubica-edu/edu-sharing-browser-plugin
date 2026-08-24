@@ -3,6 +3,7 @@ dist/
 app-src/node_modules/
 app-src/dist/
 app-src/.angular/
+app-src/coverage/
 *.log
 .DS_Store
 # Claude's local state stays out; what the project shares — its skills and the permissions

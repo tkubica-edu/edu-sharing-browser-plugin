@@ -56,6 +56,11 @@ is [TROUBLESHOOTING.md § Bundle size](TROUBLESHOOTING.md#bundle-size).
 
 ## Prebuilt downloads
 
+CI runs the sidebar's unit tests (`npm --prefix app-src run test`) after both lockfile installs and
+before `scripts/build.mjs`, so a broken contract is reported in seconds rather than after three
+targets have been packaged. Unlike the Firefox lint it has no `continue-on-error`: a failing test
+fails the build. See [TESTING.md § Unit tests](TESTING.md#unit-tests).
+
 Every push builds all three targets on CI (`.github/workflows/build.yml`); the runs under *Actions*
 carry the unpacked builds as artifacts. Tagged versions (`v*`) also publish a GitHub **Release** with
 `edu-sharing-{chrome,firefox,safari}-<version>.zip` attached — those need no login and are the ones
