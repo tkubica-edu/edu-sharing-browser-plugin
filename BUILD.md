@@ -56,13 +56,25 @@ is [TROUBLESHOOTING.md § Bundle size](TROUBLESHOOTING.md#bundle-size).
 
 ## Prebuilt downloads
 
-CI runs the sidebar's unit tests (`npm --prefix app-src run test`) after both lockfile installs and
-before `scripts/build.mjs`, so a broken contract is reported in seconds rather than after three
-targets have been packaged. Unlike the Firefox lint it has no `continue-on-error`: a failing test
-fails the build. See [TESTING.md § Unit tests](TESTING.md#unit-tests).
+`.github/workflows/build.yml` runs three jobs. `test` and `build` start together and share nothing:
+`test` installs the sidebar's lockfile alone and runs `npm --prefix app-src run test`, so the unit
+tests are a check of their own that lands in about a minute instead of behind the packaging of three
+54 MB targets. Unlike the Firefox lint it has no `continue-on-error` — a failing test fails the
+run and blocks the release. See [TESTING.md § Unit tests](TESTING.md#unit-tests). `build` installs
+both lockfiles, runs `scripts/build.mjs --target=all`, zips Safari, lints the Firefox target and
+uploads the three unpacked builds. A per-target matrix would buy nothing: `--target=all` is one
+`ng build` plus file copies out of the same 68 MB of vendored bundles.
 
-Every push builds all three targets on CI (`.github/workflows/build.yml`); the runs under *Actions*
-carry the unpacked builds as artifacts. Tagged versions (`v*`) also publish a GitHub **Release** with
+`release` runs on `v*` tags only, `needs` both other jobs, and is the sole holder of
+`contents: write` — the workflow is read-only otherwise, so the job that executes the whole npm
+dependency tree cannot write to the repository. The split is possible because the naming of the
+assets stays in `build`, which has the checkout it needs to compare the tag against
+`manifest.base.json`; the finished `edu-sharing-<target>-<version>.zip` files travel over as the
+`edu-sharing-release-zips` artifact, and `release` downloads them, writes the notes and calls
+`gh release create` without a checkout of its own.
+
+Every push to `main`, every pull request and every `v*` tag goes through it, and the runs under
+*Actions* carry the unpacked builds as artifacts. A tag also publishes a GitHub **Release** with
 `edu-sharing-{chrome,firefox,safari}-<version>.zip` attached — those need no login and are the ones
 to hand to testers. Loading them is the same as loading a local build, see
 [TESTING.md](TESTING.md#load-the-extension).
@@ -71,7 +83,8 @@ to hand to testers. Loading them is the same as loading a local build, see
 
 A pushed `v*` tag is the whole trigger — CI builds, zips and publishes on its own. One-time
 prerequisite: *Settings → Actions → General → Workflow permissions* must be **Read and write**,
-otherwise `gh release create` fails with a 403.
+otherwise `gh release create` fails with a 403. That setting is the ceiling for what a job can be
+granted, not the grant itself — inside the workflow the write is held by the `release` job alone.
 
 1. Set the new version:
    ```bash

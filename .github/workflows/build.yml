@@ -11,10 +11,36 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only by default. Only the release job is granted the write it needs, so
+# the job that runs the whole npm dependency tree cannot touch the repository.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  # The sidebar's unit tests need neither the root deps nor a browser: Vitest in
+  # jsdom, every outbound call faked (see app-src/src/testing/). Its own job, so
+  # the result is a separate check that does not wait for the packaging, and runs
+  # alongside the build rather than in front of it.
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: app-src/package-lock.json
+
+      # The --prefix form picks up app-src/.npmrc, which sets legacy-peer-deps
+      # for ngx-edu-sharing-api.
+      - name: Install sidebar dependencies
+        run: npm ci --prefix app-src
+
+      - name: Test sidebar services
+        run: npm --prefix app-src run test
+
   build:
     runs-on: ubuntu-latest
 
@@ -37,12 +63,6 @@ jobs:
 
       - name: Install sidebar dependencies
         run: npm ci --prefix app-src
-
-      # Before the build, so a broken contract is reported in seconds rather than
-      # after three extension targets have been packaged. Vitest in jsdom, no
-      # browser and no network — every outbound call is faked, see app-src/src/testing/.
-      - name: Test sidebar services
-        run: npm --prefix app-src run test
 
       # Called directly rather than via `npm run build`, which would re-run an
       # unpinned `npm install` in app-src on top of the lockfile install above.
@@ -78,6 +98,8 @@ jobs:
           name: edu-sharing-safari
           path: dist/safari
 
+      # Named here, where the checkout can compare the tag against the manifest;
+      # the release job publishes exactly these files.
       - name: Name release assets
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
@@ -91,8 +113,33 @@ jobs:
             cp "dist/$target.zip" "release/edu-sharing-$target-$version.zip"
           done
 
-      - name: Publish release
+      # Handover to the release job. The files are already compressed, so the
+      # action must not zip them a second time.
+      - name: Upload release assets
         if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v7
+        with:
+          name: edu-sharing-release-zips
+          path: release
+          compression-level: 0
+
+  # Needs no checkout and no install: the assets come from the build job, the
+  # notes are written here, and gh is preinstalled on the runner.
+  release:
+    needs: [test, build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: edu-sharing-release-zips
+          path: release
+
+      - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
