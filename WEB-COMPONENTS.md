@@ -10,6 +10,7 @@ document — no iframes**. Three prebuilt bundles ship with the extension:
 | boerdi | `scripts/boerdi/` → `boerdi/` | `boerdi-chat` (the KI assistant) |
 
 - [Loading a bundle](#loading-a-bundle)
+- [Handing the theme to a bundle](#handing-the-theme-to-a-bundle)
 - [The optional WLO metadata editor](#the-optional-wlo-metadata-editor)
 - [Refreshing a bundle](#refreshing-a-bundle)
 
@@ -52,6 +53,36 @@ the scripts run — mirroring `window.__env.EDU_SHARING_API_URL` for the edu bun
 names are content-hashed, so its entry points are read from its own `index.html`; `edu/` and
 `boerdi/` have stable names and are declared in the service.
 
+## Handing the theme to a bundle
+
+The bundles run in the panel's own document, so a light form in a dark panel is not an embedding
+detail but the panel's own surface being wrong. Each bundle is therefore handed the theme
+`ThemeService` resolved, and each takes it differently:
+
+| Bundle | What it is handed | Follows a switch without a reload |
+|---|---|---|
+| edu | `localStorage['accessibility_darkMode'] = "auto"` plus an answered `(prefers-color-scheme: dark)` query (`util/bundle-theme.ts`) | yes |
+| boerdi | the element's `theme` attribute, `"light"` or `"dark"` (`AiAssistantScreenComponent`) | yes |
+| wlo | nothing — the bundle ships no dark theme (see [TROUBLESHOOTING.md](TROUBLESHOOTING.md#the-wlo-canvas-has-no-dark-theme)) | – |
+
+The edu bundle's own theme service resolves `(a query param ?? the stored preference) === 'dark'`, or
+the media query where that preference is `auto`; from that it puts `isDarkTheme` / `isLightTheme` on
+`<body>`, recomputes its whole Material palette and pulls in its dark token set. `installBundleTheme()`
+runs as the app boots rather than where the bundle is loaded, because the preference is read at the
+bundle's bootstrap and the answer has to exist by then; `publishPanelTheme()` reports every later
+switch. The mechanics and the two things to know about the patch are in
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md#dependencies-and-runtime-limits).
+
+`styles/_embedded-material.scss` needs nothing for this. Its `:root` overrides win over the `html { … }`
+of both bundles, while the edu bundle's dark set is declared on `body.isDarkTheme` and beats `:root`
+by inheritance proximity — so the panel's surfaces hold in light and the bundle's own hold in dark.
+
+The boerdi widget's `theme` attribute also takes `auto`, which is deliberately not used: `auto` has
+the widget read the browser's preference, and the panel's setting is allowed to overrule exactly that.
+It is the one attribute the chat element is given that is followed rather than read once on mount —
+the settings are laid *over* the chat screen rather than entered in its place, so the conversation is
+still there to be repainted (see [UI-SHELL.md](UI-SHELL.md#chrome-topbar-status-bar-footer)).
+
 ## The optional WLO metadata editor
 
 `BrowserExtensionCustomWebComponentService` watches the repository config for the boolean variable
@@ -66,7 +97,9 @@ It also reshapes the footer buttons: the flag adds `wlo-theme` to the document e
 `app-src/src/styles/_wlo-theme.scss` rounds them into pills, like the buttons of the bundle itself.
 Its colours are not adopted — that palette (surface `#fcf8fd`) tints the panel violet-grey and reads
 as washed out beside its own white surfaces, so `_embedded-material.scss` goes on holding the canvas
-to the panel's colours instead.
+to the panel's colours instead. In a dark panel that is reversed for these two screens alone: the
+canvas has no dark theme, so it keeps its own light one and `_wlo-canvas-light.scss` holds it there,
+see [TROUBLESHOOTING.md](TROUBLESHOOTING.md#the-wlo-canvas-has-no-dark-theme).
 
 The per-mode settings are the two presets the bundle's own `examples/canvas-parameter-demo.html`
 documents — "Plugin" and "Detail (readonly)" — kept verbatim in `CONFIGS` so they stay comparable

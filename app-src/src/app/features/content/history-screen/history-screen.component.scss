@@ -12,12 +12,12 @@
 .item { background: var(--es-surface); border: 1px solid var(--es-border); border-radius: var(--es-radius); margin-bottom: 8px; overflow: hidden; }
 
 .item-head { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: none; border: none; text-align: left; }
-.item-head:hover { background: #f6f8fb; }
+.item-head:hover { background: var(--es-surface-2); }
 .favicon { width: 18px; height: 18px; border-radius: 3px; flex: 0 0 auto; }
 .item-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .item-title { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item-url { font-size: 11px; color: var(--es-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chip { font-size: 11px; background: #eef2f7; border-radius: 999px; padding: 2px 8px; color: var(--es-muted); flex: 0 0 auto; }
+.chip { font-size: 11px; background: var(--es-surface-2); border-radius: 999px; padding: 2px 8px; color: var(--es-muted); flex: 0 0 auto; }
 
 .item-body { padding: 4px 12px 12px; border-top: 1px solid var(--es-border); }
 .body-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 0; }

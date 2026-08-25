@@ -21,9 +21,9 @@
   @include m.badge;
 
   flex: 0 0 auto;
-  background: #fff7e6;
-  border: 1px solid #f0d492;
-  color: #7a5b00;
+  background: var(--es-notice-bg);
+  border: 1px solid var(--es-notice-border);
+  color: var(--es-notice-text);
 }
 
 .exchanges {
@@ -135,8 +135,8 @@
 // The step the exchange stands at: the amber of the draft mark and of the panel's notices, so the
 // one thing still outstanding is what the eye lands on.
 .step.is-pending {
-  background: #fff7e6;
+  background: var(--es-notice-bg);
 
-  .step-icon { color: #b07d00; }
-  .step-label { color: #7a5b00; }
+  .step-icon { color: var(--es-notice-icon); }
+  .step-label { color: var(--es-notice-text); }
 }

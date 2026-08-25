@@ -55,3 +55,18 @@ metadata-agent-canvas {
   width: 100%;
   min-height: 400px;
 }
+
+// In a dark panel the canvas stays light — its bundle ships no dark theme, and its own component
+// styles put the text colour of a light form in literals we cannot reach. So it is given the ground
+// those literals are written for, and framed as a sheet laid on the panel rather than left to look
+// like a card that failed to repaint. The tokens it *inherits* are held to the same theme, one
+// stylesheet up: see styles/_wlo-canvas-light.scss.
+:host-context(html[data-theme='dark']) metadata-agent-canvas {
+  // The bundle's own surface (`--md-surface`), so the sheet is the colour its form expects.
+  background: #fafafa;
+  border: 1px solid var(--es-border);
+  border-radius: var(--es-radius);
+  // Room between the frame and the fields, which the canvas' own inset no longer supplies at the
+  // sides (see the `fields-section` rule above).
+  padding: var(--es-space-2);
+}

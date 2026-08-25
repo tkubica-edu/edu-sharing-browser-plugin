@@ -5,6 +5,9 @@
 // Must come after 'tokens': it maps the panel's surface colours onto the Material tokens the
 // embedded bundles paint with.
 @use 'embedded-material';
+// Must come after 'embedded-material': it takes the one embedded element that has no dark theme back
+// out of the panel's, and does it by re-declaring some of the same tokens.
+@use 'wlo-canvas-light';
 @use 'mixins' as m;
 
 * { box-sizing: border-box; }

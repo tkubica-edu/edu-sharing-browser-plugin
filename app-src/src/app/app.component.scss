@@ -5,7 +5,7 @@
   overflow: hidden;
 }
 
-// The brand bar: the logo on a light surface, the utility icons drawn in the brand blue.
+// The brand bar: the logo on the panel's own surface, the utility icons drawn in the brand blue.
 .topbar {
   display: flex;
   align-items: center;
@@ -17,7 +17,9 @@
   flex: 0 0 auto;
 }
 // The full logo lockup (hexagons above the wordmark) carries the name, so no separate title text.
-.logo { height: 34px; width: auto; flex: 0 0 auto; }
+// Its wordmark is near-black artwork inside the file, so the dark palette inverts the whole image
+// rather than recolouring anything — see `--es-logo-filter`.
+.logo { height: 34px; width: auto; flex: 0 0 auto; filter: var(--es-logo-filter); }
 .spacer { flex: 1; }
 
 // The topbar's icon buttons: the utility options (Verlauf, Einstellungen) and close, sharing one
@@ -37,11 +39,11 @@
   cursor: pointer;
 }
 .close:hover:not([disabled]),
-.topbar-btn:hover:not([disabled]) { background: rgba(0, 59, 124, 0.08); }
+.topbar-btn:hover:not([disabled]) { background: var(--es-tint-hover); }
 
 .topbar-btn { position: relative; }
 // The open view's icon stays highlighted, since these two are reached from anywhere.
-.topbar-btn.is-active { background: rgba(0, 59, 124, 0.14); }
+.topbar-btn.is-active { background: var(--es-tint-active); }
 
 .close i { display: block; font-size: 20px; line-height: 1; }
 
@@ -61,7 +63,7 @@
   width: 8px; height: 8px;
   border: 1px solid var(--es-surface);
   border-radius: 50%;
-  background: #e0a800;
+  background: var(--es-attention);
 }
 
 // Workflow-step header (below the status bar): back-to-menu button + current step title.
@@ -92,7 +94,7 @@ $step-control: 28px;
   flex: 0 0 auto;
 }
 .back-btn i { font-size: 18px; line-height: 1; }
-.back-btn:hover:not([disabled]) { background: #eef1f4; }
+.back-btn:hover:not([disabled]) { background: var(--es-surface-2); }
 
 // The shell's controls while a write is in flight (see BusyService): still on screen, so the panel
 // keeps its shape, but visibly not to be used right now.

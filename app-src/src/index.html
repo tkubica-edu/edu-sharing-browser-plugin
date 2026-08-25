@@ -5,6 +5,10 @@
   <title>Edu-Sharing</title>
   <base href="./">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- First of everything, and not a module (those are deferred): it stamps the theme the panel last
+       ran in onto <html>, so a dark panel does not flash white before ThemeService has read the
+       setting out of extension storage. -->
+  <script src="theme-boot.js"></script>
   <!-- Material Icons for the embedded edu-sharing / wlo web components: their stylesheets style
        `.material-icons` / `.material-icons-outlined` but ship no font. Loaded from Google, which
        the extension CSP allows (style-src fonts.googleapis.com, font-src fonts.gstatic.com). -->

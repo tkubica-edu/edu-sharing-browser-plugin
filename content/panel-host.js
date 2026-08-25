@@ -7,6 +7,14 @@
   const api = globalThis.browser ?? globalThis.chrome;
   const PANEL_ID = 'edusharing-panel-root';
   const STORAGE_KEY = 'eduSharingPanelWidth';
+  // The panel's colours, as the sidebar's own setting states them: 'system', 'light' or 'dark' (see
+  // ThemeService). Read here for one reason — the container built below is what the page shows while
+  // the panel's iframe is still loading, and a white strip in front of a dark panel is the flash the
+  // setting is chosen to avoid. The literal has to stay in step with `APP_CONFIG.storageKeys.theme`.
+  const THEME_KEY = 'eduSharingTheme';
+  // What the container is painted in, per theme. The dark one is `--es-surface` of the sidebar's own
+  // tokens; kept as a literal because a content script shares no stylesheet with the panel.
+  const PANEL_GROUND = { light: '#ffffff', dark: '#1b2027' };
   const DEFAULT_WIDTH = 440;
   const MIN_WIDTH = 340;
   // The resize grip's three states. Grey rather than the panel's blue: it is furniture of the page
@@ -91,9 +99,21 @@
     return;
   }
 
-  // Load the persisted width (falls back to default) before building the panel.
-  storageGet({ [STORAGE_KEY]: DEFAULT_WIDTH }).then((items) => {
+  // Which of the two themes the panel will come up in — the setting, with 'system' answered by the
+  // browser, exactly as ThemeService resolves it.
+  function resolveTheme(setting) {
+    if (setting === 'dark' || setting === 'light') return setting;
+    try {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch (_) {
+      return 'light';
+    }
+  }
+
+  // Load the persisted width and theme (both fall back to their default) before building the panel.
+  storageGet({ [STORAGE_KEY]: DEFAULT_WIDTH, [THEME_KEY]: 'system' }).then((items) => {
     let panelWidth = clampWidth(Number(items && items[STORAGE_KEY]) || DEFAULT_WIDTH);
+    const ground = PANEL_GROUND[resolveTheme(items && items[THEME_KEY])];
 
     // A second toolbar click may have re-run this file while storage was pending.
     if (document.getElementById(PANEL_ID)) return;
@@ -111,7 +131,7 @@
       margin: '0',
       padding: '0',
       border: 'none',
-      background: '#ffffff',
+      background: ground,
       boxShadow: '-2px 0 12px rgba(0,0,0,0.2)'
     });
 

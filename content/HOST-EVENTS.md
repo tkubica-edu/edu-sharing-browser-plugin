@@ -237,6 +237,14 @@ that property holds.
   panel would close it, and `complete` is not guaranteed to arrive once per document.
 - A privileged page rejects injection; the tab stays marked open, so navigating back to a normal page
   brings the panel back.
+- **The container is painted in the panel's theme, before the panel exists.** `panel-host.js` builds
+  the docked `<div>` and the iframe in it, and that `<div>` is what the page shows for as long as the
+  iframe is loading — white in front of a dark panel on every one of those page changes. It therefore
+  reads `eduSharingTheme` from `storage.local` alongside the panel width and resolves it exactly as
+  `ThemeService` does, `prefers-color-scheme` included; `PANEL_GROUND` holds the two colours as
+  literals, since a content script shares no stylesheet with the panel. Inside the iframe the same
+  flash is prevented by `sidebar/theme-boot.js`, a classic (deferred scripts are too late) script that
+  stamps the theme the panel last resolved from its local-storage mirror.
 
 ### Carrying the panel's state across the change
 

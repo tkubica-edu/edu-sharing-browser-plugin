@@ -193,7 +193,14 @@ export const APP_CONFIG = {
     /** Whether the chat widget is corrected by our own stylesheet — see ChatStyleService. */
     chatStyleOverrides: 'eduSharingChatStyleOverrides',
     /** What the panel says about the chat's master skill — see ChatSkillService. */
-    chatMasterSkill: 'eduSharingChatMasterSkill'
+    chatMasterSkill: 'eduSharingChatMasterSkill',
+    /**
+     * The panel's colours: `system`, `light` or `dark` — see ThemeService. Also read by the content script
+     * that docks the panel, which paints the container the panel's iframe loads into and would otherwise
+     * flash white in front of a dark panel (`content/panel-host.js`); the literal there has to stay in step
+     * with this one.
+     */
+    theme: 'eduSharingTheme'
   },
   maxHistory: 200
 };

@@ -4,6 +4,7 @@ import {
 } from '@angular/core';
 
 import { ChatSkillService } from '../../../services/chat-skill.service';
+import { ThemeService } from '../../../services/theme.service';
 import { ChatStyleService } from '../../../services/chat-style.service';
 import { ConditionsService } from '../../../services/conditions.service';
 import { loadWebComponentBundle } from '../../../services/web-component-bundle.service';
@@ -147,6 +148,7 @@ export class AiAssistantScreenComponent implements OnDestroy {
   private readonly conditions = inject(ConditionsService);
   private readonly chatStyle = inject(ChatStyleService);
   private readonly chatSkill = inject(ChatSkillService);
+  private readonly theme = inject(ThemeService);
 
   private readonly host = viewChild.required<ElementRef<HTMLElement>>('host');
 
@@ -280,6 +282,10 @@ export class AiAssistantScreenComponent implements OnDestroy {
     // Independent of the task: a step may change what it offers without asking anything new, and the chips
     // apply to whichever turn comes next.
     effect(() => this.offer(this.quickReplies(), this.quickRepliesMax()));
+    // The one attribute that is followed rather than read once at mount: `theme` is a reactive input of the
+    // widget, and the settings that change it are laid *over* this screen rather than entered in its place
+    // (see NavigationService.overlaySection) — so the conversation is still there to be repainted.
+    effect(() => this.repaint(this.themeAttribute()));
     // Registered for as long as the screen is open, not only once a schema is stated: the widget dispatches
     // on `window` because its own view sits in a shadow root, and the listener has to be there before the
     // task goes out — the first turn is the one that answers it.
@@ -321,6 +327,9 @@ export class AiAssistantScreenComponent implements OnDestroy {
       // The panel is not the page: the widget's own detection would contribute the extension's address
       // instead of the tab's, so what we hand over stands alone.
       'auto-context': 'false',
+      // The widget's own dark theme, handed the panel's answer rather than left to resolve one — the
+      // panel's setting has three states and this attribute's `auto` would only see the browser's.
+      theme: this.themeAttribute(),
       // A context set here is one the widget greets as the element connects, and it is still answering that
       // greeting when the conversation appears — which is exactly when a task would be put, and a task put
       // while the widget is busy is dropped without a word. A screen with a task therefore hands the page
@@ -463,6 +472,21 @@ export class AiAssistantScreenComponent implements OnDestroy {
     element.setAttribute('quick-replies', stated ?? '[]');
     element.setAttribute('quick-replies-max', cap);
     this.trace(`→ quick-replies = ${stated ?? '[]'}, quick-replies-max = ${cap || 'none'}`);
+  }
+
+  /**
+   * The panel's theme as the widget's attribute states it. Resolved rather than passed through: the attribute
+   * also takes `auto`, but that would have the widget read the browser's preference — and the panel's setting
+   * is allowed to overrule exactly that.
+   */
+  private readonly themeAttribute = computed(() => (this.theme.dark() ? 'dark' : 'light'));
+
+  /** Repaint a conversation that is already running, where the panel's theme moved under it. */
+  private repaint(theme: string): void {
+    const element = this.element;
+    if (!element || element.getAttribute('theme') === theme) return;
+    element.setAttribute('theme', theme);
+    this.trace(`→ theme = ${theme}`);
   }
 
   /**

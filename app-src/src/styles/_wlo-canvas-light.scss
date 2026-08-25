@@ -1,0 +1,133 @@
+// The WLO metadata canvas, held to its own light theme while the panel is dark.
+//
+// `metadata-agent-canvas` is the one embedded element with NO dark theme: 293 of the colours in the
+// wlo bundle's own component styles are literals (`color: #1b1b1f`, `background: #fcf8fd`) against
+// only two dozen token references, so there is nothing to switch over. The two screens it takes over
+// — Metadaten editieren and Vorschau — therefore stay light in a dark panel, deliberately, as a
+// light sheet the panel's dark chrome frames (see wlo-canvas.component.scss for that frame).
+//
+// Staying light is not the same as being left alone, and that is what this file is for. Both bundles
+// run in THIS document, and the edu bundle declares its dark Material tokens on `body.isDarkTheme` —
+// on the body, so every element inside it inherits them, the canvas included. Its form fields,
+// selects, chips, checkboxes and menus would then paint white-on-light: the wrong half of a theme it
+// never asked for. The tokens below put those back to the values the canvas is designed against,
+// declared on the element itself, which beats anything inherited from an ancestor.
+//
+// Only what actually collides is listed — the intersection of the tokens the wlo bundle *references*
+// with the ones the edu bundle *darkens*, minus the `--mat-app-elevation-shadow-level-*` family,
+// which paints nothing here. That set is derived from the two bundles rather than curated, so it can
+// be recomputed after either of them is replaced (see WEB-COMPONENTS.md § Refreshing a bundle):
+//
+//   used  := every `var(--…)` in scripts/wlo/{styles.*.css,main.*.js}
+//   dark  := every custom property declared under a `.isDarkTheme` selector in scripts/edu/styles.css
+//   pin   := sorted(used & dark) without `--mat-app-elevation-shadow-level-*`
+//   value := what scripts/wlo/styles.*.css declares for it on `html` (last declaration wins)
+//
+// The dropdowns, menus and date pickers these tokens also describe are rendered into the CDK's own
+// overlay container, which hangs off `<body>` and not off the canvas — so those follow the panel's
+// dark theme like every other dropdown in it. That is intended: a dark dropdown over a light sheet
+// reads as the panel's, which is whose it is.
+
+html[data-theme='dark'] metadata-agent-canvas {
+  --mat-app-background-color: #fcf8fd;
+  --mat-app-text-color: #1b1b1f;
+  --mat-autocomplete-background-color: #f0edf1;
+  --mat-checkbox-disabled-label-color: rgba(27, 27, 31, .38);
+  --mat-checkbox-label-text-color: #1b1b1f;
+  --mat-chip-selected-disabled-trailing-icon-color: #1b1b1f;
+  --mat-chip-selected-trailing-icon-color: #444559;
+  --mat-datepicker-calendar-body-label-text-color: #1b1b1f;
+  --mat-datepicker-calendar-container-background-color: #ebe7eb;
+  --mat-datepicker-calendar-container-text-color: #1b1b1f;
+  --mat-datepicker-calendar-date-disabled-state-text-color: rgba(27, 27, 31, .38);
+  --mat-datepicker-calendar-date-focus-state-background-color: rgba(27, 27, 31, .12);
+  --mat-datepicker-calendar-date-hover-state-background-color: rgba(27, 27, 31, .08);
+  --mat-datepicker-calendar-date-in-comparison-range-state-background-color: #77ff61;
+  --mat-datepicker-calendar-date-in-overlap-range-selected-state-background-color: #5c5d72;
+  --mat-datepicker-calendar-date-in-overlap-range-state-background-color: #e1e0f9;
+  --mat-datepicker-calendar-date-in-range-state-background-color: #e0e0ff;
+  --mat-datepicker-calendar-date-outline-color: transparent;
+  --mat-datepicker-calendar-date-preview-state-outline-color: #343dff;
+  --mat-datepicker-calendar-date-selected-disabled-state-background-color: rgba(27, 27, 31, .38);
+  --mat-datepicker-calendar-date-selected-state-background-color: #343dff;
+  --mat-datepicker-calendar-date-selected-state-text-color: #ffffff;
+  --mat-datepicker-calendar-date-text-color: #1b1b1f;
+  --mat-datepicker-calendar-date-today-disabled-state-outline-color: rgba(27, 27, 31, .38);
+  --mat-datepicker-calendar-date-today-outline-color: #343dff;
+  --mat-datepicker-calendar-date-today-selected-state-outline-color: #343dff;
+  --mat-datepicker-calendar-header-divider-color: transparent;
+  --mat-datepicker-calendar-header-text-color: #46464f;
+  --mat-datepicker-calendar-navigation-button-icon-color: #46464f;
+  --mat-datepicker-calendar-period-button-icon-color: #46464f;
+  --mat-datepicker-calendar-period-button-text-color: #46464f;
+  --mat-datepicker-toggle-active-state-icon-color: #46464f;
+  --mat-datepicker-toggle-icon-color: #46464f;
+  --mat-fab-disabled-state-container-color: rgba(27, 27, 31, .12);
+  --mat-fab-disabled-state-foreground-color: rgba(27, 27, 31, .38);
+  --mat-fab-disabled-state-layer-color: black;
+  --mat-fab-focus-state-layer-opacity: .12;
+  --mat-fab-foreground-color: #0000ef;
+  --mat-fab-hover-state-layer-opacity: .08;
+  --mat-fab-pressed-state-layer-opacity: .12;
+  --mat-fab-ripple-color: rgba(0, 0, 239, .12);
+  --mat-fab-small-disabled-state-container-color: rgba(27, 27, 31, .12);
+  --mat-fab-small-disabled-state-foreground-color: rgba(27, 27, 31, .38);
+  --mat-fab-small-disabled-state-layer-color: black;
+  --mat-fab-small-focus-state-layer-opacity: .12;
+  --mat-fab-small-foreground-color: #0000ef;
+  --mat-fab-small-hover-state-layer-opacity: .08;
+  --mat-fab-small-pressed-state-layer-opacity: .12;
+  --mat-fab-small-ripple-color: rgba(0, 0, 239, .12);
+  --mat-fab-small-state-layer-color: #0000ef;
+  --mat-fab-state-layer-color: #0000ef;
+  --mat-form-field-disabled-input-text-placeholder-color: rgba(27, 27, 31, .38);
+  --mat-form-field-disabled-leading-icon-color: rgba(27, 27, 31, .38);
+  --mat-form-field-disabled-select-arrow-color: rgba(27, 27, 31, .38);
+  --mat-form-field-disabled-trailing-icon-color: rgba(27, 27, 31, .38);
+  --mat-form-field-enabled-select-arrow-color: #46464f;
+  --mat-form-field-error-focus-trailing-icon-color: #ba1a1a;
+  --mat-form-field-error-hover-trailing-icon-color: #93000a;
+  --mat-form-field-error-text-color: #ba1a1a;
+  --mat-form-field-error-trailing-icon-color: #ba1a1a;
+  --mat-form-field-focus-select-arrow-color: #343dff;
+  --mat-form-field-focus-state-layer-opacity: 0;
+  --mat-form-field-hover-state-layer-opacity: .08;
+  --mat-form-field-leading-icon-color: #46464f;
+  --mat-form-field-select-disabled-option-text-color: rgba(27, 27, 31, .38);
+  --mat-form-field-select-option-text-color: #1b1b1f;
+  --mat-form-field-state-layer-color: #1b1b1f;
+  --mat-form-field-trailing-icon-color: #46464f;
+  --mat-icon-button-disabled-state-layer-color: #46464f;
+  --mat-icon-button-focus-state-layer-opacity: .12;
+  --mat-icon-button-hover-state-layer-opacity: .08;
+  --mat-icon-button-pressed-state-layer-opacity: .12;
+  --mat-icon-button-ripple-color: rgba(70, 70, 79, .12);
+  --mat-icon-button-state-layer-color: #46464f;
+  --mat-icon-color: inherit;
+  --mat-menu-container-color: #f0edf1;
+  --mat-menu-divider-color: #e4e1ec;
+  --mat-menu-item-focus-state-layer-color: rgba(27, 27, 31, .12);
+  --mat-menu-item-hover-state-layer-color: rgba(27, 27, 31, .08);
+  --mat-menu-item-icon-color: #46464f;
+  --mat-menu-item-label-text-color: #1b1b1f;
+  --mat-option-focus-state-layer-color: rgba(27, 27, 31, .12);
+  --mat-option-hover-state-layer-color: rgba(27, 27, 31, .08);
+  --mat-option-label-text-color: #1b1b1f;
+  --mat-option-selected-state-label-text-color: #444559;
+  --mat-option-selected-state-layer-color: #e1e0f9;
+  --mat-radio-checked-ripple-color: #343dff;
+  --mat-radio-disabled-label-color: rgba(27, 27, 31, .38);
+  --mat-radio-label-text-color: #1b1b1f;
+  --mat-radio-ripple-color: #1b1b1f;
+  --mat-ripple-color: rgba(27, 27, 31, .1);
+  --mat-select-disabled-arrow-color: rgba(27, 27, 31, .38);
+  --mat-select-disabled-trigger-text-color: rgba(27, 27, 31, .38);
+  --mat-select-enabled-arrow-color: #46464f;
+  --mat-select-enabled-trigger-text-color: #1b1b1f;
+  --mat-select-focused-arrow-color: #343dff;
+  --mat-select-invalid-arrow-color: #ba1a1a;
+  --mat-select-panel-background-color: #f0edf1;
+  --mat-select-placeholder-text-color: #46464f;
+  --mat-toolbar-container-background-color: #fcf8fd;
+  --mat-toolbar-container-text-color: #1b1b1f;
+}

@@ -14,9 +14,15 @@
   // A machine's objection: the finding and the criteria it is about. Loud on purpose — it is the one
   // thing in this view that asks for a decision instead of recording one.
   --qc-alert: var(--es-danger, #c0392b);
-  // The finding's own ground. A fixed tint rather than one mixed from the colour above, so it stays
-  // legible under a theme that repaints only the foreground.
-  --qc-alert-surface: #fbe4e7;
+  // The finding's own ground. Read from the panel where it is embedded in one — a tint mixed from the
+  // colour above would land at the same lightness in both palettes and stop being a ground — and its
+  // own light tint where nothing supplies one, which is the standalone case this component is written
+  // for.
+  --qc-alert-surface: var(--es-alert-surface, #fbe4e7);
+  // A box with nothing left to press, and what is legible on a box that IS filled — the tick drawn
+  // into it. Both from the panel where there is one, since both flip with its palette.
+  --qc-disabled: var(--es-control-disabled, #b6c6d8);
+  --qc-on-accent: var(--es-on-accent, #ffffff);
 
   display: block;
   color: var(--qc-text);
@@ -113,7 +119,7 @@ input[type='checkbox'] {
       width: 5px;
       height: 10px;
       margin: 1px auto 0;
-      border: solid #fff;
+      border: solid var(--qc-on-accent);
       border-width: 0 2.5px 2.5px 0;
       transform: rotate(45deg);
     }
@@ -130,8 +136,8 @@ input[type='checkbox'] {
   // runs, every box of a record the confirmation closed. Still legible as checked, clearly not
   // something to press.
   &:disabled {
-    border-color: #b6c6d8;
-    &:checked { background: #b6c6d8; }
+    border-color: var(--qc-disabled);
+    &:checked { background: var(--qc-disabled); }
   }
 
   &:focus-visible { outline: 2px solid var(--qc-accent); outline-offset: 2px; }

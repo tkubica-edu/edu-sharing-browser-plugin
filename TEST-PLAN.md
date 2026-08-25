@@ -69,9 +69,11 @@ contributes `toApiRootUrl`, `toAgentProxyUrl` and `toTopicAssistantUrl` (URL der
 configured repository), and `pipes/authority-name.pipe.ts` a six-branch name cascade in one
 `transform`.
 
-**`app-src/angular.json` restricts the run to `src/app/services/**/*.spec.ts`.** Until that glob is
-widened, a spec placed next to any of these files is never executed — see
-[Preconditions](#preconditions).
+The glob is no longer in the way: the `test` target's `include` is `src/app/**/*.spec.ts`, so a spec
+placed next to any of these files is executed. `util/bundle-theme.spec.ts` is the first of this kind
+and is the pattern to follow for the other two `install*` modules — it installs the patch once (the
+module-level flag it shares with production makes a second install a no-op for the patch itself) and
+asserts on what the patched global answers.
 
 ### 2. Service specs — TestBed with a fake per dependency
 
@@ -227,10 +229,10 @@ Each round is worth landing on its own; nothing in a later one is a precondition
 
 ## Preconditions
 
-- **Widen the test glob.** `include` in the `test` target of `app-src/angular.json` is
-  `src/app/services/**/*.spec.ts`; rounds 1 and 6 need `src/app/**/*.spec.ts`. `coverageInclude` is
-  already `services/**` plus `util/**` and grows the same way — leaving it behind would report the
-  new specs' subject as uncovered.
+- ~~**Widen the test glob.**~~ Done: `include` in the `test` target of `app-src/angular.json` is
+  `src/app/**/*.spec.ts`. `coverageInclude` is `services/**` plus `util/**` and grows the same way —
+  a round that covers `model/`, `pipes/` or a component has to extend it, or the new specs' subject
+  is reported as uncovered.
 - **Fakes to add** in `app-src/src/testing/fakes/`, in the established shape (a `fakeX()` factory
   returning the fake and its knobs, checked with `satisfies Partial<TheRealService>`):
   `NavigationService` and `PageRecognitionService` for round 2; `MetadataAgentService`,

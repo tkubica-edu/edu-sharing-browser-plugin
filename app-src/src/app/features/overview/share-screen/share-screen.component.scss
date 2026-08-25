@@ -51,18 +51,21 @@ edu-sharing-share-qr {
   padding: 24px;
   // Dark rather than the panel's own ground: it separates the code from whatever it was laid over,
   // and a scanner reads a code best against a wide contrast.
-  background: rgba(28, 39, 51, 0.72);
+  background: var(--es-scrim);
   cursor: pointer;
 }
 
-// The code's own ground is the element's; this only rounds it off against the darkened panel.
+// The code's own ground is the element's; this only rounds it off against the darkened panel. White
+// in either palette: what a scanner reads is the code's own contrast, and a dark ground under dark
+// modules is a code that cannot be read at all.
 .qz-code {
   border-radius: 8px;
   overflow: hidden;
   background: #fff;
 }
 
-// On the dark layer, so not the muted token — that one is written for the panel's light surface.
+// Literal white rather than a token: this text lies on the scrim above, which is dark in both
+// palettes, so it is not the panel's surface it has to hold its contrast against.
 .qz-hint {
   margin: 0;
   font-size: 13px;

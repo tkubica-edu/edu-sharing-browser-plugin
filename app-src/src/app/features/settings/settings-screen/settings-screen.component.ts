@@ -14,6 +14,7 @@ import { DebugService } from '../../../services/debug.service';
 import { DevModeService } from '../../../services/dev-mode.service';
 import { ContentJudgeService } from '../../../services/content-judge.service';
 import { QualityJudgeService } from '../../../services/quality-judge.service';
+import { ThemeService, ThemeSetting } from '../../../services/theme.service';
 import { configuredSchemes } from '../../../util/quality-schemes';
 
 /**
@@ -48,6 +49,7 @@ export class SettingsScreenComponent implements OnDestroy {
   protected readonly recommendations = inject(CollectionRecommendationService);
   protected readonly qualityJudge = inject(QualityJudgeService);
   protected readonly contentJudge = inject(ContentJudgeService);
+  protected readonly theme = inject(ThemeService);
 
   /** Whether the credential is legible on screen; masked until it is asked for. */
   protected readonly basicAuthVisible = signal(false);
@@ -162,6 +164,21 @@ export class SettingsScreenComponent implements OnDestroy {
   /** No condition depends on it, so leaving the settings needs no refresh on its account. */
   protected setChatStyleOverrides(enabled: boolean): void {
     void this.chatStyle.setOverridesEnabled(enabled);
+  }
+
+  /**
+   * The three states of the panel's colours, in the order they are offered: what the reader already told
+   * their browser first, because that is what the panel keeps to unless it is told otherwise.
+   */
+  protected readonly themeOptions: { value: ThemeSetting; label: string }[] = [
+    { value: 'system', label: 'System folgen' },
+    { value: 'light', label: 'Hell' },
+    { value: 'dark', label: 'Dunkel' }
+  ];
+
+  /** Applies at once, and no condition depends on it — so leaving the settings needs no refresh either. */
+  protected setTheme(setting: ThemeSetting): void {
+    void this.theme.setSetting(setting);
   }
 
   /**

@@ -239,7 +239,8 @@ navigating to it, and closes it again where it stands; the step keeps running be
   view). All of them optional — an entry written before one of them was kept says nothing about it,
   which is not the same as saying no.
 - **Einstellungen** *(dotted while a change waits to be applied)* — the Repository-URL (used for
-  login and every embedded element) at the top, and below it four folded groups, one open at a time:
+  login and every embedded element) at the top, then **Darstellung**, and below those four folded
+  groups, one open at a time:
   *Entwickler-Optionen* (the dev and the debug mode, see [TESTING.md](TESTING.md)), *KI- und
   Chatbot-Optionen* (the corrections to the chat widget's display, the chatbot's master skill as
   *Vorgabe des Betreibers* / *An* / *Aus* — see
@@ -250,6 +251,17 @@ navigating to it, and closes it again where it stands; the step keeps running be
   so a folded group says whether anything in it was touched; a group holding nothing but defaults carries
   none. Every default is compared where it is defined — each service answers for its own settings
   (`changedSettings`), the screen only sums them per group.
+
+  *Darstellung* is not folded away, because it is about the panel rather than about a step in it:
+  *System folgen* / *Hell* / *Dunkel*, persisted under `eduSharingTheme` and resolved by
+  `ThemeService`, which stamps `data-theme="light|dark"` and `color-scheme` on the document element
+  for `styles/_tokens.scss` to read. *System folgen* is the default and answers
+  `prefers-color-scheme`, so a browser set to dark gets a dark panel without the setting being
+  visited. The embedded elements are switched with it and follow a change without a reload — the
+  edu-sharing bundle and the assistant's chat widget both take the theme as a parameter, see
+  [WEB-COMPONENTS.md § Handing the theme to a bundle](WEB-COMPONENTS.md#handing-the-theme-to-a-bundle);
+  the WLO canvas is the one screen pair that stays light, see
+  [TROUBLESHOOTING.md](TROUBLESHOOTING.md#the-wlo-canvas-has-no-dark-theme).
 - **WLO Metadaten-Agent** — only when the repository config enables it, see
   [WEB-COMPONENTS.md](WEB-COMPONENTS.md#the-optional-wlo-metadata-editor).
 - **Boerdi — KI-Assistent** — the assistant's chat widget, embedded as the real `<boerdi-chat>`

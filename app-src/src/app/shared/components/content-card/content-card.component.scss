@@ -121,7 +121,7 @@
 .fc-spinner {
   width: 26px;
   height: 26px;
-  border: 3px solid #cddff0;
+  border: 3px solid var(--es-preview-ring);
   border-top-color: var(--es-blue);
   border-radius: 50%;
   animation: fc-spin 0.9s linear infinite;

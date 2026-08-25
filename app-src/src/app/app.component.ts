@@ -24,6 +24,7 @@ import { OptionIconService } from './services/option-icon.service';
 import { PageRecognitionService } from './services/page-recognition.service';
 import { QualityJudgeService } from './services/quality-judge.service';
 import { SessionResumeService } from './services/session-resume.service';
+import { ThemeService } from './services/theme.service';
 
 import { IconDirective } from './directives/icon.directive';
 import { ActionBarComponent } from './template/action-bar/action-bar.component';
@@ -113,6 +114,9 @@ export class AppComponent implements OnInit {
   private readonly chatStyle = inject(ChatStyleService);
   private readonly chatSkill = inject(ChatSkillService);
   private readonly sessionResume = inject(SessionResumeService);
+  // Injected here so it is constructed with the app: it hands the panel's theme to the embedded
+  // bundles through the media query they read, which has to be answerable before one of them boots.
+  private readonly theme = inject(ThemeService);
 
   /** A node received while logged out — opened once the user logs in. */
   private readonly pendingNodeId = signal<string | null>(null);
@@ -170,7 +174,11 @@ export class AppComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     // Only activates when the repository config enables `browserExtensionCustomWebComponent`.
     this.browserExtensionCustomWebComponent.initialize();
-    // First of all: the debug flag decides `onlyOfficePresent`, which the section visibilities
+    // Before anything renders: a screen that comes up light and turns dark a moment later is the one
+    // thing this setting cannot afford. Until it resolves the panel stands on the theme the pre-boot
+    // snippet in index.html stamped, which is the one this panel last ran in.
+    await this.theme.load();
+    // Then: the debug flag decides `onlyOfficePresent`, which the section visibilities
     // and the document request below are gated on.
     await this.debug.load();
     // Before anything can ask one of the faked services — a resumed session may start an

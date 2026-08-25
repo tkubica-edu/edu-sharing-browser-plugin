@@ -33,7 +33,7 @@
   line-height: 1.2;
   white-space: nowrap;
 
-  &:hover:not(.is-active):not([disabled]) { color: var(--es-text); background: #f5f8fb; }
+  &:hover:not(.is-active):not([disabled]) { color: var(--es-text); background: var(--es-surface-2); }
 
   // A step that a later state unlocks: legible enough to read as the next thing, clearly not
   // clickable yet.

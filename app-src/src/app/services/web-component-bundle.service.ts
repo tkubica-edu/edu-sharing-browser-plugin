@@ -91,6 +91,9 @@ export class WebComponentBundleService {
       // The bundle chooses its language from the user's profile and from the browser, both of which can be
       // English while the panel around its forms is German only; see installBundleLanguage.
       installBundleLanguage();
+      // The theme is the one such correction that is NOT made here: the bundle resolves it from a media
+      // query, so the answer has to exist before its scripts run — ThemeService installs it as the app
+      // boots and keeps it in step with the panel's setting (see util/bundle-theme.ts).
     }
     const { styles, scripts } = await this.entriesOf(bundle);
     for (const href of styles) this.addLink(href);

@@ -13,9 +13,13 @@
   // A machine's objection: the finding and the criteria it is about. Loud on purpose — it is the one
   // thing in this view that asks for a decision instead of recording one.
   --qc-alert: var(--es-danger, #c0392b);
-  // The finding's own ground. A fixed tint rather than one mixed from the colour above, so it stays
-  // legible under a theme that repaints only the foreground.
-  --qc-alert-surface: #fbe4e7;
+  // The finding's own ground. Read from the panel where it is embedded in one — a tint mixed from the
+  // colour above would land at the same lightness in both palettes and stop being a ground — and its
+  // own light tint where nothing supplies one, which is the standalone case this component is written
+  // for.
+  --qc-alert-surface: var(--es-alert-surface, #fbe4e7);
+  // The same colour as a ground rather than as ink: the tint behind the passage the machine wrote.
+  --qc-ai-tint: var(--es-ai-tint, rgba(115, 98, 236, 0.1));
 
   display: block;
   color: var(--qc-text);
@@ -41,7 +45,7 @@
   min-height: 170px;
   padding: 14px 12px;
   border-radius: var(--es-radius, 8px);
-  background: rgba(115, 98, 236, 0.1);
+  background: var(--qc-ai-tint);
   color: var(--qc-ai);
 
   // One height across every objection, however long its caption and its finding are: they are answered

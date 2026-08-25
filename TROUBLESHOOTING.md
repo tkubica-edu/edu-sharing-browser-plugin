@@ -86,11 +86,43 @@ What is known not to work, known to be unverified, or known to look wrong at fir
   lockfile pins the builder; treat a minor bump as a change that needs `npm test` run before it is
   merged. Everything that moves lives in `app-src/src/testing/`, so a builder change touches one
   directory.
+- **The panel's theme is handed to the edu-sharing bundle through a patched media query.** The
+  bundle resolves its own theme from `(prefers-color-scheme: dark)` and from a preference in local
+  storage, and it reads that preference **once**, as its theme service subscribes — the notification
+  it listens on is internal to the bundle, so a value written from outside is only seen at bootstrap.
+  `util/bundle-theme.ts` therefore writes the preference as `"auto"` and replaces `window.matchMedia`
+  for colour-scheme queries alone, which is what makes the bundle follow a switch made while a form
+  is open. Two consequences to know about: `prefers-color-scheme` reports the *panel's* theme to
+  everything in the sidebar document, not the browser's — the panel's own resolution therefore goes
+  through the reference `util/system-theme.ts` takes at module load, before the patch exists — and a
+  bundle whose theme service stops asking the media query would silently fall back to light. What
+  pins the current behaviour is `app-src/src/app/util/bundle-theme.spec.ts`; that the *bundle* still
+  honours it is only verifiable by mounting one of its elements, see
+  [TESTING.md](TESTING.md#load-the-extension).
 - **The repository URL cannot be changed at runtime** without reloading the sidebar — the library
   freezes `rootUrl` at bootstrap and does not export its config classes.
 - **The agent may only edit its own node for two hours.** Along the guest route the repository
   refuses later writes with a 403; the panel anticipates that and asks for a login instead. See
   [ARCHITECTURE.md § Saving a content](ARCHITECTURE.md#saving-a-content).
+
+## The WLO canvas has no dark theme
+
+`<metadata-agent-canvas>` is the one embedded element that cannot follow the panel's theme: 293 of
+the colours in the `wlo/` bundle's own component styles are literals (`color: #1b1b1f`,
+`background: #fcf8fd`) against only two dozen token references, so there is nothing to switch over,
+and the element's attribute list offers only `background-color` (see
+[WIDGET-REFERENZ.md](WIDGET-REFERENZ.md)). In a dark panel the two screens it takes over — *Metadaten
+editieren* and *Vorschau* — therefore stay light, framed as a sheet laid on the panel
+(`wlo-canvas.component.scss`).
+
+Staying light takes work of its own, because both bundles run in the same document. The `edu/` bundle
+declares its dark Material tokens on `body.isDarkTheme` — on the body, so everything inside it
+inherits them, the canvas included, and its form fields, selects, chips and checkboxes would paint
+white-on-light. `styles/_wlo-canvas-light.scss` puts exactly the colliding tokens back on the element
+itself; the file's header records the derivation, which is recomputable after either bundle is
+replaced. Dropdowns, menus and date pickers are rendered into the CDK's own overlay container, which
+hangs off `<body>` rather than off the canvas, so those follow the panel's dark theme — intended, and
+the one visible seam.
 
 ## Bundle size
 

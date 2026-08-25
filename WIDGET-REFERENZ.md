@@ -71,6 +71,11 @@ Floating Controls, Reset-Button und Sprachumschalter sind in **allen** Layouts a
 
 ### Konfiguration
 
+> ⚠️ **Kein Dark-Theme.** Das Bundle bringt keines mit — seine Komponenten-Styles setzen Farben
+> hartcodiert, und außer `background-color` gibt es keinen Hebel. Im dunklen Panel bleiben die zwei
+> Screens des Canvas deshalb hell, siehe
+> [TROUBLESHOOTING.md](TROUBLESHOOTING.md#the-wlo-canvas-has-no-dark-theme).
+
 | Attribut | Werte | Default | Wirkung |
 |---|---|---|---|
 | `api-url` | URL | – | API-Basis. Setzt zusätzlich i18n-Reload. **Pflicht** (oder `window.__ENV`) |
@@ -78,7 +83,7 @@ Floating Controls, Reset-Button und Sprachumschalter sind in **allen** Layouts a
 | `context-name` | `default`, `mds_oeh` | `default` | Schema-Kontext |
 | `schema-version` | `1.8.1`, `latest` | `latest` | Schema-Version |
 | `columns` | `1`–`4` | Layout-Default | Wird geparst, außerhalb 1–4 ignoriert |
-| `background-color` | CSS-Farbe | `""` | Hintergrund |
+| `background-color` | CSS-Farbe | `""` | Hintergrund — der **einzige** Farb-Parameter des Elements |
 | `input-mode` | `text`, `url`, `nodeId` | `text` | Aktiver Eingabemodus |
 | `instance-id` | String | `default` | Multi-Instanz-Bindung |
 | `debug` | `true`/`false` | `false` | Konsolen-Logging (global, nicht pro Instanz) |

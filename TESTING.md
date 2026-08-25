@@ -21,10 +21,11 @@ npm --prefix app-src run test -- --include app/services/history.service.spec.ts
 ```
 
 `ng test` runs the `@angular/build:unit-test` builder with the Vitest runner in a Node process with
-jsdom — no browser and no extension. The target's `include` is `src/app/services/**/*.spec.ts`: the
-services own the panel's logic, and each spec drives one of them through `TestBed` with its
-dependencies replaced. `--include` patterns are relative to `src`, and `--list-tests` prints what the
-builder discovered without running it.
+jsdom — no browser and no extension. The target's `include` is `src/app/**/*.spec.ts`, and two kinds
+of spec live under it: the service specs, each driving one service through `TestBed` with its
+dependencies replaced, and the pure specs next to `src/app/util/`, which need no `TestBed` at all.
+`--include` patterns are relative to `src`, and `--list-tests` prints what the builder discovered
+without running it.
 
 **No test reaches a real service.** Three things stand in the way, in `app-src/src/testing/`:
 
@@ -43,6 +44,12 @@ builder discovered without running it.
   answering member is `runtime.id`; every other member throws and names
   `fakeBrowserExtension()`. See [TROUBLESHOOTING.md § Dependencies and runtime
   limits](TROUBLESHOOTING.md#dependencies-and-runtime-limits) for why that global has to exist at all.
+
+A fourth setup file is there for one feature rather than to hold something back: `color-scheme.setup.ts`
+gives the run a `(prefers-color-scheme: dark)` query a spec can answer (`setSystemDark()`), because
+jsdom defines no `matchMedia` at all and the panel's *System folgen* is otherwise untestable. It has to
+be a setup file: `util/system-theme.ts` takes its reference to `matchMedia` at module load, so a stub
+installed from a spec body would arrive after the module it is meant for.
 
 Fakes live in `app-src/src/testing/fakes/`, one file per faked service, each a factory returning the
 fake and the knobs a spec drives it with. They are checked against the real surface with

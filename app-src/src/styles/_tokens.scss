@@ -1,13 +1,30 @@
 // Global design tokens. Emitted once (via `@use 'tokens'` in styles.scss) as CSS custom
 // properties so they stay runtime-overridable and inheritable into every component
 // (including the emulated-encapsulation shadow-less component DOM).
+//
+// Two palettes, and every colour the panel paints with is in both: the light one on bare `:root`,
+// the dark one under `:root[data-theme='dark']`. Which of the two is up is decided in one place —
+// ThemeService resolves the setting (including "follow the system") and stamps the attribute — so no
+// stylesheet asks `prefers-color-scheme` and no component knows which theme it is in. A colour that
+// exists only in the light block is a colour that survives into the dark panel unchanged, which is
+// what makes an unreadable pairing; so anything a component would otherwise hardcode gets a token
+// here rather than a literal there.
 :root {
   // Brand / surface colours
   --es-blue: #003b7c;
   --es-blue-600: #0a4f9e;
   --es-bg: #f5f7fa;
   --es-surface: #ffffff;
+  // A step off the surface, for the things that are drawn ON one: the hover of a row or tab, the
+  // ground of a chip, the fill of an input. In the light panel that is a shade *down* from white,
+  // in the dark one a shade *up* from the surface — which is why it is a token rather than one
+  // literal grey per component.
+  --es-surface-2: #f5f8fb;
   --es-border: #dfe3e8;
+  // A field is a well rather than a surface: in the light panel it is the white the card already
+  // is and reads as a field by its border alone, in the dark one it is a step *below* the surface,
+  // which is what makes it look like something to type into.
+  --es-input-bg: #ffffff;
   --es-text: #1c2733;
   --es-muted: #63707e;
   --es-danger: #c0392b;
@@ -20,6 +37,20 @@
   // Everything a machine put there rather than a person — a value it filled in, a judgement it made.
   // Contrast ≈ 4.5:1 on white, so it carries labels and bold notes; not the colour for fine print.
   --es-ai: #7362ec;
+  // The same, as a ground rather than as ink: the tint behind a passage the machine wrote.
+  --es-ai-tint: rgba(115, 98, 236, 0.1);
+
+  // What is legible ON the brand colour, wherever it is used as a fill — a primary button, a filled
+  // badge. It flips with the palette: the light panel's blue is dark and carries white, the dark
+  // panel's blue is light and carries the panel's own ground.
+  --es-on-accent: #ffffff;
+
+  // The brand colour as a wash, for a control that is drawn on the surface rather than filled: the
+  // hover and the pressed state of the topbar's icon buttons.
+  --es-tint-hover: rgba(0, 59, 124, 0.08);
+  --es-tint-active: rgba(0, 59, 124, 0.14);
+  // The ring an input draws while it has the focus.
+  --es-focus-ring: rgba(0, 59, 124, 0.12);
 
   // Tinted hint-card background (used across intro/description cards)
   --es-hint-bg: #f0f4f9;
@@ -27,10 +58,51 @@
   // Verlauf's count badge, its "öffnen" button.
   --es-blue-tint: #e6edf6;
 
+  // A remark the panel makes about a state that is not an error but wants reading — the amber note
+  // under a card, the step of an interaction that is still open. Its own set rather than a tint of
+  // {@link --es-warning}, because it is a ground with ink on it and the two have to hold their
+  // contrast in both palettes.
+  --es-notice-bg: #fff7e6;
+  --es-notice-border: #f0d492;
+  --es-notice-text: #7a5b00;
+  --es-notice-icon: #b07d00;
+
+  // A machine's objection, as a ground: the finding and the criteria it is about.
+  --es-alert-surface: #fbe4e7;
+
+  // The ground of the badge that marks a value the user themselves put there — the counterpart of
+  // {@link --es-ai} for a human answer.
+  --es-badge-user-bg: #e2f0e8;
+
+  // A control with nothing left to do — a checkbox locked while a write runs, a box of a record the
+  // confirmation closed. Still legible as checked, clearly not something to press.
+  --es-control-disabled: #b6c6d8;
+
+  // The ring around the picture a content is shown by, which marks the frame as the picture's own
+  // rather than the card's.
+  --es-preview-ring: #cddff0;
+
+  // A change that was made and still has to be applied — the dot on the settings icon. The one
+  // colour in the panel that is there to be noticed rather than read.
+  --es-attention: #e0a800;
+
+  // What lies over the panel while a dialogue has it: dark enough that the panel behind reads as
+  // out of reach, translucent so it is still visible that it is there.
+  --es-scrim: rgba(28, 39, 51, 0.72);
+
   // The lift of a card that is the centre of its screen rather than one thing among several — two
   // layers, because one soft shadow alone reads as a blur: a tight one draws the card's edge, the
   // wider one is the light around it. Same ink as the text, so it tints rather than greys.
   --es-shadow-card: 0 1px 2px rgba(28, 39, 51, 0.10), 0 4px 12px rgba(28, 39, 51, 0.08);
+  // The lift of a bar that stays put while the screen scrolls under it (the footer), and of the one
+  // small thing that floats over a card.
+  --es-shadow-bar: 0 -2px 8px rgba(15, 23, 32, 0.06);
+  --es-shadow-raised: 0 1px 3px rgba(28, 39, 51, 0.12);
+
+  // How the logo lockup is drawn. Its wordmark is near-black artwork inside an `<img>`, so nothing
+  // in the file can be recoloured from here — the dark panel inverts the whole image instead, which
+  // is what the edu-sharing frontend does with its own images (`--invertSvgFilter`).
+  --es-logo-filter: none;
 
   // Radius + spacing scale — the paddings and corner radius shared across the components
   --es-radius: 8px;
@@ -40,4 +112,84 @@
   --es-space-2: 8px;
   --es-space-3: 10px;
   --es-space-4: 14px;
+
+  // What the browser paints for the things the panel does not: the scrollbars of its scroll areas,
+  // the widgets of a native form control. Stated, because a panel whose CSS is dark and whose
+  // scrollbars are light reads as unfinished.
+  color-scheme: light;
+}
+
+// The dark palette. Only the colours are re-declared — the radius and spacing scale above is one
+// scale for both themes, and a token repeated here that does not change would be a second place to
+// keep it.
+//
+// Not a `prefers-color-scheme` block: the panel has three settings (System, Hell, Dunkel) and
+// ThemeService resolves them into this one attribute, so "follow the system" and "dark" arrive here
+// as the same state and there is nothing left for a media query to decide.
+:root[data-theme='dark'] {
+  // The brand blue, carried over into a palette it has to be *ink* in: #003b7c on a dark ground is
+  // barely a colour at all. Same hue, lifted until it reads as text (≈ 7:1 on the surface below),
+  // and the "600" that a hover deepens to becomes the lighter of the two for the same reason.
+  --es-blue: #7fb2e8;
+  --es-blue-600: #a6cbf2;
+  // Not black: a panel docked beside a page is read for minutes at a time, and pure black under
+  // light text is what makes the edges of that text smear. Cool, like the light palette's grey.
+  --es-bg: #12161b;
+  --es-surface: #1b2027;
+  --es-surface-2: #262d36;
+  --es-border: #333c47;
+  --es-input-bg: #12161b;
+  --es-text: #e5eaf1;
+  --es-muted: #9aa7b5;
+  --es-danger: #f0908a;
+  --es-success: #5ec79a;
+  // Amber again, and light for the same reason the blue is: it carries text.
+  --es-warning: #e2b25c;
+
+  --es-ai: #a99bf5;
+  --es-ai-tint: rgba(169, 155, 245, 0.16);
+
+  // The blue above is light, so what is legible on it is the panel's own ground.
+  --es-on-accent: #12161b;
+
+  // The washes are mixed from white rather than from the brand colour: on a dark ground a coloured
+  // wash reads as a fill, and these mark a control that is being touched, not one that is filled.
+  --es-tint-hover: rgba(255, 255, 255, 0.08);
+  --es-tint-active: rgba(255, 255, 255, 0.14);
+  --es-focus-ring: rgba(127, 178, 232, 0.32);
+
+  --es-hint-bg: #222932;
+  --es-blue-tint: #24313f;
+
+  --es-notice-bg: #2e2617;
+  --es-notice-border: #574526;
+  --es-notice-text: #e8cd93;
+  --es-notice-icon: #e2b25c;
+
+  --es-alert-surface: #3a2126;
+
+  --es-badge-user-bg: #1e3630;
+
+  --es-control-disabled: #4a5666;
+
+  --es-preview-ring: #2c4054;
+
+  --es-attention: #f0b429;
+
+  // Deeper than the light palette's scrim: the ground it has to cover is already dark, so the same
+  // translucency would leave the panel behind looking merely dimmed.
+  --es-scrim: rgba(6, 9, 12, 0.78);
+
+  // Shadows on a dark ground: black rather than the text's ink, and stronger — a soft grey shadow
+  // over a dark surface is invisible, and the card's edge is then carried by its border alone.
+  --es-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.50), 0 4px 12px rgba(0, 0, 0, 0.36);
+  --es-shadow-bar: 0 -2px 8px rgba(0, 0, 0, 0.40);
+  --es-shadow-raised: 0 1px 3px rgba(0, 0, 0, 0.44);
+
+  // The logo's wordmark is near-black (#1E1E1E) and would disappear on this surface. Inverting the
+  // whole image lifts it to a light grey; the hue rotation puts the three hexagons back into the
+  // blue they are drawn in, which the inversion alone would turn to tan.
+  --es-logo-filter: invert(1) hue-rotate(180deg);
+
+  color-scheme: dark;
 }
