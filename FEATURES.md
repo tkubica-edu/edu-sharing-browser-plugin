@@ -257,7 +257,10 @@ navigating to it, and closes it again where it stands; the step keeps running be
   `ThemeService`, which stamps `data-theme="light|dark"` and `color-scheme` on the document element
   for `styles/_tokens.scss` to read. *System folgen* is the default and answers
   `prefers-color-scheme`, so a browser set to dark gets a dark panel without the setting being
-  visited. The embedded elements are switched with it and follow a change without a reload — the
+  visited. Hell and Dunkel are also one press away from every screen, through the switch in the
+  topbar (see [UI-SHELL.md](UI-SHELL.md#chrome-topbar-status-bar-footer)) — which is why *System
+  folgen* is reached here and nowhere else: it is what the switch cannot say. The embedded elements
+  are switched with it and follow a change without a reload — the
   edu-sharing bundle and the assistant's chat widget both take the theme as a parameter, see
   [WEB-COMPONENTS.md § Handing the theme to a bundle](WEB-COMPONENTS.md#handing-the-theme-to-a-bundle);
   the WLO canvas is the one screen pair that stays light, see

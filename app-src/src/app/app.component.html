@@ -2,6 +2,18 @@
   <img class="logo" src="../icons/logo.svg" alt="edu-sharing" (error)="hideBrokenLogo($event)" />
   <span class="spacer"></span>
 
+  <!-- The theme, switchable from wherever the reader is. The glyph is the theme that is up — a sun in
+       the light panel, a moon in the dark one — and pressing it changes to the other one. It offers those
+       two only: "System folgen" is a standing answer rather than a switch, and it is set in the
+       Einstellungen (see ThemeService.toggle).
+
+       Not disabled while a write is in flight, unlike the buttons beside it: it neither leaves the open
+       step nor touches what is being written. -->
+  <button class="topbar-btn" type="button" [title]="themeLabel()" [attr.aria-label]="themeLabel()"
+          (click)="toggleTheme()">
+    <i class="tb-icon" [esIcon]="theme.dark() ? 'dark_mode' : 'light_mode'"></i>
+  </button>
+
   <!-- The utility sections (Einstellungen): always reachable, so they sit here as icons next to
        the close button instead of in the main menu. The icon that opened one also closes it again —
        it stays on screen while its section is shown, so it is the obvious way back out.

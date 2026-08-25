@@ -35,6 +35,11 @@ that snapshot. The list order is the registry's, with one context rule in
   lives in the chat widget and would start over with a screen that mounts anew. The shell takes the
   covered step off screen instead of tearing it down (`.step.is-covered`), and the tab bar, the footer
   and the session bar of that step give way to the utility while it is up.
+  Beside those icons, and not a section at all, stands the theme switch: its glyph is the theme that
+  is up (a sun in the light panel, a moon in the dark one) and pressing it changes to the other one
+  (`ThemeService.toggle`). It offers those two only — *System folgen* is a standing answer rather than
+  a switch, and it is set in the Einstellungen. Unlike its neighbours it stays usable while a write is
+  in flight: it neither leaves the open step nor touches what is being written.
 - **Status bar.** Shows the same facts as chips, so it is always visible why an option appears or
   disappears — and it can drop the active content again.
 - **Footer.** `ActionBarService` contributes the current view's next steps: *Erschließung starten*

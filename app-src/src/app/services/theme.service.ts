@@ -91,6 +91,19 @@ export class ThemeService {
     await this.browserExtension.storageSet(APP_CONFIG.storageKeys.theme, setting);
   }
 
+  /**
+   * Switch to the other of the two themes — what the topbar's button does.
+   *
+   * It resolves against what is on screen, not against the setting: from "follow the system" it goes to the
+   * opposite of what the system just gave, so the button always changes the panel the reader is looking at.
+   * That leaves an explicit setting behind, and "follow the system" is reachable again through the
+   * Einstellungen — a one-press control cannot offer three states, and the third is the one nobody needs in
+   * the middle of a step.
+   */
+  async toggle(): Promise<void> {
+    await this.setSetting(this.dark() ? 'light' : 'dark');
+  }
+
   /** Stamp the resolved theme where everything that paints reads it. */
   private apply(dark: boolean): void {
     const theme = dark ? 'dark' : 'light';

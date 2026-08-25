@@ -1,5 +1,5 @@
 import {
-  ChangeDetectionStrategy, Component, OnInit, effect, inject, signal, untracked
+  ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked
 } from '@angular/core';
 
 import { APP_CONFIG } from './config';
@@ -114,9 +114,15 @@ export class AppComponent implements OnInit {
   private readonly chatStyle = inject(ChatStyleService);
   private readonly chatSkill = inject(ChatSkillService);
   private readonly sessionResume = inject(SessionResumeService);
-  // Injected here so it is constructed with the app: it hands the panel's theme to the embedded
-  // bundles through the media query they read, which has to be answerable before one of them boots.
-  private readonly theme = inject(ThemeService);
+  // Read by the topbar's theme button, and injected here in any case so it is constructed with the app:
+  // it hands the panel's theme to the embedded bundles through the media query they read, which has to be
+  // answerable before one of them boots.
+  protected readonly theme = inject(ThemeService);
+
+  /** The topbar button's label: names the theme that is up and what pressing it does. */
+  protected readonly themeLabel = computed(() =>
+    this.theme.dark() ? 'Dunkles Design – zu hellem wechseln' : 'Helles Design – zu dunklem wechseln',
+  );
 
   /** A node received while logged out — opened once the user logs in. */
   private readonly pendingNodeId = signal<string | null>(null);
@@ -259,6 +265,10 @@ export class AppComponent implements OnInit {
         void this.curation.runPendingExtraction();
       },
     );
+  }
+
+  protected toggleTheme(): void {
+    void this.theme.toggle();
   }
 
   protected hideBrokenLogo(event: Event): void {

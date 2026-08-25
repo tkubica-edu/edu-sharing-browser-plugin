@@ -62,6 +62,37 @@ describe('ThemeService', () => {
     });
   });
 
+  describe('toggle', () => {
+    it('swaps the two themes, and leaves a setting behind that says which', async () => {
+      await theme.setSetting('light');
+
+      await theme.toggle();
+
+      expect(theme.setting()).toBe('dark');
+      expect(theme.dark()).toBe(true);
+
+      await theme.toggle();
+
+      expect(theme.setting()).toBe('light');
+      expect(theme.dark()).toBe(false);
+    });
+
+    it('turns "system" into the opposite of what the browser just gave', async () => {
+      setSystemDark(true);
+
+      await theme.toggle();
+
+      expect(theme.setting()).toBe('light');
+      expect(theme.dark()).toBe(false);
+    });
+
+    it('persists what it switched to', async () => {
+      await theme.toggle();
+
+      expect(extension.storage.get(APP_CONFIG.storageKeys.theme)).toBe('dark');
+    });
+  });
+
   describe('load', () => {
     it('takes over the persisted setting', async () => {
       extension.storage.set(APP_CONFIG.storageKeys.theme, 'dark');
