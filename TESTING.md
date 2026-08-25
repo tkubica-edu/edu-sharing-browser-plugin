@@ -21,9 +21,14 @@ npm --prefix app-src run test -- --include app/services/history.service.spec.ts
 ```
 
 `ng test` runs the `@angular/build:unit-test` builder with the Vitest runner in a Node process with
-jsdom — no browser and no extension. The target's `include` is `src/app/**/*.spec.ts`, and two kinds
-of spec live under it: the service specs, each driving one service through `TestBed` with its
-dependencies replaced, and the pure specs next to `src/app/util/`, which need no `TestBed` at all.
+jsdom — no browser and no extension. The target's `include` is `src/**/*.spec.ts`, and three kinds of
+spec live under it: the service specs, each driving one service through `TestBed` with its
+dependencies replaced, the pure specs next to `src/app/util/`, which need no `TestBed` at all, and
+`src/boundary/extension-contract.spec.ts`, which is about no service — it reads the extension's
+plain-JS files, `sw.js`, the manifests and the root `config.js` off disk and checks each literal
+they share with the panel against the panel's own (see [TEST-PLAN.md § Boundary contract
+specs](TEST-PLAN.md#4-boundary-contract-specs--where-the-sidebar-meets-the-extension)). It is the
+one spec that reads its subject instead of importing it: none of those files exports anything.
 `--include` patterns are relative to `src`, and `--list-tests` prints what the builder discovered
 without running it.
 
@@ -83,9 +88,9 @@ default `npm test` path on purpose — a break in the coverage provider then can
 build and imports `lodash`, a CommonJS package Node cannot take named exports from, so the library is
 inlined to be routed through Vite instead.
 
-Seventeen of the panel's 35 services are covered, and of `src/app/util/**` one module is. What is
-still uncovered, which kind of test each part of it needs and in which order to work is
-[TEST-PLAN.md](TEST-PLAN.md).
+Seventeen of the panel's 35 services are covered, of `src/app/util/**` one module is, and the
+contracts with the extension around the panel are pinned. What is still uncovered, which kind of test
+each part of it needs and in which order to work is [TEST-PLAN.md](TEST-PLAN.md).
 
 ## Load the extension
 

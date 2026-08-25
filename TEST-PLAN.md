@@ -15,11 +15,12 @@ exist, this one names the ones that do not yet. It shrinks as it is worked off.
 
 ## Where the coverage stands
 
-Eighteen specs with 367 `it()` blocks cover seventeen of the panel's 35 services and one of its util
-modules. `npm run test:coverage` reports 34.2 % of statements and 31.5 % of functions over its
-`coverageInclude` (`src/app/services/**` and `src/app/util/**`). Everything outside that scope —
-components, `model/`, the pipe, the extension's plain-JS parts, the build harness — has no automated
-test of any kind and is not even measured.
+Nineteen specs with 384 `it()` blocks cover seventeen of the panel's 35 services, one of its util
+modules and the contracts with the extension around it. `npm run test:coverage` reports 34.2 % of
+statements and 31.5 % of functions over its `coverageInclude` (`src/app/services/**` and
+`src/app/util/**`). Everything outside that scope — components, `model/`, the pipe, the build harness
+— has no automated test of any kind and is not even measured, and the extension's plain-JS parts are
+pinned only at their boundary with the panel, never run.
 
 | Area | Files | Covered | Kind of test it needs |
 | --- | --- | --- | --- |
@@ -27,7 +28,7 @@ test of any kind and is not even measured.
 | `app-src/src/app/util/` | 24 | `bundle-theme.ts`, 9 tests | Pure-function spec |
 | `app-src/src/app/model/` | 4 | none | Pure-function spec (`navigation.ts` only; the rest is types) |
 | `app-src/src/app/features/`, `template/`, `shared/`, `pipes/` | 46 | none | Component spec, and one pure-function spec for the pipe |
-| `background/`, `content/` | 3 | none | Boundary contract spec |
+| `background/`, `content/` | 3 | the shared literals, 17 assertions | Boundary contract spec |
 | `scripts/*.mjs` | 3 | none | Build-harness spec |
 
 The ten largest uncovered files, by uncovered lines, are `services/curation.service.ts` (441 of
@@ -69,7 +70,7 @@ contributes `toApiRootUrl`, `toAgentProxyUrl` and `toTopicAssistantUrl` (URL der
 configured repository), and `pipes/authority-name.pipe.ts` a six-branch name cascade in one
 `transform`.
 
-The glob is no longer in the way: the `test` target's `include` is `src/app/**/*.spec.ts`, so a spec
+The glob is no longer in the way: the `test` target's `include` is `src/**/*.spec.ts`, so a spec
 placed next to any of these files is executed. `util/bundle-theme.spec.ts` is the first of this kind
 and is the pattern to follow for the other two `install*` modules — it installs the patch once (the
 module-level flag it shares with production makes a second install a no-op for the patch itself) and
@@ -167,9 +168,13 @@ of them can be imported by a test as they stand**. `config.js` is the exception 
 
 Two levels are worth having, and the cheap one first:
 
-**Invariant specs over the literals.** These need no refactor at all: a Node spec reads both files
-and asserts they agree. Each pair below is a contract that is upheld by hand today and breaks
-silently.
+~~**Invariant specs over the literals.**~~ Done, in
+`app-src/src/boundary/extension-contract.spec.ts`: 17 assertions over the pairs below, plus that the
+two configs name one repository and derive the same metadata agent from it. It reads each plain-JS
+file as text — none of them exports anything — and evaluates the two that are data behind a `self`
+guard (`config.js`, `background/dev-fixtures.js`) in a sandbox, so what it compares is what the
+worker really sees rather than what a regex believes about the formatting. The spec lives outside
+`src/app`, which is what widened the `include` glob to `src/**/*.spec.ts`: it belongs to no service.
 
 | Invariant | The two sides |
 | --- | --- |
@@ -180,13 +185,14 @@ silently.
 | Every fixture the settings offer exists | `agentGenerate` keys in `background/dev-fixtures.js` == `GENERATE_FIXTURES` ids in `services/dev-mode.service.ts` |
 | The dev-mode keys are one registry | the storage-key literals in `background.js` == `APP_CONFIG.storageKeys` |
 
-The first row is not hypothetical. `BrowserExtensionService.analyzeUrl` sends `analyze.url`, and
-`background.js` has a `case 'analyze.url'` for it — but `analyze.url` is not in `ALLOWED_ACTIONS`,
-so the listener returns before the `switch` and that case is unreachable. Reading the callers,
-`MetadataAgentService.runForUrl` then reports `NO_RESPONSE` and
-`CurationService.runPendingExtraction` returns silently on it, which is why nothing says so out
-loud. That is one assertion's worth of test standing between the contract and a route that cannot
-work.
+The first row was not hypothetical, and the spec's first run said so:
+`BrowserExtensionService.analyzeUrl` sends `analyze.url` and `background.js` has a
+`case 'analyze.url'` for it, but the action was not in
+`ALLOWED_ACTIONS` — so the listener returned before the `switch` and that case was unreachable, which
+`MetadataAgentService.runForUrl` reported as `NO_RESPONSE` and `CurationService.runPendingExtraction`
+swallowed. The action is in the set as of this round; the route it opens is the Erschließung of a page
+the browser is not on. Both directions are asserted now, so an action allowed without a route fails
+the same way.
 
 **Behaviour specs after an export.** Beyond the literals, `background.js` holds pure logic worth
 pinning — `agentBaseOf` (the URL allow-list and trailing-slash strip), `buildGenerateBody`,
@@ -228,7 +234,7 @@ Each round is worth landing on its own; nothing in a later one is a precondition
 | --- | --- | --- |
 | 1 | `util/**` and `model/navigation.ts`, `config.ts`, the pipe | No new infrastructure beyond the `include` glob; 3504 lines of pure logic, `quality-check-request.ts` first |
 | ~~2~~ | ~~The services with no outbound call~~ Done: `action-bar`, `navigation`, `node-write`, `chat-skill`, `chat-style`, `debug`; `metadata-agent-api` is covered through the `node-write` spec | Existing fakes plus two new ones; the largest logic gain per fake written |
-| 3 | The boundary invariant specs (kind 4, first half) | No refactor, and one of them already names a broken route |
+| ~~3~~ | ~~The boundary invariant specs (kind 4, first half)~~ Done: `src/boundary/extension-contract.spec.ts` | No refactor, and one of them already named a broken route — `analyze.url`, fixed with it |
 | 4 | The judges and the repository adapters: `content-judge`, `metadata-agent`, `quality-judge`, `repository-node`, `material-upload`, `node-connector`, `editorial-groups`, `collection-recommendation` | Needs the `ngx-edu-sharing-api` fakes; everything after this depends on them |
 | 5 | `curation.service.ts`, split by method group, then `session-resume`, `onlyoffice-document`, `browser-extension`, `context-refresh`, `content-flow`, `content-suggestions` | The fake set from rounds 2 and 4 is what makes these affordable |
 | 6 | Component specs for the seven candidates; the build harness; the exported-function half of the boundary | Each needs a decision or a change to shipped code first |
@@ -236,7 +242,8 @@ Each round is worth landing on its own; nothing in a later one is a precondition
 ## Preconditions
 
 - ~~**Widen the test glob.**~~ Done: `include` in the `test` target of `app-src/angular.json` is
-  `src/app/**/*.spec.ts`. `coverageInclude` is `services/**` plus `util/**` and grows the same way —
+  `src/**/*.spec.ts` — widened past `src/app` for the boundary spec, which is about no service.
+  `coverageInclude` is `services/**` plus `util/**` and grows the same way —
   a round that covers `model/`, `pipes/` or a component has to extend it, or the new specs' subject
   is reported as uncovered.
 - **Fakes to add** in `app-src/src/testing/fakes/`, in the established shape (a `fakeX()` factory

@@ -548,6 +548,7 @@ const ALLOWED_ACTIONS = new Set([
   'tabs.extractPageData',
   'tabs.navigate',
   'analyze.run',
+  'analyze.url',
   'metadata.saveNode'
 ]);
 

@@ -86,7 +86,7 @@
               "src/testing/no-network.setup.ts"
             ],
             "include": [
-              "src/app/**/*.spec.ts"
+              "src/**/*.spec.ts"
             ],
             "runnerConfig": "vitest.config.ts",
             "coverageInclude": [
