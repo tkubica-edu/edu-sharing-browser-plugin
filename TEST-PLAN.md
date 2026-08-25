@@ -15,33 +15,33 @@ exist, this one names the ones that do not yet. It shrinks as it is worked off.
 
 ## Where the coverage stands
 
-Ten specs with 147 `it()` blocks cover ten of the panel's 34 services. `npm run test:coverage`
-reports 19.6 % of statements and 13.5 % of functions over its `coverageInclude`
-(`src/app/services/**` and `src/app/util/**`). Everything outside that scope — components, `model/`,
-the pipe, the extension's plain-JS parts, the build harness — has no automated test of any kind and
-is not even measured.
+Eighteen specs with 367 `it()` blocks cover seventeen of the panel's 35 services and one of its util
+modules. `npm run test:coverage` reports 34.2 % of statements and 31.5 % of functions over its
+`coverageInclude` (`src/app/services/**` and `src/app/util/**`). Everything outside that scope —
+components, `model/`, the pipe, the extension's plain-JS parts, the build harness — has no automated
+test of any kind and is not even measured.
 
 | Area | Files | Covered | Kind of test it needs |
 | --- | --- | --- | --- |
-| `app-src/src/app/services/` | 34 | 10 services, 147 tests | Service spec (TestBed + fakes) |
-| `app-src/src/app/util/` | 22 | none, though measured | Pure-function spec |
+| `app-src/src/app/services/` | 35 | 17 services, 358 tests | Service spec (TestBed + fakes) |
+| `app-src/src/app/util/` | 24 | `bundle-theme.ts`, 9 tests | Pure-function spec |
 | `app-src/src/app/model/` | 4 | none | Pure-function spec (`navigation.ts` only; the rest is types) |
 | `app-src/src/app/features/`, `template/`, `shared/`, `pipes/` | 46 | none | Component spec, and one pure-function spec for the pipe |
 | `background/`, `content/` | 3 | none | Boundary contract spec |
 | `scripts/*.mjs` | 3 | none | Build-harness spec |
 
 The ten largest uncovered files, by uncovered lines, are `services/curation.service.ts` (441 of
-446), `services/navigation.service.ts` (157), `services/editorial-groups.service.ts` (118),
-`util/quality-check-request.ts` (110), `services/quality-judge.service.ts` (100),
-`services/collection-recommendation.service.ts` (82), `services/metadata-agent.service.ts` (77),
-`services/action-bar.service.ts` (76), `services/web-component-bundle.service.ts` (73) and
-`services/onlyoffice-document.service.ts` (66).
+446), `services/editorial-groups.service.ts` (118), `util/quality-check-request.ts` (110),
+`services/quality-judge.service.ts` (100), `services/collection-recommendation.service.ts` (82),
+`services/metadata-agent.service.ts` (77), `services/web-component-bundle.service.ts` (73),
+`services/onlyoffice-document.service.ts` (66), `services/content-suggestions.service.ts` (65) and
+`util/chat-overrides.ts` (56).
 
 ## The five kinds of test
 
 ### 1. Pure-function specs — no TestBed, no fakes
 
-`app-src/src/app/util/` is 22 modules and 3306 lines of functions over plain objects: no
+`app-src/src/app/util/` is 24 modules and 3504 lines of functions over plain objects: no
 `@angular/*` import, no injectable, nothing that runs at import time. A spec imports the function
 and asserts on its return value; there is no setup at all. That makes this the cheapest coverage in
 the repo and the reason to start here.
@@ -77,20 +77,26 @@ asserts on what the patched global answers.
 
 ### 2. Service specs — TestBed with a fake per dependency
 
-The established kind, ten of them in place. What is left splits by what a service reaches for, and
-the cost per service follows that, not its size:
+The established kind, seventeen of them in place. What is left splits by what a service reaches for,
+and the cost per service follows that, not its size:
 
-- **No outbound call at all, only other services' signals.** `action-bar.service.ts` (407 lines) is
-  pure derivation of the footer's buttons, `navigation.service.ts` (502) a signal state machine over
-  section, screen, trail and overlay. Both are the highest logic-per-fake ratio left in the folder
-  and need only fakes for `NavigationService` and `PageRecognitionService` to exist.
-  `node-write.service.ts` is request-body assembly (`toEnvelope`, the `write_extended_data` and
-  workflow flags) behind a single `browserExtension.saveNode` call the existing fake already
-  answers.
-- **Extension storage only.** `chat-skill.service.ts`, `chat-style.service.ts` and
-  `debug.service.ts` read and write settings through `BrowserExtensionService`, which
-  `fakeBrowserExtension()` covers today — the same shape as the already-covered `DevModeService`.
-  `metadata-agent-api.service.ts` is 14 lines and one `computed`.
+- ~~**No outbound call at all, only other services' signals.**~~ Done: `action-bar.service.ts`,
+  `navigation.service.ts` and `node-write.service.ts` are covered, and the fakes they needed
+  (`fakeNavigation()`, `fakePageRecognition()`, `saveNode` on `fakeBrowserExtension()`) exist for the
+  rounds below. Two things the three specs settled that the ones after them can follow: a fake of a
+  *state* service carries writable signals for what its dependents read and states the step directly
+  rather than deriving it (see `fakeNavigation().at()`), and a footer action is asserted by running it
+  and reading the move it made on the fake, not by matching its label.
+- ~~**Extension storage only.**~~ Done: `chat-skill.service.ts`, `chat-style.service.ts` and
+  `debug.service.ts` are covered through `fakeBrowserExtension()` alone, in the shape
+  `dev-mode.service.spec.ts` set. Two of the three are a persisted switch and a default, so what the
+  specs pin is the *default* and what is done with a stored value that no longer fits it —
+  `ChatSkillService` validates one and `ChatStyleService` does not. `DebugService` is the one with
+  behaviour beyond that: it stands in for the host-side plugin, so its spec drives the simulated
+  events with `vi.useFakeTimers()` and asserts on a spy over `window.postMessage`, which is the seam
+  the shell listens at. `metadata-agent-api.service.ts` is 14 lines and one `computed`, and
+  `node-write.service.spec.ts` uses the real one already; a spec of its own would only restate the
+  constant — with that, this round is worked off.
 - **A `fetch` of their own.** `content-judge.service.ts` and `metadata-agent.service.ts` go out
   through `fetchJson` in `util/json-api.ts` and a direct `fetch` respectively;
   `quality-judge.service.ts` does so transitively through both judges. The pattern is
@@ -220,8 +226,8 @@ Each round is worth landing on its own; nothing in a later one is a precondition
 
 | Round | What | Why here |
 | --- | --- | --- |
-| 1 | `util/**` and `model/navigation.ts`, `config.ts`, the pipe | No new infrastructure beyond the `include` glob; 3306 lines of pure logic, `quality-check-request.ts` first |
-| 2 | The services with no outbound call: `action-bar`, `navigation`, `node-write`, `chat-skill`, `chat-style`, `debug`, `metadata-agent-api` | Existing fakes plus two new ones; the largest logic gain per fake written |
+| 1 | `util/**` and `model/navigation.ts`, `config.ts`, the pipe | No new infrastructure beyond the `include` glob; 3504 lines of pure logic, `quality-check-request.ts` first |
+| ~~2~~ | ~~The services with no outbound call~~ Done: `action-bar`, `navigation`, `node-write`, `chat-skill`, `chat-style`, `debug`; `metadata-agent-api` is covered through the `node-write` spec | Existing fakes plus two new ones; the largest logic gain per fake written |
 | 3 | The boundary invariant specs (kind 4, first half) | No refactor, and one of them already names a broken route |
 | 4 | The judges and the repository adapters: `content-judge`, `metadata-agent`, `quality-judge`, `repository-node`, `material-upload`, `node-connector`, `editorial-groups`, `collection-recommendation` | Needs the `ngx-edu-sharing-api` fakes; everything after this depends on them |
 | 5 | `curation.service.ts`, split by method group, then `session-resume`, `onlyoffice-document`, `browser-extension`, `context-refresh`, `content-flow`, `content-suggestions` | The fake set from rounds 2 and 4 is what makes these affordable |
@@ -234,14 +240,15 @@ Each round is worth landing on its own; nothing in a later one is a precondition
   a round that covers `model/`, `pipes/` or a component has to extend it, or the new specs' subject
   is reported as uncovered.
 - **Fakes to add** in `app-src/src/testing/fakes/`, in the established shape (a `fakeX()` factory
-  returning the fake and its knobs, checked with `satisfies Partial<TheRealService>`):
-  `NavigationService` and `PageRecognitionService` for round 2; `MetadataAgentService`,
-  `RepositoryNodeService`, `NodeWriteService`, `MetalookupService`, `ContentJudgeService`,
-  `QualityJudgeService`, `OnlyOfficeDocumentService` and the library's `NodeService`,
-  `CollectionService`, `ConnectorService` and `ConfigService` for rounds 4 and 5.
-  `ConditionsService`, `BusyService`, `KeywordRankingService`, `OptionIconService` and
-  `MetadataAgentApiService` are cheap enough to use for real, as `page-recognition.service.spec.ts`
-  already does with `ConditionsService`.
+  returning the fake and its knobs, checked with `satisfies Partial<TheRealService>`).
+  ~~`NavigationService` and `PageRecognitionService`~~ are written; still to come, for rounds 4 and 5,
+  are `MetadataAgentService`, `RepositoryNodeService`, `NodeWriteService`, `MetalookupService`,
+  `ContentJudgeService`, `QualityJudgeService`, `OnlyOfficeDocumentService` and the library's
+  `NodeService`, `CollectionService`, `ConnectorService` and `ConfigService`. `ConditionsService`,
+  `BusyService`, `KeywordRankingService`, `OptionIconService` and `MetadataAgentApiService` are cheap
+  enough to use for real, as `navigation.service.spec.ts` does with the first two: both are
+  derivations over fakes that exist, and faking them would move the registry's own rules into the
+  spec.
 - **Exports and a main guard** in `scripts/build.mjs`, `scripts/version.mjs`,
   `background/background.js`, `content/content.js` and `content/panel-host.js` — round 6's
   precondition, and the one item on this list that changes code that ships.

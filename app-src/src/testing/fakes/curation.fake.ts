@@ -2,7 +2,7 @@ import { computed, signal } from '@angular/core';
 import { Node } from 'ngx-edu-sharing-api';
 import { vi } from 'vitest';
 
-import { ActiveNode, CurationService } from '../../app/services/curation.service';
+import { ActiveNode, CurationService, SaveSteps } from '../../app/services/curation.service';
 import { HistoryEntry } from '../../app/services/history.service';
 
 /** A minimal `ActiveNode`, for the tests that only need one to exist. */
@@ -11,17 +11,23 @@ export function anActiveNode(nodeId = 'node-1'): ActiveNode {
 }
 
 /**
- * `CurationService` reduced to the state its dependents read and the adoptions they trigger. The real
+ * `CurationService` reduced to the state its dependents read and the writes they trigger. The real
  * one is 1595 lines and owns the whole write path; nothing in this round tests that, so the fake
  * carries the signals as writable ones — a spec sets `activeNode`/`hasUnsavedWork` to put the panel
  * into the state whose branch it is after.
  *
  * The three `adopt*` spies answer `true` by default, since „the content was taken up" is the outcome a
- * caller's happy path is written for; a spec that needs the refusal overrides the resolved value.
+ * caller's happy path is written for; a spec that needs the refusal overrides the resolved value. The
+ * writes answer the same way and for the same reason, and `confirmQuality` additionally *records* the
+ * confirmation — its callers read `qualityConfirmed` back to decide whether the step may be left, so a
+ * write that did not report itself would be a refusal (see {@link refuseQuality}).
  */
 export function fakeCuration() {
   const activeNode = signal<ActiveNode | null>(null);
   const nodeDetected = signal(false);
+  const qualityConfirmed = signal(false);
+  const saving = signal(false);
+  let qualityHolds = true;
 
   const fake = {
     activeNode,
@@ -30,13 +36,30 @@ export function fakeCuration() {
     hasEditableMetadata: signal(false),
     hasCuratedResult: signal(false),
     qualityCriteriaMet: signal(false),
+    qualityCriteriaJudged: signal(false),
+    qualityMetadataEnriched: signal(false),
+    qualityMetadataProposed: signal(false),
+    qualityChecksRunning: signal(false),
+    qualityConfirmed,
     agentEditWindowClosed: signal(false),
-    saving: signal(false),
+    running: signal(false),
+    saving,
     assigning: signal(false),
+    // The real one is `computed(() => this.saving())`: what a save is under way is not written twice.
+    metadataLocked: computed(() => saving()),
     releaseDetectedContent: vi.fn(),
+    releaseChosenContent: vi.fn(),
     adoptDetectedNode: vi.fn((_node: Node): void => undefined),
     adoptDetectedNodeId: vi.fn((_nodeId: string): Promise<boolean> => Promise.resolve(true)),
     adoptRememberedNode: vi.fn((_entry: HistoryEntry): Promise<boolean> => Promise.resolve(true)),
+    analyze: vi.fn((): Promise<boolean> => Promise.resolve(true)),
+    applyDraftValues: vi.fn((): Promise<void> => Promise.resolve()),
+    createContent: vi.fn((): Promise<boolean> => Promise.resolve(true)),
+    saveCollected: vi.fn((_steps?: SaveSteps): Promise<boolean> => Promise.resolve(true)),
+    reportMetadataEnriched: vi.fn(),
+    confirmQuality: vi.fn(async (): Promise<void> => {
+      if (qualityHolds) qualityConfirmed.set(true);
+    }),
   } satisfies Partial<CurationService>;
 
   /** Put a node in place as one that arrived on its own, which is what `hasDetectedNode` reports. */
@@ -45,7 +68,12 @@ export function fakeCuration() {
     nodeDetected.set(true);
   }
 
-  return { fake, detect };
+  /** The repository refuses the confirmation: it runs and nothing is confirmed afterwards. */
+  function refuseQuality(): void {
+    qualityHolds = false;
+  }
+
+  return { fake, detect, refuseQuality };
 }
 
 export type CurationFake = ReturnType<typeof fakeCuration>;

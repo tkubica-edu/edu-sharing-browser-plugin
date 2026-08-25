@@ -1,7 +1,11 @@
 import { signal } from '@angular/core';
 import { vi } from 'vitest';
 
-import { AnnouncedPage, BrowserExtensionService } from '../../app/services/browser-extension.service';
+import {
+  AnnouncedPage,
+  BrowserExtensionService,
+  SaveNodeResponse,
+} from '../../app/services/browser-extension.service';
 
 /**
  * `BrowserExtensionService` with its extension APIs replaced: `storage.local` becomes an in-memory
@@ -20,6 +24,9 @@ export function fakeBrowserExtension() {
       Promise.resolve(storage.has(key) ? storage.get(key) : fallback),
   );
 
+  /** What the worker answers a `metadata.saveNode` with — see {@link writes} and {@link refuses}. */
+  let saved: SaveNodeResponse = { success: true, result: { success: true } };
+
   const fake = {
     available: true,
     announcedPage: signal<AnnouncedPage | null>(null),
@@ -29,9 +36,26 @@ export function fakeBrowserExtension() {
       return Promise.resolve();
     }),
     navigateTab: vi.fn((): Promise<void> => Promise.resolve()),
+    saveNode: vi.fn(
+      (_body: Record<string, unknown>, _apiUrl?: string): Promise<SaveNodeResponse> =>
+        Promise.resolve(saved),
+    ),
   } satisfies Partial<BrowserExtensionService>;
 
-  return { fake, storage, storageGet };
+  /**
+   * What the endpoint reports for the next write. Its own verdict, one level in under `result` — the
+   * transport succeeded, which is the case every write path is read for.
+   */
+  function writes(result: SaveNodeResponse['result']): void {
+    saved = { success: true, result };
+  }
+
+  /** The message never reached a worker: the *transport* failed, and it says nothing about the write. */
+  function refuses(error: string): void {
+    saved = { success: false, error };
+  }
+
+  return { fake, storage, storageGet, writes, refuses };
 }
 
 export type BrowserExtensionFake = ReturnType<typeof fakeBrowserExtension>;
