@@ -1,6 +1,7 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import browser from 'webextension-polyfill';
 
+import { PdfTextService, formatPdfText, looksLikePdf } from './pdf-text.service';
 import { errorMessage } from '../util/errors';
 
 /** Log prefix, as everywhere else in the extension (`[edu-sharing][<station>]`). */
@@ -134,6 +135,11 @@ export class BrowserExtensionService {
   /** This panel's tab, for telling its own announcements from another tab's; null while unknown. */
   private ownTabId: number | null = null;
 
+  private readonly pdfText = inject(PdfTextService);
+
+  /** The last PDF tab that was read, by address; `text` is null for one that carries none. */
+  private lastPdf: { url: string; text: string | null } | null = null;
+
   constructor() {
     if (!this.available) return;
     // Resolved once, up front: the announcement is a broadcast to every panel, so it has to be
@@ -156,7 +162,15 @@ export class BrowserExtensionService {
    * back to the agent's public deployment.
    */
   async analyzeActiveTab(language: string, apiUrl?: string): Promise<AnalyzeResponse> {
-    const response = await this.ask<AnalyzeResponse>({ action: 'analyze.run', language, apiUrl });
+    // A PDF is read here and handed over as text, because it can only be read here: the worker may
+    // start no worker of its own, which is what pdf.js needs (see {@link pdfTextOfTab}).
+    const pdfText = await this.pdfTextOfTab(null, false);
+    const response = await this.ask<AnalyzeResponse>({
+      action: 'analyze.run',
+      language,
+      apiUrl,
+      ...(pdfText ? { pdfText } : {})
+    });
     if (response === UNREACHABLE) return { success: false, error: WORKER_UNREACHABLE };
     return response ?? { success: false, error: 'NO_RESPONSE' };
   }
@@ -244,7 +258,52 @@ export class BrowserExtensionService {
     const response = await this.askOrNull<{ success?: boolean; data?: PageData }>({
       action: 'tabs.extractPageData',
     });
-    return response?.success ? response.data ?? null : null;
+    const data = response?.success ? response.data ?? null : null;
+    if (!data) return null;
+    // A PDF tab reads as an empty page: the browser shows the document in a plugin of its own, and a
+    // content script injected into the tab finds an `<embed>` and no text at all. The text is the
+    // document's own, read here.
+    const pdfText = await this.pdfTextOfTab(data.url, hasPageText(data));
+    return pdfText ? { ...data, mainContent: pdfText, formattedText: pdfText } : data;
+  }
+
+  /**
+   * The text of the open tab where that tab is a PDF, else null. Read in this document because pdf.js
+   * needs a worker and the background service worker may start none — and read at all because the text
+   * would otherwise be missing entirely, leaving the metadata agent to fetch the document itself.
+   *
+   * Kept for the address it was read from: one page is erschlossen and judged in the same breath, and
+   * reading a document of many pages twice for that would double the wait for nothing.
+   */
+  private async pdfTextOfTab(url: string | null, pageHasText: boolean): Promise<string | null> {
+    const address = url ?? (await this.getActiveTab())?.url ?? null;
+    if (!address || pageHasText) return null;
+    if (this.lastPdf?.url === address) return this.lastPdf.text;
+    // The address is the cheap half of the question and answers it for most documents; a page that
+    // read as empty is asked outright, since a PDF is served under any address a server likes.
+    if (!looksLikePdf(address) && !(await servesPdf(address))) {
+      // Remembered as "no document here", so a page erschlossen and judged in one flow is asked once.
+      this.lastPdf = { url: address, text: null };
+      return null;
+    }
+    try {
+      const pdf = await this.pdfText.readUrl(address);
+      // A scanned document has no text layer: pdf.js reads it and finds nothing, and nothing is what
+      // the agent is then better off not being handed — it falls back to fetching the page itself.
+      const text = pdf.text.trim() ? formatPdfText(pdf) : null;
+      console.log(
+        `${LOG} PDF read on the device: ${pdf.pagesRead}/${pdf.pages} pages,`,
+        text ? `${text.length} characters` : 'no text layer — a scan, most likely',
+      );
+      this.lastPdf = { url: address, text };
+      return text;
+    } catch (cause: unknown) {
+      // A document that cannot be read is one source of text missing, not a failed extraction: the
+      // caller carries on with what the page itself says.
+      console.warn(`${LOG} the PDF of the open tab could not be read:`, errorMessage(cause));
+      this.lastPdf = { url: address, text: null };
+      return null;
+    }
   }
 
   async storageGet<T>(key: string, fallback: T): Promise<T> {
@@ -315,6 +374,25 @@ export class BrowserExtensionService {
     } catch {
       /* cross-origin parent — treat as unreachable */
     }
+    return false;
+  }
+}
+
+/** Whether an extraction found text worth calling the page's own — see {@link BrowserExtensionService.extractPageData}. */
+function hasPageText(data: PageData): boolean {
+  return (data.mainContent ?? data.formattedText ?? data.text ?? '').trim().length > 0;
+}
+
+/**
+ * Whether the server answers with a PDF under this address. Asked only where the address itself does not
+ * say so and the page read as empty — a document served under a plain address, which is what a repository
+ * or a CMS does. A server that refuses the question is taken at its silence.
+ */
+async function servesPdf(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, { method: 'HEAD', credentials: 'include' });
+    return /application\/pdf/i.test(response.headers.get('content-type') ?? '');
+  } catch {
     return false;
   }
 }

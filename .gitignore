@@ -15,5 +15,7 @@ app-src/.angular/
 .idea
 
 # The sidebar's built JavaScript: `main.js` plus whatever chunks the build splits off (a lazy
-# import gets its own). index.html and styles.css are tracked — they are what the manifest points at.
+# import gets its own), and the pdf.js worker the build copies in beside them. index.html and
+# styles.css are tracked — they are what the manifest points at.
 sidebar/*.js
+sidebar/*.mjs

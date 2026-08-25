@@ -422,9 +422,14 @@ function withPageStatedPictures(result, pageData) {
  */
 const GENERATE_SCHEMA_FILE = 'learning_material.json';
 
-// Build the /generate request body: prefer text mode, fall back to URL mode.
-function buildGenerateBody(pageData, language) {
-  const text = pageData?.formattedText || pageData?.mainContent || pageData?.text || '';
+/**
+ * Build the /generate request body: prefer text mode, fall back to URL mode. `pdfText` is the panel's, for
+ * a tab showing a PDF: the browser renders such a document in a plugin of its own, so the content script
+ * reads no text off it, and pdf.js cannot run here — a service worker may start no worker (see
+ * BrowserExtensionService.pdfTextOfTab). Where it is there it IS the page's text.
+ */
+function buildGenerateBody(pageData, language, pdfText) {
+  const text = pdfText || pageData?.formattedText || pageData?.mainContent || pageData?.text || '';
   const lang = language || pageData?.meta?.language || 'de';
   if (text && text.trim().length > 50) {
     return {
@@ -602,7 +607,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
             return { success: false, error: 'UNSUPPORTED_PAGE' };
           }
           const pageData = await extractPageDataFromTab(tab.id);
-          const body = buildGenerateBody(pageData, message.language);
+          const body = buildGenerateBody(pageData, message.language, message.pdfText);
           // The page states the addresses of its own pictures; the result only transcribes them, so
           // what it names is read back against the page (see {@link withPageStatedPictures}).
           const result = withPageStatedPictures(

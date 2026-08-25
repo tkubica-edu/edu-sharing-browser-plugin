@@ -75,6 +75,7 @@ precedes every `/generate` rather than as a failed extraction a minute later.
 | `POST /generate`, `POST /nodes` (Metadata-Agent) | background service worker | background fetch is gated by `host_permissions`, not CORS/page-CSP — portable everywhere (`analyze.run`: extract the tab, generate everything) |
 | `POST /extract-field` (Metadata-Agent) | sidebar document (`MetadataAgentService`) | same context the WLO canvas calls `/generate` from, so the request is visible in the panel's own DevTools and there is no worker build that can fall out of sync with the app. Relies on `host_permissions` for the cross-origin call, like the repository login |
 | Page content extraction | `scripting.executeScript` (background) | no cross-origin fetch |
+| A PDF's own text | sidebar document (`PdfTextService`) | `fetch` with `credentials: 'include'`, then pdf.js on the device — the document is neither uploaded nor read by any service. It cannot run in the worker: pdf.js needs a worker of its own and a service worker may start none |
 | Repository login | Angular `HttpClient` (library) | the library owns the call; relies on `host_permissions` bypassing CORS on Chrome/Edge/Firefox |
 | Preview picture for the 3D conversion | sidebar document (`ImageTo3dComponent`) | `fetch` with `credentials: 'include'`; the repository shares the picture with no other origin, so this reads it through `host_permissions` rather than through the page. The pixels stay in the document — nothing is uploaded |
 | Depth model + ONNX runtime WASM | sidebar document (`DepthModelService`) | the two public files the on-device estimate needs, from `huggingface.co` and `cdn.jsdelivr.net`; both are kept in Cache storage under `es-image-to-3d-v1`, so only the first conversion waits for them. The WASM address is derived from `env.versions.web`, so runtime and binary can never drift apart |
@@ -87,6 +88,33 @@ attempts are used up the caller gets `WORKER_UNREACHABLE` — a state of its own
 worker answering with a failure — and the user is told to reopen the panel. Every other rejection is
 the worker's own and is passed on unchanged. See
 [TROUBLESHOOTING.md § Browser-specific](TROUBLESHOOTING.md#browser-specific).
+
+## Reading a PDF
+
+A tab showing a PDF reads as an empty page: the browser renders the document in a plugin of its own,
+so `content/content.js` finds an `<embed>` and no text, and `buildGenerateBody` would fall back to
+its URL mode and leave the metadata agent to fetch the document itself. `PdfTextService` reads it
+here instead — pdf.js (`pdfjs-dist`) in the sidebar document, its worker served from the extension
+(see [BUILD.md § What goes into the package](BUILD.md#what-goes-into-the-package)). Both the text and
+what the document states about itself (`Title`, `Author`, `Subject`, `Keywords`, `CreationDate`) are
+formatted into the same `=== SECTION ===` blocks the content script writes, so what reaches the agent
+looks the same whichever way the page was read. The reading is bounded by `PAGE_MAX` (60 pages) and
+by `CONTENT_TEXT_MAX`, the budget the text has downstream, and it stops at a page boundary rather
+than mid-sentence.
+
+Two paths reach it. **The open tab** goes through `BrowserExtensionService.pdfTextOfTab`, which is
+asked by `extractPageData` (so `QualityJudgeService` judges the document's text rather than falling
+back to an address) and by `analyzeActiveTab`, which hands the text to the worker as `pdfText` —
+`buildGenerateBody` prefers it over everything the content script returned. A document is recognised
+by its address, and by a `HEAD` for a page that read as empty and whose address says nothing; the
+answer is remembered per address, so a page erschlossen and judged in one flow is read once.
+
+**The node's own file** goes through `CurationService.readNodeDocument`, started by
+`applyLoadedNode` for every node of mimetype `application/pdf` and not awaited: the node is in the
+flow either way. Its text is the last fallback of `CurationService.contentText`, behind the agent's
+payload and the node's `ccm:oeh_extendedText`, which is what gives an uploaded or a stored worksheet
+a text at all — a file uploaded through `<edu-sharing-add-material>` exists at no address the agent
+could fetch.
 
 ## Saving a content
 

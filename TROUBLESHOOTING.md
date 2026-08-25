@@ -76,6 +76,24 @@ What is known not to work, known to be unverified, or known to look wrong at fir
 - **The 3D button is hidden where WebGL is missing.** `reliefViewerSupported()` requires WebGL plus
   `OES_element_index_uint`; a relief of any useful resolution exceeds the 65 536 vertices a draw call
   can address without it. The probe costs a WebGL context, so it is answered once and remembered.
+- **A scanned PDF yields nothing.** `PdfTextService` reads the text layer a document carries; a scan
+  carries none, and the reader answers with an empty text rather than an error — that is a property of
+  the document. Every caller treats it as "no text here" and carries on with what the page or the node's
+  metadata says. Recognising the characters in the image would need OCR, which the extension does not do.
+- **The PDF reader ships no cMaps and no standard fonts.** `app-src/angular.json` copies only
+  `pdf.worker.min.mjs`. Text encoded through one of pdf.js' predefined CMaps — CJK documents above all
+  — can therefore come out garbled or empty, and pdf.js warns about the missing `standardFontDataUrl`
+  on every document with a non-embedded standard font. The warning is harmless: those files carry glyph
+  outlines for rendering, and nothing here renders a page. Adding the two would cost 1.6 MB and 800 kB.
+- **The reader is a second copy of pdf.js.** `scripts/edu/` already ships one (see § Bundle size), but
+  its worker only pairs with the API version it was built against, and that version moves whenever the
+  bundle is refreshed — an unrelated overwrite would then break the reading. `pdfjs-dist` is a
+  dependency of the app for that reason, versioned with it; the library is a lazy chunk (~430 kB) and
+  the worker is 1.2 MB in the package.
+- **Erschließen costs one `HEAD` per page.** A PDF is served under any address a server likes, so
+  `BrowserExtensionService.pdfTextOfTab` asks for the content type where the address does not say and
+  the page read as empty. The answer is remembered per address for the panel's lifetime. A server that
+  refuses `HEAD` is taken at its silence — such a document goes unread.
 - **The repository URL cannot be changed at runtime** without reloading the sidebar — the library
   freezes `rootUrl` at bootstrap and does not export its config classes.
 - **The agent may only edit its own node for two hours.** Along the guest route the repository

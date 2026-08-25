@@ -23,6 +23,7 @@ import { HistoryEntry, HistoryService } from './history.service';
 import { MetadataAgentService } from './metadata-agent.service';
 import type { NavStep } from './navigation.service';
 import { NodeWriteService } from './node-write.service';
+import { PdfTextService, formatPdfText } from './pdf-text.service';
 import { NodeSummary, RepositoryNodeService } from './repository-node.service';
 import { QualityJudgeService } from './quality-judge.service';
 
@@ -103,6 +104,12 @@ const LOG_HISTORY = '[edu-sharing][history]';
 /** Log prefix for what actually reaches the node — the values, the steps, and how the write ended. */
 const LOG_WRITE = '[edu-sharing][write]';
 
+/** Log prefix for what the panel reads out of the content's own file. */
+const LOG_DOCUMENT = '[edu-sharing][document]';
+
+/** The one file format the panel reads itself — see {@link CurationService.readNodeDocument}. */
+const PDF_MIMETYPE = 'application/pdf';
+
 /**
  * What is said in place of the repository's own refusal once that window has closed: it answers with
  * the node's id, its creation date and its age in hours, none of which names the one thing that
@@ -122,6 +129,7 @@ export class CurationService {
   private readonly nodeWrite = inject(NodeWriteService);
   private readonly browserExtensionCustomWebComponent = inject(BrowserExtensionCustomWebComponentService);
   private readonly repositoryNodes = inject(RepositoryNodeService);
+  private readonly pdfText = inject(PdfTextService);
   private readonly qualityJudge = inject(QualityJudgeService);
   private readonly history = inject(HistoryService);
   // The generated CollectionV1Service (exported as CollectionServiceUnwrapped) — the read-only
@@ -205,6 +213,13 @@ export class CurationService {
   readonly editorSeedVersion = signal(0);
   /** The full hydrated node, fed to the preview element. */
   readonly previewNode = signal<Node | null>(null);
+
+  /**
+   * The text of the active node's own file, where it is one this panel can read — today a PDF, read on
+   * the device (see {@link readNodeDocument}). Null while none was read: for a link node, for a format
+   * nothing here opens, and for a scan, which carries no text to read.
+   */
+  private readonly documentText = signal<string | null>(null);
 
   readonly saving = signal(false);
   readonly saveError = signal<string | null>(null);
@@ -585,13 +600,18 @@ export class CurationService {
 
   /**
    * The text the content's metadata was read from: the agent's payload carries it, and a node that was
-   * written from such a payload keeps it as a field of its own. `''` where none is known — for a node
-   * this session merely found open, nothing states what it says.
+   * written from such a payload keeps it as a field of its own. Last the document's own text, for a
+   * PDF read off the node itself ({@link readNodeDocument}) — that is not what the metadata was read
+   * from, but it is what the content says, which is what every reader of this asks for. `''` where
+   * none of the three is known.
    */
   readonly contentText = computed<string>(() => {
     const metadata = this.editorMetadata();
     return (
-      firstString(metadata?.[SOURCE_TEXT_KEY]) ?? firstString(metadata?.[EXTENDED_TEXT_FIELD]) ?? ''
+      firstString(metadata?.[SOURCE_TEXT_KEY]) ??
+      firstString(metadata?.[EXTENDED_TEXT_FIELD]) ??
+      this.documentText() ??
+      ''
     );
   });
 
@@ -1465,6 +1485,7 @@ export class CurationService {
     this.nodeSource.set(source);
     this.previewNode.set(node);
     this.nodeMetadata.set({ ...(node.properties ?? {}) });
+    void this.readNodeDocument(node);
   }
 
   /**
@@ -1578,6 +1599,37 @@ export class CurationService {
     this.extractionUrl.set(null);
     // The page to erschließen belongs to the content that is going; the next one names its own.
     this.pendingExtractionState.set(null);
+    // The document read for the content that is going says nothing about the next one.
+    this.documentText.set(null);
+  }
+
+  /**
+   * Read the node's own file where it is one this panel can read, and keep its text ({@link documentText}).
+   * Today that is a PDF and it is read on the device: an uploaded worksheet exists at no address the
+   * metadata agent could fetch, and a stored one would have to be handed to a service to be read — while
+   * everything needed to read it is already here.
+   *
+   * Started and not awaited: the node is in the flow either way, and the text is what a later step —
+   * the KI-Prüfung, the collection recommendation — reads if it is there by then.
+   */
+  private async readNodeDocument(node: Node): Promise<void> {
+    const url = node.downloadUrl ?? node.content?.url;
+    if (!url || node.mimetype !== PDF_MIMETYPE) return;
+    try {
+      const pdf = await this.pdfText.readUrl(url);
+      if (!pdf.text.trim()) {
+        console.log(`${LOG_DOCUMENT} the PDF carries no text layer — a scan, most likely; nothing was read`);
+        return;
+      }
+      // Only for the node the read was started for: a flow that moved on meanwhile is describing
+      // another content, and this text is not about it.
+      if (this.activeNode()?.nodeId !== node.ref.id) return;
+      this.documentText.set(formatPdfText(pdf));
+      console.log(`${LOG_DOCUMENT} read ${pdf.pagesRead}/${pdf.pages} pages of the node's PDF on the device`);
+    } catch (cause: unknown) {
+      // One source of text missing, not a failed step: the content stands with what its metadata says.
+      console.warn(`${LOG_DOCUMENT} the node's PDF could not be read:`, errorMessage(cause));
+    }
   }
 }
 

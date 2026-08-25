@@ -36,6 +36,14 @@ come from the package. The runtime's WASM binary is therefore fetched as data an
 `env.wasm.wasmBinary` rather than loaded by URL, and it runs single-threaded, since its worker pool
 would start from a `blob:` URL that `script-src 'self'` forbids.
 
+pdf.js runs under that same `script-src 'self'`, which is why its worker is part of the package:
+`app-src/angular.json` copies `node_modules/pdfjs-dist/build/pdf.worker.min.mjs` (1.2 MB) beside the
+sidebar's own files as a build asset, and `PdfTextService` points `GlobalWorkerOptions.workerSrc` at
+it relative to `document.baseURI`. A worker from a CDN would be refused, and the point of reading a
+document here is that nothing about it leaves the device anyway. Like the sidebar's JavaScript the
+copied worker is build output and untracked (`.gitignore`: `sidebar/*.mjs`); the library itself is a
+lazy chunk, so it is loaded only once a PDF is actually read.
+
 Changes to the Angular app only reach the loaded extension through a build — `ng build` in
 `app-src/` alone is not enough, since `scripts/build.mjs` is what refreshes `sidebar/` and assembles
 `dist/`.
