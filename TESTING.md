@@ -55,6 +55,13 @@ without running it.
   `fakeBrowserExtension()`. See [TROUBLESHOOTING.md § Dependencies and runtime
   limits](TROUBLESHOOTING.md#dependencies-and-runtime-limits) for why that global has to exist at all.
 
+`quiet-logs.setup.ts` silences `console.log` for every test — the services log a line per step by design
+— and deliberately leaves `warn` and `error` alone, so a run still says when something went wrong. A spec
+whose *subject* is a warning takes `warn` over itself and asserts the line instead
+(`nostr-forward.service.spec.ts`: a relay that could not be reached, a stored key that could not be read).
+It re-emits in `afterEach` anything the test never looked at, so silencing the expected lines does not make
+that spec a place where a new warning can appear unnoticed.
+
 A fourth setup file is there for one feature rather than to hold something back: `color-scheme.setup.ts`
 gives the run a `(prefers-color-scheme: dark)` query a spec can answer (`setSystemDark()`), because
 jsdom defines no `matchMedia` at all and the panel's *System folgen* is otherwise untestable. It has to

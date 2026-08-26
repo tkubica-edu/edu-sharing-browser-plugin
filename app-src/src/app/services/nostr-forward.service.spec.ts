@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { verifyEvent } from 'nostr-tools/pure';
 
 import { NostrForwardService } from './nostr-forward.service';
@@ -129,8 +129,32 @@ function aSource(overrides: Partial<AmbSource> = {}): AmbSource {
 describe('NostrForwardService', () => {
   let nostr: NostrForwardService;
   let extension: BrowserExtensionFake;
+  /**
+   * What the service wrote to `console.warn` while the test ran. Three of the tests below are about a path
+   * the panel *reports in the log* — a relay it could not reach, a stored key it could not read — so that
+   * line is part of the behaviour and is asserted here rather than left to the run's report, where a stack
+   * trace under a passing suite reads as something having gone wrong.
+   *
+   * Taken over per spec and by name: `quiet-logs.setup.ts` silences `console.log` for every test and
+   * deliberately leaves `warn` alone, because a warning nobody asked for should still be seen.
+   */
+  let warnings: string[];
+
+  /** Whether the test looked at what was warned — see the `afterEach` below. */
+  let inspected: boolean;
+
+  /** Everything warned so far, as one string — what the assertions below look into. */
+  const warned = () => {
+    inspected = true;
+    return warnings.join('\n');
+  };
 
   beforeEach(async () => {
+    warnings = [];
+    inspected = false;
+    vi.spyOn(console, 'warn').mockImplementation((...parts: unknown[]) => {
+      warnings.push(parts.map((part) => String(part)).join(' '));
+    });
     extension = fakeBrowserExtension();
     TestBed.configureTestingModule({
       providers: [provideFake(BrowserExtensionService, extension.fake)],
@@ -140,6 +164,15 @@ describe('NostrForwardService', () => {
     // Every test that sends or looks up does so against the fake address; the two that are about the
     // configured default put the setting back themselves.
     await nostr.setRelayUrl(TEST_RELAY);
+  });
+
+
+  afterEach(() => {
+    vi.mocked(console.warn).mockRestore();
+    // A warning the test never looked at is one nobody asked for, so it goes to the report after all:
+    // the point of taking `warn` over here is to assert the expected lines, not to make this spec a
+    // place where a new one can appear unnoticed.
+    if (!inspected) for (const line of warnings) console.warn(line);
   });
 
   describe('which relay it publishes to', () => {
@@ -290,6 +323,8 @@ describe('NostrForwardService', () => {
 
       expect(nostr.receipt()).toBe(published);
       expect(nostr.error()).not.toBeNull();
+      // And the panel says so in the log, which is where a failed publication is traced from.
+      expect(warned()).toContain(`Das Relay ${TEST_RELAY} ist nicht erreichbar`);
     });
   });
 
@@ -380,6 +415,7 @@ describe('NostrForwardService', () => {
 
       expect(nostr.receipt()).toBeNull();
       expect(nostr.lookupError()).not.toBeNull();
+      expect(warned()).toContain(`Nachsehen bei ${TEST_RELAY} fehlgeschlagen`);
       // And the question stays open: the next screen asks again rather than repeating the non-answer.
       const relay = fakeRelay({ holds: [aStoredRecord()] });
       await nostr.lookup(aSource());
@@ -427,6 +463,9 @@ describe('NostrForwardService', () => {
       await expect(nostr.forward(aSource())).resolves.toBe(true);
 
       expect(extension.storage.get(APP_CONFIG.storageKeys.nostrSecretKey)).toMatch(/^[0-9a-f]{64}$/);
+      // Said out loud rather than done silently: the key that went is the identity every record this
+      // installation published was signed with, and nothing brings it back.
+      expect(warned()).toContain('gespeicherter Schlüssel unlesbar');
     });
   });
 
