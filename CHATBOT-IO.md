@@ -504,7 +504,10 @@ but does not guarantee:
 
 ### The gates
 
-| Step | Moves on when |
+Two conditions, and both of them hold for every step: the answer has to say the step is done, **and** it has
+to belong to a turn the person started (`AgentResult.humanTurn`).
+
+| Step | Its answer says it is done when |
 |---|---|
 | `origin` | `origin` came back — `own` goes to `proofread`, `external` straight to `quality` |
 | `proofread` | `decision` is `accepted` **or** `skipped` |
@@ -516,6 +519,24 @@ is not enough on its own — the judgement once arrived proposed and submitted i
 walked on past a person who had said nothing. An unconfirmed answer is kept, recorded where it belongs
 and logged, and the step stays open; the schema stands for every turn, so the assistant submits again
 once they have replied.
+
+**Who started the turn is the second condition, and it is the load-bearing one** (`startedByPerson()` in
+`AiQualityScreenComponent`). Every field in the table above is one the *assistant* fills in about the person,
+which only works while the assistant can choose not to answer yet — the tasks ask for exactly that (*„Rufe
+submit_result ERST auf, wenn sie bestätigt hat"*). An engine that answers under a constrained schema cannot
+choose: its decoder fills in every required field of every turn, `confirmed` and `origin` among them, so all
+four steps would run through in four back-to-back turns without anybody saying anything. The panel therefore
+reads the confirmation from who was speaking rather than from the answer. What the answer stated is still kept
+and recorded — `origin` excepted, since whose content this is cannot be read off the content — and only the
+step stays where it is.
+
+The turn's origin comes from `initiated_by` in the `boerdi:agent-result` detail (`user` / `host`). A bundle
+that does not send it has every answer counted as the person's, which is the behaviour the check was written
+against; the panel says so once in the trace.
+
+A turn that was **cut off** is not read at all, whatever it managed to fill in: `stopReason` other than
+`submit` or `text` sets the notice above the chat and nothing else. A fragment that happens to carry a
+confirmation is still a fragment.
 
 Verdicts of a later turn are laid **over** the standing ones (`merge()`), never in their place: a
 follow-up question is usually about one criterion, and taking that answer as the whole result would drop

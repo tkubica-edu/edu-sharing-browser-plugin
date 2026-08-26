@@ -108,6 +108,13 @@ export interface AssistantTask {
 export interface AgentResult {
   result: unknown;
   stopReason: string;
+  /**
+   * Whether the turn this answer belongs to was started by the person rather than by the panel. A step of the
+   * check may only move on for a turn of theirs: the whole protocol rests on the assistant *withholding* its
+   * result until they have answered, and an engine whose decoding is constrained by a schema cannot withhold
+   * anything — every one of its turns fills in every required field, the confirmations among them.
+   */
+  humanTurn: boolean;
 }
 
 /** The context of a tab that is about nothing the assistant can use — enough to clear the previous page's. */
@@ -215,6 +222,9 @@ export class AiAssistantScreenComponent implements OnDestroy {
   /** How many answers have come back, to number the turns in the trace. */
   private turns = 0;
 
+  /** Whether the bundle's silence about who started a turn has been remarked on — it is worth one line. */
+  private initiatorMissingLogged = false;
+
   /** The task last put to the assistant, so a screen that states a new one is told apart from a re-read. */
   private asked: string | null = null;
 
@@ -232,16 +242,27 @@ export class AiAssistantScreenComponent implements OnDestroy {
 
   /** Reports a submitted result while the screen is open; the widget fires it on `window`. */
   private readonly onResult = (event: Event) => {
-    const detail = (event as CustomEvent).detail as { result?: unknown; stop_reason?: unknown } | null;
+    const detail = (event as CustomEvent).detail as
+      | { result?: unknown; stop_reason?: unknown; initiated_by?: unknown }
+      | null;
     const stopReason = typeof detail?.stop_reason === 'string' ? detail.stop_reason : 'unknown';
     const result = detail?.result ?? null;
+    const startedBy = typeof detail?.initiated_by === 'string' ? detail.initiated_by : null;
+    // A bundle that does not say who started the turn keeps the behaviour it has always had — its own engine
+    // decides when to submit, which is what the check was written against. Said once, since the field's
+    // absence is a property of the bundle rather than of the turn.
+    if (!startedBy && !this.initiatorMissingLogged) {
+      this.initiatorMissingLogged = true;
+      this.trace('the widget does not report who started a turn — every answer counts as the person\'s');
+    }
     this.turns += 1;
     this.trace(`← agent-result (turn ${this.turns})`, {
       stopReason,
       submitted: result !== null,
+      startedBy: startedBy ?? 'unstated',
       result
     });
-    this.agentResult.emit({ result, stopReason });
+    this.agentResult.emit({ result, stopReason, humanTurn: startedBy ? startedBy === 'user' : true });
   };
 
   /** Traces anything the widget reports that the panel does not act on — see {@link REPORTED_EVENTS}. */

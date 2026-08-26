@@ -400,6 +400,17 @@ export class AiQualityScreenComponent implements OnDestroy {
   protected take(answer: AgentResult): void {
     const step = this.step();
     this.turnsInStep.update((turns) => turns + 1);
+    // A run that was cut off says nothing about the content, however much of the shape it managed to fill in:
+    // an answer from a turn that hit a cap or failed is a fragment, and a fragment that happens to carry a
+    // confirmation would move the check on. Only a turn that ran to its end is read.
+    if (answer.stopReason !== 'submit' && answer.stopReason !== 'text') {
+      console.log(`${LOG_QUALITY} ← a turn that was cut off — nothing taken over`, {
+        stopReason: answer.stopReason,
+        result: answer.result
+      });
+      this.problem.set(STOPPED[answer.stopReason] ?? null);
+      return;
+    }
     // Past the last step there is nothing left to take over: the values are recorded, the confirmation is
     // reported, and the schema of the enrichment still stands — so a turn that fills it in again (the
     // closing word's own among them) would write an answer nobody was asked for over one that was.
@@ -469,6 +480,10 @@ export class AiQualityScreenComponent implements OnDestroy {
     // What the footer's confirmation waits for: the assistant judged every criterion, including the ones it
     // found wanting, and the person has stood behind that judgement in the chat — so the button opens on a
     // judgement somebody answered for, not on a good one.
+    // Not before the person has spoken: the confirmation in the answer is the assistant's account of what they
+    // said, and under a constrained schema it is a field the decoder filled in rather than an account of
+    // anything.
+    if (!this.startedByPerson(answer, 'enrichment')) return;
     this.curation.reportQualityJudged();
     // Only now: the enrichment is a run of its own, and it starts from a content whose quality is
     // established. Flipping the step re-states task and schema, which the chat then puts as a further turn.
@@ -482,6 +497,34 @@ export class AiQualityScreenComponent implements OnDestroy {
   private goTo(step: CheckStep): void {
     this.turnsInStep.set(0);
     this.step.set(step);
+  }
+
+  /**
+   * Move on, but only for a turn the person started. Every step of this check ends in their confirmation, and
+   * the assistant is asked to withhold its result until they have given one — which an engine answering under
+   * a constrained schema cannot do: every one of its turns fills in every required field, `confirmed` and
+   * `origin` among them. So the confirmation is not read from the answer but from who was speaking.
+   *
+   * What the answer said is kept and recorded all the same (the callers do that before they get here): a
+   * proposal on the table is worth having, and the person is being asked about exactly that proposal. Only the
+   * step stays where it is, and the assistant submits again once they have replied.
+   */
+  private advance(step: CheckStep, answer: AgentResult): void {
+    if (this.startedByPerson(answer, step)) this.goTo(step);
+  }
+
+  /**
+   * Whether this answer belongs to a turn of the person's — the one condition every step's end has in common.
+   * Asked separately by the two steps that report something to the flow before they move on: what is reported
+   * there is what opens the way out of the check, and it must not open on an answer nobody was asked for.
+   */
+  private startedByPerson(answer: AgentResult, next: CheckStep): boolean {
+    if (answer.humanTurn) return true;
+    console.log(`${LOG_QUALITY} … an answer nobody asked for — the step stays open`, {
+      step: this.step(),
+      wouldHaveGoneTo: next
+    });
+    return false;
   }
 
   /**
@@ -502,6 +545,16 @@ export class AiQualityScreenComponent implements OnDestroy {
       this.problem.set(STOPPED[answer.stopReason] ?? null);
       return;
     }
+    // Nothing is kept from a turn the person did not start, and this step is the one where that matters most:
+    // whose content this is cannot be worked out from the content, so a value filled in before they answered
+    // is a guess in the place of their answer. The assistant's own guess has a field of its own for that.
+    if (!answer.humanTurn) {
+      console.log(`${LOG_QUALITY} … the opening question was answered before the person did — nothing kept`, {
+        stated: origin,
+        guess: originGuessOf(answer.result)
+      });
+      return;
+    }
     // Own content is the only case a language pass helps: its author can go and fix what it finds, while
     // whoever files someone else's can do nothing with a list of its typos but read it.
     const next = origin === 'own' ? 'proofread' : 'quality';
@@ -519,7 +572,7 @@ export class AiQualityScreenComponent implements OnDestroy {
     });
     this.problem.set(null);
     this.origin.set(origin);
-    this.goTo(next);
+    this.advance(next, answer);
   }
 
   /**
@@ -562,7 +615,7 @@ export class AiQualityScreenComponent implements OnDestroy {
     }
     // Taken on or skipped, the step is done either way: nothing was written to the content in either case,
     // and a person who cannot edit the text right now must be able to walk on (see ProofreadResult.decision).
-    this.goTo('quality');
+    this.advance('quality', answer);
   }
 
   /**
@@ -597,6 +650,7 @@ export class AiQualityScreenComponent implements OnDestroy {
       console.log(`${LOG_QUALITY} … the metadata are not confirmed yet — the step stays open`);
       return;
     }
+    if (!this.startedByPerson(answer, 'done')) return;
     this.goTo('done');
     // The other half of what the way on out of this step waits for; the judgement reported the first.
     this.curation.reportMetadataEnriched();

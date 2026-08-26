@@ -13,6 +13,7 @@ one of the three packaged bundles that talks to a backend of its own.
 - [The contract surface](#the-contract-surface)
 - [The page context](#the-page-context)
 - [Where it appears in the UI](#where-it-appears-in-the-ui)
+- [The seam the bundle offers](#the-seam-the-bundle-offers)
 - [Correcting the widget from outside it](#correcting-the-widget-from-outside-it)
 - [Three things called a check](#three-things-called-a-check)
 - [The backend side](#the-backend-side)
@@ -190,8 +191,10 @@ no-ops rather than exceptions. There is no `sendMessage`.
 
 ### What the widget reports back
 
-Five `window` CustomEvents, dispatched with `bubbles: true, composed: true` — needed because the
-widget renders into a shadow root. All five are heard here (`REPORTED_EVENTS`); what each of them
+Six `window` CustomEvents since the bundle of 2026-08-26, dispatched with `bubbles: true, composed:
+true` — needed because the widget renders into a shadow root. Five are heard here (`REPORTED_EVENTS`
+plus the result); the sixth, `boerdi:tool-call`, belongs to the widget's local engine and nothing here
+provides one yet — see [The seam the bundle offers](#the-seam-the-bundle-offers). What each of them
 carries, and which one the panel acts on rather than merely traces, is
 [CHATBOT-IO.md § The outputs](CHATBOT-IO.md#the-outputs).
 
@@ -381,6 +384,58 @@ What each of the three failure modes looks like in that trace: a task that never
 not take shows `← agent-result` never arriving at all; a run cut off by a cap shows it arriving with
 `stopReason` other than `submit` and `submitted: false`.
 
+## The seam the bundle offers
+
+The bundle packaged here since **2026-08-26** carries a second engine: `engine="local"`, answered by a
+model in this document instead of by the chat backend. It brings no model with it. Both the model and
+the tools come from **the host** — this panel — through a seam the widget asks for, and until the panel
+provides one the widget stays on its HTTP path. So today this section describes a capability, not a
+feature: what is wired up is the one field the check needs (`initiated_by`, below), and nothing else.
+
+Why the model is the host's business: a WebLLM runtime is some 12 MB plus a module worker, the same
+bundle is also served from the chatbot backend, and under `script-src 'self'` an extension page loads
+none of it after the fact. Whoever has the runtime has it in their own package. The same holds for the
+tools — they need the repository session, which this panel has and the widget does not.
+
+### What providing one would look like
+
+```ts
+element.setHostSeam({
+  protocol: 1,
+  llm: { label, ready, progress, complete, interrupt },   // without this, no local engine
+  tools: { catalogue, invoke },                            // optional; without it, no lookups
+});
+element.hostCapabilities();   // → { protocol, engines[], hostLlm, hostTools }
+```
+
+Both are methods on the upgraded element and belong in `mount()` right after `appendChild`.
+`hostCapabilities().engines` names `local` only where a usable model is registered, which is how a
+panel tells "this bundle is too old" from "my seam did not take". A host that does not own the element
+answers the `boerdi:host-seam` event instead, **synchronously inside the listener**.
+
+Three rules the contract does not bend on, because a 4-bit model does not bend either: a tool takes
+exactly **one string argument** (its `syntax` describes it, the host splits it), a tool returns **text
+and truncates it itself**, and a failure is a **value** (`{ok: false, reason, text}`) whose `text` is
+the German sentence the model gets to read. The full contract, the tool loop and the reasoning are in
+the other project: `docs/plans/2026-08-25-lokale-engine-und-host-werkzeuge.md` and
+`frontend/projects/ui/src/host-seam/host-engine-seam.ts`.
+
+### The one thing already used: `initiated_by`
+
+`boerdi:agent-result` now says whose turn an answer belongs to (`user` / `host`), and carries
+`tools_called[]` beside it. The KI check reads the first and refuses to move a step on without a turn
+of the person's — see [CHATBOT-IO.md § The gates](CHATBOT-IO.md#the-gates) for why a confirmation the
+model writes about the person is not evidence. A bundle without the field keeps the previous
+behaviour, and the panel says so once in the trace.
+
+### What is not in the panel
+
+There is no local chat of the panel's own. An earlier attempt built one — a component beside the
+widget with its own WebLLM runtime, prompt assembly and transcript — and it was dropped when the
+engine moved into the widget: two chat implementations in one panel is one too many, and the widget's
+one has the tool loop, the schema turns and the whole turn lifecycle already. What the panel will
+provide instead is the seam above.
+
 ## Correcting the widget from outside it
 
 `util/chat-overrides.ts` puts a stylesheet of the panel's own **into the widget's shadow root**, and
@@ -522,7 +577,13 @@ npm run build:chrome     # without this the new bundle never reaches dist/
 # then hit "Reload" in chrome://extensions
 ```
 
-The script pulls `<base>/widget/boerdi-widget.js` into `scripts/boerdi/boerdi-widget.js`. It refuses
+The script pulls `<base>/widget/boerdi-widget.js` into `scripts/boerdi/boerdi-widget.js`.
+
+**The bundle of 2026-08-26 did not come that way.** It was built from a working copy of
+`edu-chatbot-sc` (`cd frontend && npm run build:widget`, then `dist/widget/browser/main.js` copied
+over), because the local engine and the seam are not deployed yet. The deployed backend is therefore
+*behind* what is packaged here, and running `fetch-widget.mjs` against it would take the seam back
+out — check `hostCapabilities` in the bundle before refreshing. It refuses
 an answer that is HTML rather than JavaScript, because a 200 carrying an error page would be worse
 than a 404 — the file would be there and fail only later, with a syntax error nobody traces back. A
 503 means the bundle is not built in the backend (`cd frontend && npm run build:widget` in its
