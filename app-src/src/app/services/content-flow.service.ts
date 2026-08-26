@@ -123,6 +123,14 @@ export class ContentFlowService {
     this.navigation.go('overview', { tab: 'share' });
   }
 
+  /**
+   * "An Nostr Relay senden": publishing a content the panel already has, as a step of its own — the same
+   * publication the forwarding step makes, for a content that is past it.
+   */
+  showNostrForward(): void {
+    this.navigation.go('nostr-forward');
+  }
+
   /** "Interaktionen": the interactions tab of the Inhaltsübersicht, offered as a step of its own. */
   showInteractions(): void {
     this.navigation.go('overview', { tab: 'interactions' });

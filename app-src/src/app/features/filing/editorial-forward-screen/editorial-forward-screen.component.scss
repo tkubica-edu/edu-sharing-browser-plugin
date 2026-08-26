@@ -139,6 +139,8 @@
 // decision is the same one — where this content is offered — while the target is not a team of this
 // repository but the open nostr network.
 .groups.nostr {
+  // Set off from the teams' list where there is one; where there is none it is the step's only card
+  // and follows the hint above it like any other first element.
   margin-top: var(--es-space-4);
 
   .logo-glyph { font-size: 24px; }

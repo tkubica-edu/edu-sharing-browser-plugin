@@ -9,6 +9,7 @@ import {
   toDraftNode, toPartialNode, toSavedMetadata, toWrittenNode, withCanvasScalars, withReadablePreview
 } from '../util/curation-node';
 import { MdsValues, firstString, stringValues, toMdsEditorValues } from '../util/mds-values';
+import { AmbSource } from '../util/amb-event';
 import { withAgentLicense } from '../util/agent-fields';
 import {
   EXTENDED_DATA_FIELD, EXTENDED_TEXT_FIELD, SOURCE_TEXT_KEY, toEnvelope, toExtendedFields
@@ -699,15 +700,14 @@ export class CurationService {
   }
 
   /**
-   * Publish the content to the nostr relay, where the forwarding step ticked that. What is published is
-   * the content as AMB describes it, assembled here because this is where the content is: the metadata as
-   * every step of the flow has left them, the address the resource lives at, its picture, and the node the
-   * record was read off. Answers whether there is a record on the relay — `true` also where the step was
-   * not ticked at all, which is nothing failing.
+   * The content as the AMB mapping is given it, assembled here because this is where the content is: the
+   * metadata as every step of the flow has left them, the address the resource lives at, its picture, and
+   * the node the record was read off. Public, because the *An Nostr Relay senden* step shows what it would
+   * publish before publishing it — built from the same source the send uses, so the two cannot disagree.
    */
-  forwardToNostr(): Promise<boolean> {
+  ambSource(): AmbSource {
     const node = this.activeNode();
-    return this.nostr.forward({
+    return {
       metadata: this.editorMetadata(),
       url: this.contentUrl(),
       title: this.contentTitle(),
@@ -716,7 +716,26 @@ export class CurationService {
       imageUrl: this.currentPreviewSrc(),
       nodeLink: node?.link ?? null,
       repositoryUrl: this.auth.repositoryUrl()
-    });
+    };
+  }
+
+  /**
+   * Publish the content to the nostr relay, where the forwarding step ticked that — the way on out of that
+   * step. Answers whether there is a record on the relay; `true` also where the step was not ticked at all,
+   * which is nothing failing.
+   */
+  forwardToNostr(): Promise<boolean> {
+    return this.nostr.forward(this.ambSource());
+  }
+
+  /**
+   * Publish the content to the nostr relay now, whatever went before — the *An Nostr Relay senden* step,
+   * which is an errand of its own for a content the panel already has. A content that is already published
+   * is published again, which replaces its record rather than adding a second one (see
+   * NostrForwardService.publish).
+   */
+  sendToNostr(): Promise<boolean> {
+    return this.nostr.publish(this.ambSource());
   }
 
   /** Take over what the Qualität view reports of its criteria — see {@link qualityCriteriaMet}. */

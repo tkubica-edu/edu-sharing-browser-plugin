@@ -1,0 +1,60 @@
+<div class="es-screen-body">
+  <section class="es-hint-card">
+    <p class="es-muted">
+      @if (curation.contentTitle(); as title) {
+        <strong>{{ title }}</strong>
+      } @else {
+        Dieser Inhalt
+      }
+      wird als AMB-Eintrag an ein Nostr-Relay gesendet — ein Event der Art <code>30142</code> nach dem
+      <a href="https://w3id.org/kim/amb/latest/" target="_blank" rel="noopener noreferrer">Allgemeinen
+      Metadatenprofil für Bildungsressourcen</a>. Gesendet werden die Metadaten des Inhalts, nicht der
+      Inhalt selbst.
+    </p>
+  </section>
+
+  <!-- Der Stand, bevor gehandelt wird: Wohin, unter welchem Schlüssel, und ob dort schon etwas liegt. -->
+  <es-nostr-standing></es-nostr-standing>
+
+  @if (record(); as record) {
+    <!-- Was mit dem Senden hinausginge. Kurz gehalten — die vollständige Liste steht in der Quittung,
+         sobald es hinaus ist. -->
+    <section class="es-card summary">
+      <h3 class="summary-head">Was gesendet wird</h3>
+
+      <dl class="summary-facts">
+        <dt>Kennung (<code>d</code>)</dt>
+        <dd><code class="wrap">{{ record.id }}</code></dd>
+
+        <dt>Name</dt>
+        <dd>{{ record.name }}</dd>
+
+        <dt>Weitere Felder</dt>
+        <dd>
+          {{ fieldCount() }}
+          {{ fieldCount() === 1 ? 'Feld' : 'Felder' }} aus den Metadaten des Inhalts
+          @if (!fieldCount()) {
+            — der Eintrag trägt nur Adresse und Titel.
+          }
+        </dd>
+      </dl>
+
+      <p class="es-muted note">
+        Ein erneutes Senden ersetzt den vorhandenen Eintrag beim Relay, statt einen zweiten daneben zu
+        stellen: Die Kennung ist die Adresse des Inhalts, und das Relay hält je Kennung den neuesten
+        Eintrag.
+      </p>
+    </section>
+  } @else {
+    <!-- Ohne diese beiden Angaben gibt es keinen Datensatz — das Relay verlangt sie, und ohne Adresse
+         wäre der Eintrag auch nicht wiederzufinden. -->
+    <p class="es-error">
+      Für diesen Inhalt fehlt, was AMB mindestens verlangt: eine Adresse, unter der die Ressource
+      erreichbar ist (<code>ccm:wwwurl</code>), und ein Titel. Beides lässt sich unter „Metadaten
+      bearbeiten“ ergänzen.
+    </p>
+  }
+
+  <!-- Was hinausgegangen ist, und wie es sich beim Relay nachprüfen lässt. -->
+  <es-nostr-receipt></es-nostr-receipt>
+</div>

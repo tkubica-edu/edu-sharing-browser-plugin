@@ -67,14 +67,19 @@ Which editor renders that screen, and which route the save takes, is
   it; the *Persönliche Ablage*'s own collections are no part of it), with the exchange under it as a
   timeline. The forwardings a save carried out are kept in the *Verlauf* entry, so a content taken up
   again names its teams too instead of reading as one that was never forwarded — the picks of the
-  forwarding step and the recorded ones are shown as one list, each team once. Offered only where the browser extension custom web component is enabled, exactly as *An
-  Redaktionen weiterleiten* is — without that step no content is proposed to a Redaktion. Where the
+  forwarding step and the recorded ones are shown as one list, each team once. The cards need the browser
+  extension custom web component, since without it no content is proposed to a Redaktion. Where the
   content was published to a nostr relay as well, the receipt of that publication stands under the
   cards as itself: not an exchange but what went out and how to fetch it back, see
-  [An Nostr Relay weiterleiten](#an-nostr-relay-weiterleiten). Marked
-  **Entwurf**: the repository hands out no communication history yet, so the cards name the real
-  forwardings while the steps under them are an example ending in „Noch keine Entscheidung
-  erhalten". The teams' logos come from the groups the forwarding step loaded
+  [An Nostr Relay weiterleiten](#an-nostr-relay-weiterleiten). Under its own heading beside the teams'
+  stands **Nostr-Anbindung**: `es-nostr-standing`, which answers for every content whether it is
+  published, refused, in flight, merely ticked or untouched, and names the relay and the `npub` behind
+  that answer in each case — so the view has something to say even where nothing was ever forwarded, and
+  it needs no condition of its own in the registry. Only reported there; the step that acts on it is
+  [An Nostr Relay senden](#an-nostr-relay-senden). Marked
+  **Entwurf** wherever the teams apply: the repository hands out no communication history yet, so the
+  cards name the real forwardings while the steps under them are an example ending in „Noch keine
+  Entscheidung erhalten". The teams' logos come from the groups the forwarding step loaded
   (`EditorialGroupsService`), and the submission date is the node's creation — the forwarding is
   carried out by the very save that creates it.
 - **Neues OnlyOffice-Dokument** — mounts `edu-sharing-add-with-connector`, which opens the
@@ -90,11 +95,13 @@ preview; while logged out it is held until the login succeeds. The message contr
 ## Filing and handing on
 
 **An Redaktionen weiterleiten** / **Persönliche Ablage** are where the content is filed and handed
-on: the flow runs *Inhalt erschließen* → Vorschau → **An Redaktionen weiterleiten** →
+on, and **An Nostr Relay senden** is the one of these steps the flow never walks through — it is
+entered from the *Inhaltsoptionen* for a content that is past the forwarding: the flow runs *Inhalt erschließen* → Vorschau → **An Redaktionen weiterleiten** →
 **Persönliche Ablage** → *Prüfprozess auswählen* → *Qualitätsprüfung* → *Inhaltsübersicht*. Two steps
-of their own, each offered only where it applies: the forwarding while the repository config enables
-the browser extension custom web component, the *Persönliche Ablage* for a session of the user's
-own. That step offers both of the user's own filing places: the folder, through the repository's
+of their own, each offered only where it applies: the forwarding wherever a content can be forwarded
+at all — it holds two kinds of target and only the editorial teams belong to the browser extension
+custom web component, so without that flag it shows the nostr relay alone — and the *Persönliche
+Ablage* for a session of the user's own. That step offers both of the user's own filing places: the folder, through the repository's
 own Ablageort control (`edu-sharing-location-picker`, wrapped as `es-storage-location-picker`,
 seeded with the user's `defaultInboxFolder` setting and otherwise with `-inbox-`), and — optionally
 — a collection, through the same `es-collection-selector` the forwarding uses. The collection has
@@ -111,6 +118,12 @@ only once that write held, and a step that decided nothing is passed without a r
 applies.
 
 ### An Redaktionen weiterleiten
+
+The step holds two kinds of target and shows each where it applies: the editorial teams below, which
+are the browser extension custom web component's, and the
+[nostr relay](#an-nostr-relay-weiterleiten) under them, which is every repository's. In the base
+version the teams' half is not rendered at all — neither the list nor the requests behind it — and
+the step is the relay row plus its receipt.
 
 Lists the editorial groups the repository config names in **`browserExtensionEditorialGroups`**
 (`['ID1', 'ID2']`, read once per session by `EditorialGroupsService` →
@@ -138,7 +151,9 @@ the content's metadata to a **nostr relay** as an AMB record — the *Allgemeine
 Bildungsressourcen* (<https://w3id.org/kim/amb/latest/>), which the edufeed network carries as nostr
 events of **kind 30142**. Unlike a forwarding to a Redaktion this is a publication into an open
 network: the row says so before it is acted on, and the footer's way on is labelled *An Relay senden*
-rather than *Weiter* while it would publish.
+rather than *Weiter* while it would publish. It is offered in the base version too — publishing an AMB
+record needs nothing of the repository beyond the metadata — and is what keeps *An Redaktionen
+weiterleiten* a step of the flow there.
 
 The mapping lives in `util/amb-event.ts` and follows the reference converter
 (`edufeed-org/amb-nostr-converter`): the record's `id` — and with it the event's `d` tag — is the
@@ -172,8 +187,32 @@ the raw event JSON beside them, and gives the commands that fetch the record bac
 <nevent…>` for this event, `nak fetch <naddr…>` for the record's standing address, `nak req -k 30142
 -a <pubkey> <relay>` for everything this installation published, the raw `REQ` frame for a plain
 WebSocket, and the `njump.me` page for a browser. The same receipt is shown under the *Interaktionen*
-view, so what was published stays findable after the step is left. A refusal is kept as a receipt as
-well — it says what was offered and what the relay answered — and holds the step open.
+view and by *An Nostr Relay senden*, so what was published stays findable after the step is left. A
+refusal is kept as a receipt as well — it says what was offered and what the relay answered — and
+holds the step open.
+
+### An Nostr Relay senden
+
+A step of its own rather than a view of the Inhaltsübersicht, entered from the *Inhaltsoptionen* (between
+*Inhalt teilen* and *Interaktionen anzeigen*) and left again by the way back
+(`ContentFlowService.showNostrForward`). It publishes a content the panel already has — one taken up from
+the *Verlauf* or from *Meine Inhalte*, or detected on the open page — which is the same publication the
+forwarding step makes on its way on, for a content that is past that step. It applies to any active node
+and asks for nothing else: an AMB record needs nothing of the repository beyond the metadata, and unlike
+the steps around it this one writes nothing to the repository, so it needs no session of the user's own
+either.
+
+The mapping, the relay and the receipt are as in
+[An Nostr Relay weiterleiten](#an-nostr-relay-weiterleiten); what differs is that nothing is ticked — the
+footer's *An Relay senden* publishes there and then (`CurationService.sendToNostr` →
+`NostrForwardService.publish`, which unlike `forward` neither asks for a tick nor stops at an existing
+receipt). Above it stands `es-nostr-standing`, the state card the *Interaktionen* view carries too; under
+that, the screen names what would go out before it does — the `d` tag, the name, and how many further
+fields the content fills — and refuses in advance where AMB's two required fields are missing, since that
+is answerable without sending. A content already on the relay is sent **again**: the button reads *Erneut
+senden*, and because a kind-30142 event is addressable the second publication replaces the record rather
+than adding one beside it. A re-publication that fails leaves the previous receipt standing, because what
+the relay holds is unchanged by it.
 
 ### Sammlung auswählen
 

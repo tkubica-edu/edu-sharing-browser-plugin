@@ -177,6 +177,24 @@ describe('NavigationService', () => {
       expect(navigation.screen()).toBe('metadata');
     });
 
+    it('opens the forwarding without the web component, for the relay it also offers', () => {
+      contentInHand();
+
+      navigation.go('editorial-forward');
+
+      // The editorial teams belong to the web component, the nostr relay to nobody — so the step
+      // applies wherever a content can be forwarded at all, see model/navigation.ts.
+      expect(navigation.section()).toBe('editorial-forward');
+    });
+
+    it('refuses the collection pick without the web component, since there are no groups to pick in', () => {
+      contentInHand();
+
+      navigation.go('select-collection');
+
+      expect(navigation.section()).toBe('menu');
+    });
+
     it('refuses a section that does not apply', () => {
       navigation.go('quality');
 
@@ -253,7 +271,8 @@ describe('NavigationService', () => {
     it('walks past a step that no longer applies', () => {
       contentInHand();
       withWebComponent();
-      navigation.go('editorial-forward');
+      // The choice of process, which exists only where there are two processes to choose between.
+      navigation.go('flow-choice');
       navigation.go('quality');
       webComponent.fake.enabled.set(false);
 
@@ -525,7 +544,7 @@ describe('NavigationService', () => {
     it('names the step the walk back actually reaches, not the one it skips', () => {
       contentInHand();
       withWebComponent();
-      navigation.go('editorial-forward');
+      navigation.go('flow-choice');
       navigation.go('quality');
       webComponent.fake.enabled.set(false);
 
@@ -720,7 +739,7 @@ describe('NavigationService', () => {
       const resumed = navigation.resume({ section: 'ai-quality', tab: 'ai-quality' }, [
         { section: 'menu', tab: null },
         { section: 'history', tab: 'history' },
-        { section: 'editorial-forward', tab: 'editorial-forward' },
+        { section: 'flow-choice', tab: 'flow-choice' },
       ]);
       expect(resumed).toBe(true);
       expect(navigation.section()).toBe('ai-quality');
@@ -733,7 +752,7 @@ describe('NavigationService', () => {
         navigation.resume({ section: 'ai-quality', tab: 'ai-quality' }, [
           { section: 'menu', tab: null },
           { section: 'history', tab: 'history' },
-          { section: 'editorial-forward', tab: 'editorial-forward' },
+          { section: 'flow-choice', tab: 'flow-choice' },
         ]),
       ).toBe(true);
       expect(navigation.section()).toBe('history');

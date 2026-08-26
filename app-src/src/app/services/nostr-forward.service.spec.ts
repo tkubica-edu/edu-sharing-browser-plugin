@@ -14,7 +14,9 @@ import { provideFake } from '../../testing/provide-fake';
  * whatever verdict the test asked for. Constructed by the service through the global, as the real
  * `WebSocket` is — `no-network.setup.ts` puts every stubbed global back after the test.
  */
-function fakeRelay(options: { accept?: boolean; message?: string; silent?: boolean } = {}) {
+function fakeRelay(
+  options: { accept?: boolean; message?: string; unreachable?: boolean } = {},
+) {
   const sent: unknown[] = [];
   let opened: FakeSocket | null = null;
 
@@ -27,15 +29,14 @@ function fakeRelay(options: { accept?: boolean; message?: string; silent?: boole
 
     constructor(readonly url: string) {
       opened = this;
-      // The socket opens on the next turn, as a real one does: the service registers its handlers
+      // The socket settles on the next turn, as a real one does: the service registers its handlers
       // after the constructor returns.
-      queueMicrotask(() => this.onopen?.());
+      queueMicrotask(() => (options.unreachable ? this.onerror?.() : this.onopen?.()));
     }
 
     send(frame: string): void {
       const parsed = JSON.parse(frame) as [string, { id: string }];
       sent.push(parsed);
-      if (options.silent) return;
       const verdict = options.accept ?? true;
       queueMicrotask(() =>
         this.onmessage?.({
@@ -201,6 +202,42 @@ describe('NostrForwardService', () => {
       await expect(nostr.forward(aSource())).resolves.toBe(true);
 
       expect(relay.sent).toHaveLength(1);
+    });
+  });
+
+  describe('publishing on its own, as the An Nostr Relay senden step does', () => {
+    it('sends without the forwarding step having ticked anything', async () => {
+      const relay = fakeRelay();
+
+      await expect(nostr.publish(aSource())).resolves.toBe(true);
+
+      expect(relay.sent).toHaveLength(1);
+    });
+
+    it('sends a published content again, so its record on the relay is replaced', async () => {
+      const relay = fakeRelay();
+
+      await nostr.publish(aSource());
+      await expect(nostr.publish(aSource())).resolves.toBe(true);
+
+      expect(relay.sent).toHaveLength(2);
+      // The same identifier, which is what makes the second event replace the first (NIP-01).
+      const identifierOf = (frame: unknown) =>
+        ((frame as [string, { tags: string[][] }])[1].tags.find((tag) => tag[0] === 'd') ?? [])[1];
+      expect(identifierOf(relay.sent[1])).toBe(identifierOf(relay.sent[0]));
+    });
+
+    it('leaves the receipt of what is on the relay standing where a re-send fails', async () => {
+      fakeRelay();
+      await nostr.publish(aSource());
+      const published = nostr.receipt();
+
+      // The socket does not open at all: nothing reached the relay, so what it holds is unchanged.
+      fakeRelay({ unreachable: true });
+      await expect(nostr.publish(aSource())).resolves.toBe(false);
+
+      expect(nostr.receipt()).toBe(published);
+      expect(nostr.error()).not.toBeNull();
     });
   });
 

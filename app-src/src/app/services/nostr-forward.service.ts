@@ -145,17 +145,27 @@ export class NostrForwardService {
   }
 
   /**
-   * Publish the content as an AMB record. Answers whether the relay kept it; a refusal and a failure are
-   * both reported in {@link error} and both answer `false`, since neither leaves a record on the relay.
-   *
-   * Nothing happens where the step was not ticked, and nothing happens twice: a content already published
-   * in this pass answers `true` without a second event, so returning to the step and walking on again does
-   * not republish it.
+   * Publish the content where the forwarding step ticked the relay. Nothing happens where it did not, and
+   * nothing happens twice: a content already published in this pass answers `true` without a second event,
+   * so returning to the step and walking on again does not republish it. Answers whether there is a record
+   * on the relay — `true` also where the step was not ticked at all, which is nothing failing.
    */
-  async forward(source: AmbSource): Promise<boolean> {
-    if (!this.selectedState()) return true;
-    if (this.receiptState()) return true;
+  forward(source: AmbSource): Promise<boolean> {
+    if (!this.selectedState()) return Promise.resolve(true);
+    if (this.receiptState()) return Promise.resolve(true);
+    return this.publish(source);
+  }
 
+  /**
+   * Publish the content as an AMB record, now and whatever went before. Answers whether the relay kept it;
+   * a refusal and a failure are both reported in {@link error} and both answer `false`, since neither
+   * leaves a record on the relay.
+   *
+   * Called again for a content that already has a receipt this replaces it, which is the point of the
+   * *An Nostr Relay senden* step: a kind-30142 event is addressable, so a second publication of the same
+   * resource replaces the record on the relay rather than adding a second one beside it.
+   */
+  async publish(source: AmbSource): Promise<boolean> {
     this.errorState.set(null);
     const relayUrl = this.relayUrl();
     if (!isRelayUrl(relayUrl)) {

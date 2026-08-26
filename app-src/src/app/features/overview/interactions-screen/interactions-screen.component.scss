@@ -1,5 +1,6 @@
-// "Interaktionen" — one card per editorial team the content was proposed to: the team as its own head
-// row, and under it the exchange as a timeline of steps.
+// "Interaktionen" — two halves under headings of their own: one card per editorial team the content was
+// proposed to, with the team as its own head row and the exchange under it as a timeline of steps, and
+// one card for where the content stands with the nostr relay.
 @use 'mixins' as m;
 
 :host { display: block; }
@@ -141,9 +142,9 @@
   .step-label { color: var(--es-notice-text); }
 }
 
-// The heading over the relay's receipt: the cards above it are exchanges with editorial teams, this is
-// a publication — so it is introduced rather than added to their list.
-.nostr-head {
+// The heading over each half of the view. The two say different kinds of thing — an exchange that is
+// waited on, and a state that simply holds — so neither runs into the other unannounced.
+.half-head {
   margin: var(--es-space-4) 0 var(--es-space-2);
   font-size: 14px;
   font-weight: 700;

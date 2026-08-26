@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
 import { IconDirective } from '../../../directives/icon.directive';
+import { BrowserExtensionCustomWebComponentService } from '../../../services/browser-extension-custom-web-component.service';
 import { BusyService } from '../../../services/busy.service';
 import { CurationService } from '../../../services/curation.service';
 import { EditorialGroup, EditorialGroupsService } from '../../../services/editorial-groups.service';
@@ -9,14 +10,14 @@ import { NostrForwardService } from '../../../services/nostr-forward.service';
 import { NostrReceiptComponent } from '../../../shared/components/nostr-receipt/nostr-receipt.component';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 
-// "An Redaktionen weiterleiten": where the curated content is handed to one or more editorial teams, offered only
-// where the browser extension custom web component is enabled. The groups on offer are the collections the config
-// names; where a group has collections inside it, one is picked in the step behind it. Nothing is written here —
-// the choice is carried out by the save at the end of the Qualitätsprüfung, which is also what creates the node.
+// "An Redaktionen weiterleiten": where the curated content is offered on. Two kinds of target, each shown where it
+// applies, so the screen is a list of one or of both:
 //
-// Under the teams stands one more target of the same kind: a nostr relay, which the content is offered to as an AMB
-// record rather than as a repository node (see NostrForwardService). It is ticked here like a team and carried out
-// by the same way on, and what went out is shown back on this screen.
+//   - The editorial teams, which belong to the browser extension custom web component: the collections the config
+//     names, and where a team's collection has collections inside it one is picked in the step behind it. Nothing
+//     is written here — the choice is carried out by the save the way on makes, which is also what creates the node.
+//   - A nostr relay, which belongs to no repository: the content's metadata as an AMB record, published openly (see
+//     NostrForwardService). Offered everywhere, and so the only target the base version has.
 @Component({
   selector: 'es-editorial-forward-screen',
   imports: [IconDirective, NostrReceiptComponent, SpinnerComponent],
@@ -27,6 +28,12 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
 export class EditorialForwardScreenComponent {
   protected readonly curation = inject(CurationService);
   protected readonly groups = inject(EditorialGroupsService);
+  /**
+   * Whether the editorial teams are on offer at all. The step is reached without them — the relay below them is
+   * every repository's — and then it shows the relay alone rather than an empty list under a heading promising
+   * Redaktionen.
+   */
+  protected readonly teams = inject(BrowserExtensionCustomWebComponentService);
   // The way on writes what this screen picked, so the picking is closed while that write runs — see
   // BusyService, which the shell's own controls are disabled by for the same reason.
   protected readonly busy = inject(BusyService);
@@ -38,9 +45,12 @@ export class EditorialForwardScreenComponent {
   constructor() {
     // Reads the config and loads the collections once per session (see EditorialGroupsService.load),
     // then has a collection proposed for the content from its keywords — once per content, and only
-    // once the groups are there to take the proposal over for.
-    void this.groups.load();
-    void this.groups.recommendCollection();
+    // once the groups are there to take the proposal over for. Asked only where the teams are shown:
+    // without them both requests answer a list nothing renders.
+    if (this.teams.enabled()) {
+      void this.groups.load();
+      void this.groups.recommendCollection();
+    }
   }
 
   /**

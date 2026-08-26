@@ -1,0 +1,83 @@
+// Where the content stands with the relay: one card, read rather than acted on. It carries its state in
+// the border, since that state is the whole point of the card.
+@use 'mixins' as m;
+
+:host { display: block; }
+
+.standing {
+  @include m.card;
+
+  border-color: var(--es-blue);
+
+  &.is-adverse { border-color: var(--es-danger); }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--es-space-2);
+  margin: 0;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.head-icon { font-size: 20px; line-height: 1; color: var(--es-blue); }
+
+.is-adverse .head-icon { color: var(--es-danger); }
+
+.head-label { flex: 1 1 auto; min-width: 0; }
+
+.head-at {
+  @include m.muted;
+
+  flex: 0 0 auto;
+}
+
+.detail {
+  @include m.muted;
+
+  margin: var(--es-space-1) 0 var(--es-space-3);
+  line-height: 1.5;
+}
+
+// Label above value: an address and a key are long single tokens, and a two-column grid would either
+// wrap them to shreds or push the panel wide.
+.facts {
+  margin: 0;
+
+  dt {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--es-muted);
+    margin-top: var(--es-space-2);
+
+    &:first-child { margin-top: 0; }
+  }
+
+  dd { margin: 2px 0 0; font-size: 13px; }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+  }
+}
+
+// Every identifier here is one unbroken token, so it may break anywhere — the alternative is a card the
+// panel cannot hold.
+.wrap {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+// Stands in for a value that does not exist yet, and says what would bring it about.
+.note {
+  @include m.muted;
+
+  display: block;
+  line-height: 1.45;
+}
+
+.error { margin-bottom: 0; }

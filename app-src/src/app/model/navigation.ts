@@ -28,6 +28,7 @@ export type ScreenId =
   | 'preview'
   | 'usages'
   | 'share'
+  | 'nostr-forward'
   | 'interactions';
 
 /** A navigable section: the main menu itself, a menu entry, or a step of the content flow. */
@@ -50,6 +51,7 @@ export type SectionId =
   | 'editorial-forward'
   | 'personal-storage'
   | 'select-collection'
+  | 'nostr-forward'
   | 'flow-choice'
   | 'ai-quality'
   | 'overview';
@@ -361,10 +363,12 @@ export const SECTIONS: readonly AppSection[] = [
     id: 'editorial-forward',
     label: 'An Redaktionen weiterleiten',
     description: 'Den Inhalt an eine oder mehrere Redaktionen weiterleiten',
-    // Editable metadata, not a node: where the content goes is decided before it is written. The forwarding
-    // exists for the browser extension custom web component — the groups are the editorial teams a
-    // submitted content is judged by, so without it the step falls away.
-    visible: requiresLogin((c) => c.hasEditableMetadata && c.browserExtensionCustomWebComponent),
+    // Editable metadata, not a node: where the content goes is decided before it is written. The step holds
+    // two kinds of target and applies wherever one of them does: the editorial teams, which are the browser
+    // extension custom web component's (the groups a submitted content is judged by), and the nostr relay,
+    // which is nobody's — an AMB record is published from any repository. So the step itself is offered
+    // everywhere and shows only the relay where the teams do not apply (see EditorialForwardScreenComponent).
+    visible: requiresLogin((c) => c.hasEditableMetadata),
     // The way on out of the step writes what it picked, which a guest session may no longer do for a
     // content past its editing window — see AppSection.requiresSession.
     requiresSession: (c) => c.agentEditWindowClosed,
@@ -374,12 +378,28 @@ export const SECTIONS: readonly AppSection[] = [
     id: 'select-collection',
     label: 'Sammlung auswählen',
     description: 'Die Sammlung wählen, in die der Inhalt bei dieser Redaktion einsortiert wird',
-    // A step of the forwarding rather than one of the flow: it is entered from a group's row and
-    // returns to it, so it applies exactly where the forwarding does.
+    // A step of the *groups* rather than one of the flow: it is entered from a group's row and returns to
+    // it. Narrower than the forwarding it belongs to, which is also offered without the groups — where
+    // there are none, there is no row to enter this from.
     visible: requiresLogin((c) => c.hasEditableMetadata && c.browserExtensionCustomWebComponent),
     // As for the forwarding it is a step of: what is picked here is written with it.
     requiresSession: (c) => c.agentEditWindowClosed,
     tabs: [{ id: 'select-collection', label: 'Sammlung auswählen' }]
+  },
+  {
+    id: 'nostr-forward',
+    label: 'An Nostr Relay senden',
+    description: 'Die Metadaten des Inhalts als AMB-Eintrag veröffentlichen',
+    // Publishing a content the panel already has, entered from the Inhaltsoptionen rather than walked
+    // through: the flow makes this decision in the forwarding step, and this is the same publication for
+    // a content that is past it. An active node, not merely editable metadata — the record names the node
+    // it was read off, and there is nothing to publish about a result that was never written.
+    //
+    // No further condition: an AMB record needs nothing of the repository beyond those metadata, and the
+    // relay is nobody's. Nothing is written to the repository here either, so unlike the steps around it
+    // this one needs no session of the user's own.
+    visible: requiresLogin((c) => c.hasActiveNode),
+    tabs: [{ id: 'nostr-forward', label: 'An Nostr Relay senden' }]
   },
   {
     id: 'personal-storage',
@@ -455,10 +475,10 @@ export const SECTIONS: readonly AppSection[] = [
       {
         id: 'interactions',
         label: 'Interaktionen',
-        // What the editorial teams answered to a forwarded content, so the view belongs to the
-        // browser extension custom web component exactly as the forwarding itself does: without it
-        // no content is proposed to a Redaktion and there is no exchange to show.
-        visible: (c) => c.browserExtensionCustomWebComponent
+        // Where the content went outside this panel: what the editorial teams answered, and where it
+        // stands with the nostr relay. No condition of its own — the teams' half needs the browser
+        // extension custom web component and says so itself, while the relay's half applies to every
+        // content, so the view always has an answer (see InteractionsScreenComponent).
       }
     ]
   },

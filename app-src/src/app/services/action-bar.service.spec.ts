@@ -468,6 +468,38 @@ describe('ActionBarService', () => {
     });
   });
 
+  describe('An Nostr Relay senden', () => {
+    beforeEach(() => navigation.at('nostr-forward', 'nostr-forward'));
+
+    it('offers the publication behind the way back', () => {
+      expect(labels()).toEqual(['Zurück', 'An Relay senden']);
+    });
+
+    it('publishes the content the panel has', async () => {
+      await onwards().run();
+
+      expect(curation.fake.sendToNostr).toHaveBeenCalled();
+    });
+
+    it('sends a published content again, which replaces its record rather than adding one', () => {
+      nostr.published();
+
+      expect(onwards().label).toBe('Erneut senden');
+    });
+
+    it('says the publication is under way, and refuses a second one meanwhile', () => {
+      nostr.fake.sending.set(true);
+
+      expect(onwards()).toMatchObject({ label: 'Senden…', disabled: true });
+    });
+
+    it('refuses to send where the configured address cannot be a relay`s', () => {
+      nostr.fake.relayUsable.set(false);
+
+      expect(onwards().disabled).toBe(true);
+    });
+  });
+
   describe('Persönliche Ablage', () => {
     beforeEach(() => navigation.at('personal-storage', 'personal-storage'));
 

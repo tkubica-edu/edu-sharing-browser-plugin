@@ -1,21 +1,32 @@
 <div class="es-screen-body">
-  <!-- The head names the content the exchange is about, as the sibling tabs of this section do, and
-       marks the view as a draft: the forwardings below are the real ones, what came back from the
-       editorial teams cannot be read from the repository yet. -->
+  <!-- The head names the content the exchange is about, as the sibling tabs of this section do. With
+       editorial teams it also marks the view as a draft: the forwardings below are the real ones, what
+       came back from them cannot be read from the repository yet. Without teams there is no draft in
+       it — what a relay took is a fact, and the receipt below says so. -->
   <section class="es-hint-card">
     <p class="head">
-      <span class="head-title">Rückmeldungen der Redaktionen</span>
-      <span class="draft">Entwurf</span>
+      <span class="head-title">
+        {{ teams.enabled() ? 'Rückmeldungen der Redaktionen' : 'Wohin dieser Inhalt gegangen ist' }}
+      </span>
+      @if (teams.enabled()) {
+        <span class="draft">Entwurf</span>
+      }
     </p>
     @if (curation.contentTitle(); as title) {
       <h2 class="es-content-title">{{ title }}</h2>
     }
-    <p class="es-muted">
-      Der Kommunikationsverlauf kann derzeit nicht abgerufen werden. Die Karten zeigen die
-      Redaktionen, an die dieser Inhalt weitergeleitet wurde; der Verlauf darunter ist ein Beispiel.
-    </p>
+    @if (teams.enabled()) {
+      <p class="es-muted">
+        Der Kommunikationsverlauf kann derzeit nicht abgerufen werden. Die Karten zeigen die
+        Redaktionen, an die dieser Inhalt weitergeleitet wurde; der Verlauf darunter ist ein Beispiel.
+      </p>
+    }
     <es-details-link></es-details-link>
   </section>
+
+  @if (teams.enabled()) {
+    <h3 class="half-head">Redaktionen</h3>
+  }
 
   @if (exchanges().length) {
     <ul class="exchanges">
@@ -63,20 +74,23 @@
         </li>
       }
     </ul>
-  } @else if (!nostr.receipt()) {
+  } @else if (teams.enabled()) {
     <!-- Nothing was forwarded, or the forwarding was made in a session this panel does not carry:
-         either way there is no exchange, and the step that starts one is named. -->
+         either way there is no exchange, and the step that starts one is named. Said only where there
+         are teams — without them the view holds the relay's half alone. -->
     <p class="es-muted">
       Für diesen Inhalt sind keine Redaktionen hinterlegt. Über „An Redaktionen weiterleiten“ kann er
       einer oder mehreren Redaktionen vorgeschlagen werden.
     </p>
   }
 
-  <!-- Das Relay, sofern dorthin veröffentlicht wurde: kein Verlauf, sondern eine Quittung — was
-       gesendet wurde und wie es sich dort nachprüfen lässt. Anders als bei den Redaktionen ist das
-       keine Vorlage, sondern das tatsächlich gesendete Event. -->
-  @if (nostr.receipt()) {
-    <h3 class="nostr-head">Nostr-Relay</h3>
-    <es-nostr-receipt></es-nostr-receipt>
-  }
+  <!-- Die zweite Hälfte: kein Verlauf, sondern ein Stand — auch für einen Inhalt, der nie gesendet
+       wurde, denn „liegt bei keinem Relay" ist die Auskunft, nach der hier gesucht wird. Gesendet wird
+       nicht hier, sondern im Schritt „An Nostr Relay senden“; was hinausging, steht als Quittung
+       darunter. -->
+  <h3 class="half-head">Nostr-Anbindung</h3>
+
+  <es-nostr-standing></es-nostr-standing>
+
+  <es-nostr-receipt></es-nostr-receipt>
 </div>

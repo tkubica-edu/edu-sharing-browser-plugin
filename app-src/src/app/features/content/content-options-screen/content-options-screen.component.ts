@@ -157,6 +157,16 @@ export class ContentOptionsScreenComponent {
         label: 'Inhalt teilen',
         description: 'Link oder QR-Code erstellen und weitergeben',
         run: () => this.flow.showShare()
+      },
+      // Passing the content on outside the repository altogether: its metadata as an AMB record on a
+      // nostr relay. Its own errand rather than part of the forwarding, because the forwarding is a step
+      // of the flow and this content is past it — see NostrForwardScreenComponent.
+      {
+        section: 'nostr-forward',
+        icon: 'hub',
+        label: 'An Nostr Relay senden',
+        description: 'Die Metadaten des Inhalts als AMB-Eintrag veröffentlichen',
+        run: () => this.flow.showNostrForward()
       }
     );
     // The exchange with the editorial teams, which only exists where a content is forwarded to them

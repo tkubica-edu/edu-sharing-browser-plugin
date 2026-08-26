@@ -57,6 +57,7 @@ export function fakeCuration() {
     createContent: vi.fn((): Promise<boolean> => Promise.resolve(true)),
     saveCollected: vi.fn((_steps?: SaveSteps): Promise<boolean> => Promise.resolve(true)),
     forwardToNostr: vi.fn((): Promise<boolean> => Promise.resolve(true)),
+    sendToNostr: vi.fn((): Promise<boolean> => Promise.resolve(true)),
     reportMetadataEnriched: vi.fn(),
     confirmQuality: vi.fn(async (): Promise<void> => {
       if (qualityHolds) qualityConfirmed.set(true);

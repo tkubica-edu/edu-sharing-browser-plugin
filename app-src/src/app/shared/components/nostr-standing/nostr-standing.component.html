@@ -1,0 +1,44 @@
+<section class="standing" [class.is-adverse]="standing().adverse">
+  <p class="head">
+    <i class="head-icon" [esIcon]="standing().icon"></i>
+    <span class="head-label">{{ standing().label }}</span>
+    <!-- Wann gesendet wurde, am Ende der Zeile, die den Stand benennt. -->
+    @if (nostr.receipt(); as receipt) {
+      <time class="head-at">{{ receipt.at | date: 'dd.MM.yyyy, HH:mm' }}</time>
+    }
+  </p>
+
+  <p class="detail">{{ standing().detail }}</p>
+
+  <!-- Die beiden Angaben, die den Stand tragen: wohin gesendet wurde bzw. würde, und unter welchem
+       Schlüssel. Beide gelten auch ohne Veröffentlichung — sie sagen, was passieren würde. -->
+  <dl class="facts">
+    <dt>Relay</dt>
+    <dd>
+      <code class="wrap">{{ nostr.relayUrl() }}</code>
+      @if (!nostr.relayUsable()) {
+        <span class="note">
+          Keine Relay-Adresse — ein Nostr-Relay wird über WebSocket angesprochen. In den Einstellungen
+          korrigieren.
+        </span>
+      }
+    </dd>
+
+    <dt>Absender</dt>
+    <dd>
+      @if (nostr.npub(); as npub) {
+        <code class="wrap">{{ npub }}</code>
+      } @else {
+        <span class="note">
+          Noch kein Schlüssel — er wird beim ersten Senden erzeugt und bleibt in diesem Browser.
+        </span>
+      }
+    </dd>
+  </dl>
+
+  <!-- Warum es nicht geklappt hat, wo es nicht geklappt hat. Eine Ablehnung des Relays steht
+       zusätzlich in der Quittung, in dessen eigenen Worten. -->
+  @if (nostr.error(); as message) {
+    <p class="es-error error">{{ message }}</p>
+  }
+</section>

@@ -213,6 +213,26 @@ export class ActionBarService {
         return [back, this.finishAction()];
       }
 
+      // "An Nostr Relay senden": publishing a content the panel already has. Its way on is the publication
+      // itself rather than a step behind it — the step is entered for this one errand and left again by the
+      // way back. A content already on the relay is sent *again* rather than a second time: a kind-30142
+      // event is addressable, so the second publication replaces the record (NostrForwardService.publish).
+      // Refused where the configured address cannot be a relay's — nothing would leave the panel then, and
+      // the standing card on the screen says where to correct it.
+      case 'nostr-forward':
+        return [
+          this.backAction(),
+          {
+            label: this.nostr.sending()
+              ? 'Senden…'
+              : this.nostr.receipt()
+                ? 'Erneut senden'
+                : 'An Relay senden',
+            disabled: this.nostr.sending() || !this.nostr.relayUsable(),
+            run: () => void this.curation.sendToNostr()
+          }
+        ];
+
       // "An Redaktionen weiterleiten" and "Persönliche Ablage": where the content is filed and handed
       // on. The content exists by now, so the way on out of each of them writes what that step
       // picked — the collections it is referenced in, the folder it is moved to (see

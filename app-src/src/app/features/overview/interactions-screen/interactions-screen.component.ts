@@ -2,11 +2,13 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 
 import { IconDirective } from '../../../directives/icon.directive';
+import { BrowserExtensionCustomWebComponentService } from '../../../services/browser-extension-custom-web-component.service';
 import { CurationService } from '../../../services/curation.service';
 import { EditorialGroupsService } from '../../../services/editorial-groups.service';
 import { NostrForwardService } from '../../../services/nostr-forward.service';
 import { DetailsLinkComponent } from '../../../shared/components/details-link/details-link.component';
 import { NostrReceiptComponent } from '../../../shared/components/nostr-receipt/nostr-receipt.component';
+import { NostrStandingComponent } from '../../../shared/components/nostr-standing/nostr-standing.component';
 import { createdAtOf } from '../../../util/curation-node';
 
 /** One line of an exchange: what happened, when it is known, and whether it is still outstanding. */
@@ -34,13 +36,20 @@ interface EditorialExchange {
   steps: readonly CommunicationStep[];
 }
 
-// "Interaktionen", the fourth sub step of the Inhaltsübersicht: what became of the content at the editorial
-// teams it was proposed to — one card per team, with the exchange so far under it. A draft: the repository
-// hands out no communication history yet, so the cards name the forwardings this flow really made while the
-// exchange under them is an example of what will be shown there (marked as such in the template).
+// "Interaktionen", the fourth sub step of the Inhaltsübersicht: where the content went outside this panel.
+//
+// Two halves, each answering for itself. The editorial teams it was proposed to — one card per team, with the
+// exchange so far under it, and a draft at that: the repository hands out no communication history yet, so the
+// cards name the forwardings this flow really made while the exchange under them is an example of what will be
+// shown there (marked as such in the template). And the nostr relay, which is not an exchange at all but a
+// state: whether this content was published there, to which relay, under which identity (es-nostr-standing) —
+// with the receipt of the publication under it where there was one. Only reported here; the step that acts on
+// it is *An Nostr Relay senden*.
 @Component({
   selector: 'es-interactions-screen',
-  imports: [DatePipe, DetailsLinkComponent, IconDirective, NostrReceiptComponent],
+  imports: [
+    DatePipe, DetailsLinkComponent, IconDirective, NostrReceiptComponent, NostrStandingComponent
+  ],
   templateUrl: './interactions-screen.component.html',
   styleUrl: './interactions-screen.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -50,12 +59,18 @@ export class InteractionsScreenComponent {
   // The other place this content was offered to, where the forwarding step published it there: a relay
   // hands back a receipt rather than an exchange, so it is shown as itself under the teams' cards.
   protected readonly nostr = inject(NostrForwardService);
+  /**
+   * Whether the editorial teams apply at all — the view is also opened by a publication to a relay alone (see the
+   * registry), and the teams' half is then not merely empty but beside the point.
+   */
+  protected readonly teams = inject(BrowserExtensionCustomWebComponentService);
   private readonly groups = inject(EditorialGroupsService);
 
   constructor() {
     // The groups are what the pictures come from; loading is idempotent and usually done already, as
-    // the forwarding step runs before this one (see EditorialGroupsService.load).
-    void this.groups.load();
+    // the forwarding step runs before this one (see EditorialGroupsService.load). Asked only where
+    // there are teams: without them the view holds the relay's receipt alone.
+    if (this.teams.enabled()) void this.groups.load();
   }
 
   /**

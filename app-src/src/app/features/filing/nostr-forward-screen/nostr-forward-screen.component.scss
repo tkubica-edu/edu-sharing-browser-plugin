@@ -1,0 +1,46 @@
+// "An Nostr Relay senden" — the standing, what would go out, and the receipt of what did. A screen that
+// is read down and acted on from the footer, so it holds no controls of its own.
+@use 'mixins' as m;
+
+:host { display: block; }
+
+.summary-head {
+  margin: 0 0 var(--es-space-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+// Label above value, as in the standing card above it: the identifier is a whole URL, which no
+// two-column grid in this width can hold.
+.summary-facts {
+  margin: 0;
+
+  dt {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--es-muted);
+    margin-top: var(--es-space-2);
+
+    &:first-child { margin-top: 0; }
+  }
+
+  dd { margin: 2px 0 0; font-size: 13px; word-break: break-word; }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+  }
+}
+
+.wrap {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.note {
+  margin: var(--es-space-3) 0 0;
+  line-height: 1.5;
+}

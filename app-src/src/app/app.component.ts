@@ -48,6 +48,7 @@ import { SearchScreenComponent } from './features/content/search-screen/search-s
 import { CurationPreviewScreenComponent } from './features/curation/curation-preview-screen/curation-preview-screen.component';
 import { CurationScreenComponent } from './features/curation/curation-screen/curation-screen.component';
 import { EditorialForwardScreenComponent } from './features/filing/editorial-forward-screen/editorial-forward-screen.component';
+import { NostrForwardScreenComponent } from './features/filing/nostr-forward-screen/nostr-forward-screen.component';
 import { PersonalStorageScreenComponent } from './features/filing/personal-storage-screen/personal-storage-screen.component';
 import { SelectCollectionScreenComponent } from './features/filing/select-collection-screen/select-collection-screen.component';
 import { MetadataScreenComponent } from './features/metadata/metadata-screen/metadata-screen.component';
@@ -78,7 +79,8 @@ const DISCARD_PROMPT =
     FindContentScreenComponent,
     NewDocumentScreenComponent, AddMaterialScreenComponent, OwnContentScreenComponent,
     QualityCheckScreenComponent, MetadataScreenComponent, PreviewScreenComponent,
-    EditorialForwardScreenComponent, PersonalStorageScreenComponent, SelectCollectionScreenComponent,
+    EditorialForwardScreenComponent, NostrForwardScreenComponent, PersonalStorageScreenComponent,
+    SelectCollectionScreenComponent,
     FlowChoiceScreenComponent, AiQualityScreenComponent,
     UsagesScreenComponent, ShareScreenComponent, InteractionsScreenComponent
   ],

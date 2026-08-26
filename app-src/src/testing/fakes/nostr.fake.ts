@@ -4,14 +4,15 @@ import { vi } from 'vitest';
 import { NostrForwardService, NostrReceipt } from '../../app/services/nostr-forward.service';
 
 /**
- * `NostrForwardService` reduced to what the forwarding step's footer reads: whether the relay is ticked,
- * whether a publication is running, and whether one already happened. The publication itself is
- * {@link CurationService.forwardToNostr}'s business, so the fake carries no `forward`.
+ * `NostrForwardService` reduced to what the footer reads: whether the relay is ticked, whether the address
+ * can be one at all, whether a publication is running, and whether one already happened. The publication
+ * itself is {@link CurationService}'s business, so the fake carries neither `forward` nor `publish`.
  */
 export function fakeNostrForward() {
   const fake = {
     selected: signal(false),
     sending: signal(false),
+    relayUsable: signal(true),
     error: signal<string | null>(null),
     receipt: signal<NostrReceipt | null>(null),
     reset: vi.fn(),
