@@ -76,7 +76,7 @@ precedes every `/generate` rather than as a failed extraction a minute later.
 | `POST /extract-field` (Metadata-Agent) | sidebar document (`MetadataAgentService`) | same context the WLO canvas calls `/generate` from, so the request is visible in the panel's own DevTools and there is no worker build that can fall out of sync with the app. Relies on `host_permissions` for the cross-origin call, like the repository login |
 | Page content extraction | `scripting.executeScript` (background) | no cross-origin fetch |
 | Repository login | Angular `HttpClient` (library) | the library owns the call; relies on `host_permissions` bypassing CORS on Chrome/Edge/Firefox |
-| `EVENT` to a nostr relay (AMB, kind 30142) | sidebar document (`NostrForwardService` → `util/nostr-relay.ts`) | nostr has no HTTP write path: one WebSocket per publication, opened on the user's decision and closed with the relay's `OK`. Needs `wss:`/`ws:` in the extension's `connect-src`, which the scheme sources for `https:`/`http:` do not have to imply |
+| `EVENT` / `REQ` to a nostr relay (AMB, kind 30142) | sidebar document (`NostrForwardService` → `util/nostr-relay.ts`) | nostr has no HTTP path at all: one WebSocket per exchange — `publishToRelay` closes with the relay's `OK`, `queryRelay` with its `EOSE`. Needs `wss:`/`ws:` in the extension's `connect-src`, which the scheme sources for `https:`/`http:` do not have to imply |
 
 Every message to the worker goes through one send path (`BrowserExtensionService.ask`). A rejection
 saying the message found **no receiver** is retried a few times with a short backoff instead of being

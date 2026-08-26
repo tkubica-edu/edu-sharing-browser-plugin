@@ -35,3 +35,42 @@
   padding: 3px 6px;
   border-radius: 999px;
 }
+
+// Under the focal card: where continuing the Erschließung would land, and the way past it. A note rather
+// than a second card — it explains the card above it and must not compete with it for attention.
+.resume-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--es-space-2);
+  margin: var(--es-space-2) 0 0;
+  padding: 0 var(--es-space-1);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--es-muted);
+}
+
+.resume-icon {
+  flex: 0 0 auto;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--es-blue);
+}
+
+.resume-text { min-width: 0; }
+
+// The alternative way on, set as a link inside the sentence that names the other one: the two belong to
+// one statement about the same content, so it wraps with the text rather than sitting apart from it.
+.resume-alt {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--es-blue);
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover { color: var(--es-blue-600); }
+}

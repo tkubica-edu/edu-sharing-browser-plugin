@@ -240,6 +240,36 @@ describe('NavigationService', () => {
     });
   });
 
+  describe('naming a step from outside it', () => {
+    it('names a section by the title it is open under, not by the label it is entered by', () => {
+      // The Inhaltsoptionen are entered from a row that reports the *finding* ("Inhalt erkannt").
+      expect(navigation.stepLabel({ section: 'content-options', tab: 'content-options' })).toBe(
+        'Inhaltsoptionen',
+      );
+    });
+
+    it('names the sub step behind it where the section has more than one to tell apart', () => {
+      contentInHand();
+      withWebComponent();
+
+      expect(navigation.stepLabel({ section: 'quality', tab: 'metadata' })).toBe(
+        'Qualitätsprüfung – Metadaten',
+      );
+    });
+
+    it('leaves the sub step out where the section is that one step', () => {
+      contentInHand();
+
+      // Without the web component the Qualitätsprüfung is the Metadaten view alone, so naming both
+      // would say the same thing twice.
+      expect(navigation.stepLabel({ section: 'quality', tab: 'metadata' })).toBe('Qualitätsprüfung');
+    });
+
+    it('says nothing about a step the registry does not know', () => {
+      expect(navigation.stepLabel(null)).toBe('');
+    });
+  });
+
   describe('walking back', () => {
     it('returns to the sub step that was open there', () => {
       contentInHand();

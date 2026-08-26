@@ -115,8 +115,12 @@
         @if (nostr.sending()) {
           <es-spinner class="folder-spinner"></es-spinner>
           Der Eintrag wird an <code>{{ nostr.relayUrl() }}</code> gesendet …
-        } @else if (nostr.receipt()) {
-          Gesendet an <code>{{ nostr.relayUrl() }}</code> — die Daten stehen unten.
+        } @else if (nostr.receipt(); as receipt) {
+          @if (receipt.origin === 'session') {
+            Gesendet an <code>{{ nostr.relayUrl() }}</code> — die Daten stehen unten.
+          } @else {
+            Liegt bereits bei <code>{{ nostr.relayUrl() }}</code> — die Daten stehen unten.
+          }
         } @else {
           Relay: <code>{{ nostr.relayUrl() }}</code> — als AMB-Eintrag (Nostr-Event der Art 30142).
           Änderbar in den Einstellungen.

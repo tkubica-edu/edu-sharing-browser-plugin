@@ -27,6 +27,13 @@ export class NostrForwardScreenComponent {
   protected readonly curation = inject(CurationService);
   protected readonly nostr = inject(NostrForwardService);
 
+  constructor() {
+    // What the relay already holds about this content, which is how a publication made before this panel
+    // was last closed is known at all: nothing about one is kept in this browser. Once per content, and
+    // never over what this session itself published (see NostrForwardService.lookup).
+    void this.curation.lookUpOnNostr();
+  }
+
   /**
    * The record as it would go out, built from the content exactly as the send does. `null` where AMB has
    * nothing to identify the resource by — an address and a title — which is the one refusal that can be

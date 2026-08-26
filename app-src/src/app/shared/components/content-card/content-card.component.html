@@ -12,6 +12,11 @@
       <ng-container [ngTemplateOutlet]="body" />
     </div>
   }
+
+  <!-- What belongs to the card but cannot sit inside it: an interactive card is a button, and a second
+       control within one is neither valid nor clickable. Projected here so it still reads as part of the
+       card's block — above the hairline that ends it, not adrift in the gap below. -->
+  <ng-content select="[cardAside]" />
 </section>
 
 <ng-template #body>

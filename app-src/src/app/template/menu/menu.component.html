@@ -15,7 +15,23 @@
                      [interactive]="true"
                      [elevated]="true"
                      [disabled]="cardDisabled(section)"
-                     (activate)="activateCard(section)" />
+                     (activate)="activateCard(section)">
+      <!-- Die Karte sagt, dass fortgefahren werden kann; diese Zeile sagt wohin — der Schritt ist der
+           eine Umstand, der die Entscheidung trägt, und er steht vor dem Druck darauf statt danach.
+           Daneben der andere Weg: Eine angefangene Erschließung fortzusetzen ist nicht immer das, was
+           mit dem Inhalt gewollt ist. -->
+      @if (resumeStepLabel(); as step) {
+        <p cardAside class="resume-note">
+          <i class="resume-icon" esIcon="info"></i>
+          <span class="resume-text">
+            „Erschließung fortfahren“ öffnet <strong>{{ step }}</strong>.
+            <button type="button" class="resume-alt" (click)="openContentOptions()">
+              Stattdessen zu den Inhaltsoptionen
+            </button>
+          </span>
+        </p>
+      }
+    </es-content-card>
   }
 
   <ul class="menu-list">

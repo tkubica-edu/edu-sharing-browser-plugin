@@ -288,6 +288,11 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    the record twice with the receipt's `nak fetch <naddr…>` and compare the event ids). Point the relay
    at an unreachable address to check that the previous receipt stays and the failure is reported beside
    it. A node without `ccm:wwwurl` must be refused before anything is sent.
+
+   Then **reload the panel** and open the same node again: the record must reappear — read back off the
+   relay, not out of the *Verlauf* — labelled „Beim Nostr-Relay hinterlegt". Clearing the *Verlauf* must
+   change nothing about that. With the relay pointed at an unreachable address the state must read
+   **Unbekannt**, never „Nicht gesendet".
 9. **Verlauf**: every *saved* node is listed (nothing is recorded until you save); entries expand to
    show their fields and offer *In Vorschau öffnen*, which reloads the node from the repository;
    *Leeren* clears the list.

@@ -68,6 +68,29 @@ export class MenuComponent {
   );
 
   /**
+   * The step an unfinished Erschließung would be continued at, while the card is that offer — see
+   * {@link activateCard}. Null where the card leads somewhere else: a page not yet curated, a draft with
+   * no node, or a content whose Erschließung was never left unfinished.
+   *
+   * Held as the state itself rather than as its name, since both the note under the card and the walk the
+   * card makes are this one answer — asked once, so they cannot come apart.
+   */
+  private readonly resumeState = computed(() =>
+    !this.draftStep() && this.curation.curationUnfinished()
+      ? this.navigation.resumableStep(this.curation.leftAtStep())
+      : null,
+  );
+
+  /**
+   * What that step is called, for the line that says where continuing would lead. Null while the card is
+   * not that offer, which is also what takes the line off the screen.
+   */
+  protected readonly resumeStepLabel = computed(() => {
+    const step = this.resumeState();
+    return step ? this.navigation.stepLabel(step) || null : null;
+  });
+
+  /**
    * The *Inhalt erschließen* entry as the menu renders it, for the state below: whether that step can
    * be entered is what decides whether the card may offer it — the registry's answer, not a second
    * reading of the conditions (it is disabled on Edu-Sharing's own pages, among others).
@@ -120,11 +143,22 @@ export class MenuComponent {
    * longer applies, or that would start something rather than show it, hands over to the target as well.
    */
   protected activateCard(section: SectionView): void {
-    const left = this.curation.curationUnfinished()
-      ? this.navigation.resumableStep(this.curation.leftAtStep())
-      : null;
+    const left = this.resumeState();
     if (left) this.navigation.go(left.section, { tab: left.tab ?? undefined });
     else this.navigation.go(this.cardTarget(section));
+  }
+
+  /**
+   * Open the Inhaltsoptionen for the content the card shows, instead of continuing its Erschließung.
+   * Offered beside the card because the card can only do one thing when pressed, and continuing is not
+   * always what is wanted of a content that was left half-described — looking at it, filing it or handing
+   * it on are all reached from there.
+   *
+   * The focal card *is* the Inhaltsoptionen (`focal` in the registry), so this is where the card leads
+   * whenever it is not the offer to continue.
+   */
+  protected openContentOptions(): void {
+    this.navigation.go('content-options');
   }
 
   /** The sign for adding a content, in place of the kind of content there is none of yet. */

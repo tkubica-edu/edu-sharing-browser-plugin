@@ -23,6 +23,9 @@ const TYPE_ICONS: Record<string, string> = {
  * The card that shows which content the panel is working on: a heading, a tile carrying the kind of content, and
  * its name. Shared by the main menu's centre and the Inhaltsoptionen, which mean the same content — so it asks
  * {@link CurationService} rather than taking one as an input. Only the framing differs per place.
+ *
+ * Two content slots: the default one is projected into the card's own body, `[cardAside]` under the card and
+ * still within its block — for what belongs to the card but cannot sit inside a button.
  */
 @Component({
   selector: 'es-content-card',

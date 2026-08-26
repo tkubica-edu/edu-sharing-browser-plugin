@@ -257,6 +257,26 @@ export class NavigationService {
   }
 
   /**
+   * What a step is called where it is named from outside itself — the main menu's offer to continue an
+   * Erschließung says which step it would continue at. The section's title, and the sub step behind it
+   * where the section has more than one to tell apart; `''` for a step the registry does not know.
+   *
+   * Read from the registry rather than written out by the caller, so a step renamed there is renamed
+   * everywhere it is spoken about.
+   */
+  stepLabel(step: NavStep | null | undefined): string {
+    const section = step?.section ? this.sectionOf(step.section) : undefined;
+    if (!section) return '';
+    const title = this.titleOf(section);
+    const conditions = this.conditions.snapshot();
+    const shown = section.tabs.filter((tab) => tab.visible?.(conditions) ?? true);
+    // A section with one sub step *is* that sub step, so naming both would say the same thing twice.
+    if (shown.length < 2) return title;
+    const tab = shown.find((candidate) => candidate.id === step?.tab);
+    return tab ? `${title} – ${tab.label}` : title;
+  }
+
+  /**
    * Whether one of a section's sub steps applies right now, for the screens that offer a *tab* as an
    * errand of its own (see the Inhaltsoptionen): such a row and the tab it leads to are then gated by
    * the same statement in the registry. A tab that does not exist counts as absent.

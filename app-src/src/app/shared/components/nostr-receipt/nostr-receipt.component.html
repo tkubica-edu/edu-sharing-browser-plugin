@@ -2,10 +2,19 @@
   <!-- Carries the outcome in its border: a refusal is still a receipt — it says what was offered and
        what the relay answered — but it must not read as a publication that happened. -->
   <section class="receipt" [class.is-rejected]="!receipt.accepted">
+    <!-- Ein Eintrag, der beim Relay abgeholt wurde, ist etwas anderes als einer, den dieses Panel
+         gerade gesendet hat: Beides ist derselbe Datensatz, aber nur das Zweite ist ein Beleg über
+         einen Vorgang. -->
     <p class="head">
       <i class="head-icon" [esIcon]="receipt.accepted ? 'cloud_done' : 'cloud_off'"></i>
       <span class="head-text">
-        {{ receipt.accepted ? 'An das Nostr-Relay gesendet' : 'Vom Nostr-Relay abgelehnt' }}
+        @if (!receipt.accepted) {
+          Vom Nostr-Relay abgelehnt
+        } @else if (receipt.origin === 'relay') {
+          Beim Nostr-Relay hinterlegt
+        } @else {
+          An das Nostr-Relay gesendet
+        }
       </span>
     </p>
 
@@ -33,28 +42,48 @@
       <dd>
         <code class="wrap">{{ receipt.npub }}</code>
         <span class="note">
-          Der Schlüssel dieser Installation. Er wird beim ersten Senden erzeugt, bleibt in diesem
-          Browser und ist das Einzige, woran das Relay den Absender erkennt.
+          @if (receipt.own) {
+            Der Schlüssel dieser Installation. Er wird beim ersten Senden erzeugt, bleibt in diesem
+            Browser und ist das Einzige, woran das Relay den Absender erkennt.
+          } @else {
+            Ein fremder Schlüssel — dieser Eintrag stammt nicht aus dieser Installation. Ein Senden von
+            hier aus stellt einen zweiten Eintrag daneben, statt diesen zu ersetzen.
+          }
         </span>
       </dd>
 
       <dt>Event-ID</dt>
       <dd><code class="wrap">{{ receipt.event.id }}</code></dd>
 
-      <dt>Antwort des Relays</dt>
-      <dd>
-        <span class="verdict" [class.is-rejected]="!receipt.accepted">
-          {{ receipt.accepted ? 'OK, angenommen' : 'OK: false, abgelehnt' }}
-        </span>
-        @if (receipt.message) {
-          <code class="wrap">{{ receipt.message }}</code>
-        }
-      </dd>
+      <!-- Die Antwort des Relays gibt es nur zu einem Vorgang; ein abgeholter Eintrag hat keine, seine
+           bloße Anwesenheit beim Relay ist die Auskunft. -->
+      @if (receipt.origin === 'session') {
+        <dt>Antwort des Relays</dt>
+        <dd>
+          <span class="verdict" [class.is-rejected]="!receipt.accepted">
+            {{ receipt.accepted ? 'OK, angenommen' : 'OK: false, abgelehnt' }}
+          </span>
+          @if (receipt.message) {
+            <code class="wrap">{{ receipt.message }}</code>
+          }
+        </dd>
+      } @else {
+        <dt>Veröffentlicht am</dt>
+        <dd>
+          {{ receipt.at | date: 'dd.MM.yyyy, HH:mm' }}
+          <span class="note">
+            Der Zeitpunkt, den das Event selbst trägt (<code>created_at</code>) — nicht der, zu dem hier
+            nachgesehen wurde.
+          </span>
+        </dd>
+      }
     </dl>
 
     <!-- Was gesendet wurde: die Tags des Events selbst, nicht ihre Beschreibung. In AMB steckt der
          ganze Datensatz in den Tags — der Text des Events wiederholt nur die Beschreibung. -->
-    <h3 class="sub">Diese Daten wurden gesendet</h3>
+    <h3 class="sub">
+      {{ receipt.origin === 'relay' ? 'Diese Daten liegen beim Relay' : 'Diese Daten wurden gesendet' }}
+    </h3>
     <p class="sub-note">
       Ein AMB-Eintrag steht vollständig in den Tags des Events. Verschachtelte Felder tragen ihren
       Pfad im Schlüssel (<code>about:id</code>), Sprachlabels ihre Sprache am Ende

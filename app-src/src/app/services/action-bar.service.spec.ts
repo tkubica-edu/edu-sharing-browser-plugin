@@ -487,6 +487,20 @@ describe('ActionBarService', () => {
       expect(onwards().label).toBe('Erneut senden');
     });
 
+    it('does not call a foreign record on the relay something this panel could send again', () => {
+      nostr.publishedByAnother();
+
+      // Publishing would put a second record beside it — an addressable event is addressed by its
+      // publisher as well as by its identifier.
+      expect(onwards().label).toBe('An Relay senden');
+    });
+
+    it('refuses to send while the relay is still being asked what it holds', () => {
+      nostr.fake.looking.set(true);
+
+      expect(onwards().disabled).toBe(true);
+    });
+
     it('says the publication is under way, and refuses a second one meanwhile', () => {
       nostr.fake.sending.set(true);
 

@@ -73,8 +73,8 @@ Which editor renders that screen, and which route the save takes, is
   cards as itself: not an exchange but what went out and how to fetch it back, see
   [An Nostr Relay weiterleiten](#an-nostr-relay-weiterleiten). Under its own heading beside the teams'
   stands **Nostr-Anbindung**: `es-nostr-standing`, which answers for every content whether it is
-  published, refused, in flight, merely ticked or untouched, and names the relay and the `npub` behind
-  that answer in each case — so the view has something to say even where nothing was ever forwarded, and
+  published — by this installation or by another — refused, in flight, being looked up, unknown, merely
+  ticked or untouched, and names the relay and the `npub` behind that answer in each case — so the view has something to say even where nothing was ever forwarded, and
   it needs no condition of its own in the registry. Only reported there; the step that acts on it is
   [An Nostr Relay senden](#an-nostr-relay-senden). Marked
   **Entwurf** wherever the teams apply: the repository hands out no communication history yet, so the
@@ -191,6 +191,26 @@ view and by *An Nostr Relay senden*, so what was published stays findable after 
 refusal is kept as a receipt as well — it says what was offered and what the relay answered — and
 holds the step open.
 
+**Nothing about a publication is kept in this browser.** The panel does not remember which content it
+published; it asks the relay (`NostrForwardService.lookup`, opened by both screens that speak about it,
+once per content). Two filters in one `REQ`, which a relay reads as an *or*: `{kinds:[30142], "#d":[<the
+AMB id>]}` — the record under the identifier this content would be published as — and `{kinds:[30142],
+"#r":[<the node's page>]}`, which still finds it after the content's own address has changed. Both are
+single-letter tags and therefore indexed (NIP-01). This answers more than a stored id could: it holds
+after a reload and after the *Verlauf* is cleared, it sees a publication made from another installation,
+and it cannot claim a record that has since been replaced or removed. What it cannot recover is a
+*refusal* — that is an event of this session, not a record on the relay, and needs no longer life.
+
+A record read back this way is marked as such (`NostrReceipt.origin: 'relay'`), so the receipt says
+„Beim Nostr-Relay hinterlegt" rather than „gesendet", carries the event's own `created_at` in place of a
+relay verdict there was no exchange for, and dates it from the event rather than from the lookup. It also
+says whose it is (`NostrReceipt.own`): an addressable event is addressed by kind, **publisher** and
+identifier, so a record for the same resource under a foreign key is a second record and not an older
+version of this panel's — publishing would put one beside it, which is why the state is named separately
+and the button keeps saying *An Relay senden* there. A lookup that does not get through is its own state,
+**Unbekannt**: not knowing is not the same as knowing there is nothing, and only the second may read as
+„nicht gesendet".
+
 ### An Nostr Relay senden
 
 A step of its own rather than a view of the Inhaltsübersicht, entered from the *Inhaltsoptionen* (between
@@ -212,7 +232,9 @@ fields the content fills — and refuses in advance where AMB's two required fie
 is answerable without sending. A content already on the relay is sent **again**: the button reads *Erneut
 senden*, and because a kind-30142 event is addressable the second publication replaces the record rather
 than adding one beside it. A re-publication that fails leaves the previous receipt standing, because what
-the relay holds is unchanged by it.
+the relay holds is unchanged by it. Opening the step asks the relay what it already holds, so a content
+published in an earlier session shows its record here rather than reading as untouched — see
+[An Nostr Relay weiterleiten](#an-nostr-relay-weiterleiten).
 
 ### Sammlung auswählen
 

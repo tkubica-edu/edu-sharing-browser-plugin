@@ -71,6 +71,9 @@ export class InteractionsScreenComponent {
     // the forwarding step runs before this one (see EditorialGroupsService.load). Asked only where
     // there are teams: without them the view holds the relay's receipt alone.
     if (this.teams.enabled()) void this.groups.load();
+    // What the relay holds about this content — the half of this view that is a state rather than an
+    // exchange has nothing to report until it has been asked (see NostrForwardService.lookup).
+    void this.curation.lookUpOnNostr();
   }
 
   /**

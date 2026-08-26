@@ -15,7 +15,7 @@ exist, this one names the ones that do not yet. It shrinks as it is worked off.
 
 ## Where the coverage stands
 
-Twenty-one specs with 430 `it()` blocks cover eighteen of the panel's 36 services, two of its util
+Twenty-one specs with 445 `it()` blocks cover eighteen of the panel's 36 services, two of its util
 modules and the contracts with the extension around it. `npm run test:coverage` reports 38.8 % of
 statements and 34.2 % of functions over its `coverageInclude` (`src/app/services/**` and
 `src/app/util/**`). Everything outside that scope — components, `model/`, the pipe, the build harness
@@ -24,7 +24,7 @@ pinned only at their boundary with the panel, never run.
 
 | Area | Files | Covered | Kind of test it needs |
 | --- | --- | --- | --- |
-| `app-src/src/app/services/` | 36 | 18 services, 387 tests | Service spec (TestBed + fakes) |
+| `app-src/src/app/services/` | 36 | 18 services, 402 tests | Service spec (TestBed + fakes) |
 | `app-src/src/app/util/` | 26 | `bundle-theme.ts`, `amb-event.ts`, 26 tests | Pure-function spec |
 | `app-src/src/app/model/` | 4 | none | Pure-function spec (`navigation.ts` only; the rest is types) |
 | `app-src/src/app/features/`, `template/`, `shared/`, `pipes/` | 48 | none | Component spec, and one pure-function spec for the pipe |

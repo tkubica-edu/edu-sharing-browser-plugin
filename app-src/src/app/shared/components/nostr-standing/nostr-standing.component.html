@@ -41,4 +41,8 @@
   @if (nostr.error(); as message) {
     <p class="es-error error">{{ message }}</p>
   }
+
+  @if (nostr.lookupError(); as message) {
+    <p class="es-error error">Nachsehen fehlgeschlagen: {{ message }}</p>
+  }
 </section>

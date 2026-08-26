@@ -93,6 +93,17 @@ choosing what to work on, and what to do with it is the next choice rather than 
 Where a content was left is still said — on the main menu's card for an Erschließung that was left
 unfinished (`CurationService.leftAtStep`), which continues it there.
 
+That card **names the step it would continue at** before it is pressed, in a line under it:
+`NavigationService.stepLabel` resolves the remembered step against the registry — the section's title,
+plus the sub step behind it where the section has more than one to tell apart (*Qualitätsprüfung –
+Metadaten*) — so a step renamed in the registry is renamed here too. Beside it stands the other way on,
+*Stattdessen zu den Inhaltsoptionen*: the card can only do one thing when pressed, and continuing a
+half-described content is not always what is wanted of it — looking at it, filing it or handing it on
+are all reached from the junction instead. The line is shown only where the card really is that offer,
+which is the same answer the card's own press uses (`MenuComponent.resumeState`), so the two cannot come
+apart. It is projected into the card's `[cardAside]` slot rather than rendered under it: an interactive
+card is a `<button>`, and a second control inside one is neither valid nor clickable.
+
 That remembered step is the step the content was **left** on, not the one its save was made from: for
 as long as the panel works on a content the history holds, every move writes the step onto its entry
 (`NavigationService` → `HistoryService.noteStep`). The main menu is not such a step — it is where the

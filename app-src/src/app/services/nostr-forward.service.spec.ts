@@ -15,9 +15,16 @@ import { provideFake } from '../../testing/provide-fake';
  * `WebSocket` is — `no-network.setup.ts` puts every stubbed global back after the test.
  */
 function fakeRelay(
-  options: { accept?: boolean; message?: string; unreachable?: boolean } = {},
+  options: {
+    accept?: boolean;
+    message?: string;
+    unreachable?: boolean;
+    /** What a `REQ` is answered with, before the `EOSE` that ends it. */
+    holds?: readonly Record<string, unknown>[];
+  } = {},
 ) {
   const sent: unknown[] = [];
+  const asked: unknown[] = [];
   let opened: FakeSocket | null = null;
 
   class FakeSocket {
@@ -35,12 +42,26 @@ function fakeRelay(
     }
 
     send(frame: string): void {
-      const parsed = JSON.parse(frame) as [string, { id: string }];
+      const parsed = JSON.parse(frame) as [string, ...unknown[]];
+      // A lookup asks with REQ and is answered with the stored events and then EOSE; a publication
+      // sends EVENT and is answered with OK.
+      if (parsed[0] === 'REQ') {
+        const [, subscription, ...filters] = parsed as [string, string, ...unknown[]];
+        asked.push(filters);
+        queueMicrotask(() => {
+          for (const event of options.holds ?? []) {
+            this.onmessage?.({ data: JSON.stringify(['EVENT', subscription, event]) });
+          }
+          this.onmessage?.({ data: JSON.stringify(['EOSE', subscription]) });
+        });
+        return;
+      }
       sent.push(parsed);
       const verdict = options.accept ?? true;
+      const event = parsed[1] as { id: string };
       queueMicrotask(() =>
         this.onmessage?.({
-          data: JSON.stringify(['OK', parsed[1].id, verdict, options.message ?? '']),
+          data: JSON.stringify(['OK', event.id, verdict, options.message ?? '']),
         }),
       );
     }
@@ -56,9 +77,28 @@ function fakeRelay(
     sent,
     /** The event of the one publication that was made. */
     event: () => (sent[0] as [string, Record<string, unknown>])[1],
+    /** The filters of each `REQ` the service sent, in order. */
+    asked,
     /** Where the socket was opened, so a test can assert the relay that was actually reached. */
     url: () => opened?.url ?? null,
     closed: () => opened?.closed ?? false,
+  };
+}
+
+/** A kind-30142 event as a relay hands one back, under whichever key the test names. */
+function aStoredRecord(overrides: { pubkey?: string; identifier?: string; created_at?: number } = {}) {
+  return {
+    id: 'a'.repeat(64),
+    pubkey: overrides.pubkey ?? 'b'.repeat(64),
+    created_at: overrides.created_at ?? 1_750_000_000,
+    kind: 30142,
+    tags: [
+      ['d', overrides.identifier ?? 'https://example.org/optik'],
+      ['type', 'LearningResource'],
+      ['name', 'Optik'],
+    ],
+    content: '',
+    sig: 'c'.repeat(128),
   };
 }
 
@@ -238,6 +278,111 @@ describe('NostrForwardService', () => {
 
       expect(nostr.receipt()).toBe(published);
       expect(nostr.error()).not.toBeNull();
+    });
+  });
+
+  describe('looking the content up on the relay', () => {
+    it('asks by the record`s identifier and by the node it was read off', async () => {
+      const relay = fakeRelay();
+
+      await nostr.lookup(aSource({ nodeLink: 'https://repo.example/components/render/node-1' }));
+
+      // Two filters, which a relay reads as an "or" — the second still finds the record after the
+      // content's own address has changed.
+      expect(relay.asked[0]).toEqual([
+        { kinds: [30142], '#d': ['https://example.org/optik'] },
+        { kinds: [30142], '#r': ['https://repo.example/components/render/node-1'] },
+      ]);
+    });
+
+    it('takes a record the relay holds over, marked as read off the relay rather than sent', async () => {
+      fakeRelay({ holds: [aStoredRecord()] });
+
+      await nostr.lookup(aSource());
+
+      const receipt = nostr.receipt();
+      expect(receipt?.origin).toBe('relay');
+      expect(receipt?.accepted).toBe(true);
+      expect(receipt?.resource.id).toBe('https://example.org/optik');
+      // The moment the event states, not the moment it was found.
+      expect(receipt?.at).toBe(1_750_000_000_000);
+    });
+
+    it('marks a record under a foreign key as not this installation`s', async () => {
+      fakeRelay({ holds: [aStoredRecord()] });
+
+      await nostr.lookup(aSource());
+
+      expect(nostr.receipt()?.own).toBe(false);
+    });
+
+    it('prefers this installation`s own record over a foreign one for the same resource', async () => {
+      // A key has to exist before one of its records can be recognised, and publishing is what makes one.
+      fakeRelay();
+      await nostr.publish(aSource());
+      const own = nostr.npub();
+      const pubkey = nostr.receipt()!.event.pubkey;
+      nostr.reset();
+
+      fakeRelay({
+        holds: [aStoredRecord({ created_at: 1_760_000_000 }), aStoredRecord({ pubkey })],
+      });
+      await nostr.lookup(aSource());
+
+      expect(nostr.receipt()?.own).toBe(true);
+      expect(nostr.npub()).toBe(own);
+    });
+
+    it('reports nothing where the relay holds nothing, so the content reads as unpublished', async () => {
+      fakeRelay({ holds: [] });
+
+      await nostr.lookup(aSource());
+
+      expect(nostr.receipt()).toBeNull();
+      expect(nostr.lookupError()).toBeNull();
+    });
+
+    it('asks once per content, not once per screen that shows it', async () => {
+      const relay = fakeRelay();
+
+      await nostr.lookup(aSource());
+      await nostr.lookup(aSource());
+
+      expect(relay.asked).toHaveLength(1);
+    });
+
+    it('never asks over what this session published, which is the more exact answer', async () => {
+      const relay = fakeRelay();
+      await nostr.publish(aSource());
+
+      await nostr.lookup(aSource());
+
+      expect(relay.asked).toHaveLength(0);
+      expect(nostr.receipt()?.origin).toBe('session');
+    });
+
+    it('says nothing is known where the relay could not be asked, rather than nothing is there', async () => {
+      fakeRelay({ unreachable: true });
+
+      await nostr.lookup(aSource());
+
+      expect(nostr.receipt()).toBeNull();
+      expect(nostr.lookupError()).not.toBeNull();
+      // And the question stays open: the next screen asks again rather than repeating the non-answer.
+      const relay = fakeRelay({ holds: [aStoredRecord()] });
+      await nostr.lookup(aSource());
+      expect(relay.asked).toHaveLength(1);
+      expect(nostr.receipt()?.origin).toBe('relay');
+    });
+
+    it('asks about the next content on its own account', async () => {
+      const relay = fakeRelay();
+      await nostr.lookup(aSource());
+
+      nostr.reset();
+      await nostr.lookup(aSource());
+
+      expect(relay.asked).toHaveLength(2);
     });
   });
 

@@ -12,8 +12,10 @@ export function fakeNostrForward() {
   const fake = {
     selected: signal(false),
     sending: signal(false),
+    looking: signal(false),
     relayUsable: signal(true),
     error: signal<string | null>(null),
+    lookupError: signal<string | null>(null),
     receipt: signal<NostrReceipt | null>(null),
     reset: vi.fn(),
   } satisfies Partial<NostrForwardService>;
@@ -24,15 +26,21 @@ export function fakeNostrForward() {
   }
 
   /**
-   * A content that has already been published. The receipt's contents are never read by the footer —
-   * only its presence is — so it stands in as the empty object it is allowed to be here.
+   * A content already published under this installation's own key — the one case in which sending again
+   * replaces the record. Only `own` is read by the footer, so the rest of the receipt stands in as the
+   * empty object it is allowed to be here.
    */
   function published(): void {
     fake.selected.set(true);
-    fake.receipt.set({} as NostrReceipt);
+    fake.receipt.set({ own: true } as NostrReceipt);
   }
 
-  return { fake, select, published };
+  /** A record for the same resource on the relay, but under somebody else's key. */
+  function publishedByAnother(): void {
+    fake.receipt.set({ own: false } as NostrReceipt);
+  }
+
+  return { fake, select, published, publishedByAnother };
 }
 
 export type NostrForwardFake = ReturnType<typeof fakeNostrForward>;

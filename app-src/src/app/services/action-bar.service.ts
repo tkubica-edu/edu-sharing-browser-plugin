@@ -215,8 +215,10 @@ export class ActionBarService {
 
       // "An Nostr Relay senden": publishing a content the panel already has. Its way on is the publication
       // itself rather than a step behind it — the step is entered for this one errand and left again by the
-      // way back. A content already on the relay is sent *again* rather than a second time: a kind-30142
-      // event is addressable, so the second publication replaces the record (NostrForwardService.publish).
+      // way back. A content whose record on the relay is *this installation's* is sent again rather than a
+      // second time: an addressable event is addressed by kind, publisher and identifier, so publishing
+      // again replaces it (NostrForwardService.publish). A record under a foreign key is not replaced by
+      // anything this panel sends, so there the button keeps saying what it does.
       // Refused where the configured address cannot be a relay's — nothing would leave the panel then, and
       // the standing card on the screen says where to correct it.
       case 'nostr-forward':
@@ -225,10 +227,10 @@ export class ActionBarService {
           {
             label: this.nostr.sending()
               ? 'Senden…'
-              : this.nostr.receipt()
+              : this.nostr.receipt()?.own
                 ? 'Erneut senden'
                 : 'An Relay senden',
-            disabled: this.nostr.sending() || !this.nostr.relayUsable(),
+            disabled: this.nostr.sending() || this.nostr.looking() || !this.nostr.relayUsable(),
             run: () => void this.curation.sendToNostr()
           }
         ];

@@ -729,6 +729,14 @@ export class CurationService {
   }
 
   /**
+   * Ask the relay whether it already holds a record about this content — how a publication is known again
+   * after a reload, since nothing about one is kept in this browser (see NostrForwardService.lookup).
+   */
+  lookUpOnNostr(): Promise<void> {
+    return this.nostr.lookup(this.ambSource());
+  }
+
+  /**
    * Publish the content to the nostr relay now, whatever went before — the *An Nostr Relay senden* step,
    * which is an errand of its own for a content the panel already has. A content that is already published
    * is published again, which replaces its record rather than adding a second one (see

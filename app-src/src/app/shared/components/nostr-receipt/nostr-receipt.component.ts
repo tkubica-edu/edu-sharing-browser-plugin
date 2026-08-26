@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
 import { IconDirective } from '../../../directives/icon.directive';
@@ -21,8 +22,10 @@ interface Lookup {
 }
 
 /**
- * What was published to the nostr relay, as the receipt of it: which relay took it, under which identity,
- * which fields went out, and how to fetch the record back. Rendered wherever the publication is spoken
+ * The record on the nostr relay, in full: which relay holds it, under which identity, which fields it
+ * carries, and how to fetch it back. Either the receipt of a publication this session made — then it also
+ * carries the relay's own verdict — or the record the relay handed back when the content was looked up
+ * there, which is how one published before this panel was last closed is shown at all. Rendered wherever the publication is spoken
  * about — the forwarding step it is made from, and the Interaktionen view that collects what became of a
  * content — so the answer to "was ist da rausgegangen?" reads the same in both places.
  *
@@ -31,7 +34,7 @@ interface Lookup {
  */
 @Component({
   selector: 'es-nostr-receipt',
-  imports: [IconDirective],
+  imports: [DatePipe, IconDirective],
   templateUrl: './nostr-receipt.component.html',
   styleUrl: './nostr-receipt.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
