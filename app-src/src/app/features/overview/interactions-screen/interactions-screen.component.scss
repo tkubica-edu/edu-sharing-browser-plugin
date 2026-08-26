@@ -140,3 +140,11 @@
   .step-icon { color: var(--es-notice-icon); }
   .step-label { color: var(--es-notice-text); }
 }
+
+// The heading over the relay's receipt: the cards above it are exchanges with editorial teams, this is
+// a publication — so it is introduced rather than added to their list.
+.nostr-head {
+  margin: var(--es-space-4) 0 var(--es-space-2);
+  font-size: 14px;
+  font-weight: 700;
+}

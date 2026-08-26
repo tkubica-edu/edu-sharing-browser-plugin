@@ -4,6 +4,7 @@ import { SectionId } from '../model/navigation';
 import { resetChatSession } from '../util/chat-session';
 import { CurationService } from './curation.service';
 import { NavigationService } from './navigation.service';
+import { NostrForwardService } from './nostr-forward.service';
 import { PageRecognitionService } from './page-recognition.service';
 
 /**
@@ -69,6 +70,7 @@ export interface FooterAction {
 @Injectable({ providedIn: 'root' })
 export class ActionBarService {
   private readonly curation = inject(CurationService);
+  private readonly nostr = inject(NostrForwardService);
   private readonly navigation = inject(NavigationService);
   // The last write of the flow makes the open page one the repository holds — see {@link finishAction}.
   private readonly pageRecognition = inject(PageRecognitionService);
@@ -216,18 +218,35 @@ export class ActionBarService {
       // picked — the collections it is referenced in, the folder it is moved to (see
       // CurationService.saveCollected) — and only then leads on: to the other of the two where it
       // applies, and to the choice of process behind them otherwise.
-      case 'editorial-forward':
+      case 'editorial-forward': {
+        // The relay is one more target of this step, so the way on carries it too — and where it is
+        // about to be published to, the way on says so rather than reading as a plain step forward.
+        const publishes = this.nostr.selected() && !this.nostr.receipt();
         return [
           this.backAction(),
           {
-            label: this.curation.saving() ? 'Speichern…' : 'Weiter',
-            disabled: this.curation.saving(),
+            label: this.nostr.sending()
+              ? 'Senden…'
+              : this.curation.saving()
+                ? 'Speichern…'
+                : publishes
+                  ? 'An Relay senden'
+                  : 'Weiter',
+            disabled: this.curation.saving() || this.nostr.sending(),
             run: async () => {
               if (!(await this.curation.saveCollected())) return;
+              // A publication that did not get through keeps the step: what the relay said is answered
+              // here — by correcting its address, or by not publishing after all.
+              if (!(await this.curation.forwardToNostr())) return;
+              // The publication that just happened stays on the step, because what it left behind is
+              // shown there: which data went to which relay, and how to look them up again. The next
+              // way on leads on, the content being published by then.
+              if (publishes) return;
               this.navigation.go(this.nextSection('personal-storage', 'flow-choice'));
             }
           }
         ];
+      }
 
       // The filing's collection is optional and has no confirmation of its own, so the way on is
       // also what takes it over: a collection ticked in the embedded selector is applied here (the

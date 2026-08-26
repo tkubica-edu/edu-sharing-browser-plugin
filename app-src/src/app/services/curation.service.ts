@@ -23,6 +23,7 @@ import { HistoryEntry, HistoryService } from './history.service';
 import { MetadataAgentService } from './metadata-agent.service';
 import type { NavStep } from './navigation.service';
 import { NodeWriteService } from './node-write.service';
+import { NostrForwardService } from './nostr-forward.service';
 import { NodeSummary, RepositoryNodeService } from './repository-node.service';
 import { QualityJudgeService } from './quality-judge.service';
 
@@ -123,6 +124,9 @@ export class CurationService {
   private readonly browserExtensionCustomWebComponent = inject(BrowserExtensionCustomWebComponentService);
   private readonly repositoryNodes = inject(RepositoryNodeService);
   private readonly qualityJudge = inject(QualityJudgeService);
+  // The forwarding step's other target: a nostr relay, which is published to by the same way on that
+  // carries the forwarding to the editorial teams — see {@link forwardToNostr}.
+  private readonly nostr = inject(NostrForwardService);
   private readonly history = inject(HistoryService);
   // The generated CollectionV1Service (exported as CollectionServiceUnwrapped) — the read-only
   // CollectionService wrapper does not cover adding a node.
@@ -692,6 +696,27 @@ export class CurationService {
     return this.hasCollectedValues() || steps.quality || steps.review
       ? this.save({}, null, steps)
       : Promise.resolve(true);
+  }
+
+  /**
+   * Publish the content to the nostr relay, where the forwarding step ticked that. What is published is
+   * the content as AMB describes it, assembled here because this is where the content is: the metadata as
+   * every step of the flow has left them, the address the resource lives at, its picture, and the node the
+   * record was read off. Answers whether there is a record on the relay — `true` also where the step was
+   * not ticked at all, which is nothing failing.
+   */
+  forwardToNostr(): Promise<boolean> {
+    const node = this.activeNode();
+    return this.nostr.forward({
+      metadata: this.editorMetadata(),
+      url: this.contentUrl(),
+      title: this.contentTitle(),
+      // A mere type icon says what kind of material this is, not what this content looks like — see
+      // {@link contentPreview}.
+      imageUrl: this.currentPreviewSrc(),
+      nodeLink: node?.link ?? null,
+      repositoryUrl: this.auth.repositoryUrl()
+    });
   }
 
   /** Take over what the Qualität view reports of its criteria — see {@link qualityCriteriaMet}. */
@@ -1571,6 +1596,8 @@ export class CurationService {
     // starts without it rather than inheriting it — the forwardings it already stands in included.
     this.editorialTargetsState.set([]);
     this.savedForwardingsState.set([]);
+    // Including what was published about it to a relay: the tick and its receipt describe that content.
+    this.nostr.reset();
     this.storageParentState.set(null);
     this.personalCollectionsState.set([]);
     // Which process a content is checked in is a statement about that content, not a standing preference.

@@ -12,6 +12,7 @@ import { ContextRefreshService } from '../../../services/context-refresh.service
 import { CurationService } from '../../../services/curation.service';
 import { DebugService } from '../../../services/debug.service';
 import { DevModeService } from '../../../services/dev-mode.service';
+import { NostrForwardService } from '../../../services/nostr-forward.service';
 import { ContentJudgeService } from '../../../services/content-judge.service';
 import { QualityJudgeService } from '../../../services/quality-judge.service';
 import { ThemeService, ThemeSetting } from '../../../services/theme.service';
@@ -20,9 +21,10 @@ import { configuredSchemes } from '../../../util/quality-schemes';
 /**
  * The folded groups of this screen, in the order they are offered and each named after what it holds: the
  * switches that stand in for a service while the panel is developed on, the chat and what the KI is told
- * with it, what a collection proposal is derived from, and which services a quality check asks.
+ * with it, what a collection proposal is derived from, which services a quality check asks, and where the
+ * forwarding step publishes AMB records to.
  */
-type SettingsSection = 'developer' | 'ai' | 'recommendation' | 'quality';
+type SettingsSection = 'developer' | 'ai' | 'recommendation' | 'quality' | 'nostr';
 
 // Repository configuration plus the settings of the chat, the checks and the two development switches.
 // Changing the URL requires a reload, because the API library freezes its rootUrl at bootstrap (see
@@ -50,6 +52,7 @@ export class SettingsScreenComponent implements OnDestroy {
   protected readonly qualityJudge = inject(QualityJudgeService);
   protected readonly contentJudge = inject(ContentJudgeService);
   protected readonly theme = inject(ThemeService);
+  protected readonly nostr = inject(NostrForwardService);
 
   /** Whether the credential is legible on screen; masked until it is asked for. */
   protected readonly basicAuthVisible = signal(false);
@@ -59,6 +62,9 @@ export class SettingsScreenComponent implements OnDestroy {
    * request itself uses, so the listing cannot state something the judge is not doing.
    */
   protected readonly contentJudgeSchemes = configuredSchemes().schemes;
+
+  /** The relay the panel ships with, named where the field says what an empty one falls back to. */
+  protected readonly defaultNostrRelayUrl = APP_CONFIG.nostrRelayUrl;
 
   /**
    * The checks the measurement is asked for, as its description lists them. Read from the rules rather than
@@ -97,7 +103,8 @@ export class SettingsScreenComponent implements OnDestroy {
     developer: this.devMode.changedSettings() + this.debug.changedSettings(),
     ai: this.chatStyle.changedSettings() + this.chatSkill.changedSettings(),
     recommendation: this.recommendations.changedSettings(),
-    quality: this.qualityJudge.changedSettings() + this.contentJudge.changedSettings()
+    quality: this.qualityJudge.changedSettings() + this.contentJudge.changedSettings(),
+    nostr: this.nostr.changedSettings()
   }));
 
   protected toggleSection(section: SettingsSection): void {
@@ -212,6 +219,18 @@ export class SettingsScreenComponent implements OnDestroy {
 
   protected toggleBasicAuthVisible(): void {
     this.basicAuthVisible.update((visible) => !visible);
+  }
+
+  // ---- Nostr relay --------------------------------------------------------
+  // Written as it is edited, like every other setting here. An emptied field is not an invalid one: it
+  // puts the relay the panel ships with back in force (see NostrForwardService.relayUrl).
+
+  protected setNostrRelayUrl(url: string): void {
+    void this.nostr.setRelayUrl(url);
+  }
+
+  protected resetNostrRelayUrl(): void {
+    void this.nostr.setRelayUrl('');
   }
 
   // ---- Debug mode ---------------------------------------------------------

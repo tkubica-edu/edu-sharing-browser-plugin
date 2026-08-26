@@ -1,0 +1,252 @@
+import { TestBed } from '@angular/core/testing';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { verifyEvent } from 'nostr-tools/pure';
+
+import { NostrForwardService } from './nostr-forward.service';
+import { BrowserExtensionService } from './browser-extension.service';
+import { APP_CONFIG } from '../config';
+import { AmbSource } from '../util/amb-event';
+import { BrowserExtensionFake, fakeBrowserExtension } from '../../testing/fakes';
+import { provideFake } from '../../testing/provide-fake';
+
+/**
+ * A relay in place of the network: it takes the frames the service sends, and answers the `EVENT` with
+ * whatever verdict the test asked for. Constructed by the service through the global, as the real
+ * `WebSocket` is — `no-network.setup.ts` puts every stubbed global back after the test.
+ */
+function fakeRelay(options: { accept?: boolean; message?: string; silent?: boolean } = {}) {
+  const sent: unknown[] = [];
+  let opened: FakeSocket | null = null;
+
+  class FakeSocket {
+    onopen: (() => void) | null = null;
+    onmessage: ((event: { data: string }) => void) | null = null;
+    onerror: (() => void) | null = null;
+    onclose: ((event: { reason: string }) => void) | null = null;
+    closed = false;
+
+    constructor(readonly url: string) {
+      opened = this;
+      // The socket opens on the next turn, as a real one does: the service registers its handlers
+      // after the constructor returns.
+      queueMicrotask(() => this.onopen?.());
+    }
+
+    send(frame: string): void {
+      const parsed = JSON.parse(frame) as [string, { id: string }];
+      sent.push(parsed);
+      if (options.silent) return;
+      const verdict = options.accept ?? true;
+      queueMicrotask(() =>
+        this.onmessage?.({
+          data: JSON.stringify(['OK', parsed[1].id, verdict, options.message ?? '']),
+        }),
+      );
+    }
+
+    close(): void {
+      this.closed = true;
+    }
+  }
+
+  vi.stubGlobal('WebSocket', FakeSocket as unknown as typeof WebSocket);
+  return {
+    /** The frames the service sent, in order — `['EVENT', <event>]` for a publication. */
+    sent,
+    /** The event of the one publication that was made. */
+    event: () => (sent[0] as [string, Record<string, unknown>])[1],
+    /** Where the socket was opened, so a test can assert the relay that was actually reached. */
+    url: () => opened?.url ?? null,
+    closed: () => opened?.closed ?? false,
+  };
+}
+
+/** A content that carries what AMB requires and a little more. */
+function aSource(overrides: Partial<AmbSource> = {}): AmbSource {
+  return {
+    metadata: {
+      'cclom:title': ['Optik'],
+      'cclom:general_description': ['Eine Einführung.'],
+      'ccm:wwwurl': ['https://example.org/optik'],
+    },
+    url: 'https://example.org/optik',
+    title: 'Optik',
+    imageUrl: null,
+    nodeLink: null,
+    repositoryUrl: null,
+    ...overrides,
+  };
+}
+
+describe('NostrForwardService', () => {
+  let nostr: NostrForwardService;
+  let extension: BrowserExtensionFake;
+
+  beforeEach(async () => {
+    extension = fakeBrowserExtension();
+    TestBed.configureTestingModule({
+      providers: [provideFake(BrowserExtensionService, extension.fake)],
+    });
+    nostr = TestBed.inject(NostrForwardService);
+    await nostr.load();
+  });
+
+  describe('which relay it publishes to', () => {
+    it('is the one the panel ships with while the settings name none', () => {
+      expect(nostr.relayUrl()).toBe(APP_CONFIG.nostrRelayUrl);
+      expect(nostr.relayUsable()).toBe(true);
+    });
+
+    it('is the one the settings name, and it is remembered', async () => {
+      await nostr.setRelayUrl('  wss://relay.example  ');
+
+      expect(nostr.relayUrl()).toBe('wss://relay.example');
+      expect(extension.storage.get(APP_CONFIG.storageKeys.nostrRelayUrl)).toBe('wss://relay.example');
+    });
+
+    it('falls back to the panel`s own relay once the setting is emptied again', async () => {
+      await nostr.setRelayUrl('wss://relay.example');
+      await nostr.setRelayUrl('');
+
+      expect(nostr.relayUrl()).toBe(APP_CONFIG.nostrRelayUrl);
+    });
+
+    it('reports an address that cannot be a relay`s, since nostr speaks WebSocket alone', async () => {
+      await nostr.setRelayUrl('https://relay.example');
+
+      expect(nostr.relayUsable()).toBe(false);
+    });
+  });
+
+  describe('publishing', () => {
+    it('does nothing at all where the step was not ticked', async () => {
+      const relay = fakeRelay();
+
+      await expect(nostr.forward(aSource())).resolves.toBe(true);
+
+      expect(relay.sent).toHaveLength(0);
+      expect(nostr.receipt()).toBeNull();
+    });
+
+    it('sends a signed AMB event to the configured relay and closes the socket after it', async () => {
+      const relay = fakeRelay();
+      await nostr.setRelayUrl('wss://relay.example');
+      nostr.select(true);
+
+      await expect(nostr.forward(aSource())).resolves.toBe(true);
+
+      expect(relay.url()).toBe('wss://relay.example');
+      const [verb, event] = relay.sent[0] as [string, Record<string, unknown>];
+      expect(verb).toBe('EVENT');
+      expect(event['kind']).toBe(30142);
+      // The signature is what a relay checks first; a client that gets it wrong is refused outright.
+      expect(verifyEvent(event as never)).toBe(true);
+      expect(relay.closed()).toBe(true);
+    });
+
+    it('keeps the whole exchange as the receipt, under the names it can be looked up by', async () => {
+      fakeRelay({ message: '' });
+      nostr.select(true);
+
+      await nostr.forward(aSource());
+
+      const receipt = nostr.receipt();
+      expect(receipt?.accepted).toBe(true);
+      expect(receipt?.resource.id).toBe('https://example.org/optik');
+      expect(receipt?.npub).toMatch(/^npub1/);
+      expect(receipt?.nevent).toMatch(/^nevent1/);
+      // The record's standing address, which keeps pointing at the current version of it.
+      expect(receipt?.naddr).toMatch(/^naddr1/);
+      expect(nostr.error()).toBeNull();
+    });
+
+    it('reports the relay`s refusal in its own words, and keeps it as a receipt all the same', async () => {
+      fakeRelay({ accept: false, message: 'invalid: missing required "name" tag' });
+      nostr.select(true);
+
+      await expect(nostr.forward(aSource())).resolves.toBe(false);
+
+      expect(nostr.error()).toContain('invalid: missing required "name" tag');
+      expect(nostr.receipt()?.accepted).toBe(false);
+    });
+
+    it('sends nothing where the content lacks what AMB identifies a resource by', async () => {
+      const relay = fakeRelay();
+      nostr.select(true);
+
+      await expect(
+        nostr.forward(aSource({ metadata: { 'cclom:title': ['Optik'] }, url: null, nodeLink: null })),
+      ).resolves.toBe(false);
+
+      expect(relay.sent).toHaveLength(0);
+      expect(nostr.error()).toContain('Adresse');
+    });
+
+    it('sends nothing to an address that cannot be a relay`s', async () => {
+      const relay = fakeRelay();
+      await nostr.setRelayUrl('https://relay.example');
+      nostr.select(true);
+
+      await expect(nostr.forward(aSource())).resolves.toBe(false);
+
+      expect(relay.sent).toHaveLength(0);
+      expect(nostr.error()).toContain('wss://');
+    });
+
+    it('publishes one content once, however often the step is walked through', async () => {
+      const relay = fakeRelay();
+      nostr.select(true);
+
+      await nostr.forward(aSource());
+      await expect(nostr.forward(aSource())).resolves.toBe(true);
+
+      expect(relay.sent).toHaveLength(1);
+    });
+  });
+
+  describe('the key it publishes under', () => {
+    it('is generated on the first publication and kept from then on', async () => {
+      fakeRelay();
+      nostr.select(true);
+
+      await nostr.forward(aSource());
+      const generated = extension.storage.get(APP_CONFIG.storageKeys.nostrSecretKey);
+
+      expect(generated).toMatch(/^[0-9a-f]{64}$/);
+      expect(nostr.npub()).toMatch(/^npub1/);
+
+      // A second content goes out under the same identity — that is what makes the records findable
+      // as one publisher's.
+      nostr.reset();
+      nostr.select(true);
+      await nostr.forward(aSource());
+
+      expect(extension.storage.get(APP_CONFIG.storageKeys.nostrSecretKey)).toBe(generated);
+    });
+
+    it('replaces a stored key that cannot be read, rather than failing to publish over it', async () => {
+      extension.storage.set(APP_CONFIG.storageKeys.nostrSecretKey, 'not-a-key');
+      await nostr.load();
+      fakeRelay();
+      nostr.select(true);
+
+      await expect(nostr.forward(aSource())).resolves.toBe(true);
+
+      expect(extension.storage.get(APP_CONFIG.storageKeys.nostrSecretKey)).toMatch(/^[0-9a-f]{64}$/);
+    });
+  });
+
+  it('lets go of what was published for one content, keeping the identity it went out under', async () => {
+    fakeRelay();
+    nostr.select(true);
+    await nostr.forward(aSource());
+    const npub = nostr.npub();
+
+    nostr.reset();
+
+    expect(nostr.selected()).toBe(false);
+    expect(nostr.receipt()).toBeNull();
+    expect(nostr.error()).toBeNull();
+    expect(nostr.npub()).toBe(npub);
+  });
+});

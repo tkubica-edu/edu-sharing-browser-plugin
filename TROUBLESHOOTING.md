@@ -33,7 +33,11 @@ What is known not to work, known to be unverified, or known to look wrong at fir
 ## Permissions
 
 - **Broad permissions** (`host_permissions: https://*/*`, `connect-src https:`) are required because
-  the repository URL is user-editable; expect stricter store review. `connect-src` also allows
+  the repository URL is user-editable; expect stricter store review. `connect-src` also names `wss:`
+  and `ws:`, for the nostr relay a content is published to (see
+  [FEATURES.md § An Nostr Relay weiterleiten](FEATURES.md#an-nostr-relay-weiterleiten)): the relay
+  address is user-editable for the same reason the repository URL is, and a WebSocket is the only
+  transport nostr has. It also allows
   `data:` and `blob:`, because the bundle reads a picture it was handed as a URL of its own: the
   preview widget `fetch`es the picked node's inline `preview.data` (a data URL) to turn it into a
   file, and the panel does the same with the object URL of a picture picked in the widget

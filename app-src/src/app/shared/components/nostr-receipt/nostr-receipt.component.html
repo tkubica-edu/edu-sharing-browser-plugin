@@ -1,0 +1,109 @@
+@if (nostr.receipt(); as receipt) {
+  <!-- Carries the outcome in its border: a refusal is still a receipt — it says what was offered and
+       what the relay answered — but it must not read as a publication that happened. -->
+  <section class="receipt" [class.is-rejected]="!receipt.accepted">
+    <p class="head">
+      <i class="head-icon" [esIcon]="receipt.accepted ? 'cloud_done' : 'cloud_off'"></i>
+      <span class="head-text">
+        {{ receipt.accepted ? 'An das Nostr-Relay gesendet' : 'Vom Nostr-Relay abgelehnt' }}
+      </span>
+    </p>
+
+    <!-- Wohin, als was, unter welchem Namen: die vier Angaben, mit denen der Eintrag beim Relay
+         wiederzufinden ist. -->
+    <dl class="facts">
+      <dt>Relay</dt>
+      <dd><code>{{ receipt.relayUrl }}</code></dd>
+
+      <dt>Event-Art</dt>
+      <dd>
+        <code>30142</code> — AMB, „Allgemeines Metadatenprofil für Bildungsressourcen“
+      </dd>
+
+      <dt>Kennung (<code>d</code>)</dt>
+      <dd>
+        <code class="wrap">{{ receipt.resource.id }}</code>
+        <span class="note">
+          Die Adresse der Ressource ist zugleich die Kennung des Eintrags: Ein späterer Eintrag zu
+          derselben Adresse ersetzt diesen, statt neben ihm zu stehen.
+        </span>
+      </dd>
+
+      <dt>Absender</dt>
+      <dd>
+        <code class="wrap">{{ receipt.npub }}</code>
+        <span class="note">
+          Der Schlüssel dieser Installation. Er wird beim ersten Senden erzeugt, bleibt in diesem
+          Browser und ist das Einzige, woran das Relay den Absender erkennt.
+        </span>
+      </dd>
+
+      <dt>Event-ID</dt>
+      <dd><code class="wrap">{{ receipt.event.id }}</code></dd>
+
+      <dt>Antwort des Relays</dt>
+      <dd>
+        <span class="verdict" [class.is-rejected]="!receipt.accepted">
+          {{ receipt.accepted ? 'OK, angenommen' : 'OK: false, abgelehnt' }}
+        </span>
+        @if (receipt.message) {
+          <code class="wrap">{{ receipt.message }}</code>
+        }
+      </dd>
+    </dl>
+
+    <!-- Was gesendet wurde: die Tags des Events selbst, nicht ihre Beschreibung. In AMB steckt der
+         ganze Datensatz in den Tags — der Text des Events wiederholt nur die Beschreibung. -->
+    <h3 class="sub">Diese Daten wurden gesendet</h3>
+    <p class="sub-note">
+      Ein AMB-Eintrag steht vollständig in den Tags des Events. Verschachtelte Felder tragen ihren
+      Pfad im Schlüssel (<code>about:id</code>), Sprachlabels ihre Sprache am Ende
+      (<code>about:prefLabel:de</code>), Schlagworte stehen als <code>t</code>.
+    </p>
+
+    <ul class="tags">
+      @for (line of tagLines(); track $index) {
+        <li class="tag">
+          <code class="tag-key">{{ line.key }}</code>
+          <span class="tag-value">{{ line.value }}</span>
+        </li>
+      }
+    </ul>
+
+    <details class="raw">
+      <summary>Das Event im Rohformat</summary>
+      <pre>{{ eventJson() }}</pre>
+      <button type="button" class="es-btn es-btn--text es-btn--small" (click)="copy(eventJson())">
+        {{ copied() === eventJson() ? 'Kopiert' : 'JSON kopieren' }}
+      </button>
+    </details>
+
+    <!-- Nachprüfen heißt hier: den Eintrag beim Relay selbst abholen. Jede Zeile ist so, wie sie
+         läuft — kopieren, einfügen, fertig. -->
+    <h3 class="sub">So lässt sich das nachprüfen</h3>
+    <ul class="lookups">
+      @for (lookup of lookups(); track lookup.label) {
+        <li class="lookup">
+          <p class="lookup-label">{{ lookup.label }}</p>
+          <div class="lookup-value">
+            <code class="wrap">{{ lookup.value }}</code>
+            <span class="lookup-actions">
+              @if (lookup.href; as href) {
+                <a class="lookup-open" [href]="href" target="_blank" rel="noopener noreferrer"
+                   title="Im Browser öffnen" aria-label="Im Browser öffnen">
+                  <i esIcon="open_in_new"></i>
+                </a>
+              }
+              <button type="button" class="lookup-copy" (click)="copy(lookup.value)"
+                      [attr.aria-label]="copied() === lookup.value ? 'Kopiert' : 'Kopieren'"
+                      [title]="copied() === lookup.value ? 'Kopiert' : 'Kopieren'">
+                <i [esIcon]="copied() === lookup.value ? 'check' : 'content_copy'"></i>
+              </button>
+            </span>
+          </div>
+          <p class="lookup-detail">{{ lookup.detail }}</p>
+        </li>
+      }
+    </ul>
+  </section>
+}

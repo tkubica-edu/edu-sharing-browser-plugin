@@ -4,7 +4,9 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { IconDirective } from '../../../directives/icon.directive';
 import { CurationService } from '../../../services/curation.service';
 import { EditorialGroupsService } from '../../../services/editorial-groups.service';
+import { NostrForwardService } from '../../../services/nostr-forward.service';
 import { DetailsLinkComponent } from '../../../shared/components/details-link/details-link.component';
+import { NostrReceiptComponent } from '../../../shared/components/nostr-receipt/nostr-receipt.component';
 import { createdAtOf } from '../../../util/curation-node';
 
 /** One line of an exchange: what happened, when it is known, and whether it is still outstanding. */
@@ -38,13 +40,16 @@ interface EditorialExchange {
 // exchange under them is an example of what will be shown there (marked as such in the template).
 @Component({
   selector: 'es-interactions-screen',
-  imports: [DatePipe, DetailsLinkComponent, IconDirective],
+  imports: [DatePipe, DetailsLinkComponent, IconDirective, NostrReceiptComponent],
   templateUrl: './interactions-screen.component.html',
   styleUrl: './interactions-screen.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class InteractionsScreenComponent {
   protected readonly curation = inject(CurationService);
+  // The other place this content was offered to, where the forwarding step published it there: a relay
+  // hands back a receipt rather than an exchange, so it is shown as itself under the teams' cards.
+  protected readonly nostr = inject(NostrForwardService);
   private readonly groups = inject(EditorialGroupsService);
 
   constructor() {

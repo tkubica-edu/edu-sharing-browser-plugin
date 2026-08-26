@@ -19,6 +19,7 @@ import { DebugService } from './services/debug.service';
 import { DevModeService } from './services/dev-mode.service';
 import { HistoryEntry, HistoryService } from './services/history.service';
 import { NavigationService } from './services/navigation.service';
+import { NostrForwardService } from './services/nostr-forward.service';
 import { OnlyOfficeDocumentService } from './services/onlyoffice-document.service';
 import { OptionIconService } from './services/option-icon.service';
 import { PageRecognitionService } from './services/page-recognition.service';
@@ -113,6 +114,7 @@ export class AppComponent implements OnInit {
   private readonly qualityJudge = inject(QualityJudgeService);
   private readonly chatStyle = inject(ChatStyleService);
   private readonly chatSkill = inject(ChatSkillService);
+  private readonly nostr = inject(NostrForwardService);
   private readonly sessionResume = inject(SessionResumeService);
   // Read by the topbar's theme button, and injected here in any case so it is constructed with the app:
   // it hands the panel's theme to the embedded bundles through the media query they read, which has to be
@@ -199,6 +201,9 @@ export class AppComponent implements OnInit {
     // Before the assistant screen can mount its chat element, which reads both switches as it creates it.
     await this.chatStyle.load();
     await this.chatSkill.load();
+    // Before the forwarding step can offer the relay — which relay it publishes to is a setting, and the
+    // step reads it as it renders.
+    await this.nostr.load();
     await this.auth.init();
     await this.history.load();
     const tab = await this.browserExtension.getActiveTab().catch(() => null);

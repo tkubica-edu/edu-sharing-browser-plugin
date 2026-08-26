@@ -1,0 +1,194 @@
+// The receipt of one publication to a nostr relay: a card that is read rather than acted on, so it is
+// set quieter than the choices around it and its values are set in the monospace they are — a key, an
+// address and a command are all things that get copied out of here.
+@use 'mixins' as m;
+
+:host { display: block; }
+
+.receipt {
+  @include m.card;
+
+  border-color: var(--es-blue);
+  background: var(--es-hint-bg);
+
+  // A refusal is still a receipt, but it must not read as a publication that happened.
+  &.is-rejected { border-color: var(--es-danger); }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--es-space-2);
+  margin: 0 0 var(--es-space-3);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.head-icon { font-size: 20px; line-height: 1; color: var(--es-blue); }
+
+.is-rejected .head-icon { color: var(--es-danger); }
+
+// Label above value rather than beside it: the values are long (an address, a 64-character id) and a
+// two-column grid would either wrap them to shreds or push the panel wide.
+.facts {
+  margin: 0 0 var(--es-space-4);
+
+  dt {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--es-muted);
+    margin-top: var(--es-space-2);
+  }
+
+  dd { margin: 2px 0 0; font-size: 13px; }
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+// Every identifier here is one long unbroken token, so it is allowed to break anywhere — the
+// alternative is a card the panel cannot hold.
+.wrap {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+// The fine print under a value, which says what the value means for the reader.
+.note {
+  display: block;
+  margin-top: 2px;
+  color: var(--es-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.verdict {
+  @include m.badge;
+  @include m.badge-user;
+
+  margin-right: var(--es-space-2);
+
+  &.is-rejected { background: var(--es-alert-surface); color: var(--es-danger); }
+}
+
+.sub {
+  margin: var(--es-space-4) 0 var(--es-space-1);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sub-note {
+  @include m.muted;
+
+  margin: 0 0 var(--es-space-2);
+  line-height: 1.5;
+}
+
+// The tags as the event carries them. A hairline between the rows and nothing else: this is a listing
+// to be read down, and boxes around 40 rows would drown it.
+.tags {
+  @include m.list-reset;
+
+  border-top: 1px solid var(--es-border);
+}
+
+.tag {
+  display: flex;
+  gap: var(--es-space-2);
+  padding: 5px 0;
+  border-bottom: 1px solid var(--es-border);
+}
+
+// Fixed share for the key, so the values line up and the listing can be scanned by field.
+.tag-key {
+  flex: 0 0 38%;
+  color: var(--es-blue);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.tag-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+// The whole event, folded away: it repeats what the listing above already says, and is here for
+// copying rather than for reading.
+.raw {
+  margin-top: var(--es-space-3);
+
+  summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--es-blue); }
+
+  pre {
+    margin: var(--es-space-2) 0;
+    padding: var(--es-space-2);
+    max-height: 260px;
+    overflow: auto;
+    background: var(--es-surface);
+    border: 1px solid var(--es-border);
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+}
+
+.lookups {
+  @include m.list-reset;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--es-space-3);
+}
+
+.lookup-label { margin: 0 0 2px; font-size: 12px; font-weight: 600; }
+
+// The command and the buttons that take it away: the command may wrap freely, the buttons keep their
+// size at the end of the row.
+.lookup-value {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--es-space-1);
+  padding: var(--es-space-2);
+  background: var(--es-surface);
+  border: 1px solid var(--es-border);
+  border-radius: 6px;
+
+  code { flex: 1 1 auto; min-width: 0; }
+}
+
+.lookup-actions { display: flex; flex: 0 0 auto; gap: 2px; }
+
+.lookup-copy,
+.lookup-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--es-blue);
+  cursor: pointer;
+  text-decoration: none;
+
+  &:hover { background: var(--es-blue-tint); }
+
+  i { font-size: 16px; line-height: 1; }
+}
+
+.lookup-detail {
+  @include m.muted;
+
+  margin: 4px 0 0;
+  line-height: 1.45;
+}

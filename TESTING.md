@@ -270,7 +270,15 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    switched off (*Plugins im Hintergrund*) the screen must report the timeout instead of hanging.
 6. **Vorschau → Sammlungen**: from the preview, *Sammlung zuordnen* → pick a collection and confirm
    with *In Sammlung einfügen*; the screen lists what was added.
-7. **Verlauf**: every *saved* node is listed (nothing is recorded until you save); entries expand to
+7. **An Nostr Relay weiterleiten**: in the forwarding step, tick the relay row → the footer reads *An
+   Relay senden*. Press it → the step stays open and the receipt appears: relay, `npub`, event id, the
+   tags that went out, and the lookup commands. Verify against the relay itself with the receipt's own
+   `nak fetch <naddr…>` (or paste its `REQ` frame into `websocat`) — the record that comes back must
+   carry the same `d`, `name` and `t` tags. Pressing *Weiter* again must lead on **without** publishing
+   a second event. Point the relay in *Einstellungen* at something unreachable to see the refusal
+   reported in the step instead of the flow moving on. This needs a real browser: WebSockets are what
+   the unit tests stub.
+8. **Verlauf**: every *saved* node is listed (nothing is recorded until you save); entries expand to
    show their fields and offer *In Vorschau öffnen*, which reloads the node from the repository;
    *Leeren* clears the list.
 

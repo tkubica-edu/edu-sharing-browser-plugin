@@ -68,7 +68,10 @@ Which editor renders that screen, and which route the save takes, is
   timeline. The forwardings a save carried out are kept in the *Verlauf* entry, so a content taken up
   again names its teams too instead of reading as one that was never forwarded — the picks of the
   forwarding step and the recorded ones are shown as one list, each team once. Offered only where the browser extension custom web component is enabled, exactly as *An
-  Redaktionen weiterleiten* is — without that step no content is proposed to a Redaktion. Marked
+  Redaktionen weiterleiten* is — without that step no content is proposed to a Redaktion. Where the
+  content was published to a nostr relay as well, the receipt of that publication stands under the
+  cards as itself: not an exchange but what went out and how to fetch it back, see
+  [An Nostr Relay weiterleiten](#an-nostr-relay-weiterleiten). Marked
   **Entwurf**: the repository hands out no communication history yet, so the cards name the real
   forwardings while the steps under them are an example ending in „Noch keine Entscheidung
   erhalten". The teams' logos come from the groups the forwarding step loaded
@@ -127,6 +130,50 @@ write does not file it twice.
 A collection the topic assistant proposed for the content is taken over here as well — the group it
 sits in is ticked and the collection is picked inside it, until the user picks another
 (`EditorialGroupsService.recommendCollection`, `CollectionRecommendationService`).
+
+### An Nostr Relay weiterleiten
+
+One more row under the editorial groups, and one more target of the same step: ticking it publishes
+the content's metadata to a **nostr relay** as an AMB record — the *Allgemeines Metadatenprofil für
+Bildungsressourcen* (<https://w3id.org/kim/amb/latest/>), which the edufeed network carries as nostr
+events of **kind 30142**. Unlike a forwarding to a Redaktion this is a publication into an open
+network: the row says so before it is acted on, and the footer's way on is labelled *An Relay senden*
+rather than *Weiter* while it would publish.
+
+The mapping lives in `util/amb-event.ts` and follows the reference converter
+(`edufeed-org/amb-nostr-converter`): the record's `id` — and with it the event's `d` tag — is the
+address the resource lives at (`ccm:wwwurl`, else the page the Erschließung ran on), which is what
+makes a later publication of the same content replace the record rather than add a second one. A
+scalar field is one tag of its own name (`name`, `description`, `inLanguage`, `image`,
+`datePublished`), a nested one is flattened into colon-delimited keys (`about:id`,
+`learningResourceType:prefLabel:de`, `creator:name`), keywords go as the nostr-native `t` tags, and
+the node the record was read off travels as `mainEntityOfPage:*` plus a plain `r` tag. The WLO
+vocabulary properties (`ccm:taxonid`, `ccm:educationalcontext`, `ccm:oeh_lrt` /`oeh:new_lrt`,
+`ccm:educationalintendedenduserrole`) already hold URIs and are written as term ids; a value that is
+no URI is written as a German `prefLabel` instead. `ccm:commonlicense_key` plus
+`ccm:commonlicense_cc_version` become the licence's own address (`CC_BY_SA` + `4.0` →
+`https://creativecommons.org/licenses/by-sa/4.0/`); a key that cannot be named as one is left off
+rather than stated wrongly. The relay itself requires only `d` and `name`, so every other field is
+written only where the content states it.
+
+`NostrForwardService` signs the event and publishes it over one WebSocket per publication
+(`util/nostr-relay.ts`: `["EVENT", …]`, awaiting the relay's `["OK", <id>, <accepted>, <reason>]`).
+Nostr identifies a publisher by a key pair and by nothing else, so the panel holds one of its own: 64
+hex characters generated on the first publication and kept under `eduSharingNostrSecretKey`, never
+leaving the browser. Its public half is shown in *Einstellungen* as the `npub…` a relay knows this
+installation by. Which relay is published to is a setting too (`eduSharingNostrRelayUrl`, falling
+back to `APP_CONFIG.nostrRelayUrl`, `wss://amb-relay.edufeed.org`); an address that is not a
+WebSocket one is refused before anything is sent, since nostr has no other transport.
+
+A publication happens once per content however often the step is walked through, and the step is
+**kept open** after it so the receipt can be read: `es-nostr-receipt` names the relay, the kind, the
+`d` tag, the `npub`, the event id and the relay's own verdict, lists **every tag that went out** and
+the raw event JSON beside them, and gives the commands that fetch the record back — `nak fetch
+<nevent…>` for this event, `nak fetch <naddr…>` for the record's standing address, `nak req -k 30142
+-a <pubkey> <relay>` for everything this installation published, the raw `REQ` frame for a plain
+WebSocket, and the `njump.me` page for a browser. The same receipt is shown under the *Interaktionen*
+view, so what was published stays findable after the step is left. A refusal is kept as a receipt as
+well — it says what was offered and what the relay answered — and holds the step open.
 
 ### Sammlung auswählen
 
@@ -239,13 +286,15 @@ navigating to it, and closes it again where it stands; the step keeps running be
   view). All of them optional — an entry written before one of them was kept says nothing about it,
   which is not the same as saying no.
 - **Einstellungen** *(dotted while a change waits to be applied)* — the Repository-URL (used for
-  login and every embedded element) at the top, then **Darstellung**, and below those four folded
+  login and every embedded element) at the top, then **Darstellung**, and below those five folded
   groups, one open at a time:
   *Entwickler-Optionen* (the dev and the debug mode, see [TESTING.md](TESTING.md)), *KI- und
   Chatbot-Optionen* (the corrections to the chat widget's display, the chatbot's master skill as
   *Vorgabe des Betreibers* / *An* / *Aus* — see
   [CHATBOT.md](CHATBOT.md#the-attributes-set-on-mount)),
-  *Zugehörige Sammlungen empfehlen* and *Qualitätsprüfung*. Everything but the Entwickler-Optionen
+  *Zugehörige Sammlungen empfehlen*, *Qualitätsprüfung* and *Nostr-Relay* (the relay
+  [An Nostr Relay weiterleiten](#an-nostr-relay-weiterleiten) publishes to, plus the `npub` this
+  installation publishes under). Everything but the Entwickler-Optionen
   belongs to the WLO panel and is shown only there (`browserExtensionCustomWebComponent`). Each group's
   head carries a pill counting the settings inside it that stand away from their default (`… geändert`),
   so a folded group says whether anything in it was touched; a group holding nothing but defaults carries

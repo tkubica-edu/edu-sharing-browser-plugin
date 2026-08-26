@@ -134,3 +134,30 @@
 
   .head, .folder { cursor: not-allowed; }
 }
+
+// The relay's card, a card of the same shape as the teams' but standing apart from their list: the
+// decision is the same one — where this content is offered — while the target is not a team of this
+// repository but the open nostr network.
+.groups.nostr {
+  margin-top: var(--es-space-4);
+
+  .logo-glyph { font-size: 24px; }
+}
+
+// Which relay it goes to, in the row the teams state their collection in. Set in monospace, since it
+// is an address the reader may want to compare against what the settings hold.
+.nostr-target {
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    overflow-wrap: anywhere;
+  }
+}
+
+// What ticking the relay means, said before it is acted on rather than after: a publication into a
+// network that redistributes cannot be taken back, which is the one way this target differs from
+// every other one on this screen.
+.nostr-hint {
+  margin: var(--es-space-2) 0;
+  line-height: 1.5;
+}

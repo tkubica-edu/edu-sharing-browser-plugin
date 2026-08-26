@@ -63,12 +63,20 @@
         </li>
       }
     </ul>
-  } @else {
+  } @else if (!nostr.receipt()) {
     <!-- Nothing was forwarded, or the forwarding was made in a session this panel does not carry:
          either way there is no exchange, and the step that starts one is named. -->
     <p class="es-muted">
       Für diesen Inhalt sind keine Redaktionen hinterlegt. Über „An Redaktionen weiterleiten“ kann er
       einer oder mehreren Redaktionen vorgeschlagen werden.
     </p>
+  }
+
+  <!-- Das Relay, sofern dorthin veröffentlicht wurde: kein Verlauf, sondern eine Quittung — was
+       gesendet wurde und wie es sich dort nachprüfen lässt. Anders als bei den Redaktionen ist das
+       keine Vorlage, sondern das tatsächlich gesendete Event. -->
+  @if (nostr.receipt()) {
+    <h3 class="nostr-head">Nostr-Relay</h3>
+    <es-nostr-receipt></es-nostr-receipt>
   }
 </div>

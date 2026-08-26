@@ -5,16 +5,19 @@ import { Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ActionBarService, FooterAction } from './action-bar.service';
 import { CurationService } from './curation.service';
 import { NavigationService } from './navigation.service';
+import { NostrForwardService } from './nostr-forward.service';
 import { PageRecognitionService } from './page-recognition.service';
 import { provideFake } from '../../testing/provide-fake';
 import {
   CurationFake,
   NavigationFake,
+  NostrForwardFake,
   PageRecognitionFake,
   aTab,
   anActiveNode,
   fakeCuration,
   fakeNavigation,
+  fakeNostrForward,
   fakePageRecognition,
 } from '../../testing/fakes';
 
@@ -26,6 +29,7 @@ describe('ActionBarService', () => {
   let curation: CurationFake;
   let navigation: NavigationFake;
   let recognition: PageRecognitionFake;
+  let nostr: NostrForwardFake;
   /** Stands in for `window.confirm`; answers yes unless a test says otherwise. */
   let asked: Mock<(message?: string) => boolean>;
 
@@ -33,6 +37,7 @@ describe('ActionBarService', () => {
     curation = fakeCuration();
     navigation = fakeNavigation();
     recognition = fakePageRecognition();
+    nostr = fakeNostrForward();
     asked = vi.fn(() => true);
     // Through the global rather than through a provider: the service asks the browser directly, and
     // `no-network.setup.ts` puts every stubbed global back after the test.
@@ -42,6 +47,7 @@ describe('ActionBarService', () => {
         provideFake(CurationService, curation.fake),
         provideFake(NavigationService, navigation.fake),
         provideFake(PageRecognitionService, recognition.fake),
+        provideFake(NostrForwardService, nostr.fake),
       ],
     });
     bar = TestBed.inject(ActionBarService);
@@ -414,6 +420,51 @@ describe('ActionBarService', () => {
       await onwards().run();
 
       expect(navigation.fake.go).toHaveBeenCalledWith('flow-choice');
+    });
+
+    describe('and the nostr relay ticked with them', () => {
+      it('names the publication it is about to make, rather than reading as a plain step forward', () => {
+        nostr.select();
+
+        expect(onwards().label).toBe('An Relay senden');
+      });
+
+      it('publishes and stays on the step, so the receipt of what went out can be read', async () => {
+        navigation.offer('personal-storage');
+        nostr.select();
+
+        await onwards().run();
+
+        expect(curation.fake.forwardToNostr).toHaveBeenCalled();
+        expect(navigation.fake.go).not.toHaveBeenCalled();
+      });
+
+      it('leads on once the content is published, without publishing it a second time', async () => {
+        navigation.offer('personal-storage');
+        nostr.published();
+
+        expect(onwards().label).toBe('Weiter');
+        await onwards().run();
+
+        expect(navigation.fake.go).toHaveBeenCalledWith('personal-storage');
+      });
+
+      it('keeps the step where the publication did not get through', async () => {
+        navigation.offer('personal-storage');
+        nostr.select();
+        curation.fake.forwardToNostr.mockResolvedValue(false);
+
+        await onwards().run();
+
+        expect(navigation.fake.go).not.toHaveBeenCalled();
+      });
+
+      it('says the publication is under way, and refuses a second one meanwhile', () => {
+        nostr.select();
+        nostr.fake.sending.set(true);
+
+        expect(onwards()).toMatchObject({ label: 'Senden…', disabled: true });
+      });
     });
   });
 

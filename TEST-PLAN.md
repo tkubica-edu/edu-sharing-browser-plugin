@@ -15,17 +15,17 @@ exist, this one names the ones that do not yet. It shrinks as it is worked off.
 
 ## Where the coverage stands
 
-Nineteen specs with 384 `it()` blocks cover seventeen of the panel's 35 services, one of its util
-modules and the contracts with the extension around it. `npm run test:coverage` reports 34.2 % of
-statements and 31.5 % of functions over its `coverageInclude` (`src/app/services/**` and
+Twenty-one specs with 420 `it()` blocks cover eighteen of the panel's 36 services, two of its util
+modules and the contracts with the extension around it. `npm run test:coverage` reports 38.8 % of
+statements and 34.2 % of functions over its `coverageInclude` (`src/app/services/**` and
 `src/app/util/**`). Everything outside that scope — components, `model/`, the pipe, the build harness
 — has no automated test of any kind and is not even measured, and the extension's plain-JS parts are
 pinned only at their boundary with the panel, never run.
 
 | Area | Files | Covered | Kind of test it needs |
 | --- | --- | --- | --- |
-| `app-src/src/app/services/` | 35 | 17 services, 358 tests | Service spec (TestBed + fakes) |
-| `app-src/src/app/util/` | 24 | `bundle-theme.ts`, 9 tests | Pure-function spec |
+| `app-src/src/app/services/` | 36 | 18 services, 377 tests | Service spec (TestBed + fakes) |
+| `app-src/src/app/util/` | 26 | `bundle-theme.ts`, `amb-event.ts`, 26 tests | Pure-function spec |
 | `app-src/src/app/model/` | 4 | none | Pure-function spec (`navigation.ts` only; the rest is types) |
 | `app-src/src/app/features/`, `template/`, `shared/`, `pipes/` | 46 | none | Component spec, and one pure-function spec for the pipe |
 | `background/`, `content/` | 3 | the shared literals, 17 assertions | Boundary contract spec |

@@ -70,6 +70,16 @@ export const APP_CONFIG = {
    */
   contentJudgeCrawlerMethod: 'simple' as 'simple' | 'browser',
   /**
+   * The nostr relay AMB records are published to — the address of a relay that serves kind 30142, the
+   * kind the "Allgemeines Metadatenprofil für Bildungsressourcen" is published under (see
+   * NostrForwardService and `util/amb-event.ts`). A WebSocket address, since that is the only transport
+   * nostr has; the default is the edufeed network's own AMB relay.
+   *
+   * Only the fallback for what the settings hold — which relay a deployment publishes to belongs to
+   * whoever runs the extension.
+   */
+  nostrRelayUrl: 'wss://amb-relay.edufeed.org',
+  /**
    * Which ContentJudge scheme judges which quality criterion and how its answer is read, keyed by the criterion's id as
    * the metadata set states it; `null` marks a criterion no scheme is asked for, which is then reported as unjudged.
    * It decides both halves of the exchange, like the MetalookUp rules below: what the request asks for, and what is
@@ -194,6 +204,17 @@ export const APP_CONFIG = {
     chatStyleOverrides: 'eduSharingChatStyleOverrides',
     /** What the panel says about the chat's master skill — see ChatSkillService. */
     chatMasterSkill: 'eduSharingChatMasterSkill',
+    /**
+     * The relay the "An Nostr Relay weiterleiten" step publishes to, where the settings name one of
+     * their own; empty leaves `APP_CONFIG.nostrRelayUrl` standing (see NostrForwardService).
+     */
+    nostrRelayUrl: 'eduSharingNostrRelayUrl',
+    /**
+     * The secret key those events are signed with, as 64 hex characters. Nostr identifies a publisher by
+     * their key and by nothing else, so this key *is* the panel's identity on the relay — it is generated
+     * once on the first publication and then kept, and it never leaves this browser.
+     */
+    nostrSecretKey: 'eduSharingNostrSecretKey',
     /**
      * The panel's colours: `system`, `light` or `dark` — see ThemeService. Also read by the content script
      * that docks the panel, which paints the container the panel's iframe loads into and would otherwise
