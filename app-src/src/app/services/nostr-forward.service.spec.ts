@@ -102,6 +102,13 @@ function aStoredRecord(overrides: { pubkey?: string; identifier?: string; create
   };
 }
 
+/**
+ * The relay every test in here points at. Deliberately not the address the panel ships with: a spec that
+ * names a live host is misleading in its own output, whatever the socket underneath it is — and the
+ * `.test` TLD is reserved for exactly this (RFC 2606), so it can never resolve to anything.
+ */
+const TEST_RELAY = 'wss://relay.test';
+
 /** A content that carries what AMB requires and a little more. */
 function aSource(overrides: Partial<AmbSource> = {}): AmbSource {
   return {
@@ -130,30 +137,35 @@ describe('NostrForwardService', () => {
     });
     nostr = TestBed.inject(NostrForwardService);
     await nostr.load();
+    // Every test that sends or looks up does so against the fake address; the two that are about the
+    // configured default put the setting back themselves.
+    await nostr.setRelayUrl(TEST_RELAY);
   });
 
   describe('which relay it publishes to', () => {
-    it('is the one the panel ships with while the settings name none', () => {
+    it('is the one the panel ships with while the settings name none', async () => {
+      await nostr.setRelayUrl('');
+
       expect(nostr.relayUrl()).toBe(APP_CONFIG.nostrRelayUrl);
       expect(nostr.relayUsable()).toBe(true);
     });
 
     it('is the one the settings name, and it is remembered', async () => {
-      await nostr.setRelayUrl('  wss://relay.example  ');
+      await nostr.setRelayUrl('  wss://another.test  ');
 
-      expect(nostr.relayUrl()).toBe('wss://relay.example');
-      expect(extension.storage.get(APP_CONFIG.storageKeys.nostrRelayUrl)).toBe('wss://relay.example');
+      expect(nostr.relayUrl()).toBe('wss://another.test');
+      expect(extension.storage.get(APP_CONFIG.storageKeys.nostrRelayUrl)).toBe('wss://another.test');
     });
 
     it('falls back to the panel`s own relay once the setting is emptied again', async () => {
-      await nostr.setRelayUrl('wss://relay.example');
+      await nostr.setRelayUrl('wss://another.test');
       await nostr.setRelayUrl('');
 
       expect(nostr.relayUrl()).toBe(APP_CONFIG.nostrRelayUrl);
     });
 
     it('reports an address that cannot be a relay`s, since nostr speaks WebSocket alone', async () => {
-      await nostr.setRelayUrl('https://relay.example');
+      await nostr.setRelayUrl('https://relay.test');
 
       expect(nostr.relayUsable()).toBe(false);
     });
@@ -171,12 +183,12 @@ describe('NostrForwardService', () => {
 
     it('sends a signed AMB event to the configured relay and closes the socket after it', async () => {
       const relay = fakeRelay();
-      await nostr.setRelayUrl('wss://relay.example');
+      await nostr.setRelayUrl('wss://another.test');
       nostr.select(true);
 
       await expect(nostr.forward(aSource())).resolves.toBe(true);
 
-      expect(relay.url()).toBe('wss://relay.example');
+      expect(relay.url()).toBe('wss://another.test');
       const [verb, event] = relay.sent[0] as [string, Record<string, unknown>];
       expect(verb).toBe('EVENT');
       expect(event['kind']).toBe(30142);
@@ -225,7 +237,7 @@ describe('NostrForwardService', () => {
 
     it('sends nothing to an address that cannot be a relay`s', async () => {
       const relay = fakeRelay();
-      await nostr.setRelayUrl('https://relay.example');
+      await nostr.setRelayUrl('https://relay.test');
       nostr.select(true);
 
       await expect(nostr.forward(aSource())).resolves.toBe(false);

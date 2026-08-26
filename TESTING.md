@@ -34,13 +34,18 @@ without running it.
 
 **No test reaches a real service.** Three things stand in the way, in `app-src/src/testing/`:
 
-- `no-network.setup.ts` replaces `fetch` per test with a function that *records* the address and then
-  throws, and fails the test in `afterEach` if anything was recorded. The recording is the load-bearing
-  half — `fetchJson` in `util/json-api.ts` turns any `fetch` rejection into its own
-  „&lt;service&gt; nicht erreichbar", which a test could otherwise assert on and pass. The same hook calls
-  `HttpTestingController.verify()`, so an unanswered `HttpClient` request is named rather than left to
-  time out. A spec that exercises a `fetch` of its own (`metalookup.service.spec.ts`) stubs the global
-  again in its own `beforeEach`, which runs later and wins.
+- `no-network.setup.ts` replaces `fetch` **and `WebSocket`** per test with stand-ins that *record* the
+  address and then throw, and fails the test in `afterEach` if anything was recorded. The recording is
+  the load-bearing half: `fetchJson` in `util/json-api.ts` turns any `fetch` rejection into its own
+  „&lt;service&gt; nicht erreichbar", and `publishToRelay` in `util/nostr-relay.ts` catches the
+  constructor's throw and rejects with a message of its own — either of which a test could otherwise
+  assert on and pass while having reached for the network. jsdom's `WebSocket` dials for real, and the
+  relay address the panel ships with is a live one, so this is the guard that keeps a unit test off
+  `wss://amb-relay.edufeed.org`. The same hook calls `HttpTestingController.verify()`, so an unanswered
+  `HttpClient` request is named rather than left to time out. A spec that exercises one of these
+  (`metalookup.service.spec.ts` for `fetch`, `fakeRelay()` in `nostr-forward.service.spec.ts` for the
+  socket) stubs the global again itself, which runs later and wins — and points at `wss://relay.test`,
+  a name reserved by RFC 2606 and therefore unresolvable, rather than at any real relay.
 - `test-providers.ts` is the builder's `providersFile` and supplies `provideHttpClient()` plus
   `provideHttpClientTesting()` for every `TestBed`, so anything going through `ngx-edu-sharing-api`
   answers from the testing backend. `ApiConfiguration` is deliberately **not** provided: constructing a
