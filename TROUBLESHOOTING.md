@@ -94,6 +94,26 @@ What is known not to work, known to be unverified, or known to look wrong at fir
   `BrowserExtensionService.pdfTextOfTab` asks for the content type where the address does not say and
   the page read as empty. The answer is remembered per address for the panel's lifetime. A server that
   refuses `HEAD` is taken at its silence — such a document goes unread.
+- **The chat's local engine needs WebGPU, and the setting says so.** `LocalLlmService.supported()` is a
+  `navigator.gpu` probe; without it the checkbox is disabled and the panel registers no seam. There is
+  no CPU fallback on purpose — WASM inference answers a sentence in minutes, which is not a chat.
+- **The first conversation on the device waits for a download of 1.5–2 GB.** The weights come from
+  WebLLM's CDN once and live in Cache storage afterwards. Every later start still uploads them to the
+  GPU, and the panel is torn down on every page change — so that upload is paid per page change.
+- **The local model and the 3D conversion share one GPU.** Qwen2.5-3B claims about 2.9 GB and the depth
+  model of `DepthModelService` wants its own; on an integrated GPU whichever loads second can fail.
+- **The local engine has one tool.** It reads the open page (`get_url_text`) and nothing else: no WLO
+  search, no collection instruction. A KI check on the device therefore judges against the criteria of
+  the metadata set alone, while its tasks ask by name for tools that are not there yet.
+- **A model that answers nothing usable, in two shapes seen so far.** Both are fixed and both are worth
+  recognising again: a *second* system message fails the whole turn
+  (`SystemMessageOrderError` — a runtime takes exactly one, at position 0), and a schema without a
+  readable field leaves the person a placeholder instead of an answer (see
+  [CHATBOT-IO.md § The structured formats](CHATBOT-IO.md#the-structured-formats)).
+- **A chat that answers over the network although the setting says „on this device"** was refused at the
+  seam. `[edu-sharing][boerdi] → setHostSeam, and the widget answers {…}` names the reason: no `local`
+  in `engines` means the widget turned the model down, and a missing `setHostSeam` means the packaged
+  bundle predates the seam (`scripts/boerdi/boerdi-widget.js` older than 2026-08-26).
 - **The repository URL cannot be changed at runtime** without reloading the sidebar — the library
   freezes `rootUrl` at bootstrap and does not export its config classes.
 - **The agent may only edit its own node for two hours.** Along the guest route the repository

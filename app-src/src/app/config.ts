@@ -193,7 +193,9 @@ export const APP_CONFIG = {
     /** Whether the chat widget is corrected by our own stylesheet — see ChatStyleService. */
     chatStyleOverrides: 'eduSharingChatStyleOverrides',
     /** What the panel says about the chat's master skill — see ChatSkillService. */
-    chatMasterSkill: 'eduSharingChatMasterSkill'
+    chatMasterSkill: 'eduSharingChatMasterSkill',
+    /** Whether the panel offers the chat its own model on this device — see HostSeamService. */
+    localEngine: 'eduSharingLocalEngine'
   },
   maxHistory: 200
 };

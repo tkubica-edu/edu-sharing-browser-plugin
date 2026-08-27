@@ -388,16 +388,21 @@ not take shows `← agent-result` never arriving at all; a run cut off by a cap 
 
 The bundle packaged here since **2026-08-26** carries a second engine: `engine="local"`, answered by a
 model in this document instead of by the chat backend. It brings no model with it. Both the model and
-the tools come from **the host** — this panel — through a seam the widget asks for, and until the panel
-provides one the widget stays on its HTTP path. So today this section describes a capability, not a
-feature: what is wired up is the one field the check needs (`initiated_by`, below), and nothing else.
+the tools come from **the host** — this panel — through a seam the widget asks for, and without one the
+widget stays on its HTTP path.
+
+**The panel provides one, experimentally**, behind a setting that is off by default (`HostSeamService`,
+the checkbox *Chat auf diesem Gerät beantworten (experimentell)* in the KI section). Switched on,
+`AiAssistantScreenComponent.mount()` sets `engine="local"` and hands the seam over; switched off,
+nothing is registered and the attribute is not set either — the two belong together, since the
+attribute without a seam is a chat that answers nothing.
 
 Why the model is the host's business: a WebLLM runtime is some 12 MB plus a module worker, the same
 bundle is also served from the chatbot backend, and under `script-src 'self'` an extension page loads
 none of it after the fact. Whoever has the runtime has it in their own package. The same holds for the
 tools — they need the repository session, which this panel has and the widget does not.
 
-### What providing one would look like
+### How it is provided
 
 ```ts
 element.setHostSeam({
@@ -408,7 +413,28 @@ element.setHostSeam({
 element.hostCapabilities();   // → { protocol, engines[], hostLlm, hostTools }
 ```
 
-Both are methods on the upgraded element and belong in `mount()` right after `appendChild`.
+Both are methods on the upgraded element, called in `mount()` right after `appendChild` — and the
+panel additionally answers the widget's own `boerdi:host-seam` request, which it installs *before*
+`appendChild` because the widget asks as it connects. `util/host-seam.ts` mirrors the contract,
+`HostSeamService` fills it in: `LocalLlmService` is the model (WebLLM in a packaged module worker, see
+[BUILD.md](BUILD.md)), and the tools are the panel's own.
+
+**The catalogue is one tool today.** `get_url_text` reads the open page — something the panel does for
+every extraction anyway, so it carries no open question. The repository tools (`get_skill_registry`,
+`get_skill`, `lookup_wlo_vocabulary`) are missing, and they are what the KI check's tasks ask for by
+name: how a skill node is found per collection is answered in the other project's plan (§ A1) but not
+yet measured against a live repository. Until it is, a local check judges against the criteria of the
+metadata set alone.
+
+### Reading the trace
+
+`[edu-sharing][boerdi] → setHostSeam, and the widget answers {…}` says whether the switch took: `local`
+among `engines` means the widget accepted the model. Without it the seam was refused — a protocol
+mismatch, or a model that failed the shape check — and the chat stays on the backend, which is warned
+about rather than left to be guessed. `[edu-sharing][seam] → ready` / `← ready after …ms` /
+`✗ ready failed: …` is the model's loading, `→ complete` / `← complete` one turn, and
+`← get_url_text(…)` one tool call. What went wrong reaches the conversation as well, in words: a model
+that cannot be loaded says so in its own bubble rather than answering "incomplete".
 `hostCapabilities().engines` names `local` only where a usable model is registered, which is how a
 panel tells "this bundle is too old" from "my seam did not take". A host that does not own the element
 answers the `boerdi:host-seam` event instead, **synchronously inside the listener**.
@@ -430,11 +456,11 @@ behaviour, and the panel says so once in the trace.
 
 ### What is not in the panel
 
-There is no local chat of the panel's own. An earlier attempt built one — a component beside the
-widget with its own WebLLM runtime, prompt assembly and transcript — and it was dropped when the
-engine moved into the widget: two chat implementations in one panel is one too many, and the widget's
-one has the tool loop, the schema turns and the whole turn lifecycle already. What the panel will
-provide instead is the seam above.
+There is no local chat of the panel's own. An earlier attempt built one — a component beside the widget
+with its own prompt assembly and transcript — and it was dropped when the engine moved into the widget:
+two chat implementations in one panel is one too many, and the widget's has the tool loop, the schema
+turns and the whole turn lifecycle already. Of that attempt only the runtime survives,
+`LocalLlmService`, which is what the seam hands over.
 
 ## Correcting the widget from outside it
 

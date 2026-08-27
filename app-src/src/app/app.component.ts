@@ -12,6 +12,7 @@ import { ContentFlowService } from './services/content-flow.service';
 import { BusyService } from './services/busy.service';
 import { ChatSkillService } from './services/chat-skill.service';
 import { ChatStyleService } from './services/chat-style.service';
+import { HostSeamService } from './services/host-seam.service';
 import { CollectionRecommendationService } from './services/collection-recommendation.service';
 import { ConditionsService } from './services/conditions.service';
 import { CurationService } from './services/curation.service';
@@ -111,6 +112,7 @@ export class AppComponent implements OnInit {
   private readonly recommendations = inject(CollectionRecommendationService);
   private readonly qualityJudge = inject(QualityJudgeService);
   private readonly chatStyle = inject(ChatStyleService);
+  private readonly hostSeam = inject(HostSeamService);
   private readonly chatSkill = inject(ChatSkillService);
   private readonly sessionResume = inject(SessionResumeService);
 
@@ -185,6 +187,9 @@ export class AppComponent implements OnInit {
     // Before the assistant screen can mount its chat element, which reads both switches as it creates it.
     await this.chatStyle.load();
     await this.chatSkill.load();
+    // Before the assistant screen can mount its chat element: the seam is read as the element is
+    // created, and a switch that arrives afterwards would reach the next conversation, not this one.
+    await this.hostSeam.load();
     await this.auth.init();
     await this.history.load();
     const tab = await this.browserExtension.getActiveTab().catch(() => null);

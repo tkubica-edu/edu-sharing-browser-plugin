@@ -7,6 +7,7 @@ import { AuthService } from '../../../services/auth.service';
 import { BrowserExtensionCustomWebComponentService } from '../../../services/browser-extension-custom-web-component.service';
 import { ChatSkillService, MasterSkillSetting } from '../../../services/chat-skill.service';
 import { ChatStyleService } from '../../../services/chat-style.service';
+import { HostSeamService } from '../../../services/host-seam.service';
 import { CollectionRecommendationService } from '../../../services/collection-recommendation.service';
 import { ContextRefreshService } from '../../../services/context-refresh.service';
 import { CurationService } from '../../../services/curation.service';
@@ -45,6 +46,7 @@ export class SettingsScreenComponent implements OnDestroy {
   protected readonly devMode = inject(DevModeService);
   protected readonly chatStyle = inject(ChatStyleService);
   protected readonly chatSkill = inject(ChatSkillService);
+  protected readonly hostSeam = inject(HostSeamService);
   protected readonly recommendations = inject(CollectionRecommendationService);
   protected readonly qualityJudge = inject(QualityJudgeService);
   protected readonly contentJudge = inject(ContentJudgeService);
@@ -93,7 +95,8 @@ export class SettingsScreenComponent implements OnDestroy {
    */
   protected readonly changedPerSection = computed<Record<SettingsSection, number>>(() => ({
     developer: this.devMode.changedSettings() + this.debug.changedSettings(),
-    ai: this.chatStyle.changedSettings() + this.chatSkill.changedSettings(),
+    ai: this.chatStyle.changedSettings() + this.chatSkill.changedSettings()
+      + this.hostSeam.changedSettings(),
     recommendation: this.recommendations.changedSettings(),
     quality: this.qualityJudge.changedSettings() + this.contentJudge.changedSettings()
   }));
@@ -160,6 +163,11 @@ export class SettingsScreenComponent implements OnDestroy {
   }
 
   /** No condition depends on it, so leaving the settings needs no refresh on its account. */
+  /** Whether the panel offers the chat its own model. Experimental — see the description in the card. */
+  protected setLocalEngine(enabled: boolean): void {
+    void this.hostSeam.setEnabled(enabled);
+  }
+
   protected setChatStyleOverrides(enabled: boolean): void {
     void this.chatStyle.setOverridesEnabled(enabled);
   }
@@ -187,6 +195,7 @@ export class SettingsScreenComponent implements OnDestroy {
   protected resetAiOptions(): void {
     void this.chatStyle.resetToDefault();
     void this.chatSkill.resetToDefault();
+    void this.hostSeam.resetToDefault();
   }
 
   protected setContentJudgeAuth(credential: string): void {

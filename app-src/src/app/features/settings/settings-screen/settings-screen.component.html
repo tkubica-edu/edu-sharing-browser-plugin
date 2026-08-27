@@ -158,6 +158,27 @@
     </button>
 
     @if (openSection() === 'ai') {
+      <!-- Das Modell auf dem Gerät, das das Panel dem Chat-Widget anbietet (Naht, siehe CHATBOT.md). -->
+      <div class="group-item">
+        <label class="check">
+          <input type="checkbox" [ngModel]="hostSeam.enabled()"
+                 [disabled]="!hostSeam.supported"
+                 (ngModelChange)="setLocalEngine($event)" />
+          <span>Chat auf diesem Gerät beantworten (experimentell)</span>
+        </label>
+
+        <p class="desc">
+          Das Panel stellt dem Chat ein Sprachmodell im Browser zur Verfügung: nichts von dem Gespräch
+          verlässt das Gerät. Beim ersten Mal wird das Modell einmalig heruntergeladen (1–2 GB), danach
+          liegt es im Browser. Es kann die geöffnete Seite lesen, aber noch nicht in WLO suchen und noch
+          nicht die Anleitungen einer Sammlung — dafür braucht es weiter den Chatbot-Dienst.
+          Standardmäßig aus. Gilt ab dem nächsten Öffnen des Chats.
+          @if (!hostSeam.supported) {
+            <br />Dieser Browser unterstützt kein WebGPU; das Modell lässt sich hier nicht einschalten.
+          }
+        </p>
+      </div>
+
       <!-- Korrekturen an der Darstellung des Chat-Widgets; das Panel setzt sie in dessen Shadow-DOM ein. -->
       <div class="group-item">
         <label class="check">

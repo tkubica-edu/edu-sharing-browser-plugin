@@ -4,11 +4,15 @@ import {
 } from '@angular/core';
 
 import { ChatSkillService } from '../../../services/chat-skill.service';
+import { HostSeamService } from '../../../services/host-seam.service';
 import { ChatStyleService } from '../../../services/chat-style.service';
 import { ConditionsService } from '../../../services/conditions.service';
 import { loadWebComponentBundle } from '../../../services/web-component-bundle.service';
 import { installChatOverrides } from '../../../util/chat-overrides';
 import { chatSession } from '../../../util/chat-session';
+import {
+  HOST_SEAM_EVENT, HostCapabilities, HostEngineSeam, HostSeamOffer,
+} from '../../../util/host-seam';
 import { PageContext, pageContextOf, sameSubject } from '../../../util/page-context';
 
 /** The chat element the boerdi bundle defines. */
@@ -32,6 +36,14 @@ const SHELL_POLL_MS = 50;
  * mismatch in its own log. Both or neither, so the two are set together.
  */
 const AGENT_ENGINE = 'agent';
+
+/**
+ * The engine answered in this document rather than by the chat backend, with the model this panel
+ * registers as a seam (see HostSeamService). It travels as no header — the widget keeps it off the
+ * wire — and it does nothing at all unless a usable seam is there, which is why the attribute and the
+ * registration are set in the same breath.
+ */
+const LOCAL_ENGINE = 'local';
 
 /**
  * How long a follow-up task waits before it goes out. The widget refuses anything put to it while it is busy,
@@ -85,6 +97,10 @@ interface ChatElement extends HTMLElement {
     text: string,
     options?: { trigger?: 'now' | 'next'; message?: string },
   ): void;
+  /** Take this panel's model and tools. Missing = a bundle older than the seam. */
+  setHostSeam?(seam: HostEngineSeam | null): void;
+  /** What the bundle can do with what was registered; its `engines` name `local` only where it works. */
+  hostCapabilities?(): HostCapabilities;
 }
 
 /**
@@ -154,6 +170,7 @@ export class AiAssistantScreenComponent implements OnDestroy {
   private readonly conditions = inject(ConditionsService);
   private readonly chatStyle = inject(ChatStyleService);
   private readonly chatSkill = inject(ChatSkillService);
+  private readonly hostSeam = inject(HostSeamService);
 
   private readonly host = viewChild.required<ElementRef<HTMLElement>>('host');
 
@@ -240,6 +257,9 @@ export class AiAssistantScreenComponent implements OnDestroy {
   /** The timer holding a follow-up task, while one is waiting — see {@link FOLLOW_UP_DELAY_MS}. */
   private followUp: number | null = null;
 
+  /** Takes the seam listener off again, while one is installed — see {@link listenForSeamRequest}. */
+  private seamRequest: (() => void) | null = null;
+
   /** Reports a submitted result while the screen is open; the widget fires it on `window`. */
   private readonly onResult = (event: Event) => {
     const detail = (event as CustomEvent).detail as
@@ -312,6 +332,8 @@ export class AiAssistantScreenComponent implements OnDestroy {
     window.removeEventListener(RESULT_EVENT, this.onResult);
     for (const name of REPORTED_EVENTS) window.removeEventListener(name, this.onReport);
     if (this.followUp !== null) clearTimeout(this.followUp);
+    this.seamRequest?.();
+    this.seamRequest = null;
     this.stopWaitingForShell();
     this.element?.remove();
     this.element = null;
@@ -324,6 +346,18 @@ export class AiAssistantScreenComponent implements OnDestroy {
     const element = document.createElement(CHAT_TAG) as ChatElement;
     this.current = this.subject();
     const schema = this.resultSchema();
+    // Read once, here: the switch is a setting, and reaching the settings closes this screen — which
+    // unmounts the element and mounts a new one on the way back.
+    const seam = this.hostSeam.seam();
+    this.trace(
+      seam
+        ? 'this panel offers its own model to the chat'
+        : `this panel offers no model — ${this.hostSeam.supported ? 'the setting is off' : 'no WebGPU here'}`,
+    );
+    // Answered before the element is in the document, because the widget asks as it connects — which
+    // happens inside `appendChild`, before the next line of this method runs. The listener is the way
+    // in that does not depend on when the element is upgraded; `setHostSeam` below is the other.
+    if (seam) this.listenForSeamRequest(seam);
     const masterSkill = this.chatSkill.masterSkillAttribute();
     const attributes: Record<string, string> = {
       'api-url': CHAT_API_URL,
@@ -347,7 +381,14 @@ export class AiAssistantScreenComponent implements OnDestroy {
       // while the widget is busy is dropped without a word. A screen with a task therefore hands the page
       // over itself, in front of the task; see {@link AiAssistantScreenComponent.openConversation}.
       ...(this.task() ? {} : { 'page-context': JSON.stringify(this.current) }),
-      ...(schema ? { 'result-schema': JSON.stringify(schema), engine: AGENT_ENGINE } : {}),
+      // The engine, and the one place the two routes are told apart. `local` needs no `agent`: the
+      // widget's local engine constrains the decoding itself, so a schema takes effect there without
+      // the extra model pass the backend needs it for.
+      ...(seam
+        ? { engine: LOCAL_ENGINE, ...(schema ? { 'result-schema': JSON.stringify(schema) } : {}) }
+        : schema
+          ? { 'result-schema': JSON.stringify(schema), engine: AGENT_ENGINE }
+          : {}),
       // The widget's master skill, and only where the panel states something about it: the attribute has
       // three states rather than two, and it is its absence that leaves the skill to the operator's own
       // configuration. See ChatSkillService.
@@ -379,12 +420,69 @@ export class AiAssistantScreenComponent implements OnDestroy {
     this.host().nativeElement.appendChild(element);
     this.element = element;
     this.trace(`→ <${CHAT_TAG}> appended, the widget now boots`);
+    if (seam) this.offerSeam(element, seam);
     // Read here rather than watched: the switch is a setting, and reaching the settings closes this screen.
     if (this.chatStyle.overridesEnabled()) {
       installChatOverrides(element);
       this.trace('→ styling corrections go into the widget\'s shadow root');
     }
     this.openConversation();
+  }
+
+  /**
+   * Answer the widget's own request for a seam, once. Two ways in exist and both are used on purpose:
+   *
+   * - **This listener.** The widget asks for a seam as it connects, which happens *inside*
+   *   `appendChild` — so the offer has to stand before that line runs. It does not depend on when the
+   *   element is upgraded, which is the one thing about the other way that cannot be relied upon.
+   * - **`setHostSeam` after `appendChild`.** For a bundle that does not ask, and as the way to replace
+   *   a seam later.
+   *
+   * Answered synchronously, because the offer lapses when the listener returns — the widget says so in
+   * its own contract, and a host that stores the offer and answers later finds it gone.
+   */
+  private listenForSeamRequest(seam: HostEngineSeam): void {
+    const answer = (event: Event) => {
+      const offer = (event as CustomEvent).detail as HostSeamOffer | null;
+      if (typeof offer?.provide !== 'function') return;
+      this.trace('← the widget asks for a seam, and gets one');
+      offer.provide(seam);
+    };
+    window.addEventListener(HOST_SEAM_EVENT, answer, { once: true });
+    // Taken off again either way: the widget asks once, and a screen that is left before it asked must
+    // not leave a listener holding this screen's seam behind.
+    this.seamRequest = () => window.removeEventListener(HOST_SEAM_EVENT, answer);
+  }
+
+  /**
+   * Hand this panel's model and tools to the widget, and put on the record what it made of them.
+   *
+   * `hostCapabilities()` answers the question a bundle cannot be asked any other way: whether it knows
+   * the seam at all. A packaged bundle older than 2026-08-26 has neither method, and then the chat is
+   * the backend's as it always was — logged once, because a chat answering over the network while the
+   * settings say „on this device" is otherwise a puzzle. An element that is somehow not upgraded yet
+   * answers `undefined` rather than an object, which is the same case and is treated as one.
+   */
+  private offerSeam(element: ChatElement, seam: HostEngineSeam): void {
+    if (!element.setHostSeam || !element.hostCapabilities) {
+      console.warn(
+        `${LOG} <${CHAT_TAG}> knows no host seam — this bundle predates it, the chat stays on the backend`,
+      );
+      return;
+    }
+    element.setHostSeam(seam);
+    const capabilities = element.hostCapabilities();
+    if (!capabilities) {
+      console.warn(`${LOG} <${CHAT_TAG}> answered nothing about its capabilities — not upgraded yet?`);
+      return;
+    }
+    this.trace('→ setHostSeam, and the widget answers', capabilities);
+    // The one line that says whether the switch took: `local` among `engines` means the widget
+    // accepted the model. Missing it means the seam was refused — a protocol mismatch, or a model the
+    // shape check turned down.
+    if (!capabilities.engines?.includes(LOCAL_ENGINE)) {
+      console.warn(`${LOG} the seam was refused — the chat stays on the backend`, capabilities);
+    }
   }
 
   /**

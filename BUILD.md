@@ -44,6 +44,15 @@ document here is that nothing about it leaves the device anyway. Like the sideba
 copied worker is build output and untracked (`.gitignore`: `sidebar/*.mjs`); the library itself is a
 lazy chunk, so it is loaded only once a PDF is actually read.
 
+WebLLM is packaged the same way and for the same reason, but twice: the runtime is a lazy chunk of the
+document (6.0 MB) *and* the whole of `sidebar/worker-*.js` (6.0 MB), because the worker bundles what it
+imports and `@mlc-ai/web-llm` ships as one file with no subpath to import a smaller part of. Both are
+build output and untracked. The worker is started from a packaged file rather than a `blob:` URL —
+`script-src 'self'` again — and it is `new Worker(new URL('./local-llm.worker', import.meta.url))` in
+`LocalLlmService` that makes the build emit it. The model's weights are not in the package: they are
+fetched once from WebLLM's CDN and kept in the browser's Cache storage. Nothing loads any of it unless
+the chat's local engine is switched on (see [CHATBOT.md](CHATBOT.md#the-seam-the-bundle-offers)).
+
 Changes to the Angular app only reach the loaded extension through a build — `ng build` in
 `app-src/` alone is not enough, since `scripts/build.mjs` is what refreshes `sidebar/` and assembles
 `dist/`.

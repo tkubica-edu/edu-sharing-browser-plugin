@@ -257,6 +257,11 @@ export class AiQualityScreenComponent implements OnDestroy {
     if (step === 'proofread') {
       return announced('the language pass is asked for in this shape', proofreadSchemaOf());
     }
+    // The closing word is asked for in no shape at all. It used to get the enrichment's — `take()`
+    // discards a turn in `done`, so the answer went nowhere, and on the local engine, where the schema
+    // IS the turn, the person read a field of an enrichment nobody asked for instead of the closing
+    // sentence. A step whose answer is not read has no business stating a shape.
+    if (step === 'done') return null;
     if (step !== 'quality') {
       return announced('the enrichment is asked for in this shape', enrichmentSchemaOf());
     }

@@ -100,9 +100,27 @@ export function resultSchemaOf(criteria: readonly QualityCriterion[]): Record<st
           'Solange sie nicht geantwortet hat: false — dann gilt der Schritt als offen und es geht nicht weiter.'
       }
     },
-    required: ['criteria', 'suitable', 'confirmed']
+    required: ['criteria', 'suitable', 'confirmed', 'summary']
   };
 }
+
+/**
+ * The field every schema carries so that a turn has something a person can READ.
+ *
+ * Two engines answer these schemas and they differ in exactly this: over the backend the prose is the
+ * chat message and the schema is a second pass beside it, while a model on the device answers the
+ * schema *as* the turn — its JSON is all there is. Without this field such a turn shows a placeholder
+ * („Meine Antwort steht im Ergebnis dieses Schrittes"), which is what the KI check did on the device
+ * until 2026-08-27. Named `message` because `visibleText` in the widget looks for it.
+ */
+const MESSAGE_FIELD = {
+  message: {
+    type: 'string',
+    description:
+      'Was du der Person dazu im Chat sagst — dieselben Sätze, die du ohnehin schreiben würdest. '
+      + 'Zwei bis vier Sätze, auf Deutsch, und wo dieser Schritt eine Frage stellt, endet es mit ihr.'
+  }
+} as const;
 
 /**
  * The shape the opening question is answered in: one word, and expressly not one the assistant works out for
@@ -128,9 +146,10 @@ export function originSchemaOf(): Record<string, unknown> {
         description:
           'Wovon du selbst ausgegangen bist, bevor die Person geantwortet hat. Ihre Antwort steht in ' +
           'origin und gilt — auch dann, wenn sie deiner Vermutung widerspricht.'
-      }
+      },
+      ...MESSAGE_FIELD
     },
-    required: ['origin']
+    required: ['origin', 'message']
   };
 }
 
@@ -189,7 +208,7 @@ export function proofreadSchemaOf(): Record<string, unknown> {
           'nur ihre Entscheidung, was sie damit vorhat.'
       }
     },
-    required: ['findings', 'decision']
+    required: ['findings', 'decision', 'summary']
   };
 }
 
@@ -271,8 +290,9 @@ export function enrichmentSchemaOf(): Record<string, unknown> {
         description:
           'Nur true, wenn die Person die Werte im Chat durchgegangen ist und ihnen zugestimmt hat. Solange ' +
           'sie nicht geantwortet hat: false — dann gilt der Schritt als offen und der Vorschlag steht noch aus.'
-      }
+      },
+      ...MESSAGE_FIELD
     },
-    required: [...VOCABULARY_FIELD_NAMES, 'keywords', 'confirmed']
+    required: [...VOCABULARY_FIELD_NAMES, 'keywords', 'confirmed', 'message']
   };
 }

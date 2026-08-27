@@ -13,6 +13,7 @@
     "@angular/core": "^21.0.0",
     "@angular/forms": "^21.0.0",
     "@angular/platform-browser": "^21.0.0",
+    "@mlc-ai/web-llm": "^0.2.84",
     "ngx-edu-sharing-api": "^11.0.2",
     "onnxruntime-web": "^1.27.0",
     "pdfjs-dist": "^6.2.108",

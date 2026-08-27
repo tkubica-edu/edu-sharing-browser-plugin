@@ -388,6 +388,19 @@ reach — measured failures include *„Was bedeuten die Lizenzen?"* under the q
 
 ## The structured formats
 
+**Every schema carries a readable field** (`message`, or `summary` where one already existed), and it is
+**required** since 2026-08-27. The reason is the second engine: over the backend the prose a person
+reads is the chat message and the schema is a second pass beside it, while a model on the device
+answers the schema *as* the turn — its JSON is all there is. A schema without such a field therefore
+shows a placeholder there („Meine Antwort steht im Ergebnis dieses Schrittes"), which is what
+`originSchemaOf` and `enrichmentSchemaOf` did: they had no prose field at all, and `proofreadSchemaOf`
+and `resultSchemaOf` had one that was optional. The widget's `visibleText` looks for `summary`, `note`,
+`message`, `text`, `antwort`, in that order.
+
+**The closing turn (`done`) is asked for no shape.** `take()` discards a turn in that step, so its
+answer went nowhere — and on the local engine the person read a field of an enrichment nobody asked for
+instead of the closing sentence. `resultSchema()` returns `null` there.
+
 One schema per step, swapped as the step flips. The schema's `description` texts are **prompt, not
 documentation**: they travel verbatim into the parameters of the assistant's `submit_result` tool and are
 read by the model as instructions.
