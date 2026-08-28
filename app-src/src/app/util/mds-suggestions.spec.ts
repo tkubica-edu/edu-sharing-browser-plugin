@@ -1,7 +1,7 @@
 import { NodeSuggestionResponseDto, SuggestionResponseDto } from 'ngx-edu-sharing-api';
 import { describe, expect, it } from 'vitest';
 
-import { aiSuggestionRequests, storedAiSuggestions } from './mds-suggestions';
+import { aiSuggestionRequests, proposedAiSuggestions, storedAiSuggestions } from './mds-suggestions';
 
 /** An agent payload where the agent filled a description and two keywords, and the user the title. */
 function aPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -137,5 +137,58 @@ describe('storedAiSuggestions', () => {
   it('answers null for a node the repository holds no proposals for', () => {
     expect(storedAiSuggestions({ nodeId: 'node-1', suggestions: {} })).toBeNull();
     expect(storedAiSuggestions(null)).toBeNull();
+  });
+});
+
+describe('proposedAiSuggestions', () => {
+  it('offers what a run reports it proposed, by property', () => {
+    expect(
+      proposedAiSuggestions('node-1', [
+        { id: 'a', propertyId: 'cclom:general_description', value: 'Eine Einführung.', status: 'PENDING', type: 'AI' },
+        { id: 'b', propertyId: 'cclom:general_keyword', value: 'Optik', status: 'PENDING', type: 'AI' },
+        { id: 'c', propertyId: 'cclom:general_keyword', value: 'Linsen', status: 'PENDING', type: 'AI' },
+      ]),
+    ).toEqual({
+      nodeId: 'node-1',
+      suggestions: {
+        'cclom:general_description': [
+          { id: 'a', propertyId: 'cclom:general_description', value: 'Eine Einführung.', status: 'PENDING', type: 'AI' },
+        ],
+        'cclom:general_keyword': [
+          { id: 'b', propertyId: 'cclom:general_keyword', value: 'Optik', status: 'PENDING', type: 'AI' },
+          { id: 'c', propertyId: 'cclom:general_keyword', value: 'Linsen', status: 'PENDING', type: 'AI' },
+        ],
+      },
+    });
+  });
+
+  it('offers an entry the run states no status for — it was just made', () => {
+    expect(
+      proposedAiSuggestions('node-1', [{ propertyId: 'cclom:general_description', value: 'Eine Einführung.' }])
+        ?.suggestions['cclom:general_description'],
+    ).toEqual([
+      {
+        id: 'es-proposed-cclom:general_description-0',
+        propertyId: 'cclom:general_description',
+        value: 'Eine Einführung.',
+        status: 'PENDING',
+        type: 'AI',
+      },
+    ]);
+  });
+
+  it('leaves out a declined entry, a person\'s proposal and an empty value', () => {
+    expect(
+      proposedAiSuggestions('node-1', [
+        { id: 'a', propertyId: 'cclom:general_description', value: 'Abgelehnt.', status: 'DECLINED', type: 'AI' },
+        { id: 'b', propertyId: 'cclom:general_keyword', value: 'Optik', type: 'USER_PROPOSAL' },
+        { id: 'c', propertyId: 'cclom:general_keyword', value: '  ', type: 'AI' },
+      ]),
+    ).toBeNull();
+  });
+
+  it('offers nothing for a run that reported nothing', () => {
+    expect(proposedAiSuggestions('node-1', [])).toBeNull();
+    expect(proposedAiSuggestions('node-1', null)).toBeNull();
   });
 });

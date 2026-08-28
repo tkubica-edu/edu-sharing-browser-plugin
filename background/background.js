@@ -547,6 +547,7 @@ const ALLOWED_ACTIONS = new Set([
   'tabs.getActive',
   'tabs.extractPageData',
   'tabs.navigate',
+  'page.read',
   'analyze.run',
   'analyze.url',
   'metadata.saveNode'
@@ -594,6 +595,30 @@ browser.runtime.onMessage.addListener((message, sender) => {
           const tabId = typeof message.tabId === 'number' ? message.tabId : (await getActiveNormalTab()).id;
           const data = await extractPageDataFromTab(tabId);
           return { success: true, data };
+        }
+
+        // Read the active tab and nothing more: the Erschließung outside the WLO context, which does
+        // not call /generate at all — the page's own title and picture describe the content, and what
+        // it does not state is proposed by the repository (see MdsAiSuggestionService). Same source
+        // record as `analyze.run`, screenshot included, so both routes describe the page alike.
+        case 'page.read': {
+          const tab = await getActiveNormalTab();
+          if (!tab.url || /^(chrome|edge|about|chrome-extension|moz-extension|safari-web-extension):/.test(tab.url)) {
+            return { success: false, error: 'UNSUPPORTED_PAGE' };
+          }
+          const pageData = await extractPageDataFromTab(tab.id);
+          // Only for a page that names no picture of its own — the same rule as in `analyze.run`.
+          const screenshot = pageImageUrls(pageData).length ? null : await captureVisiblePage(tab);
+          return {
+            success: true,
+            data: pageData,
+            source: {
+              url: pageData?.url || tab.url,
+              title: pageData?.title || tab.title,
+              favIconUrl: tab.favIconUrl,
+              screenshot: screenshot ?? undefined
+            }
+          };
         }
 
         // Extract the active tab and POST it to /generate.

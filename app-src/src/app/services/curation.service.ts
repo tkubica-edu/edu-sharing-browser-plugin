@@ -12,7 +12,7 @@ import { MdsValues, firstString, stringValues, toMdsEditorValues } from '../util
 import { AmbSource } from '../util/amb-event';
 import { withAgentLicense } from '../util/agent-fields';
 import {
-  EXTENDED_DATA_FIELD, EXTENDED_TEXT_FIELD, SOURCE_TEXT_KEY, toEnvelope, toExtendedFields
+  EXTENDED_DATA_FIELD, EXTENDED_TEXT_FIELD, sourceTextOf, toEnvelope, toExtendedFields
 } from '../util/agent-payload';
 import { errorMessage } from '../util/errors';
 import { renderLink } from '../util/repository-links';
@@ -197,6 +197,13 @@ export class CurationService {
   async runPendingExtraction(): Promise<void> {
     const url = this.pendingExtractionState();
     if (!url || !this.auth.authorized() || this.metadataAgent.running()) return;
+    if (!this.browserExtensionCustomWebComponent.enabled()) {
+      // Nothing to run: the agent is a WLO function, and the page of a content taken up from the
+      // Verlauf is not the open one, so there is nothing to read either. The content stands as it was
+      // saved, and the Metadaten step has the repository propose for it (see MdsAiSuggestionService).
+      this.pendingExtractionState.set(null);
+      return;
+    }
     const outcome = await this.metadataAgent.runForUrl(url, this.contentTitle());
     if (!outcome.ok) return;
     // Only once it has answered: a run cut short by the page change is picked up again on the next one.
@@ -597,17 +604,13 @@ export class CurationService {
    * written from such a payload keeps it as a field of its own. `''` where none is known — for a node
    * this session merely found open, nothing states what it says.
    */
-  readonly contentText = computed<string>(() => {
-    const metadata = this.editorMetadata();
-    return (
-      firstString(metadata?.[SOURCE_TEXT_KEY]) ?? firstString(metadata?.[EXTENDED_TEXT_FIELD]) ?? ''
-    );
-  });
+  readonly contentText = computed<string>(() => sourceTextOf(this.editorMetadata()) ?? '');
 
   /**
    * The content's picture, ranked by how much each source says about *this* content: a picture the
-   * user picked, the one the node states, the image the agent found, the page screenshot, and last
-   * the node's type icon — true of the kind of material rather than of this one.
+   * user picked, the one the node states, the one the run reports — the page's own or the agent's
+   * reading of it — the page screenshot, and last the node's type icon, true of the kind of material
+   * rather than of this one.
    */
   readonly contentPreview = computed<ContentPreview | null>(() => {
     const picked = this.pendingPreview();
@@ -941,7 +944,12 @@ export class CurationService {
   async analyze(): Promise<boolean> {
     if (!this.auth.authorized()) return false;
     this.resetNodeState();
-    const outcome = await this.metadataAgent.run();
+    // The metadata agent only where the WLO functions are switched on: its `/generate` is one of them.
+    // Elsewhere the page is read and nothing is generated from it — the fields it does not state are
+    // proposed by the repository at the Metadaten step (see MetadataAgentService.readPage).
+    const outcome = this.browserExtensionCustomWebComponent.enabled()
+      ? await this.metadataAgent.run()
+      : await this.metadataAgent.readPage();
     const ok = outcome.ok && !!outcome.parsed && !!outcome.source;
     this.resultPending.set(ok);
     // A content that is being erschlossen right now is not one that was erschlossen: from here it counts
@@ -988,11 +996,13 @@ export class CurationService {
     if (!node) this.applyStoredEntry(entry, source);
     else this.applyLoadedNode(entry.nodeId, node, node.name ?? entry.title, source);
     this.applyStoredFlow(entry);
-    // Only for an entry that carries no run: the page is erschlossen once more so the content has one.
-    // Marked here rather than started, because the caller is what settles the panel on the content
-    // and the run belongs behind that (see {@link runPendingExtraction}).
-    this.pendingExtractionState.set(entry.run ? null : entry.url || null);
-    if (!entry.run) {
+    // Only for an entry that carries no run, and only where the agent may run at all: the page is
+    // erschlossen once more so the content has one. Marked here rather than started, because the caller
+    // is what settles the panel on the content and the run belongs behind that (see
+    // {@link runPendingExtraction}).
+    const rerun = !entry.run && this.browserExtensionCustomWebComponent.enabled();
+    this.pendingExtractionState.set(rerun ? entry.url || null : null);
+    if (rerun) {
       console.log(`${LOG_HISTORY} … the entry carries no run, so ${entry.url} is erschlossen again for it`);
     }
   }

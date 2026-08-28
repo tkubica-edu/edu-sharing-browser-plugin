@@ -1,6 +1,10 @@
 <div class="mds-wrap">
   @if (bundle.error()) {
     <p class="es-error">Editor konnte nicht geladen werden: {{ bundle.error() }}</p>
+  } @else if (generating()) {
+    <!-- The repository's own generation runs before the form is built, so its findings are in the form
+         the moment it appears — see MdsEditorComponent.generateSuggestions. -->
+    <p class="es-muted">Metadaten werden vorgeschlagen…</p>
   } @else if (!ready()) {
     <p class="es-muted">Editor wird geladen…</p>
   }

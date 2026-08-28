@@ -166,6 +166,9 @@ instead of the canvas in `mode="detail"`, the repository's default metadata set 
 the login gate back in front of the flow, no *Prüfprozess auswählen* / *Individuelle Qualitätsprüfung
 mit KI* / *Sammlung auswählen* / Boerdi and no *Qualität* tab, no `ccm:oeh_*` write and no
 `200_tocheck` workflow on the save, and the three WLO-only settings groups gone from this screen.
+**And no `/generate`**: the Erschließung then reads the page (`page.read`) and takes its title,
+picture and text as they stand, while everything else is proposed by the repository at the Metadaten
+step ([SUGGESTION-API.md](SUGGESTION-API.md#erzeugen-lassen-der-b-api-lauf)).
 
 The switch is read at every one of those places through the one signal they all hang on, see
 [WEB-COMPONENTS.md § Refusing the variable](WEB-COMPONENTS.md#refusing-the-variable). It survives a
