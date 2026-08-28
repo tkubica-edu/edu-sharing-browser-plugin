@@ -39,9 +39,10 @@ type SettingsSection = 'developer' | 'ai' | 'recommendation' | 'quality' | 'nost
 export class SettingsScreenComponent implements OnDestroy {
   protected readonly auth = inject(AuthService);
   /**
-   * Whether this is a WLO panel: the settings that tune the chat, the KI check and the collection
-   * proposal configure steps that only exist there, so they are shown only where those steps are —
-   * the same statement the registry gates those steps by (see model/navigation.ts).
+   * Whether this is a WLO panel, and the switch that decides it along with the repository: the settings that
+   * tune the chat, the KI check and the collection proposal configure steps that only exist there, so they are
+   * shown only where those steps are — the same statement the registry gates those steps by (see
+   * model/navigation.ts). The switch itself stands in the Entwickler-Optionen, which are outside that gate.
    */
   protected readonly wlo = inject(BrowserExtensionCustomWebComponentService);
   protected readonly debug = inject(DebugService);
@@ -100,7 +101,7 @@ export class SettingsScreenComponent implements OnDestroy {
    * are grouped for the reader and not how the services are split.
    */
   protected readonly changedPerSection = computed<Record<SettingsSection, number>>(() => ({
-    developer: this.devMode.changedSettings() + this.debug.changedSettings(),
+    developer: this.wlo.changedSettings() + this.devMode.changedSettings() + this.debug.changedSettings(),
     ai: this.chatStyle.changedSettings() + this.chatSkill.changedSettings(),
     recommendation: this.recommendations.changedSettings(),
     quality: this.qualityJudge.changedSettings() + this.contentJudge.changedSettings(),
@@ -241,6 +242,18 @@ export class SettingsScreenComponent implements OnDestroy {
 
   protected resetNostrRelayUrl(): void {
     void this.nostr.setRelayUrl('');
+  }
+
+  // ---- WLO extensions -----------------------------------------------------
+
+  /**
+   * Whether the repository's `browserExtensionCustomWebComponent` variable counts. Marked as a change: which
+   * steps the panel offers hangs on it, and the menu that is landed on when the settings are left is built
+   * from those (see {@link ngOnDestroy}).
+   */
+  protected setWloEnabled(enabled: boolean): void {
+    this.changed = true;
+    void this.wlo.setEnabled(enabled);
   }
 
   // ---- Debug mode ---------------------------------------------------------

@@ -60,6 +60,33 @@
   </button>
 
   @if (openSection() === 'developer') {
+    <!-- Ob die WLO-Erweiterungen des Repositoriums gelten. Steht hier statt bei den WLO-Karten weiter
+         unten: die sind selbst hinter dem Schalter, ein abgeschaltetes Panel könnte ihn dort nicht mehr
+         zeigen. -->
+    <div class="group-item">
+      <label class="check">
+        <input type="checkbox" [ngModel]="wlo.settingEnabled()" (ngModelChange)="setWloEnabled($event)" />
+        <span>WLO-Funktionen verwenden</span>
+      </label>
+
+      <p class="desc">
+        Ob das Panel die Erweiterungen anbietet, die ein Repositorium über die Config-Variable
+        <code>browserExtensionCustomWebComponent</code> einschaltet. Standardmäßig an. Abgeschaltet gilt die
+        Variable als nicht gesetzt: Metadaten und Vorschau laufen über den MDS-Editor mit dem Standard-Set
+        des Repositoriums statt über den WLO-Canvas, die Schritte „Prüfprozess auswählen“, „Qualität“,
+        „Sammlung auswählen“ und der KI-Assistent entfallen, beim Speichern werden keine
+        <code>ccm:oeh_*</code>-Felder geschrieben und kein Redaktions-Workflow gesetzt, und es wird eine
+        Anmeldung verlangt. So lässt sich der normale Core-Workflow auch gegen ein WLO-Repositorium
+        durchspielen.
+      </p>
+
+      <!-- Der Schalter sagt, was dem Panel aufgetragen wurde, nicht was das Repositorium antwortet — an
+           einem Repositorium ohne die Variable steht er auf „an“ und bewirkt nichts. -->
+      @if (wlo.settingEnabled() && !wlo.offeredByRepository()) {
+        <p class="es-hint">Dieses Repositorium bietet keine WLO-Funktionen an.</p>
+      }
+    </div>
+
     <!-- Entwicklung: ersetzt die Antworten der KI-Dienste durch Fixtures. -->
     <div class="group-item">
       <label class="check">

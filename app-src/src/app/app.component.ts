@@ -182,6 +182,10 @@ export class AppComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
+    // Before the repository config is subscribed to: whether its answer counts at all is a setting, and a
+    // panel that reads the config first would come up in the WLO palette and fall back out of it a moment
+    // later.
+    await this.browserExtensionCustomWebComponent.load();
     // Only activates when the repository config enables `browserExtensionCustomWebComponent`.
     this.browserExtensionCustomWebComponent.initialize();
     // Before anything renders: a screen that comes up light and turns dark a moment later is the one

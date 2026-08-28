@@ -77,7 +77,7 @@ describe('NavigationService', () => {
 
   /** The repository runs the browser extension custom web component, which several steps belong to. */
   function withWebComponent(): void {
-    webComponent.fake.enabled.set(true);
+    webComponent.fake.offeredByRepository.set(true);
   }
 
   /** The ids the menu offers, in the order it lists them. */
@@ -107,6 +107,26 @@ describe('NavigationService', () => {
         'own-content',
         'history',
       ]);
+    });
+
+    it('drops the WLO steps where the settings switch the repository variable off', async () => {
+      contentInHand();
+      withWebComponent();
+      // Steps of the flow rather than menu entries, so they are asked for by id.
+      const wloSteps = ['flow-choice', 'ai-quality', 'select-collection', 'ai-assistant'] as const;
+      for (const id of wloSteps) expect(navigation.isVisible(id), id).toBe(true);
+      expect(navigation.isTabVisible('quality', 'quality-check')).toBe(true);
+
+      await webComponent.fake.setEnabled(false);
+
+      // Every step that belongs to the browser extension custom web component goes with it, leaving a core
+      // panel behind — which is what makes the ordinary flow walkable against a WLO repository.
+      for (const id of wloSteps) expect(navigation.isVisible(id), id).toBe(false);
+      // The Qualitätsprüfung stays, as the Metadaten view it is in a core panel — its criteria tab is what
+      // belongs to the web component, and the gate that tab put in front of the metadata goes with it.
+      expect(navigation.isVisible('quality')).toBe(true);
+      expect(navigation.isTabVisible('quality', 'quality-check')).toBe(false);
+      expect(navigation.isTabDisabled('quality', 'metadata')).toBe(false);
     });
 
     it('keeps the utilities out of the menu and in the topbar', () => {
@@ -348,7 +368,7 @@ describe('NavigationService', () => {
       // The choice of process, which exists only where there are two processes to choose between.
       navigation.go('flow-choice');
       navigation.go('quality');
-      webComponent.fake.enabled.set(false);
+      webComponent.fake.offeredByRepository.set(false);
 
       navigation.back();
 
@@ -571,7 +591,7 @@ describe('NavigationService', () => {
     });
 
     it('is one view alone without the web component, and then carries no tab bar', () => {
-      webComponent.fake.enabled.set(false);
+      webComponent.fake.offeredByRepository.set(false);
 
       expect(navigation.tabs().map((tab) => tab.id)).toEqual(['metadata']);
       expect(navigation.showTabs()).toBe(false);
@@ -644,7 +664,7 @@ describe('NavigationService', () => {
       withWebComponent();
       navigation.go('flow-choice');
       navigation.go('quality');
-      webComponent.fake.enabled.set(false);
+      webComponent.fake.offeredByRepository.set(false);
 
       expect(navigation.backLabel()).toBe('Zurück zum Hauptmenü');
     });
@@ -843,7 +863,7 @@ describe('NavigationService', () => {
       expect(navigation.section()).toBe('ai-quality');
 
       // The same page without the web component: neither step belongs to it any more.
-      webComponent.fake.enabled.set(false);
+      webComponent.fake.offeredByRepository.set(false);
       navigation.land();
 
       expect(

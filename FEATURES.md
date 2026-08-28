@@ -363,7 +363,8 @@ navigating to it, and closes it again where it stands; the step keeps running be
 - **Einstellungen** *(dotted while a change waits to be applied)* — the Repository-URL (used for
   login and every embedded element) at the top, then **Darstellung**, and below those five folded
   groups, one open at a time:
-  *Entwickler-Optionen* (the dev and the debug mode, see [TESTING.md](TESTING.md)), *KI- und
+  *Entwickler-Optionen* (the switch **WLO-Funktionen verwenden**, plus the dev and the debug mode, see
+  [TESTING.md](TESTING.md)), *KI- und
   Chatbot-Optionen* (the corrections to the chat widget's display, the chatbot's master skill as
   *Vorgabe des Betreibers* / *An* / *Aus* — see
   [CHATBOT.md](CHATBOT.md#the-attributes-set-on-mount)),
@@ -374,7 +375,12 @@ navigating to it, and closes it again where it stands; the step keeps running be
   *Qualitätsprüfung* configure steps that only the WLO panel has and are shown only there
   (`browserExtensionCustomWebComponent`); *Entwickler-Optionen* and *Nostr-Relay* are shown in every
   panel, the latter because the step it configures is offered in every panel too — an AMB record is
-  published from any repository and the relay belongs to none. Each group's
+  published from any repository and the relay belongs to none. **WLO-Funktionen verwenden** is what
+  decides that: on by default, and off it reads `browserExtensionCustomWebComponent` as unset whatever
+  the repository answers, so the panel offers the MDS editor, the login and a save without
+  `ccm:oeh_*` fields — the ordinary flow, walkable through against a WLO repository. It sits in
+  *Entwickler-Optionen* because the three groups it hides are behind the flag themselves, see
+  [WEB-COMPONENTS.md § Refusing the variable](WEB-COMPONENTS.md#refusing-the-variable). Each group's
   head carries a pill counting the settings inside it that stand away from their default (`… geändert`),
   so a folded group says whether anything in it was touched; a group holding nothing but defaults carries
   none. Every default is compared where it is defined — each service answers for its own settings

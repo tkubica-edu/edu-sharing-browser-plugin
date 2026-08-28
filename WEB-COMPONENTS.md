@@ -86,8 +86,10 @@ still there to be repainted (see [UI-SHELL.md](UI-SHELL.md#chrome-topbar-status-
 ## The optional WLO metadata editor
 
 `BrowserExtensionCustomWebComponentService` watches the repository config for the boolean variable
-**`browserExtensionCustomWebComponent`**. While it is enabled, `WloCanvasComponent` —
-`<metadata-agent-canvas>` from the packaged `wlo/` bundle — takes over two screens:
+**`browserExtensionCustomWebComponent`**. Its `enabled` is that variable **and** the panel's own
+switch for it (see [§ Refusing the variable](#refusing-the-variable)), and everything below hangs on
+that one signal. While it is enabled, `WloCanvasComponent` — `<metadata-agent-canvas>` from the
+packaged `wlo/` bundle — takes over two screens:
 
 - **Metadaten editieren** (`mode="edit"`) instead of the edu-sharing MDS editor,
 - **Vorschau** (`mode="detail"`) instead of `edu-sharing-preview-sidebar`, showing the saved
@@ -130,6 +132,29 @@ erschließen* is the app's own extraction path). Seeding is direct: its `importJ
 which is exactly the agent payload shape, so an analysis result and a node's stored properties both
 load as-is. Edits arrive continuously via `metadataChange`; on save the namespaced field values are
 kept and the envelope is dropped, since it is not node metadata.
+
+## Refusing the variable
+
+A repository that sets the variable makes every panel connected to it a WLO panel, which leaves the
+ordinary flow — MDS editor, login, a save without `ccm:oeh_*` fields — unreachable against that
+repository. The checkbox **WLO-Funktionen verwenden** in *Einstellungen → Entwickler-Optionen*
+(`eduSharingWloEnabled`, default on) is what makes it reachable: with it off the variable is read as
+unset whatever the repository answers.
+
+The service keeps the two statements apart. `offeredByRepository` is the config's answer,
+`settingEnabled` the switch, and `enabled` is the conjunction — so the checkbox shows what the panel
+was told rather than what came back, and a hint beside it names a repository that offers none of this
+in the first place. Because every WLO branch in the app reads `enabled` and nothing else — the two
+screens above, `metadataSet`, the `wlo-theme` class, `AuthService.authorized` /
+`AuthService.loginRequired`, the WLO-only options in `model/navigation.ts`, the `ccm:oeh_*` write and
+the `GROUP_ORG_WLO-Uploadmanager` workflow in `CurationService`, and the settings groups that
+configure them — the switch reaches all of them at once. Its own card is outside those groups for
+that reason: a panel switched off would otherwise have nowhere left to switch itself back on.
+
+`AppComponent` loads the setting before it subscribes to the config, so a panel that has it off never
+comes up in the WLO palette. Nothing of a content in hand is let go of: the switch decides which
+screens and which fields a save has, and an Erschließung in progress carries on into whichever editor
+the metadata screen mounts next.
 
 ## Refreshing a bundle
 

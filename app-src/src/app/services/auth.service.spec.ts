@@ -103,7 +103,7 @@ describe('AuthService', () => {
     });
 
     it('asks for none where the repository brings its own session', () => {
-      webComponent.fake.enabled.set(true);
+      webComponent.fake.offeredByRepository.set(true);
 
       expect(auth.authorized()).toBe(true);
       // Not even the logged-out state is reported: nothing about a login is shown at all.

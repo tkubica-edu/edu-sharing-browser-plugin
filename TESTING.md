@@ -156,6 +156,23 @@ Two things it is not:
 
 Since a watch build is unoptimized, measure size and check budgets with a normal `npm run build`.
 
+## Walking the core flow against a WLO repository
+
+*Einstellungen* → *Entwickler-Optionen* → **WLO-Funktionen verwenden** (on by default,
+`eduSharingWloEnabled`). Off, the panel reads `browserExtensionCustomWebComponent` as unset whatever
+the repository answers, which is the only way to reach the base version's behaviour while connected
+to a repository that sets the variable: the MDS editor instead of the WLO canvas, `edu-sharing-preview-sidebar`
+instead of the canvas in `mode="detail"`, the repository's default metadata set instead of `mds_oeh`,
+the login gate back in front of the flow, no *Prüfprozess auswählen* / *Individuelle Qualitätsprüfung
+mit KI* / *Sammlung auswählen* / Boerdi and no *Qualität* tab, no `ccm:oeh_*` write and no
+`200_tocheck` workflow on the save, and the three WLO-only settings groups gone from this screen.
+
+The switch is read at every one of those places through the one signal they all hang on, see
+[WEB-COMPONENTS.md § Refusing the variable](WEB-COMPONENTS.md#refusing-the-variable). It survives a
+reload and takes effect on leaving the settings — the options menu is rebuilt then — so the extension
+does not have to be reloaded to go back and forth. A repository that offers none of this leaves the
+switch on and says so under it.
+
 ## Dev mode (faked KI answers)
 
 *Einstellungen* → *Entwickler-Optionen* → **Dev-Modus: KI-Antworten faken** (`DevModeService`). The slow, paid services answer
@@ -266,23 +283,28 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    `https://repository.staging.openeduhub.net/edu-sharing` and is required. Changing it shows an
    *Übernehmen* button that reloads the sidebar so the library re-initializes against the new
    repository (a dot marks the icon until applied).
-3. **Login**: required for everything except *Einstellungen*. Enter staging credentials → the session
+3. **WLO abschalten**: against a repository that sets `browserExtensionCustomWebComponent`, untick
+   *Einstellungen* → *Entwickler-Optionen* → **WLO-Funktionen verwenden** and leave the screen — the
+   panel must lose the WLO palette, ask for a login, and offer neither *Prüfprozess auswählen* nor the
+   *Qualität* tab nor Boerdi; the metadata screen must show the MDS editor. Tick it again and all of
+   it must come back without reloading the extension. Everything below is walked with it ticked.
+4. **Login**: required for everything except *Einstellungen*. Enter staging credentials → the session
    bar flips to "Angemeldet: …" and the login option disappears while the rest appear. If the
    repository URL was changed, login is blocked until it is applied in *Einstellungen*.
-4. **Erschließen + speichern**: *Inhalt erschließen* on a content page → the metadata screen shows
+5. **Erschließen + speichern**: *Inhalt erschließen* on a content page → the metadata screen shows
    `fields_extracted / fields_total` and loads the MDS editor with the generated metadata. Edit, then
    the footer's **Speichern** → a node is created in your inbox and the preview opens, and the flow's
    steps become reachable for that content.
-5. **Metadaten anreichern** (OnlyOffice): open a document in the OnlyOffice editor with the
+6. **Metadaten anreichern** (OnlyOffice): open a document in the OnlyOffice editor with the
    edu-sharing plugin active, open the panel → the option appears and names the detected document.
    The footer's **Metadaten anreichern** reads the document and lands on the metadata screen with the
    generated metadata, the menu naming the document under *Inhalt erkannt*. **Speichern** must update
    **that** node — check in the repository that the document's metadata changed, that its
    name/extension is unchanged, and that no new node appeared in the inbox. With the page-side plugin
    switched off (*Plugins im Hintergrund*) the screen must report the timeout instead of hanging.
-6. **Vorschau → Sammlungen**: from the preview, *Sammlung zuordnen* → pick a collection and confirm
+7. **Vorschau → Sammlungen**: from the preview, *Sammlung zuordnen* → pick a collection and confirm
    with *In Sammlung einfügen*; the screen lists what was added.
-7. **An Nostr Relay weiterleiten**: the step is reached in the base version too — against a repository
+8. **An Nostr Relay weiterleiten**: the step is reached in the base version too — against a repository
    *without* `browserExtensionCustomWebComponent` it must show the relay row alone, with no Redaktionen
    list, no „keine Redaktionen konfiguriert" line and no collection request in the network tab. The
    *Nostr-Relay* group in *Einstellungen* must be there in that version too — the step is, so its relay
@@ -302,7 +324,7 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    flow as well, since it has no target left. Ticking it again brings all of it back, with the relay
    row unticked and no receipt carried over.
 
-8. **An Nostr Relay senden** (Inhaltsoptionen, between *Inhalt teilen* and *Interaktionen anzeigen*):
+9. **An Nostr Relay senden** (Inhaltsoptionen, between *Inhalt teilen* and *Interaktionen anzeigen*):
    open a node from the *Verlauf* → the row appears and opens a step of its own — the Inhaltsübersicht
    must **not** grow a tab for it. The screen names the `d` tag and the field count
    it would publish, with the standing card above it. *An Relay senden* publishes it; the button then
@@ -315,7 +337,7 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    relay, not out of the *Verlauf* — labelled „Beim Nostr-Relay hinterlegt". Clearing the *Verlauf* must
    change nothing about that. With the relay pointed at an unreachable address the state must read
    **Unbekannt**, never „Nicht gesendet".
-9. **Verlauf**: every *saved* node is listed (nothing is recorded until you save); entries expand to
+10. **Verlauf**: every *saved* node is listed (nothing is recorded until you save); entries expand to
    show their fields and offer *In Vorschau öffnen*, which reloads the node from the repository;
    *Leeren* clears the list.
 

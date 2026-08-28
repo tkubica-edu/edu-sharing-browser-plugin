@@ -200,6 +200,14 @@ export const APP_CONFIG = {
      * (`DEV_MODE_GENERATE_STORAGE_KEY` in background/background.js).
      */
     devModeGenerate: 'eduSharingDevModeGenerate',
+    /**
+     * Whether the repository's `browserExtensionCustomWebComponent` variable counts — see
+     * BrowserExtensionCustomWebComponentService. Off reads the variable as unset, whatever the repository
+     * answers: the panel then shows the MDS editor rather than the WLO canvas, offers none of the WLO-only
+     * steps, writes no `ccm:oeh_*` fields and asks for a login — the ordinary core flow, walkable through
+     * against a repository that has the variable set.
+     */
+    wloEnabled: 'eduSharingWloEnabled',
     /** Whether the chat widget is corrected by our own stylesheet — see ChatStyleService. */
     chatStyleOverrides: 'eduSharingChatStyleOverrides',
     /** What the panel says about the chat's master skill — see ChatSkillService. */

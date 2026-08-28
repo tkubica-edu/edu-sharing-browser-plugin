@@ -116,8 +116,9 @@ flat.
 - **Metadata agent** — not that URL, but the default repository's B-API proxy; see
   [ARCHITECTURE.md](ARCHITECTURE.md#the-metadata-agents-address).
 - **Repository config variables** — `browserExtensionCustomWebComponent` swaps in the WLO editor and
-  switches the panel login off; `browserExtensionEditorialGroups` names the editorial groups
-  contents can be forwarded to.
+  switches the panel login off, and the checkbox *WLO-Funktionen verwenden* in *Einstellungen* refuses
+  it so the base version's flow stays reachable against such a repository;
+  `browserExtensionEditorialGroups` names the editorial groups contents can be forwarded to.
 - **Defaults and storage keys** live in `config.js` (worker) and `app-src/src/app/config.ts` (app).
 
 ## Contributing

@@ -142,6 +142,15 @@ describe('ConditionsService', () => {
     expect(conditions.hasDetectedNode()).toBe(true);
   });
 
+  it('reads the WLO flag as unset while the settings switch it off', async () => {
+    webComponent.fake.offeredByRepository.set(true);
+    expect(conditions.browserExtensionCustomWebComponent()).toBe(true);
+
+    await webComponent.fake.setEnabled(false);
+    expect(conditions.browserExtensionCustomWebComponent()).toBe(false);
+    expect(conditions.snapshot().browserExtensionCustomWebComponent).toBe(false);
+  });
+
   it('hands every flag on in the snapshot, and recomputes it when a source changes', () => {
     conditions.activeUrl.set('https://example.org/article');
     // The one flag that stands at true without anybody setting it, turned down so this test starts from
@@ -170,7 +179,7 @@ describe('ConditionsService', () => {
     curation.fake.hasCuratedResult.set(true);
     curation.fake.qualityCriteriaMet.set(true);
     curation.fake.agentEditWindowClosed.set(true);
-    webComponent.fake.enabled.set(true);
+    webComponent.fake.offeredByRepository.set(true);
     nostr.fake.enabled.set(true);
     conditions.recognizingContent.set(false);
 
