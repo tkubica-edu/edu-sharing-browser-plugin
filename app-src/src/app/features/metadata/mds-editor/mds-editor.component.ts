@@ -1,6 +1,6 @@
 import {
   afterRenderEffect, ChangeDetectionStrategy, Component, computed, CUSTOM_ELEMENTS_SCHEMA,
-  ElementRef, OnDestroy, inject, input, output, signal, viewChild
+  ElementRef, OnDestroy, OnInit, inject, input, output, signal, viewChild
 } from '@angular/core';
 import { HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 
@@ -12,6 +12,7 @@ import { MetadataEditor, MetadataSeed } from '../../../model/metadata-editor';
 import {
   BrowserExtensionCustomWebComponentService
 } from '../../../services/browser-extension-custom-web-component.service';
+import { SuggestionService } from '../../../services/suggestion.service';
 import { loadWebComponentBundle } from '../../../services/web-component-bundle.service';
 
 const EDITOR_TAG = 'edu-sharing-mds-editor-wrapper';
@@ -33,7 +34,8 @@ interface MdsEditorElement extends HTMLElement {
 // ngOnInit, which Angular Elements runs on append, so the element is created imperatively with its inputs already
 // set; the footer then drives commit() and the values are read from `currentValuesChange`, since Angular Elements
 // proxies no methods. It runs on a node where the caller has one and on a plain values map otherwise, which
-// renders less of the view. What the agent filled is handed over as KI-Vorschläge (see {@link aiFields}).
+// renders less of the view. What the agent filled is handed over as KI-Vorschläge — the ones the repository
+// stores for the node where it has them, the run's own findings otherwise (see {@link loadSuggestions}).
 @Component({
   selector: 'es-mds-editor',
   templateUrl: './mds-editor.component.html',
@@ -41,7 +43,7 @@ interface MdsEditorElement extends HTMLElement {
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class MdsEditorComponent implements MetadataEditor, OnDestroy {
+export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
   /** The metadata payload (raw agent output or a node's properties). */
   readonly metadata = input.required<MetadataSeed>();
 
@@ -68,6 +70,9 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
 
   private readonly webComponent = inject(BrowserExtensionCustomWebComponentService);
 
+  // Reads the node's proposals out of the repository — see {@link loadSuggestions}.
+  private readonly suggestions = inject(SuggestionService);
+
   protected readonly bundle = loadWebComponentBundle('edu', EDITOR_TAG);
 
   /** True once the element is mounted and can be committed. */
@@ -79,6 +84,15 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
    * from the seed for the marking to happen: a widget takes a suggestion on only while its value is empty.
    */
   private readonly aiFields = signal<readonly string[]>([]);
+
+  /**
+   * The node's stored proposals, once the repository has answered about them; null where it holds none.
+   * Read before the form is built, because whether a field is offered decides whether it is a value.
+   */
+  private readonly storedSuggestions = signal<NodeSuggestions | null>(null);
+
+  /** The repository has been asked — the mount waits for this, whatever the answer was. */
+  private readonly suggestionsRead = signal(false);
 
   /** Whether the form carries KI-Vorschläge — the note above it says what that means for them. */
   protected readonly hasAiSuggestions = computed(() => this.aiFields().length > 0);
@@ -102,9 +116,13 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
     // The metadata is read once, at mount time.
     afterRenderEffect({
       write: () => {
-        if (this.bundle.ready()) this.mount();
+        if (this.bundle.ready() && this.suggestionsRead()) this.mount();
       }
     });
+  }
+
+  ngOnInit(): void {
+    void this.loadSuggestions();
   }
 
   ngOnDestroy(): void {
@@ -129,6 +147,19 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
     this.save.emit(toMdsEditorValues(mapAgentFields(values)));
   }
 
+  /**
+   * Take over what the repository proposes for this node — written when the content was created (see
+   * CurationService.createContent). A draft has no node to carry proposals, and a repository that cannot
+   * answer leaves none: either way the mount goes on with the run's own findings instead.
+   */
+  private async loadSuggestions(): Promise<void> {
+    const node = this.node();
+    if (node && !isDraftNode(node)) {
+      this.storedSuggestions.set(await this.suggestions.load(node.ref.id));
+    }
+    this.suggestionsRead.set(true);
+  }
+
   /** Create the element, set every input as a property, THEN append (see the class comment). */
   private mount(): void {
     if (this.element) return;
@@ -148,11 +179,17 @@ export class MdsEditorComponent implements MetadataEditor, OnDestroy {
     this.latestValues = this.initialValues;
 
     const node = this.node();
-    // The agent's fields, as the editor's own suggestions. Node mode only: the fan-out that hands a
-    // suggestion to its widget is set up in `initWithNodes`, so a form built on a values map never
-    // sees them (`nodes` is what decides that, not `editorMode` — a draft's form is built on its
-    // stand-in node too). Set before the element connects, like every other input.
-    const suggestions = node ? aiSuggestionsFor(metadata, node.ref.id) : null;
+    // The node's proposals, as the editor's own suggestions: what the repository stores for it, else the
+    // run's findings for a content it holds none of. Handed in either way — the wrapper reads the stored
+    // ones itself, but only this input turns the widgets' KI marking on.
+    //
+    // Node mode only: the fan-out that hands a suggestion to its widget is set up in `initWithNodes`, so a
+    // form built on a values map never sees them (`nodes` is what decides that, not `editorMode` — a
+    // draft's form is built on its stand-in node too). Set before the element connects, like every other
+    // input.
+    const suggestions = node
+      ? this.storedSuggestions() ?? aiSuggestionsFor(metadata, node.ref.id)
+      : null;
     // The licence is set rather than proposed: dropping it from the offer is what keeps it on the node,
     // so its widget shows a licence chosen instead of one to accept first.
     for (const field of LICENSE_FIELDS) delete suggestions?.suggestions[field];

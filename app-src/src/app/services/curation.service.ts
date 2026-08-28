@@ -27,6 +27,7 @@ import { NodeWriteService } from './node-write.service';
 import { NostrForwardService } from './nostr-forward.service';
 import { NodeSummary, RepositoryNodeService } from './repository-node.service';
 import { QualityJudgeService } from './quality-judge.service';
+import { SuggestionService } from './suggestion.service';
 
 /** A collection the content was added to. */
 export interface Collection {
@@ -124,6 +125,9 @@ export class CurationService {
   private readonly nodeWrite = inject(NodeWriteService);
   private readonly browserExtensionCustomWebComponent = inject(BrowserExtensionCustomWebComponentService);
   private readonly repositoryNodes = inject(RepositoryNodeService);
+  // The node's KI-Vorschläge in the repository — where the agent's findings are laid down once the
+  // content has a node to hang them off (see {@link proposeGeneratedMetadata}).
+  private readonly suggestions = inject(SuggestionService);
   private readonly qualityJudge = inject(QualityJudgeService);
   // The forwarding step's other target: a nostr relay, which is published to by the same way on that
   // carries the forwarding to the editorial teams — see {@link forwardToNostr}.
@@ -674,9 +678,10 @@ export class CurationService {
   /**
    * Write the content as the preview step confirmed it — the first save, and the one that creates the
    * node. Picture, title and the page the content was read off: the agent's other findings stay a
-   * proposal until the user has seen them.
+   * proposal until the user has seen them, and are laid down as such on the node that is created here
+   * (see {@link proposeGeneratedMetadata}).
    */
-  createContent(): Promise<boolean> {
+  async createContent(): Promise<boolean> {
     const title = this.contentTitle();
     const url = this.contentUrl();
     const values: MdsValues = {};
@@ -685,7 +690,26 @@ export class CurationService {
     // "this page is already in here" by this property, so a node that carries it is recognisable as
     // this page's content long before it is described (see PageRecognitionService).
     if (url) values['ccm:wwwurl'] = [url];
-    return this.save(values);
+    const written = await this.save(values);
+    if (written) await this.proposeGeneratedMetadata();
+    return written;
+  }
+
+  /**
+   * Hand the run's findings to the repository as KI-Vorschläge on the content's node — everything the
+   * agent filled in, which this write deliberately does not write as values. It is the earliest moment
+   * they can be laid down: a suggestion hangs off a node, and this is where the node comes into being.
+   *
+   * Only where this session writes as the user: the agent route's node belongs to the agent, and this
+   * session may not propose on it. There the Metadaten step falls back to the panel's own offer.
+   *
+   * Nothing hangs on the outcome — a repository without the `mongo-plugin` refuses, and the step behind
+   * this one shows the same proposals from the run itself (see MdsEditorComponent).
+   */
+  private async proposeGeneratedMetadata(): Promise<void> {
+    const nodeId = this.activeNode()?.nodeId;
+    if (!nodeId || this.savesThroughAgent()) return;
+    await this.suggestions.propose(nodeId, this.metadataAgent.lastRun()?.parsed?.raw ?? null);
   }
 
   /**

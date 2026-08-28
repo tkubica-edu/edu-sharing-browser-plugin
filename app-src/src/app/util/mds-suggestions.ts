@@ -1,7 +1,16 @@
-// The MDS editor's metadata suggestions, as the wrapper's `suggestions` input takes them. Handing them in from
-// outside is how the panel gets the agent's fields marked as KI-Vorschläge: the editor's own path to them needs
-// the mongo-plugin, the b-api and a toolpermission, and generates suggestions of its own on top.
+// The MDS editor's metadata suggestions, on both sides of the repository: what the suggestion API is given
+// (`aiSuggestionRequests`) and what comes back from it (`storedAiSuggestions`), plus the in-memory stand-in
+// for a content the repository holds none for (`aiSuggestionsFor`).
+//
+// They are handed to the wrapper through its `suggestions` input in every case, also for the ones the
+// repository stores: the wrapper fetches those itself, but only its `suggestions` input flips the switch the
+// widgets show a proposal under (`showAiSuggestions`).
 
+import {
+  CreateSuggestionRequestDto, NodeSuggestionResponseDto, RestConstants
+} from 'ngx-edu-sharing-api';
+
+import { LICENSE_FIELDS } from './agent-fields';
 import { toMdsEditorValues } from './mds-values';
 
 /** One proposed value for one property, in the shape the editor's widgets read. */
@@ -57,4 +66,76 @@ export function aiSuggestionsFor(
     }));
   }
   return Object.keys(suggestions).length ? { nodeId, suggestions } : null;
+}
+
+/**
+ * How sure the agent is of a value, as the suggestion API records it. A flat 1: the agent reports no
+ * per-field confidence of its own, and inventing a spread would state a certainty nothing measured.
+ */
+const AI_CONFIDENCE = 1;
+
+/**
+ * The namespaces a proposed property may be in. The repository resolves a `propertyId` through
+ * `CCConstants.getValidGlobalName()`, which answers `null` for a prefix it does not know — and the
+ * suggestion endpoint hands that `null` straight to `QName.createQName()`, which fails the whole
+ * request (`InvalidQNameException`, HTTP 500), not just the one entry.
+ *
+ * The agent's payload carries names of its own besides the repository's (`schema:datePublished`,
+ * `oeh:new_lrt`); those are a vocabulary, not properties of a node, and are left out here.
+ */
+const PROPOSABLE_NAMESPACES: readonly string[] = ['ccm', 'cclom', 'cm'];
+
+/** Whether a property is one the repository can resolve — see {@link PROPOSABLE_NAMESPACES}. */
+function isProposable(propertyId: string): boolean {
+  return PROPOSABLE_NAMESPACES.includes(propertyId.split(':')[0]);
+}
+
+/**
+ * The agent's fields of a payload as the repository's suggestion API takes them — one entry per property
+ * and value, which is the grain a suggestion has (it is always single-valued). The licence is left out:
+ * it is set rather than proposed, so the form shows a licence chosen instead of one still to be accepted.
+ */
+export function aiSuggestionRequests(
+  payload: Record<string, unknown> | null | undefined,
+): CreateSuggestionRequestDto[] {
+  const values = toMdsEditorValues(payload);
+  return aiFieldsOf(payload)
+    .filter((propertyId) => isProposable(propertyId) && !LICENSE_FIELDS.includes(propertyId))
+    .flatMap((propertyId) =>
+      (values[propertyId] ?? [])
+        .filter((value) => value.trim())
+        .map((value) => ({
+          propertyId,
+          value,
+          description: RestConstants.SUGGESTION_DESCRIPTION_METHODOLOGY,
+          confidence: AI_CONFIDENCE
+        })),
+    );
+}
+
+/**
+ * The suggestions the repository stores for a node, in the shape the widgets read: the machine's pending
+ * ones only — an accepted or declined suggestion is a decision already taken, and a person's proposal is
+ * not what the KI marking is about. Null where the node carries none, so the caller can leave the editor's
+ * input unset rather than hand it an empty offer.
+ */
+export function storedAiSuggestions(
+  response: NodeSuggestionResponseDto | null | undefined,
+): NodeSuggestions | null {
+  if (!response) return null;
+  const suggestions: Record<string, MdsSuggestion[]> = {};
+  for (const [propertyId, stored] of Object.entries(response.suggestions ?? {})) {
+    const pending = (stored ?? [])
+      .filter((entry) => entry.type === 'AI' && entry.status === 'PENDING')
+      .map((entry) => ({
+        id: entry.id,
+        propertyId,
+        value: String(entry.value ?? ''),
+        status: 'PENDING' as const,
+        type: 'AI' as const
+      }))
+      .filter((entry) => entry.value.trim());
+    if (pending.length) suggestions[propertyId] = pending;
+  }
+  return Object.keys(suggestions).length ? { nodeId: response.nodeId, suggestions } : null;
 }
