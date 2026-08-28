@@ -83,6 +83,9 @@ export interface Conditions {
   /** The repository config enabled the browser extension custom web component — see
    *  BrowserExtensionCustomWebComponentService. */
   browserExtensionCustomWebComponent: boolean;
+  /** The settings let the panel speak to a nostr relay. Off, nothing is published to one and nothing
+   *  asked of one, so the steps that do either are not offered (NostrForwardService.enabled). */
+  nostrEnabled: boolean;
   /** The Qualitätsprüfung's knock-out criteria are answered, so the quality may be confirmed
    *  (QualityCriteriaComponent reports it, CurationService holds it). */
   qualityCriteriaMet: boolean;
@@ -368,7 +371,11 @@ export const SECTIONS: readonly AppSection[] = [
     // extension custom web component's (the groups a submitted content is judged by), and the nostr relay,
     // which is nobody's — an AMB record is published from any repository. So the step itself is offered
     // everywhere and shows only the relay where the teams do not apply (see EditorialForwardScreenComponent).
-    visible: requiresLogin((c) => c.hasEditableMetadata),
+    // Which is also why it needs one of the two to exist: with the relay switched off and no teams to
+    // forward to, the step would be a heading over an empty list.
+    visible: requiresLogin(
+      (c) => c.hasEditableMetadata && (c.browserExtensionCustomWebComponent || c.nostrEnabled)
+    ),
     // The way on out of the step writes what it picked, which a guest session may no longer do for a
     // content past its editing window — see AppSection.requiresSession.
     requiresSession: (c) => c.agentEditWindowClosed,
@@ -395,10 +402,11 @@ export const SECTIONS: readonly AppSection[] = [
     // a content that is past it. An active node, not merely editable metadata — the record names the node
     // it was read off, and there is nothing to publish about a result that was never written.
     //
-    // No further condition: an AMB record needs nothing of the repository beyond those metadata, and the
+    // Nothing further of the repository: an AMB record needs nothing of it beyond those metadata, and the
     // relay is nobody's. Nothing is written to the repository here either, so unlike the steps around it
-    // this one needs no session of the user's own.
-    visible: requiresLogin((c) => c.hasActiveNode),
+    // this one needs no session of the user's own. What it does need is the settings' switch — the step is
+    // a publication into the open network and is not offered where that was switched off.
+    visible: requiresLogin((c) => c.hasActiveNode && c.nostrEnabled),
     tabs: [{ id: 'nostr-forward', label: 'An Nostr Relay senden' }]
   },
   {
@@ -476,9 +484,10 @@ export const SECTIONS: readonly AppSection[] = [
         id: 'interactions',
         label: 'Interaktionen',
         // Where the content went outside this panel: what the editorial teams answered, and where it
-        // stands with the nostr relay. No condition of its own — the teams' half needs the browser
-        // extension custom web component and says so itself, while the relay's half applies to every
-        // content, so the view always has an answer (see InteractionsScreenComponent).
+        // stands with the nostr relay. Each half says for itself whether it applies (see
+        // InteractionsScreenComponent); the view is offered while either of them does, and with the
+        // teams absent and the relay switched off there is nothing left for it to report.
+        visible: (c) => c.browserExtensionCustomWebComponent || c.nostrEnabled
       }
     ]
   },

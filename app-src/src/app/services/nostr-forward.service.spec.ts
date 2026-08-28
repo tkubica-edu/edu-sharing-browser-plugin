@@ -469,6 +469,64 @@ describe('NostrForwardService', () => {
     });
   });
 
+  describe('the switch that takes the relay out of the panel altogether', () => {
+    it('is on to begin with, the relay being every repository`s', () => {
+      expect(nostr.enabled()).toBe(true);
+    });
+
+    it('is remembered, so a panel that was switched off comes back switched off', async () => {
+      await nostr.setEnabled(false);
+
+      await nostr.load();
+
+      expect(nostr.enabled()).toBe(false);
+    });
+
+    it('sends nothing while it is off, whatever the step ticked', async () => {
+      const relay = fakeRelay();
+      nostr.select(true);
+      await nostr.setEnabled(false);
+
+      // The forwarding leads on rather than reporting a failure: there is nothing to publish, which is
+      // not the same as a publication that did not get through.
+      expect(await nostr.forward(aSource())).toBe(true);
+      expect(await nostr.publish(aSource())).toBe(false);
+      expect(relay.sent).toEqual([]);
+      expect(nostr.receipt()).toBeNull();
+    });
+
+    it('asks no relay what it holds while it is off', async () => {
+      const relay = fakeRelay({ holds: [aStoredRecord()] });
+      await nostr.setEnabled(false);
+
+      await nostr.lookup(aSource());
+
+      expect(relay.asked).toEqual([]);
+      expect(nostr.receipt()).toBeNull();
+    });
+
+    it('lets go of what the content had with the relay as it goes off', async () => {
+      fakeRelay();
+      nostr.select(true);
+      await nostr.forward(aSource());
+
+      await nostr.setEnabled(false);
+
+      // Nothing of it is shown any more, so nothing of it may come back with the switch either.
+      expect(nostr.selected()).toBe(false);
+      expect(nostr.receipt()).toBeNull();
+    });
+
+    it('publishes again once it is back on', async () => {
+      const relay = fakeRelay();
+      await nostr.setEnabled(false);
+      await nostr.setEnabled(true);
+
+      expect(await nostr.publish(aSource())).toBe(true);
+      expect(relay.sent).toHaveLength(1);
+    });
+  });
+
   it('lets go of what was published for one content, keeping the identity it went out under', async () => {
     fakeRelay();
     nostr.select(true);

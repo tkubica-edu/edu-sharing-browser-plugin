@@ -72,8 +72,10 @@ export class InteractionsScreenComponent {
     // there are teams: without them the view holds the relay's receipt alone.
     if (this.teams.enabled()) void this.groups.load();
     // What the relay holds about this content — the half of this view that is a state rather than an
-    // exchange has nothing to report until it has been asked (see NostrForwardService.lookup).
-    void this.curation.lookUpOnNostr();
+    // exchange has nothing to report until it has been asked (see NostrForwardService.lookup). Asked
+    // only where that half is shown; the service refuses the question anyway with the relay switched
+    // off, so this is what keeps the asking and the showing one statement.
+    if (this.nostr.enabled()) void this.curation.lookUpOnNostr();
   }
 
   /**

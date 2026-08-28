@@ -205,6 +205,12 @@ export const APP_CONFIG = {
     /** What the panel says about the chat's master skill — see ChatSkillService. */
     chatMasterSkill: 'eduSharingChatMasterSkill',
     /**
+     * Whether the panel speaks to a nostr relay at all — see NostrForwardService. Off takes the two steps
+     * that publish, the relay row of the forwarding and the standing in the Interaktionen with it, and
+     * nothing about a content is sent to or asked of a relay.
+     */
+    nostrEnabled: 'eduSharingNostrEnabled',
+    /**
      * The relay the "An Nostr Relay weiterleiten" step publishes to, where the settings name one of
      * their own; empty leaves `APP_CONFIG.nostrRelayUrl` standing (see NostrForwardService).
      */

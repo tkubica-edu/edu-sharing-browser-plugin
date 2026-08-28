@@ -284,14 +284,24 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    with *In Sammlung einfügen*; the screen lists what was added.
 7. **An Nostr Relay weiterleiten**: the step is reached in the base version too — against a repository
    *without* `browserExtensionCustomWebComponent` it must show the relay row alone, with no Redaktionen
-   list, no „keine Redaktionen konfiguriert" line and no collection request in the network tab. Tick the
-   relay row → the footer reads *An Relay senden*. Press it → the step stays open and the receipt appears: relay, `npub`, event id, the
-   tags that went out, and the lookup commands. Verify against the relay itself with the receipt's own
+   list, no „keine Redaktionen konfiguriert" line and no collection request in the network tab. The
+   *Nostr-Relay* group in *Einstellungen* must be there in that version too — the step is, so its relay
+   address has to be settable. Tick the relay row → the footer reads *An Relay senden*. Press it → the
+   step stays open and the receipt appears: relay, `npub`, event id, the tags that went out, and the
+   lookup commands. Verify against the relay itself with the receipt's own
    `nak fetch <naddr…>` (or paste its `REQ` frame into `websocat`) — the record that comes back must
    carry the same `d`, `name` and `t` tags. Pressing *Weiter* again must lead on **without** publishing
    a second event. Point the relay in *Einstellungen* at something unreachable to see the refusal
    reported in the step instead of the flow moving on. This needs a real browser: WebSockets are what
    the unit tests stub.
+
+   Then untick *Nostr-Relay verwenden* in *Einstellungen*: the relay row must be gone from this step,
+   *An Nostr Relay senden* gone from the *Inhaltsoptionen*, and the *Nostr-Anbindung* half gone from
+   the *Interaktionen* — with no `wss:` connection in the network tab from any of the three. Against a
+   repository *without* `browserExtensionCustomWebComponent` the whole step must then be gone from the
+   flow as well, since it has no target left. Ticking it again brings all of it back, with the relay
+   row unticked and no receipt carried over.
+
 8. **An Nostr Relay senden** (Inhaltsoptionen, between *Inhalt teilen* and *Interaktionen anzeigen*):
    open a node from the *Verlauf* → the row appears and opens a step of its own — the Inhaltsübersicht
    must **not** grow a tab for it. The screen names the `d` tag and the field count

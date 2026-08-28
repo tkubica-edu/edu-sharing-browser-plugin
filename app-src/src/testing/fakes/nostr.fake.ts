@@ -4,12 +4,14 @@ import { vi } from 'vitest';
 import { NostrForwardService, NostrReceipt } from '../../app/services/nostr-forward.service';
 
 /**
- * `NostrForwardService` reduced to what the footer reads: whether the relay is ticked, whether the address
- * can be one at all, whether a publication is running, and whether one already happened. The publication
- * itself is {@link CurationService}'s business, so the fake carries neither `forward` nor `publish`.
+ * `NostrForwardService` reduced to what the footer and the registry read: whether the panel speaks to a
+ * relay at all, whether the relay is ticked, whether the address can be one, whether a publication is
+ * running, and whether one already happened. The publication itself is {@link CurationService}'s business,
+ * so the fake carries neither `forward` nor `publish`.
  */
 export function fakeNostrForward() {
   const fake = {
+    enabled: signal(true),
     selected: signal(false),
     sending: signal(false),
     looking: signal(false),
@@ -40,7 +42,12 @@ export function fakeNostrForward() {
     fake.receipt.set({ own: false } as NostrReceipt);
   }
 
-  return { fake, select, published, publishedByAnother };
+  /** The settings switched the relay off, so nothing about nostr is offered — see the registry. */
+  function disable(): void {
+    fake.enabled.set(false);
+  }
+
+  return { fake, select, published, publishedByAnother, disable };
 }
 
 export type NostrForwardFake = ReturnType<typeof fakeNostrForward>;

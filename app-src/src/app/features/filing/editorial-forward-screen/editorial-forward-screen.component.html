@@ -93,56 +93,60 @@
     }
   }
 
-  <!-- The relay, as one more target of this step: a card of the same shape as the teams above, since it
-       is the same decision — where this content is offered. It sits apart from them because it is not a
-       team of this repository: what goes there is the content's metadata as an AMB record, published
-       openly into the nostr network under this installation's own key. -->
-  <ul class="groups nostr" [class.is-locked]="busy.busy() || nostr.sending()">
-    <li class="group" [class.is-selected]="nostr.selected()">
-      <label class="head" [attr.title]="busy.hint()">
-        <input type="checkbox" [checked]="nostr.selected()"
-               [disabled]="busy.busy() || nostr.sending() || !!nostr.receipt()"
-               (change)="nostr.select($any($event.target).checked)" />
-        <span class="logo">
-          <i class="logo-glyph" esIcon="hub"></i>
-        </span>
-        <span class="name">An Nostr Relay weiterleiten</span>
-      </label>
+  <!-- The relay is a target of this step only where the settings let the panel speak to one at all; off,
+       the step is the teams alone (see NostrForwardService.enabled). -->
+  @if (nostr.enabled()) {
+    <!-- The relay, as one more target of this step: a card of the same shape as the teams above, since it
+         is the same decision — where this content is offered. It sits apart from them because it is not a
+         team of this repository: what goes there is the content's metadata as an AMB record, published
+         openly into the nostr network under this installation's own key. -->
+    <ul class="groups nostr" [class.is-locked]="busy.busy() || nostr.sending()">
+      <li class="group" [class.is-selected]="nostr.selected()">
+        <label class="head" [attr.title]="busy.hint()">
+          <input type="checkbox" [checked]="nostr.selected()"
+                 [disabled]="busy.busy() || nostr.sending() || !!nostr.receipt()"
+                 (change)="nostr.select($any($event.target).checked)" />
+          <span class="logo">
+            <i class="logo-glyph" esIcon="hub"></i>
+          </span>
+          <span class="name">An Nostr Relay weiterleiten</span>
+        </label>
 
-      <!-- Wohin es geht, steht in der Zeile: Das Relay ist einstellbar, und welches gerade gilt, ist
-           die eine Angabe, die diese Auswahl trägt. -->
-      <p class="folder-none nostr-target">
-        @if (nostr.sending()) {
-          <es-spinner class="folder-spinner"></es-spinner>
-          Der Eintrag wird an <code>{{ nostr.relayUrl() }}</code> gesendet …
-        } @else if (nostr.receipt(); as receipt) {
-          @if (receipt.origin === 'session') {
-            Gesendet an <code>{{ nostr.relayUrl() }}</code> — die Daten stehen unten.
+        <!-- Wohin es geht, steht in der Zeile: Das Relay ist einstellbar, und welches gerade gilt, ist
+             die eine Angabe, die diese Auswahl trägt. -->
+        <p class="folder-none nostr-target">
+          @if (nostr.sending()) {
+            <es-spinner class="folder-spinner"></es-spinner>
+            Der Eintrag wird an <code>{{ nostr.relayUrl() }}</code> gesendet …
+          } @else if (nostr.receipt(); as receipt) {
+            @if (receipt.origin === 'session') {
+              Gesendet an <code>{{ nostr.relayUrl() }}</code> — die Daten stehen unten.
+            } @else {
+              Liegt bereits bei <code>{{ nostr.relayUrl() }}</code> — die Daten stehen unten.
+            }
           } @else {
-            Liegt bereits bei <code>{{ nostr.relayUrl() }}</code> — die Daten stehen unten.
+            Relay: <code>{{ nostr.relayUrl() }}</code> — als AMB-Eintrag (Nostr-Event der Art 30142).
+            Änderbar in den Einstellungen.
           }
-        } @else {
-          Relay: <code>{{ nostr.relayUrl() }}</code> — als AMB-Eintrag (Nostr-Event der Art 30142).
-          Änderbar in den Einstellungen.
-        }
+        </p>
+      </li>
+    </ul>
+
+    @if (nostr.selected() && !nostr.receipt() && !nostr.sending()) {
+      <p class="es-muted nostr-hint">
+        Mit „An Relay senden“ geht der Eintrag hinaus. Das ist eine Veröffentlichung und keine Vorlage
+        zur Prüfung: Nostr-Relays verteilen Events weiter, und ein einmal gesendetes Event lässt sich
+        nicht zurückholen.
       </p>
-    </li>
-  </ul>
+    }
 
-  @if (nostr.selected() && !nostr.receipt() && !nostr.sending()) {
-    <p class="es-muted nostr-hint">
-      Mit „An Relay senden“ geht der Eintrag hinaus. Das ist eine Veröffentlichung und keine Vorlage
-      zur Prüfung: Nostr-Relays verteilen Events weiter, und ein einmal gesendetes Event lässt sich
-      nicht zurückholen.
-    </p>
+    @if (nostr.error(); as message) {
+      <p class="es-error">Der Eintrag konnte nicht an das Relay gesendet werden: {{ message }}</p>
+    }
+
+    <!-- Was hinausgegangen ist, und wie es sich beim Relay nachprüfen lässt. -->
+    <es-nostr-receipt></es-nostr-receipt>
   }
-
-  @if (nostr.error(); as message) {
-    <p class="es-error">Der Eintrag konnte nicht an das Relay gesendet werden: {{ message }}</p>
-  }
-
-  <!-- Was hinausgegangen ist, und wie es sich beim Relay nachprüfen lässt. -->
-  <es-nostr-receipt></es-nostr-receipt>
 
   <!-- The forwarding is carried out by the write the way on makes; a refusal is reported back here,
        which is where it can be answered by picking differently. -->

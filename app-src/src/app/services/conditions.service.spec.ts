@@ -6,16 +6,19 @@ import { BrowserExtensionCustomWebComponentService } from './browser-extension-c
 import { ConditionsService } from './conditions.service';
 import { CurationService } from './curation.service';
 import { DebugService } from './debug.service';
+import { NostrForwardService } from './nostr-forward.service';
 import { provideFake } from '../../testing/provide-fake';
 import {
   AuthFake,
   CurationFake,
   DebugFake,
   FAKE_REPOSITORY_URL,
+  NostrForwardFake,
   WebComponentFake,
   fakeAuth,
   fakeCuration,
   fakeDebug,
+  fakeNostrForward,
   fakeWebComponent,
 } from '../../testing/fakes';
 
@@ -24,18 +27,21 @@ describe('ConditionsService', () => {
   let auth: AuthFake;
   let curation: CurationFake;
   let debug: DebugFake;
+  let nostr: NostrForwardFake;
   let webComponent: WebComponentFake;
 
   beforeEach(() => {
     auth = fakeAuth();
     curation = fakeCuration();
     debug = fakeDebug();
+    nostr = fakeNostrForward();
     webComponent = fakeWebComponent();
     TestBed.configureTestingModule({
       providers: [
         provideFake(AuthService, auth.fake),
         provideFake(CurationService, curation.fake),
         provideFake(DebugService, debug.fake),
+        provideFake(NostrForwardService, nostr.fake),
         provideFake(BrowserExtensionCustomWebComponentService, webComponent.fake),
       ],
     });
@@ -138,6 +144,9 @@ describe('ConditionsService', () => {
 
   it('hands every flag on in the snapshot, and recomputes it when a source changes', () => {
     conditions.activeUrl.set('https://example.org/article');
+    // The one flag that stands at true without anybody setting it, turned down so this test starts from
+    // the same place for all of them and every one of them is watched changing.
+    nostr.fake.enabled.set(false);
 
     expect(conditions.snapshot()).toEqual({
       onlyOfficePresent: false,
@@ -150,6 +159,7 @@ describe('ConditionsService', () => {
       hasCuratedContent: false,
       recognizingContent: true,
       browserExtensionCustomWebComponent: false,
+      nostrEnabled: false,
       qualityCriteriaMet: false,
       agentEditWindowClosed: false,
     });
@@ -161,6 +171,7 @@ describe('ConditionsService', () => {
     curation.fake.qualityCriteriaMet.set(true);
     curation.fake.agentEditWindowClosed.set(true);
     webComponent.fake.enabled.set(true);
+    nostr.fake.enabled.set(true);
     conditions.recognizingContent.set(false);
 
     expect(conditions.snapshot()).toEqual({
@@ -174,6 +185,7 @@ describe('ConditionsService', () => {
       hasCuratedContent: true,
       recognizingContent: false,
       browserExtensionCustomWebComponent: true,
+      nostrEnabled: true,
       qualityCriteriaMet: true,
       agentEditWindowClosed: true,
     });

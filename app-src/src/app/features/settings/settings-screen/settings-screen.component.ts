@@ -225,6 +225,16 @@ export class SettingsScreenComponent implements OnDestroy {
   // Written as it is edited, like every other setting here. An emptied field is not an invalid one: it
   // puts the relay the panel ships with back in force (see NostrForwardService.relayUrl).
 
+  /**
+   * Switch the whole nostr connection on or off. Marked as a change, unlike the relay address beside it:
+   * which steps the panel offers hangs on it, and the menu that is landed on when the settings are left is
+   * built from those (see {@link ngOnDestroy}).
+   */
+  protected setNostrEnabled(enabled: boolean): void {
+    this.changed = true;
+    void this.nostr.setEnabled(enabled);
+  }
+
   protected setNostrRelayUrl(url: string): void {
     void this.nostr.setRelayUrl(url);
   }

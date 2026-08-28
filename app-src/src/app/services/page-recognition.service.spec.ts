@@ -10,6 +10,7 @@ import { CurationService } from './curation.service';
 import { DebugService } from './debug.service';
 import { DevModeService } from './dev-mode.service';
 import { HistoryEntry, HistoryService } from './history.service';
+import { NostrForwardService } from './nostr-forward.service';
 import { PageRecognitionService } from './page-recognition.service';
 import { provideFake } from '../../testing/provide-fake';
 import {
@@ -27,6 +28,7 @@ import {
   fakeDebug,
   fakeDevMode,
   fakeHistory,
+  fakeNostrForward,
   fakeWebComponent,
 } from '../../testing/fakes';
 
@@ -69,6 +71,8 @@ describe('PageRecognitionService', () => {
         provideFake(HistoryService, history.fake),
         provideFake(ClientutilsV1Service, clientUtils.fake),
         provideFake(BrowserExtensionCustomWebComponentService, fakeWebComponent().fake),
+        // Reached through the real ConditionsService, which asks it whether the panel speaks to a relay.
+        provideFake(NostrForwardService, fakeNostrForward().fake),
       ],
     });
     conditions = TestBed.inject(ConditionsService);

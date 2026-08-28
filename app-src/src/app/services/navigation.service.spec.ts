@@ -8,12 +8,14 @@ import { CurationService } from './curation.service';
 import { DebugService } from './debug.service';
 import { HistoryService } from './history.service';
 import { NavigationService } from './navigation.service';
+import { NostrForwardService } from './nostr-forward.service';
 import { PageRecognitionService } from './page-recognition.service';
 import { provideFake } from '../../testing/provide-fake';
 import {
   AuthFake,
   CurationFake,
   HistoryFake,
+  NostrForwardFake,
   PageRecognitionFake,
   WebComponentFake,
   anActiveNode,
@@ -21,6 +23,7 @@ import {
   fakeCuration,
   fakeDebug,
   fakeHistory,
+  fakeNostrForward,
   fakePageRecognition,
   fakeWebComponent,
 } from '../../testing/fakes';
@@ -32,6 +35,7 @@ describe('NavigationService', () => {
   let curation: CurationFake;
   let webComponent: WebComponentFake;
   let history: HistoryFake;
+  let nostr: NostrForwardFake;
   let recognition: PageRecognitionFake;
 
   /**
@@ -44,6 +48,7 @@ describe('NavigationService', () => {
     curation = fakeCuration();
     webComponent = fakeWebComponent();
     history = fakeHistory();
+    nostr = fakeNostrForward();
     recognition = fakePageRecognition();
     TestBed.configureTestingModule({
       providers: [
@@ -52,6 +57,7 @@ describe('NavigationService', () => {
         provideFake(DebugService, fakeDebug().fake),
         provideFake(BrowserExtensionCustomWebComponentService, webComponent.fake),
         provideFake(HistoryService, history.fake),
+        provideFake(NostrForwardService, nostr.fake),
         provideFake(PageRecognitionService, recognition.fake),
       ],
     });
@@ -184,6 +190,44 @@ describe('NavigationService', () => {
 
       // The editorial teams belong to the web component, the nostr relay to nobody — so the step
       // applies wherever a content can be forwarded at all, see model/navigation.ts.
+      expect(navigation.section()).toBe('editorial-forward');
+    });
+
+    it('opens the publication step for a saved content', () => {
+      contentInHand();
+
+      navigation.go('nostr-forward');
+
+      expect(navigation.section()).toBe('nostr-forward');
+    });
+
+    it('refuses the publication step where the settings switched the relay off', () => {
+      contentInHand();
+      nostr.disable();
+
+      navigation.go('nostr-forward');
+
+      expect(navigation.section()).toBe('menu');
+    });
+
+    it('refuses the forwarding where neither a team nor the relay is left to forward to', () => {
+      contentInHand();
+      nostr.disable();
+
+      navigation.go('editorial-forward');
+
+      // Without the web component there are no editorial teams, and with the relay switched off there
+      // is no second target either — the step would be a heading over an empty list.
+      expect(navigation.section()).toBe('menu');
+    });
+
+    it('keeps the forwarding where the teams stand for the switched-off relay', () => {
+      contentInHand();
+      withWebComponent();
+      nostr.disable();
+
+      navigation.go('editorial-forward');
+
       expect(navigation.section()).toBe('editorial-forward');
     });
 
@@ -533,6 +577,30 @@ describe('NavigationService', () => {
       expect(navigation.showTabs()).toBe(false);
       // The gate belongs to the Qualität view, which is not there to answer it.
       expect(navigation.screen()).toBe('metadata');
+    });
+  });
+
+  describe('the views of the Inhaltsübersicht', () => {
+    beforeEach(() => {
+      contentInHand();
+      navigation.go('overview');
+    });
+
+    it('reports the Interaktionen for the relay alone, without the editorial teams', () => {
+      expect(navigation.tabs().map((tab) => tab.id)).toContain('interactions');
+    });
+
+    it('drops them where there is neither a team nor a relay to report about', () => {
+      nostr.disable();
+
+      expect(navigation.tabs().map((tab) => tab.id)).not.toContain('interactions');
+    });
+
+    it('keeps them for the teams where the relay is switched off', () => {
+      withWebComponent();
+      nostr.disable();
+
+      expect(navigation.tabs().map((tab) => tab.id)).toContain('interactions');
     });
   });
 

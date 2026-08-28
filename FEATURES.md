@@ -74,8 +74,10 @@ Which editor renders that screen, and which route the save takes, is
   [An Nostr Relay weiterleiten](#an-nostr-relay-weiterleiten). Under its own heading beside the teams'
   stands **Nostr-Anbindung**: `es-nostr-standing`, which answers for every content whether it is
   published — by this installation or by another — refused, in flight, being looked up, unknown, merely
-  ticked or untouched, and names the relay and the `npub` behind that answer in each case — so the view has something to say even where nothing was ever forwarded, and
-  it needs no condition of its own in the registry. Only reported there; the step that acts on it is
+  ticked or untouched, and names the relay and the `npub` behind that answer in each case — so the view has something to say even where nothing was ever forwarded.
+  That half needs the relay to be switched on (*Einstellungen → Nostr-Relay verwenden*), and the view
+  itself is offered while either half applies: with no teams and no relay there is nothing left to
+  report and the tab falls away. Only reported there; the step that acts on it is
   [An Nostr Relay senden](#an-nostr-relay-senden). Marked
   **Entwurf** wherever the teams apply: the repository hands out no communication history yet, so the
   cards name the real forwardings while the steps under them are an example ending in „Noch keine
@@ -123,7 +125,8 @@ The step holds two kinds of target and shows each where it applies: the editoria
 are the browser extension custom web component's, and the
 [nostr relay](#an-nostr-relay-weiterleiten) under them, which is every repository's. In the base
 version the teams' half is not rendered at all — neither the list nor the requests behind it — and
-the step is the relay row plus its receipt.
+the step is the relay row plus its receipt. With the relay switched off as well
+(*Einstellungen → Nostr-Relay verwenden*) the step has no target left and is not offered at all.
 
 Lists the editorial groups the repository config names in **`browserExtensionEditorialGroups`**
 (`['ID1', 'ID2']`, read once per session by `EditorialGroupsService` →
@@ -154,6 +157,16 @@ network: the row says so before it is acted on, and the footer's way on is label
 rather than *Weiter* while it would publish. It is offered in the base version too — publishing an AMB
 record needs nothing of the repository beyond the metadata — and is what keeps *An Redaktionen
 weiterleiten* a step of the flow there.
+
+The whole connection is a setting: **Nostr-Relay verwenden** in *Einstellungen*
+(`eduSharingNostrEnabled`, on by default, `NostrForwardService.enabled`). Switched off, the panel has
+nothing to do with the network at all — this row is not rendered, *An Nostr Relay senden* is not
+offered in the *Inhaltsoptionen*, the *Nostr-Anbindung* half of the *Interaktionen* falls away with
+it, and neither `publish` nor `lookup` reaches a relay, so nothing is sent and nothing asked. Two
+steps then rest on it: *An Redaktionen weiterleiten* is offered only while it has a target — the
+editorial teams or the relay — and the *Interaktionen* view only while one of the two has something
+to report. Switching it off also drops what the content in hand had with the relay (the tick and the
+receipt), so switching it back on carries nothing into a step as though it had just happened.
 
 The mapping lives in `util/amb-event.ts` and follows the reference converter
 (`edufeed-org/amb-nostr-converter`): the record's `id` — and with it the event's `d` tag — is the
@@ -218,9 +231,10 @@ A step of its own rather than a view of the Inhaltsübersicht, entered from the 
 (`ContentFlowService.showNostrForward`). It publishes a content the panel already has — one taken up from
 the *Verlauf* or from *Meine Inhalte*, or detected on the open page — which is the same publication the
 forwarding step makes on its way on, for a content that is past that step. It applies to any active node
-and asks for nothing else: an AMB record needs nothing of the repository beyond the metadata, and unlike
-the steps around it this one writes nothing to the repository, so it needs no session of the user's own
-either.
+and asks for nothing else of the repository: an AMB record needs nothing of it beyond the metadata, and
+unlike the steps around it this one writes nothing to the repository, so it needs no session of the
+user's own either. What it does need is the settings' switch — with *Nostr-Relay verwenden* off the row
+is not offered in the *Inhaltsoptionen* at all.
 
 The mapping, the relay and the receipt are as in
 [An Nostr Relay weiterleiten](#an-nostr-relay-weiterleiten); what differs is that nothing is ticked — the
@@ -355,8 +369,12 @@ navigating to it, and closes it again where it stands; the step keeps running be
   [CHATBOT.md](CHATBOT.md#the-attributes-set-on-mount)),
   *Zugehörige Sammlungen empfehlen*, *Qualitätsprüfung* and *Nostr-Relay* (the relay
   [An Nostr Relay weiterleiten](#an-nostr-relay-weiterleiten) publishes to, plus the `npub` this
-  installation publishes under). Everything but the Entwickler-Optionen
-  belongs to the WLO panel and is shown only there (`browserExtensionCustomWebComponent`). Each group's
+  installation publishes under, and above both the switch **Nostr-Relay verwenden** that takes the
+  connection out of the panel altogether). *KI- und Chatbot-Optionen*, *Zugehörige Sammlungen empfehlen* and
+  *Qualitätsprüfung* configure steps that only the WLO panel has and are shown only there
+  (`browserExtensionCustomWebComponent`); *Entwickler-Optionen* and *Nostr-Relay* are shown in every
+  panel, the latter because the step it configures is offered in every panel too — an AMB record is
+  published from any repository and the relay belongs to none. Each group's
   head carries a pill counting the settings inside it that stand away from their default (`… geändert`),
   so a folded group says whether anything in it was touched; a group holding nothing but defaults carries
   none. Every default is compared where it is defined — each service answers for its own settings

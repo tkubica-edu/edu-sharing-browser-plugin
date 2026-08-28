@@ -87,10 +87,13 @@
   <!-- Die zweite Hälfte: kein Verlauf, sondern ein Stand — auch für einen Inhalt, der nie gesendet
        wurde, denn „liegt bei keinem Relay" ist die Auskunft, nach der hier gesucht wird. Gesendet wird
        nicht hier, sondern im Schritt „An Nostr Relay senden“; was hinausging, steht als Quittung
-       darunter. -->
-  <h3 class="half-head">Nostr-Anbindung</h3>
+       darunter. Shown only where the settings let the panel speak to a relay: with none, there is no
+       standing to report rather than one that reads as unpublished. -->
+  @if (nostr.enabled()) {
+    <h3 class="half-head">Nostr-Anbindung</h3>
 
-  <es-nostr-standing></es-nostr-standing>
+    <es-nostr-standing></es-nostr-standing>
 
-  <es-nostr-receipt></es-nostr-receipt>
+    <es-nostr-receipt></es-nostr-receipt>
+  }
 </div>

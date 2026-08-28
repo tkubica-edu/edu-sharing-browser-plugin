@@ -84,7 +84,9 @@ werden — und hier verlässt Folgendes das Gerät:
 - ein **JPEG-Screenshot des sichtbaren Tabs** (`background/background.js:338`), wenn die Seite kein eigenes Vorschaubild nennt
 - Repository-Zugangsdaten (Basic, nur im Login-Request), danach ein Session-Cookie mit `credentials: 'include'` (`background/background.js:98`)
 - bis **50 000 Zeichen** Inhaltstext an ContentJudge, bis 20 000 an den Chatbot
-- ein lokal erzeugter, dauerhafter Nostr-Schlüssel — der Pubkey geht an ein öffentliches Relay
+- ein lokal erzeugter, dauerhafter Nostr-Schlüssel — der Pubkey geht an ein öffentliches Relay; die
+  Anbindung ist in den Einstellungen ganz abschaltbar (*Nostr-Relay verwenden*), dann wird kein
+  Schlüssel erzeugt und nichts gesendet
 
 Zu schreiben: Datenschutzerklärung unter öffentlich erreichbarer URL, Support-URL, LICENSE.
 **≈1–2 PT Textarbeit, plus externe juristische Abnahme.**
@@ -289,7 +291,8 @@ antwortet der Proxy also nicht".
 - Off-Device-Übertragung von vollem Seitentext an Metadata-Agent, ContentJudge und Chatbot
 - der **hartverdrahtete IP-Host** `87.106.127.225.nip.io` als Chatbot-Backend
 - MetalookUp läuft per Default und ist im Core nicht abschaltbar
-- eine **öffentliche, nicht widerrufbare** Nostr-Publikation kuratierter Metadaten
+- eine **öffentliche, nicht widerrufbare** Nostr-Publikation kuratierter Metadaten — abschaltbar, aber
+  per Default an
 - Google-Fonts-Fetch zur Laufzeit
 - 54 MB Vendor-Bundles mit Fremdcode; `frame-ancestors *` im CSP
 - der Origin-lose `postMessage`-Eingangspfad in `content/panel-host.js`

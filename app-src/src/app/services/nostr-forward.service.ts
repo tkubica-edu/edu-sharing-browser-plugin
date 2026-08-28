@@ -15,6 +15,14 @@ import { BrowserExtensionService } from './browser-extension.service';
 const LOG = '[edu-sharing][nostr]';
 
 /**
+ * The relay is spoken to unless the settings say otherwise: publishing an AMB record needs nothing of the
+ * repository and works against every one of them, so it is offered wherever the panel runs. The switch is
+ * for the installation that wants nothing to do with the open network — see
+ * {@link NostrForwardService.enabled}.
+ */
+const DEFAULT_ENABLED = true;
+
+/**
  * What one publication left behind: the event as it went over the wire, the relay's verdict on it, and
  * the names under which it can be looked up again. Kept whole rather than summarised — the point of the
  * receipt is that the user can check what was published, and a summary is exactly what cannot be checked.
@@ -69,6 +77,16 @@ export interface NostrReceipt {
 @Injectable({ providedIn: 'root' })
 export class NostrForwardService {
   private readonly browserExtension = inject(BrowserExtensionService);
+
+  private readonly enabledState = signal(DEFAULT_ENABLED);
+
+  /**
+   * Whether this panel speaks to a relay at all. A setting rather than a condition of the content: off, the
+   * two steps that publish are not offered, the forwarding shows no relay row and the Interaktionen no
+   * standing, and neither {@link publish} nor {@link lookup} reaches a relay — so an installation that has
+   * switched it off sends nothing into the open network and asks nothing of it either.
+   */
+  readonly enabled = this.enabledState.asReadonly();
 
   /**
    * Whether the step is to publish to the relay. Ticked in the forwarding step and read by its way on;
@@ -143,17 +161,37 @@ export class NostrForwardService {
     return pubkey ? nip19.npubEncode(pubkey) : null;
   });
 
-  /** Whether the setting stands away from what the panel ships with — see ChatStyleService.changedSettings. */
-  readonly changedSettings = computed(() => (this.relayState().trim() ? 1 : 0));
+  /**
+   * How many of the settings stand away from what the panel ships with — see
+   * ChatStyleService.changedSettings. The relay counts as changed while one is named, the default being
+   * the address the panel carries itself.
+   */
+  readonly changedSettings = computed(
+    () => (this.enabledState() === DEFAULT_ENABLED ? 0 : 1) + (this.relayState().trim() ? 1 : 0)
+  );
 
   /** Load the persisted settings. Before the forwarding step can offer the relay. */
   async load(): Promise<void> {
+    this.enabledState.set(
+      await this.browserExtension.storageGet(APP_CONFIG.storageKeys.nostrEnabled, DEFAULT_ENABLED)
+    );
     this.relayState.set(
       (await this.browserExtension.storageGet<string>(APP_CONFIG.storageKeys.nostrRelayUrl, '')) || ''
     );
     this.secretKeyState.set(
       (await this.browserExtension.storageGet<string>(APP_CONFIG.storageKeys.nostrSecretKey, '')) || ''
     );
+  }
+
+  /**
+   * Take over whether the panel speaks to a relay at all. Switching it off also lets go of what the
+   * current content had with the relay: the tick and the receipt are shown nowhere any more, and a panel
+   * switched on again must not carry them back into a step as though they had just been made.
+   */
+  async setEnabled(enabled: boolean): Promise<void> {
+    this.enabledState.set(enabled);
+    if (!enabled) this.reset();
+    await this.browserExtension.storageSet(APP_CONFIG.storageKeys.nostrEnabled, enabled);
   }
 
   /** Take over the relay the settings name. Empty puts the configured default back in force. */
@@ -199,6 +237,7 @@ export class NostrForwardService {
    * relay's own `OK` and is the more exact answer of the two.
    */
   async lookup(source: AmbSource): Promise<void> {
+    if (!this.enabledState()) return;
     const resource = toAmbResource(source);
     if (!resource) return;
     if (this.lookedUp === resource.id) return;
@@ -261,6 +300,9 @@ export class NostrForwardService {
    * on the relay — `true` also where the step was not ticked at all, which is nothing failing.
    */
   forward(source: AmbSource): Promise<boolean> {
+    // A relay that is switched off is not a publication that failed: the way on out of the step leads on
+    // as it does for a step that was never ticked.
+    if (!this.enabledState()) return Promise.resolve(true);
     if (!this.selectedState()) return Promise.resolve(true);
     if (this.receiptState()) return Promise.resolve(true);
     return this.publish(source);
@@ -276,6 +318,10 @@ export class NostrForwardService {
    * resource replaces the record on the relay rather than adding a second one beside it.
    */
   async publish(source: AmbSource): Promise<boolean> {
+    // Nothing leaves the panel where the relay is switched off. The screens that would ask for a
+    // publication are not offered then, so this is the guard behind them rather than a case they run
+    // into — and it is the one that has to hold, since a publication cannot be taken back.
+    if (!this.enabledState()) return false;
     this.errorState.set(null);
     const relayUrl = this.relayUrl();
     if (!isRelayUrl(relayUrl)) {

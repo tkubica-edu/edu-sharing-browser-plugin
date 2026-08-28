@@ -356,60 +356,78 @@
       </ul>
     }
   </section>
-
-  <!-- Wohin der Schritt „An Redaktionen weiterleiten“ veröffentlicht, wenn dort das Relay angehakt ist. -->
-  <section class="es-card">
-    <button type="button" class="section-head" (click)="toggleSection('nostr')"
-            [attr.aria-expanded]="openSection() === 'nostr'">
-      <h2>Nostr-Relay</h2>
-      <!-- What was changed in this section, so a folded one says whether it holds anything but the
-           defaults; absent where it holds only those. -->
-      @if (changedPerSection().nostr; as changed) {
-        <span class="section-count">{{ changed }} geändert</span>
-      }
-      <i class="section-chevron" [class.is-open]="openSection() === 'nostr'" esIcon="expand_more"></i>
-    </button>
-
-    @if (openSection() === 'nostr') {
-      <label class="es-field-label" for="nostr-relay">Relay-Adresse</label>
-      <input id="nostr-relay" type="text" class="es-input" autocomplete="off" spellcheck="false"
-             [class.invalid]="!nostr.relayUsable()"
-             [placeholder]="nostr.relayUrl()"
-             [ngModel]="nostr.configuredRelayUrl()" (ngModelChange)="setNostrRelayUrl($event)" />
-
-      @if (!nostr.relayUsable()) {
-        <p class="es-hint">
-          Ein Nostr-Relay wird über WebSocket angesprochen; die Adresse beginnt mit <code>wss://</code>
-          (oder <code>ws://</code> im lokalen Netz).
-        </p>
-      }
-
-      <p class="desc">
-        Das Relay, an das der Schritt „An Redaktionen weiterleiten“ den Inhalt als AMB-Eintrag sendet —
-        ein Nostr-Event der Art <code>30142</code> nach dem
-        <a href="https://w3id.org/kim/amb/latest/" target="_blank" rel="noopener noreferrer">Allgemeinen
-        Metadatenprofil für Bildungsressourcen</a>. Leer gelassen gilt wieder das mitgelieferte Relay
-        <code>{{ defaultNostrRelayUrl }}</code>.
-      </p>
-
-      <!-- Der Schlüssel ist keine Einstellung, sondern die Identität dieser Installation: Er wird beim
-           ersten Senden erzeugt. Angezeigt, weil er das Einzige ist, woran ein Relay den Absender
-           erkennt — und damit das, wonach man dort sucht. -->
-      <label class="es-field-label">Absender dieser Installation</label>
-      @if (nostr.npub(); as npub) {
-        <p class="desc">
-          <code>{{ npub }}</code>
-        </p>
-        <p class="desc">
-          Der öffentliche Teil des Schlüssels, mit dem gesendete Einträge signiert werden. Der geheime
-          Teil bleibt in diesem Browser und wird nirgendwohin übertragen.
-        </p>
-      } @else {
-        <p class="desc">
-          Noch kein Schlüssel vorhanden — er wird beim ersten Senden an ein Relay erzeugt und danach in
-          diesem Browser behalten.
-        </p>
-      }
-    }
-  </section>
 }
+
+<!-- Where the forwarding step publishes to when the relay is ticked there, and where the step
+     "An Nostr Relay senden" publishes to. Outside the WLO block above: an AMB record is published
+     from any repository and the relay belongs to none, so both steps are offered everywhere (see
+     model/navigation.ts) and the setting they read has to be reachable everywhere too. -->
+<section class="es-card">
+  <button type="button" class="section-head" (click)="toggleSection('nostr')"
+          [attr.aria-expanded]="openSection() === 'nostr'">
+    <h2>Nostr-Relay</h2>
+    <!-- What was changed in this section, so a folded one says whether it holds anything but the
+         defaults; absent where it holds only those. -->
+    @if (changedPerSection().nostr; as changed) {
+      <span class="section-count">{{ changed }} geändert</span>
+    }
+    <i class="section-chevron" [class.is-open]="openSection() === 'nostr'" esIcon="expand_more"></i>
+  </button>
+
+  @if (openSection() === 'nostr') {
+    <!-- The switch for the connection as a whole, above what it configures: with it off there is no relay
+         to address and no identity to publish under, so the rest of the card goes with it. -->
+    <label class="check">
+      <input type="checkbox" [ngModel]="nostr.enabled()" (ngModelChange)="setNostrEnabled($event)" />
+      <span>Nostr-Relay verwenden</span>
+    </label>
+
+    <p class="desc">
+      Ob das Panel überhaupt mit einem Nostr-Relay spricht. Standardmäßig an. Abgeschaltet entfallen die
+      Schritte „An Nostr Relay weiterleiten“ und „An Nostr Relay senden“ sowie die Nostr-Anbindung in den
+      Interaktionen; es wird dann weder etwas an ein Relay gesendet noch etwas bei einem erfragt.
+    </p>
+  }
+
+  @if (openSection() === 'nostr' && nostr.enabled()) {
+    <label class="es-field-label" for="nostr-relay">Relay-Adresse</label>
+    <input id="nostr-relay" type="text" class="es-input" autocomplete="off" spellcheck="false"
+           [class.invalid]="!nostr.relayUsable()"
+           [placeholder]="nostr.relayUrl()"
+           [ngModel]="nostr.configuredRelayUrl()" (ngModelChange)="setNostrRelayUrl($event)" />
+
+    @if (!nostr.relayUsable()) {
+      <p class="es-hint">
+        Ein Nostr-Relay wird über WebSocket angesprochen; die Adresse beginnt mit <code>wss://</code>
+        (oder <code>ws://</code> im lokalen Netz).
+      </p>
+    }
+
+    <p class="desc">
+      Das Relay, an das der Schritt „An Redaktionen weiterleiten“ den Inhalt als AMB-Eintrag sendet —
+      ein Nostr-Event der Art <code>30142</code> nach dem
+      <a href="https://w3id.org/kim/amb/latest/" target="_blank" rel="noopener noreferrer">Allgemeinen
+      Metadatenprofil für Bildungsressourcen</a>. Leer gelassen gilt wieder das mitgelieferte Relay
+      <code>{{ defaultNostrRelayUrl }}</code>.
+    </p>
+
+    <!-- Der Schlüssel ist keine Einstellung, sondern die Identität dieser Installation: Er wird beim
+         ersten Senden erzeugt. Angezeigt, weil er das Einzige ist, woran ein Relay den Absender
+         erkennt — und damit das, wonach man dort sucht. -->
+    <label class="es-field-label">Absender dieser Installation</label>
+    @if (nostr.npub(); as npub) {
+      <p class="desc">
+        <code>{{ npub }}</code>
+      </p>
+      <p class="desc">
+        Der öffentliche Teil des Schlüssels, mit dem gesendete Einträge signiert werden. Der geheime
+        Teil bleibt in diesem Browser und wird nirgendwohin übertragen.
+      </p>
+    } @else {
+      <p class="desc">
+        Noch kein Schlüssel vorhanden — er wird beim ersten Senden an ein Relay erzeugt und danach in
+        diesem Browser behalten.
+      </p>
+    }
+  }
+</section>

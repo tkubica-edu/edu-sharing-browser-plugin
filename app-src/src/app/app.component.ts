@@ -203,8 +203,8 @@ export class AppComponent implements OnInit {
     // Before the assistant screen can mount its chat element, which reads both switches as it creates it.
     await this.chatStyle.load();
     await this.chatSkill.load();
-    // Before the forwarding step can offer the relay — which relay it publishes to is a setting, and the
-    // step reads it as it renders.
+    // Before the forwarding step can offer the relay — whether a relay is spoken to at all decides which
+    // steps the menu holds, and which one it publishes to is read by the step as it renders.
     await this.nostr.load();
     await this.auth.init();
     await this.history.load();

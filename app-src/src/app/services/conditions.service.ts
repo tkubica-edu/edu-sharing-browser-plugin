@@ -5,6 +5,7 @@ import { BrowserExtensionCustomWebComponentService } from './browser-extension-c
 import { AuthService } from './auth.service';
 import { CurationService } from './curation.service';
 import { DebugService } from './debug.service';
+import { NostrForwardService } from './nostr-forward.service';
 
 /**
  * URL patterns that mark an insert host — the OnlyOffice editor, where searching applies and the plugin speaks for
@@ -41,6 +42,7 @@ export class ConditionsService {
   private readonly curation = inject(CurationService);
   private readonly debug = inject(DebugService);
   private readonly webComponent = inject(BrowserExtensionCustomWebComponentService);
+  private readonly nostr = inject(NostrForwardService);
 
   /** The active browser tab's URL (set by the shell on boot). */
   readonly activeUrl = signal<string | null>(null);
@@ -101,6 +103,10 @@ export class ConditionsService {
   // also what makes the editorial forwarding a step of the flow (see the `collections` section).
   readonly browserExtensionCustomWebComponent = this.webComponent.enabled;
 
+  // The settings' switch for the nostr relay, which is what the steps that publish to one hang on: the
+  // relay belongs to no repository, so nothing but this says whether they apply.
+  readonly nostrEnabled = this.nostr.enabled;
+
   // What the Qualität view reports of its criteria — the gate the Metadaten sub step sits behind.
   readonly qualityCriteriaMet = this.curation.qualityCriteriaMet;
 
@@ -120,6 +126,7 @@ export class ConditionsService {
     hasCuratedContent: this.hasCuratedContent(),
     recognizingContent: this.recognizingContent(),
     browserExtensionCustomWebComponent: this.browserExtensionCustomWebComponent(),
+    nostrEnabled: this.nostrEnabled(),
     qualityCriteriaMet: this.qualityCriteriaMet(),
     agentEditWindowClosed: this.agentEditWindowClosed()
   }));
