@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="1508" viewBox="0 0 1560 1508" font-family="Helvetica, Arial, sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1 L 9 5 L 0 9 z" fill="#8a9099"/></marker></defs>
+<rect width="1560" height="1508" fill="#ffffff"/>
+<text x="60" y="58" font-size="30" font-weight="bold" fill="#123359">„Inhalt erschließen“ — welche Screens erscheinen</text>
+<text x="60" y="86" font-size="14" fill="#5b616b">Derselbe Weg in beiden Kontexten. Die Kästen tragen die Titel, unter denen der Screen im Panel steht.</text>
+<rect x="60" y="110" width="26" height="16" fill="#eeeeee" stroke="#666666"/>
+<text x="94" y="123" font-size="13" fill="#1b1b1f">in beiden Kontexten gleich</text>
+<rect x="332" y="110" width="26" height="16" fill="#dae8fc" stroke="#6c8ebf"/>
+<text x="366" y="123" font-size="13" fill="#1b1b1f">nur hier, oder hier anders</text>
+<rect x="604" y="110" width="26" height="16" fill="#fbfbfc" stroke="#b4bac2" stroke-dasharray="4 3"/>
+<text x="638" y="123" font-size="13" fill="#1b1b1f">Schritt entfällt</text>
+<path d="M 290.0 279 V 323" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)"/>
+<path d="M 810.0 279 V 297 H 602 V 412 H 810.0 V 430" fill="none" stroke="#8a9099" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<path d="M 290.0 386 V 430" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)"/>
+<path d="M 290.0 509 V 553" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)"/>
+<path d="M 290.0 632 V 676" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)"/>
+<path d="M 290.0 755 V 815" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)"/>
+<path d="M 290.0 894 V 912 H 82 V 1198 H 290.0 V 1216" fill="none" stroke="#8a9099" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<path d="M 290.0 1311 V 1355" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)"/>
+<path d="M 810.0 509 V 553" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)"/>
+<path d="M 810.0 632 V 676" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)"/>
+<path d="M 810.0 771 V 815" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)"/>
+<path d="M 810.0 910 V 954" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)"/>
+<path d="M 810.0 1033 V 1077" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)"/>
+<path d="M 810.0 1172 V 1216" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)"/>
+<path d="M 810.0 1311 V 1355" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)"/>
+<path d="M 1040 723.5 H 1090" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)" marker-start="url(#a)"/>
+<path d="M 1040 993.5 H 1064 V 1124.5 H 1090" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)"/>
+<path d="M 1290.0 1172 V 1376.5 H 1074 V 1402.5 H 1040" fill="none" stroke="#8a9099" stroke-width="1.4" marker-end="url(#a)"/>
+<rect x="60" y="150" width="460" height="40" fill="#ffffff" stroke="#1d4e89" stroke-width="2"/>
+<text x="290.0" y="175.0" font-size="15" font-weight="bold" fill="#123359" text-anchor="middle">Core-Repository</text>
+<rect x="580" y="150" width="460" height="40" fill="#ffffff" stroke="#1d4e89" stroke-width="2"/>
+<text x="810.0" y="175.0" font-size="15" font-weight="bold" fill="#123359" text-anchor="middle">WLO-Kontext</text>
+<rect x="60" y="216" width="980" height="63" fill="#fff2cc" stroke="#d6b656" stroke-width="2"/>
+<text x="550.0" y="244" font-size="14" font-weight="bold" fill="#123359" text-anchor="middle">Hauptmenü</text>
+<text x="550.0" y="264" font-size="12.5" fill="#1b1b1f" text-anchor="middle">Der Eintrag „Inhalt erschließen“ wird angetippt — nichts öffnet sich von selbst.</text>
+<rect x="60" y="323" width="460" height="63" fill="#eeeeee" stroke="#666666" stroke-width="1.3"/>
+<text x="76" y="351" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">Anmelden</text>
+<text x="76" y="371" font-size="12.5" fill="#5b616b" text-anchor="start">Zugangsdaten für das Repository.</text>
+<rect x="636" y="323" width="404" height="63" fill="#fbfbfc" stroke="#b4bac2" stroke-width="1.3" stroke-dasharray="5 4"/>
+<text x="652" y="351" font-size="14" font-weight="bold" fill="#5b616b" text-anchor="start" font-style="italic">Anmelden entfällt</text>
+<text x="652" y="371" font-size="12.5" fill="#5b616b" text-anchor="start">Kein Login-Screen: die Sitzung bringt die Umgebung mit.</text>
+<rect x="60" y="430" width="460" height="79" fill="#eeeeee" stroke="#666666" stroke-width="1.3"/>
+<text x="76" y="458" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">Inhalt erschließen</text>
+<text x="76" y="478" font-size="12.5" fill="#5b616b" text-anchor="start">Die geöffnete Seite wird gelesen. Ein Fortschrittsbild läuft,</text>
+<text x="76" y="494" font-size="12.5" fill="#5b616b" text-anchor="start">bis die Metadaten da sind.</text>
+<rect x="580" y="430" width="460" height="79" fill="#eeeeee" stroke="#666666" stroke-width="1.3"/>
+<text x="596" y="458" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">Inhalt erschließen</text>
+<text x="596" y="478" font-size="12.5" fill="#5b616b" text-anchor="start">Die geöffnete Seite wird gelesen. Ein Fortschrittsbild läuft,</text>
+<text x="596" y="494" font-size="12.5" fill="#5b616b" text-anchor="start">bis die Metadaten da sind.</text>
+<rect x="60" y="553" width="460" height="79" fill="#eeeeee" stroke="#666666" stroke-width="1.3"/>
+<text x="76" y="581" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">Inhalt erschließen · Vorschau</text>
+<text x="76" y="601" font-size="12.5" fill="#5b616b" text-anchor="start">Vorschaubild und Titel prüfen.</text>
+<text x="76" y="617" font-size="12.5" fill="#5b616b" text-anchor="start">„Weiter“ legt den Inhalt an.</text>
+<rect x="580" y="553" width="460" height="79" fill="#eeeeee" stroke="#666666" stroke-width="1.3"/>
+<text x="596" y="581" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">Inhalt erschließen · Vorschau</text>
+<text x="596" y="601" font-size="12.5" fill="#5b616b" text-anchor="start">Vorschaubild und Titel prüfen.</text>
+<text x="596" y="617" font-size="12.5" fill="#5b616b" text-anchor="start">„Weiter“ legt den Inhalt an.</text>
+<rect x="60" y="676" width="460" height="79" fill="#eeeeee" stroke="#666666" stroke-width="1.3"/>
+<text x="76" y="704" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">An Redaktionen weiterleiten</text>
+<text x="76" y="724" font-size="12.5" fill="#5b616b" text-anchor="start">Nur die Zeile für das Nostr-Relay —</text>
+<text x="76" y="740" font-size="12.5" fill="#5b616b" text-anchor="start">Redaktionen gibt es hier nicht.</text>
+<rect x="580" y="676" width="460" height="95" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.3"/>
+<text x="596" y="704" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">An Redaktionen weiterleiten</text>
+<text x="596" y="724" font-size="12.5" fill="#5b616b" text-anchor="start">Redaktionen ankreuzen, darunter die</text>
+<text x="596" y="740" font-size="12.5" fill="#5b616b" text-anchor="start">Relay-Zeile. Ein Team mit Unter-</text>
+<text x="596" y="756" font-size="12.5" fill="#5b616b" text-anchor="start">sammlungen führt einen Schritt weiter.</text>
+<rect x="1090" y="676" width="400" height="95" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.3"/>
+<text x="1106" y="704" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">Sammlung auswählen</text>
+<text x="1106" y="724" font-size="12.5" fill="#5b616b" text-anchor="start">Die Sammlung innerhalb des gewählten</text>
+<text x="1106" y="740" font-size="12.5" fill="#5b616b" text-anchor="start">Teams. „Sammlung übernehmen“ führt</text>
+<text x="1106" y="756" font-size="12.5" fill="#5b616b" text-anchor="start">zurück in die Liste.</text>
+<rect x="60" y="815" width="460" height="79" fill="#eeeeee" stroke="#666666" stroke-width="1.3"/>
+<text x="76" y="843" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">Persönliche Ablage</text>
+<text x="76" y="863" font-size="12.5" fill="#5b616b" text-anchor="start">Ordner der eigenen Ablage, dazu</text>
+<text x="76" y="879" font-size="12.5" fill="#5b616b" text-anchor="start">wahlweise eine Sammlung.</text>
+<rect x="580" y="815" width="460" height="95" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.3"/>
+<text x="596" y="843" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">Persönliche Ablage</text>
+<text x="596" y="863" font-size="12.5" fill="#5b616b" text-anchor="start">Gleicher Screen — aber nur mit eigenem</text>
+<text x="596" y="879" font-size="12.5" fill="#5b616b" text-anchor="start">Login. Mit der mitgebrachten Sitzung</text>
+<text x="596" y="895" font-size="12.5" fill="#5b616b" text-anchor="start">entfällt der Schritt.</text>
+<rect x="116" y="954" width="404" height="79" fill="#fbfbfc" stroke="#b4bac2" stroke-width="1.3" stroke-dasharray="5 4"/>
+<text x="132" y="982" font-size="14" font-weight="bold" fill="#5b616b" text-anchor="start" font-style="italic">Prüfprozess entfällt</text>
+<text x="132" y="1002" font-size="12.5" fill="#5b616b" text-anchor="start">Es gibt nur einen Weg; die Metadaten</text>
+<text x="132" y="1018" font-size="12.5" fill="#5b616b" text-anchor="start">folgen direkt.</text>
+<rect x="580" y="954" width="460" height="79" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.3"/>
+<text x="596" y="982" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">Prüfprozess auswählen</text>
+<text x="596" y="1002" font-size="12.5" fill="#5b616b" text-anchor="start">Zwei Karten zur Wahl: strukturierte</text>
+<text x="596" y="1018" font-size="12.5" fill="#5b616b" text-anchor="start">Prüfung oder Prüfung mit KI.</text>
+<rect x="116" y="1077" width="404" height="79" fill="#fbfbfc" stroke="#b4bac2" stroke-width="1.3" stroke-dasharray="5 4"/>
+<text x="132" y="1105" font-size="14" font-weight="bold" fill="#5b616b" text-anchor="start" font-style="italic">Qualität entfällt</text>
+<text x="132" y="1125" font-size="12.5" fill="#5b616b" text-anchor="start">Die Kriterien-Ansicht gibt es in</text>
+<text x="132" y="1141" font-size="12.5" fill="#5b616b" text-anchor="start">diesem Kontext nicht.</text>
+<rect x="580" y="1077" width="460" height="95" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.3"/>
+<text x="596" y="1105" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">Qualitätsprüfung · Qualität</text>
+<text x="596" y="1125" font-size="12.5" fill="#5b616b" text-anchor="start">Kriterien beantworten. Erst wenn sie</text>
+<text x="596" y="1141" font-size="12.5" fill="#5b616b" text-anchor="start">erfüllt sind, öffnet sich der zweite</text>
+<text x="596" y="1157" font-size="12.5" fill="#5b616b" text-anchor="start">Reiter.</text>
+<rect x="1090" y="1077" width="400" height="95" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.3"/>
+<text x="1106" y="1105" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">Individuelle Qualitätsprüfung mit KI</text>
+<text x="1106" y="1125" font-size="12.5" fill="#5b616b" text-anchor="start">Der andere Weg: ein Gespräch mit dem</text>
+<text x="1106" y="1141" font-size="12.5" fill="#5b616b" text-anchor="start">Assistenten über den Inhalt.</text>
+<text x="1106" y="1157" font-size="12.5" fill="#5b616b" text-anchor="start">„Abschließen und zur Inhaltsübersicht“.</text>
+<rect x="60" y="1216" width="460" height="95" fill="#eeeeee" stroke="#666666" stroke-width="1.3"/>
+<text x="76" y="1244" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">Qualitätsprüfung · Metadaten</text>
+<text x="76" y="1264" font-size="12.5" fill="#5b616b" text-anchor="start">Das Formular des Repositorys — der</text>
+<text x="76" y="1280" font-size="12.5" fill="#5b616b" text-anchor="start">einzige Reiter des Schritts.</text>
+<text x="76" y="1296" font-size="12.5" fill="#5b616b" text-anchor="start">„Weiter“ speichert.</text>
+<rect x="580" y="1216" width="460" height="95" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.3"/>
+<text x="596" y="1244" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">Qualitätsprüfung · Metadaten</text>
+<text x="596" y="1264" font-size="12.5" fill="#5b616b" text-anchor="start">Das WLO-Formular, zweiter Reiter</text>
+<text x="596" y="1280" font-size="12.5" fill="#5b616b" text-anchor="start">nach der Qualität.</text>
+<text x="596" y="1296" font-size="12.5" fill="#5b616b" text-anchor="start">„Weiter“ speichert.</text>
+<rect x="60" y="1355" width="460" height="95" fill="#eeeeee" stroke="#666666" stroke-width="1.3"/>
+<text x="76" y="1383" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">Inhaltsübersicht</text>
+<text x="76" y="1403" font-size="12.5" fill="#5b616b" text-anchor="start">Vorschau · Nutzung · Inhalt teilen ·</text>
+<text x="76" y="1419" font-size="12.5" fill="#5b616b" text-anchor="start">Interaktionen. Interaktionen zeigt nur</text>
+<text x="76" y="1435" font-size="12.5" fill="#5b616b" text-anchor="start">den Stand beim Nostr-Relay.</text>
+<rect x="580" y="1355" width="460" height="95" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.3"/>
+<text x="596" y="1383" font-size="14" font-weight="bold" fill="#1b1b1f" text-anchor="start">Inhaltsübersicht</text>
+<text x="596" y="1403" font-size="12.5" fill="#5b616b" text-anchor="start">Dieselben vier Reiter. Interaktionen</text>
+<text x="596" y="1419" font-size="12.5" fill="#5b616b" text-anchor="start">zeigt zusätzlich eine Karte je</text>
+<text x="596" y="1435" font-size="12.5" fill="#5b616b" text-anchor="start">Redaktion.</text>
+<text x="60" y="1488" font-size="12" fill="#5b616b">edu-sharing Browser-Plugin 0.1.5 · Stand 27.08.2026 · Ablauf und Beschriftungen: FEATURES.md, MATURITY.md</text>
+</svg>

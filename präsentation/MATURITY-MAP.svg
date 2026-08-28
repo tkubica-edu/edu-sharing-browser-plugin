@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1628" height="902" viewBox="0 0 1628 902" font-family="Helvetica, Arial, sans-serif">
+<rect width="1628" height="902" fill="#ffffff"/>
+<text x="40" y="58" font-size="30" font-weight="bold" fill="#123359">Reifegrad-Karte der Anwendung</text>
+<text x="40" y="86" font-size="14" fill="#5b616b">Jede Spalte ist eine Station des Ablaufs; jeder Kasten eine Fähigkeit. Farbe sagt, wie weit sie ist.</text>
+<rect x="40" y="112" width="26" height="16" rx="1" fill="#eeeeee" stroke="#666666"/>
+<text x="74" y="125" font-size="13" fill="#1b1b1f">in beiden Kontexten eingebaut</text>
+<rect x="340" y="112" width="26" height="16" rx="1" fill="#dae8fc" stroke="#6c8ebf"/>
+<text x="374" y="125" font-size="13" fill="#1b1b1f">nur im WLO-Kontext eingebaut</text>
+<rect x="632" y="112" width="26" height="16" rx="1" fill="#fff2cc" stroke="#d6b656"/>
+<text x="666" y="125" font-size="13" fill="#1b1b1f">fehlt oder offen für Reife</text>
+<path d="M 51 220 V 257.5 H 66" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 51 220 V 311.5 H 66" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 51 220 V 365.5 H 66" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 51 220 V 428.0 H 66" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 51 220 V 499.0 H 66" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 51 220 V 570.0 H 66" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 51 220 V 641.0 H 66" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 363 220 V 266.0 H 378" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 363 220 V 345.5 H 378" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 363 220 V 416.5 H 378" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 363 220 V 479.0 H 378" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 363 220 V 550.0 H 378" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 363 220 V 621.0 H 378" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 363 220 V 692.0 H 378" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 675 220 V 257.5 H 690" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 675 220 V 311.5 H 690" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 675 220 V 374.0 H 690" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 675 220 V 436.5 H 690" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 675 220 V 499.0 H 690" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 675 220 V 561.5 H 690" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 675 220 V 624.0 H 690" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 675 220 V 695.0 H 690" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 987 220 V 266.0 H 1002" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 987 220 V 328.5 H 1002" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 987 220 V 391.0 H 1002" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 987 220 V 453.5 H 1002" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 987 220 V 516.0 H 1002" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 987 220 V 587.0 H 1002" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 987 220 V 658.0 H 1002" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 987 220 V 729.0 H 1002" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 987 220 V 800.0 H 1002" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 1299 220 V 266.0 H 1314" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 1299 220 V 337.0 H 1314" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 1299 220 V 408.0 H 1314" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 1299 220 V 479.0 H 1314" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 1299 220 V 550.0 H 1314" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 1299 220 V 621.0 H 1314" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 1299 220 V 692.0 H 1314" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 1299 220 V 763.0 H 1314" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<path d="M 1299 220 V 825.5 H 1314" fill="none" stroke="#8a9099" stroke-width="1.2"/>
+<rect x="40" y="176" width="300" height="44" fill="#ffffff" stroke="#1d4e89" stroke-width="2"/>
+<text x="190.0" y="203.0" font-size="15" font-weight="bold" fill="#123359" text-anchor="middle">Zugang und Panel</text>
+<rect x="66" y="237" width="262" height="41" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="197.0" y="261.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Login (BasicAuth)</text>
+<rect x="66" y="291" width="262" height="41" fill="#fff2cc" stroke="#d6b656" stroke-width="1.2"/>
+<text x="197.0" y="315.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Login (SSO)</text>
+<rect x="66" y="345" width="262" height="41" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.2"/>
+<text x="197.0" y="369.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Gast-Session ohne Login</text>
+<rect x="66" y="399" width="262" height="58" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="197.0" y="423.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Panel als andockbares</text>
+<text x="197.0" y="440.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Iframe, Breite gemerkt</text>
+<rect x="66" y="470" width="262" height="58" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="197.0" y="494.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Theme hell / dunkel,</text>
+<text x="197.0" y="511.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Bundles folgen live</text>
+<rect x="66" y="541" width="262" height="58" fill="#fff2cc" stroke="#d6b656" stroke-width="1.2"/>
+<text x="197.0" y="565.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Dark Theme im</text>
+<text x="197.0" y="582.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">WLO-Canvas</text>
+<rect x="66" y="612" width="262" height="58" fill="#fff2cc" stroke="#d6b656" stroke-width="1.2"/>
+<text x="197.0" y="636.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Safari: Login und</text>
+<text x="197.0" y="653.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Session unverifiziert</text>
+<rect x="352" y="176" width="300" height="44" fill="#ffffff" stroke="#1d4e89" stroke-width="2"/>
+<text x="502.0" y="203.0" font-size="15" font-weight="bold" fill="#123359" text-anchor="middle">Inhalt erfassen</text>
+<rect x="378" y="237" width="262" height="58" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="509.0" y="261.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Inhalte erfassen mit KI</text>
+<text x="509.0" y="278.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">(POST /generate)</text>
+<rect x="378" y="308" width="262" height="75" fill="#fff2cc" stroke="#d6b656" stroke-width="1.2"/>
+<text x="509.0" y="332.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">B-API: öffentlicher</text>
+<text x="509.0" y="349.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Endpunkt statt gepinnter</text>
+<text x="509.0" y="366.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Proxy-Adresse</text>
+<rect x="378" y="396" width="262" height="41" fill="#fff2cc" stroke="#d6b656" stroke-width="1.2"/>
+<text x="509.0" y="420.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Metadaten ohne KI</text>
+<rect x="378" y="450" width="262" height="58" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="509.0" y="474.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Seiten-Erkennung</text>
+<text x="509.0" y="491.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">(Duplikat im Repository)</text>
+<rect x="378" y="521" width="262" height="58" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="509.0" y="545.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Datei oder Link</text>
+<text x="509.0" y="562.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">hochladen</text>
+<rect x="378" y="592" width="262" height="58" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="509.0" y="616.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">OnlyOffice: Dokument</text>
+<text x="509.0" y="633.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">anreichern</text>
+<rect x="378" y="663" width="262" height="58" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="509.0" y="687.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">OnlyOffice: passende</text>
+<text x="509.0" y="704.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Inhalte finden</text>
+<rect x="664" y="176" width="300" height="44" fill="#ffffff" stroke="#1d4e89" stroke-width="2"/>
+<text x="814.0" y="203.0" font-size="15" font-weight="bold" fill="#123359" text-anchor="middle">Beschreiben und Speichern</text>
+<rect x="690" y="237" width="262" height="41" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="821.0" y="261.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">edu-core Formular (MDS)</text>
+<rect x="690" y="291" width="262" height="41" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.2"/>
+<text x="821.0" y="315.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">WLO-Canvas Formular</text>
+<rect x="690" y="345" width="262" height="58" fill="#fff2cc" stroke="#d6b656" stroke-width="1.2"/>
+<text x="821.0" y="369.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">MDS-Editor im echten</text>
+<text x="821.0" y="386.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Browser verifizieren</text>
+<rect x="690" y="416" width="262" height="41" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="821.0" y="440.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Node schreiben (Inbox)</text>
+<rect x="690" y="470" width="262" height="58" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.2"/>
+<text x="821.0" y="494.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Extended fields und</text>
+<text x="821.0" y="511.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Workflow-Schritte</text>
+<rect x="690" y="541" width="262" height="41" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="821.0" y="565.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Vorschaubild hochladen</text>
+<rect x="690" y="595" width="262" height="58" fill="#fff2cc" stroke="#d6b656" stroke-width="1.2"/>
+<text x="821.0" y="619.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Ordnerwahl auf der</text>
+<text x="821.0" y="636.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Agent-Route</text>
+<rect x="690" y="666" width="262" height="58" fill="#fff2cc" stroke="#d6b656" stroke-width="1.2"/>
+<text x="821.0" y="690.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">2-h-Editierfenster</text>
+<text x="821.0" y="707.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">der Gast-Session</text>
+<rect x="976" y="176" width="300" height="44" fill="#ffffff" stroke="#1d4e89" stroke-width="2"/>
+<text x="1126.0" y="203.0" font-size="15" font-weight="bold" fill="#123359" text-anchor="middle">Einsortieren und Weitergeben</text>
+<rect x="1002" y="237" width="262" height="58" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="1133.0" y="261.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Persönliche Ablage</text>
+<text x="1133.0" y="278.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">(Ordner wählen)</text>
+<rect x="1002" y="308" width="262" height="41" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.2"/>
+<text x="1133.0" y="332.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Sammlung auswählen</text>
+<rect x="1002" y="362" width="262" height="58" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.2"/>
+<text x="1133.0" y="386.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Sammlung vorschlagen</text>
+<text x="1133.0" y="403.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">(Topic-Assistant)</text>
+<rect x="1002" y="433" width="262" height="41" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="1133.0" y="457.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Sammlung einfügen</text>
+<rect x="1002" y="487" width="262" height="58" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.2"/>
+<text x="1133.0" y="511.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">An Redaktionen</text>
+<text x="1133.0" y="528.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">weiterleiten</text>
+<rect x="1002" y="558" width="262" height="58" fill="#fff2cc" stroke="#d6b656" stroke-width="1.2"/>
+<text x="1133.0" y="582.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Rückmeldung der</text>
+<text x="1133.0" y="599.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Redaktionen</text>
+<rect x="1002" y="629" width="262" height="58" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="1133.0" y="653.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Nostr-Relay:</text>
+<text x="1133.0" y="670.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">AMB-Eintrag (30142)</text>
+<rect x="1002" y="700" width="262" height="58" fill="#fff2cc" stroke="#d6b656" stroke-width="1.2"/>
+<text x="1133.0" y="724.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Relay-Einstellungen</text>
+<text x="1133.0" y="741.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">auch im Core</text>
+<rect x="1002" y="771" width="262" height="58" fill="#fff2cc" stroke="#d6b656" stroke-width="1.2"/>
+<text x="1133.0" y="795.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Schlüssel: Export</text>
+<text x="1133.0" y="812.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">und Backup</text>
+<rect x="1288" y="176" width="300" height="44" fill="#ffffff" stroke="#1d4e89" stroke-width="2"/>
+<text x="1438.0" y="203.0" font-size="15" font-weight="bold" fill="#123359" text-anchor="middle">Prüfen und Übersicht</text>
+<rect x="1314" y="237" width="262" height="58" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.2"/>
+<text x="1445.0" y="261.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Qualitätskriterien</text>
+<text x="1445.0" y="278.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">(mds_oeh)</text>
+<rect x="1314" y="308" width="262" height="58" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="1445.0" y="332.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Maschinelle Beurteilung</text>
+<text x="1445.0" y="349.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">(ContentJudge, MetalookUp)</text>
+<rect x="1314" y="379" width="262" height="58" fill="#fff2cc" stroke="#d6b656" stroke-width="1.2"/>
+<text x="1445.0" y="403.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Beurteilung im Core</text>
+<text x="1445.0" y="420.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">sichtbar und abschaltbar</text>
+<rect x="1314" y="450" width="262" height="58" fill="#fff2cc" stroke="#d6b656" stroke-width="1.2"/>
+<text x="1445.0" y="474.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Schema für 3 von 11</text>
+<text x="1445.0" y="491.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Kriterien</text>
+<rect x="1314" y="521" width="262" height="58" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.2"/>
+<text x="1445.0" y="545.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">KI-Prüfung im Dialog</text>
+<text x="1445.0" y="562.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">(Boerdi)</text>
+<rect x="1314" y="592" width="262" height="58" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="1445.0" y="616.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Vorschau, Nutzung,</text>
+<text x="1445.0" y="633.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Teilen (QR)</text>
+<rect x="1314" y="663" width="262" height="58" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="1445.0" y="687.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Interaktionen:</text>
+<text x="1445.0" y="704.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Nostr-Standing</text>
+<rect x="1314" y="734" width="262" height="58" fill="#fff2cc" stroke="#d6b656" stroke-width="1.2"/>
+<text x="1445.0" y="758.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Redaktions-Timeline</text>
+<text x="1445.0" y="775.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">mit echten Daten</text>
+<rect x="1314" y="805" width="262" height="41" fill="#eeeeee" stroke="#666666" stroke-width="1.2"/>
+<text x="1445.0" y="829.8" font-size="13" font-weight="normal" fill="#1b1b1f" text-anchor="middle">Verlauf (lokal)</text>
+<text x="40" y="882" font-size="12" fill="#5b616b">edu-sharing Browser-Plugin 0.1.5 · Stand 27.08.2026 · Einzelheiten: MATURITY.md</text>
+</svg>
