@@ -69,18 +69,25 @@ export class OAuthService {
   private readonly browserExtension = inject(BrowserExtensionService);
 
   private readonly issuerState = signal('');
+  private readonly discoveryUrlState = signal('');
   private readonly clientIdState = signal('');
   private readonly scopesState = signal('');
   private readonly redirectUriState = signal('');
 
   /** The issuer the settings name; empty leaves `APP_CONFIG.oauth.issuer` standing. */
   readonly issuer = computed(() => this.issuerState().trim() || APP_CONFIG.oauth.issuer);
+  /**
+   * Where the provider's discovery document is fetched from; empty leaves the OpenID Connect path
+   * below the issuer standing (see `discoveryUrlOf` in `background/oauth.js`).
+   */
+  readonly discoveryUrl = computed(() => this.discoveryUrlState().trim() || APP_CONFIG.oauth.discoveryUrl);
   readonly clientId = computed(() => this.clientIdState().trim() || APP_CONFIG.oauth.clientId);
   readonly scopes = computed(() => this.scopesState().trim() || APP_CONFIG.oauth.scopes);
   readonly redirectUri = computed(() => this.redirectUriState().trim() || APP_CONFIG.oauth.redirectUri);
 
   /** What the fields hold verbatim, for the settings screen to edit — see {@link issuer}. */
   readonly configuredIssuer = this.issuerState.asReadonly();
+  readonly configuredDiscoveryUrl = this.discoveryUrlState.asReadonly();
   readonly configuredClientId = this.clientIdState.asReadonly();
   readonly configuredScopes = this.scopesState.asReadonly();
   readonly configuredRedirectUri = this.redirectUriState.asReadonly();
@@ -119,6 +126,7 @@ export class OAuthService {
   readonly changedSettings = computed(
     () =>
       (this.issuerState().trim() ? 1 : 0) +
+      (this.discoveryUrlState().trim() ? 1 : 0) +
       (this.clientIdState().trim() ? 1 : 0) +
       (this.scopesState().trim() ? 1 : 0) +
       (this.redirectUriState().trim() ? 1 : 0),
@@ -128,6 +136,7 @@ export class OAuthService {
   async load(): Promise<void> {
     const keys = APP_CONFIG.storageKeys;
     this.issuerState.set((await this.browserExtension.storageGet<string>(keys.oauthIssuer, '')) || '');
+    this.discoveryUrlState.set((await this.browserExtension.storageGet<string>(keys.oauthDiscoveryUrl, '')) || '');
     this.clientIdState.set((await this.browserExtension.storageGet<string>(keys.oauthClientId, '')) || '');
     this.scopesState.set((await this.browserExtension.storageGet<string>(keys.oauthScopes, '')) || '');
     this.redirectUriState.set((await this.browserExtension.storageGet<string>(keys.oauthRedirectUri, '')) || '');
@@ -135,6 +144,10 @@ export class OAuthService {
 
   async setIssuer(issuer: string): Promise<void> {
     await this.persist(this.issuerState, APP_CONFIG.storageKeys.oauthIssuer, issuer);
+  }
+
+  async setDiscoveryUrl(discoveryUrl: string): Promise<void> {
+    await this.persist(this.discoveryUrlState, APP_CONFIG.storageKeys.oauthDiscoveryUrl, discoveryUrl);
   }
 
   async setClientId(clientId: string): Promise<void> {
@@ -240,6 +253,7 @@ export class OAuthService {
   private request(repositoryUrl: string, provider?: OAuthProvider): OAuthRequest {
     return {
       issuer: this.issuer(),
+      discoveryUrl: this.discoveryUrl(),
       clientId: this.clientId(),
       scopes: this.scopes(),
       redirectUri: this.redirectUri(),

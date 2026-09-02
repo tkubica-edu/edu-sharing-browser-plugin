@@ -54,7 +54,26 @@
     <p class="desc">
       Die Basis, unter der das Discovery-Dokument des Providers liegt
       (<code>&lt;Issuer&gt;/.well-known/openid-configuration</code>). Die Endpunkte werden daraus
-      gelesen und nicht geraten — es muss also nur der Issuer eingetragen werden.
+      gelesen und nicht geraten — es muss also nur der Issuer eingetragen werden. Am Issuer wird
+      außerdem erkannt, ob eine gespeicherte Sitzung noch zur aktuellen Konfiguration gehört.
+    </p>
+
+    <!-- Zwei Pfade sind in Gebrauch, und welcher gilt, sagt der Provider nicht vorher: OpenID
+         Connect beschreibt sich unter /.well-known/openid-configuration, ein reiner OAuth
+         Authorization Server unter /.well-known/oauth-authorization-server (RFC 8414). Beide
+         Dokumente tragen dieselben Endpunkt-Felder, nur die Adresse unterscheidet sich. -->
+    <label class="es-field-label" for="oauth-discovery">Discovery-URL</label>
+    <input id="oauth-discovery" type="url" class="es-input" autocomplete="off" spellcheck="false"
+           [placeholder]="discoveryUrlFromIssuer()"
+           [ngModel]="oauth.configuredDiscoveryUrl()" (ngModelChange)="setOAuthDiscoveryUrl($event)" />
+
+    <p class="desc">
+      Die Adresse des Discovery-Dokuments, falls sie nicht unter dem Issuer liegt. Leer gelassen gilt
+      <code>&lt;Issuer&gt;/.well-known/openid-configuration</code>. Ein Server, der sich nicht als
+      OpenID-Connect-Provider, sondern als OAuth Authorization Server beschreibt, veröffentlicht
+      stattdessen <code>/.well-known/oauth-authorization-server</code> — so auch edu-sharings eigener
+      Authorization Server, dessen Endpunkte unter <code>&lt;Repository&gt;/oauth2server/</code>
+      liegen.
     </p>
 
     <label class="es-field-label" for="oauth-client">Client-ID</label>

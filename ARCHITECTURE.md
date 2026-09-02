@@ -101,9 +101,14 @@ exchange. The PKCE pair is generated the way
 [`pkce-challenge`](https://github.com/crouchcd/pkce-challenge) does it (a 128-character verifier over
 the unreserved set with the modulo bias cut off, SHA-256 as a base64url challenge), inlined because
 this file is plain script the worker loads directly — there is no bundler on the extension's side.
-Endpoints are never assembled: they come from the issuer's `/.well-known/openid-configuration`,
-cached per issuer for the worker's lifetime, which is what lets one implementation serve Keycloak,
-Shibboleth or edu-sharing's own authorization server. The `state` is checked before the code is
+Endpoints are never assembled: they come from the provider's discovery document, cached per document
+address for the worker's lifetime, which is what lets one implementation serve Keycloak, Shibboleth
+or edu-sharing's own authorization server. Which address that is has to be configurable, because two
+paths are in use and the provider does not say which it serves: an OpenID Connect provider describes
+itself at `<issuer>/.well-known/openid-configuration`, a plain OAuth authorization server at
+`/.well-known/oauth-authorization-server` (RFC 8414) — edu-sharing's own among the latter. The
+issuer's OIDC path is what an empty *Discovery-URL* falls back to; the issuer itself is still what a
+stored session is recognised by, whichever document was read. The `state` is checked before the code is
 looked at, so an answer belonging to another request is refused rather than exchanged.
 
 **Showing the provider's pages** is the one part that differs per browser, and it is branched on the

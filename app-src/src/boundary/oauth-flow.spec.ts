@@ -28,6 +28,13 @@ function repoRoot(): string {
 
 const SOURCE = readFileSync(join(repoRoot(), 'background/oauth.js'), 'utf8');
 
+/**
+ * Where an authorization server that is not an OpenID Connect provider describes itself (RFC 8414).
+ * Deliberately not below {@link ISSUER}: a case that names it proves the address was taken as given
+ * rather than assembled from the issuer.
+ */
+const AUTHORIZATION_SERVER_METADATA = 'https://as.example/.well-known/oauth-authorization-server';
+
 /** The issuer every case here signs in against, and the endpoints its discovery document names. */
 const ISSUER = 'https://sso.example/realms/edu';
 const CLIENT_ID = 'edu-sharing-extension';
@@ -153,6 +160,9 @@ describe('the worker`s OAuth flow', () => {
     // Only this issuer describes itself; any other is a host with nothing at that path, which is
     // what the flow has to report rather than assume endpoints for.
     if (url === `${ISSUER}/.well-known/openid-configuration`) return jsonResponse(discovery);
+    // The same fields at the address a plain OAuth authorization server describes itself under
+    // (RFC 8414), which is not below the issuer here — nothing but the address distinguishes them.
+    if (url === AUTHORIZATION_SERVER_METADATA) return jsonResponse(discovery);
     if (url === TOKEN_ENDPOINT) {
       if (body?.get('grant_type') === 'refresh_token') {
         return jsonResponse({ access_token: 'a-renewed-token', refresh_token: 'a-rotated-refresh-token', expires_in: 300 });
@@ -340,6 +350,32 @@ describe('the worker`s OAuth flow', () => {
 
       const asked = requests.filter((sent) => sent.url.endsWith('/.well-known/openid-configuration'));
       expect(asked).toHaveLength(1);
+    });
+
+    it('reads the document the request names instead of the one below the issuer', async () => {
+      await loadModule().login({ ...request, discoveryUrl: AUTHORIZATION_SERVER_METADATA });
+
+      expect(requests[0]?.url).toBe(AUTHORIZATION_SERVER_METADATA);
+      expect(requests.some((sent) => sent.url.endsWith('/.well-known/openid-configuration'))).toBe(false);
+    });
+
+    it('runs the flow off that document, endpoints and all', async () => {
+      const flow = await loadModule().login({ ...request, discoveryUrl: AUTHORIZATION_SERVER_METADATA });
+
+      expect(flow.accessToken).toBe('an-access-token');
+      expect(authorizationRequest().origin + authorizationRequest().pathname).toBe(AUTHORIZATION_ENDPOINT);
+    });
+
+    it('caches per document address, so a moved document is not answered from the old one', async () => {
+      const module = loadModule();
+      await module.login(request);
+      await module.login({ ...request, discoveryUrl: AUTHORIZATION_SERVER_METADATA });
+
+      expect(requests.filter((sent) => sent.url.includes('/.well-known/'))).toHaveLength(2);
+    });
+
+    it('still needs somewhere to look: neither an issuer nor an address is refused as such', async () => {
+      await expect(loadModule().login({ ...request, issuer: '' })).rejects.toThrow('OAUTH_NO_ISSUER');
     });
 
     it('refuses a document without the endpoints the flow needs', async () => {

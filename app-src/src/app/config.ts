@@ -164,9 +164,18 @@ export const APP_CONFIG = {
     /**
      * The issuer, as it names itself — the base its discovery document sits under
      * (`<issuer>/.well-known/openid-configuration`). Endpoints are read from that document rather
-     * than assembled here, so an issuer is the single thing that has to be configured.
+     * than assembled here, so an issuer is the single thing that has to be configured. It also
+     * identifies the stored session, so a token held for one issuer is never offered to another.
      */
     issuer: '',
+    /**
+     * The document the endpoints are read from, where it does not sit at the OpenID Connect path
+     * below the issuer. Two paths are in use: `/.well-known/openid-configuration` for an OpenID
+     * Connect provider, and `/.well-known/oauth-authorization-server` (RFC 8414) for one that
+     * describes itself as a plain OAuth authorization server — edu-sharing's own among them. Empty
+     * means the first, assembled from the issuer.
+     */
+    discoveryUrl: '',
     /** The public client registered for this extension at that issuer. No secret: it cannot keep one. */
     clientId: '',
     /**
@@ -274,6 +283,8 @@ export const APP_CONFIG = {
      * and a client id the alternative is not offered at all.
      */
     oauthIssuer: 'eduSharingOAuthIssuer',
+    /** The address of the discovery document, where it is not the issuer's OpenID Connect one. */
+    oauthDiscoveryUrl: 'eduSharingOAuthDiscoveryUrl',
     oauthClientId: 'eduSharingOAuthClientId',
     oauthScopes: 'eduSharingOAuthScopes',
     oauthRedirectUri: 'eduSharingOAuthRedirectUri',

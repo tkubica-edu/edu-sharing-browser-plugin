@@ -108,6 +108,12 @@ export interface SaveNodeResponse {
  */
 export interface OAuthRequest {
   issuer: string;
+  /**
+   * The address of the provider's discovery document, where it is not the OpenID Connect one below
+   * the issuer — a plain OAuth authorization server describes itself at
+   * `/.well-known/oauth-authorization-server` instead. Empty leaves the issuer's own path standing.
+   */
+  discoveryUrl: string;
   clientId: string;
   scopes: string;
   /** The address to redirect back to, where it is configured; empty leaves the choice to the browser. */

@@ -74,6 +74,16 @@ export class SettingsScreenComponent implements OnDestroy {
   protected readonly defaultOAuthScopes = APP_CONFIG.oauth.scopes;
 
   /**
+   * The discovery address the issuer implies, as the empty field's placeholder — the same assembly
+   * the worker makes of it (`discoveryUrlOf` in `background/oauth.js`). Without an issuer there is
+   * nothing to imply, and the placeholder says what the field is for instead.
+   */
+  protected readonly discoveryUrlFromIssuer = computed(() => {
+    const issuer = this.oauth.issuer().replace(/\/+$/, '');
+    return issuer ? `${issuer}/.well-known/openid-configuration` : 'aus dem Issuer abgeleitet';
+  });
+
+  /**
    * The redirect address this browser will actually use, as the background worker reports it, and
    * whether its own `identity` API produced it. Null until it has answered, and where it cannot —
    * outside an extension, or with no repository to derive one from. Shown because it is what has to
@@ -261,6 +271,11 @@ export class SettingsScreenComponent implements OnDestroy {
     // The previous answer described a different client, so it is dropped rather than left standing.
     this.oauth.clearCheck();
     void this.oauth.setIssuer(issuer).then(() => this.readRedirectUri());
+  }
+
+  protected setOAuthDiscoveryUrl(discoveryUrl: string): void {
+    this.changed = true;
+    void this.oauth.setDiscoveryUrl(discoveryUrl);
   }
 
   protected setOAuthClientId(clientId: string): void {

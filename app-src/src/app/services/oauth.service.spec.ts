@@ -99,12 +99,33 @@ describe('OAuthService', () => {
 
       expect(extension.fake.oauthLogin).toHaveBeenCalledWith({
         issuer: 'https://sso.example/realms/edu',
+        discoveryUrl: '',
         clientId: 'edu-sharing-extension',
         scopes: APP_CONFIG.oauth.scopes,
         redirectUri: '',
         repositoryUrl: REPOSITORY_URL,
         registrationId: 'uni',
       });
+    });
+
+    it('states the discovery address the settings name, so the worker fetches that document', async () => {
+      // An authorization server that describes itself under the RFC 8414 path rather than the OpenID
+      // Connect one: the issuer stays what it is, only the document moves.
+      extension.storage.set(
+        APP_CONFIG.storageKeys.oauthDiscoveryUrl,
+        'https://sso.example/.well-known/oauth-authorization-server',
+      );
+      await configure();
+      extension.oauthYields('an-access-token');
+
+      await oauth.login(REPOSITORY_URL);
+
+      expect(extension.fake.oauthLogin).toHaveBeenCalledWith(
+        expect.objectContaining({
+          issuer: 'https://sso.example/realms/edu',
+          discoveryUrl: 'https://sso.example/.well-known/oauth-authorization-server',
+        }),
+      );
     });
 
     it('answers with the token a completed flow produced', async () => {

@@ -88,17 +88,30 @@ function normalizeIssuer(issuer) {
 }
 
 /**
- * The issuer's OpenID Connect metadata (`/.well-known/openid-configuration`), cached per issuer.
+ * Where the provider describes itself. The address as configured, else the OpenID Connect path below
+ * the issuer — which is the one an OIDC provider serves, while a plain OAuth authorization server
+ * describes itself at `/.well-known/oauth-authorization-server` instead (RFC 8414) and has to be
+ * named. Both documents carry the endpoint fields this flow reads, so only the address differs.
+ */
+function discoveryUrlOf(issuer, discoveryUrl) {
+  const stated = String(discoveryUrl || '').trim();
+  if (stated) return stated;
+  const base = normalizeIssuer(issuer);
+  return base ? `${base}/.well-known/openid-configuration` : '';
+}
+
+/**
+ * The provider's metadata, cached per document address rather than per issuer — the address is what
+ * was fetched, and an issuer whose document moved would otherwise keep answering from the old one.
  * Only the endpoints this flow uses are taken from it; a document missing the two required ones is
  * rejected here rather than at the request that would have used them.
  */
-async function discover(issuer) {
-  const base = normalizeIssuer(issuer);
-  if (!base) throw new Error('OAUTH_NO_ISSUER');
-  const cached = discoveryCache.get(base);
+async function discover(issuer, discoveryUrl) {
+  const url = discoveryUrlOf(issuer, discoveryUrl);
+  if (!url) throw new Error('OAUTH_NO_ISSUER');
+  const cached = discoveryCache.get(url);
   if (cached) return cached;
 
-  const url = `${base}/.well-known/openid-configuration`;
   const document = await fetchJson(url, { method: 'GET' }, 'OAUTH_DISCOVERY_FAILED');
   const endpoints = {
     authorization: document.authorization_endpoint,
@@ -109,8 +122,8 @@ async function discover(issuer) {
     scopesSupported: Array.isArray(document.scopes_supported) ? document.scopes_supported : null,
   };
   if (!endpoints.authorization || !endpoints.token) throw new Error('OAUTH_DISCOVERY_INCOMPLETE');
-  discoveryCache.set(base, endpoints);
-  console.log(`${OAUTH_LOG} discovered ${base}`);
+  discoveryCache.set(url, endpoints);
+  console.log(`${OAUTH_LOG} discovered ${url}`);
   return endpoints;
 }
 
@@ -337,9 +350,9 @@ function postToken(endpoint, params) {
  * provider behind its authorization server by `kc_idp_hint`-style registration id, which is what its
  * `oauthEntries` advertise.
  */
-async function login({ issuer, clientId, scopes, configuredRedirectUri, repositoryUrl, registrationId, loginHint } = {}) {
+async function login({ issuer, discoveryUrl, clientId, scopes, configuredRedirectUri, repositoryUrl, registrationId, loginHint } = {}) {
   if (!clientId) throw new Error('OAUTH_NO_CLIENT_ID');
-  const endpoints = await discover(issuer);
+  const endpoints = await discover(issuer, discoveryUrl);
   const redirect = redirectUri({ configuredRedirectUri, repositoryUrl });
   const { verifier, challenge } = await pkcePair();
   const state = randomString(32);
@@ -391,7 +404,7 @@ async function login({ issuer, clientId, scopes, configuredRedirectUri, reposito
  * the one now configured — so a caller can tell "nobody is signed in" from "the renewal failed".
  * A refresh the IdP rejects clears the store: that token will not start working again.
  */
-async function refresh({ issuer, clientId } = {}) {
+async function refresh({ issuer, discoveryUrl, clientId } = {}) {
   const stored = await readStoredTokens();
   if (!stored?.refreshToken) return null;
   const wanted = normalizeIssuer(issuer);
@@ -401,7 +414,7 @@ async function refresh({ issuer, clientId } = {}) {
     return null;
   }
 
-  const endpoints = await discover(wanted || stored.issuer);
+  const endpoints = await discover(wanted || stored.issuer, discoveryUrl);
   try {
     const session = toSession(
       await postToken(endpoints.token, {
@@ -426,14 +439,14 @@ async function refresh({ issuer, clientId } = {}) {
  * best-effort — the revocation endpoint where the issuer has one, so the refresh token stops working
  * for anyone who did get hold of it.
  */
-async function logout({ issuer, clientId } = {}) {
+async function logout({ issuer, discoveryUrl, clientId } = {}) {
   const stored = await readStoredTokens();
   await clearTokens();
   if (!stored?.refreshToken) return { revoked: false };
 
   const base = normalizeIssuer(issuer) || stored.issuer;
   try {
-    const endpoints = await discover(base);
+    const endpoints = await discover(base, discoveryUrl);
     if (!endpoints.revocation) return { revoked: false };
     await postToken(endpoints.revocation, {
       token: stored.refreshToken,
@@ -457,8 +470,8 @@ async function logout({ issuer, clientId } = {}) {
  * redirecting, so the panel never learns why. Checking it here turns that into a sentence in the
  * settings before anybody tries to sign in.
  */
-async function checkIssuer({ issuer, scopes } = {}) {
-  const endpoints = await discover(issuer);
+async function checkIssuer({ issuer, discoveryUrl, scopes } = {}) {
+  const endpoints = await discover(issuer, discoveryUrl);
   const wanted = String(scopes || DEFAULT_SCOPES).split(/\s+/).filter(Boolean);
   return {
     revocable: !!endpoints.revocation,
@@ -520,7 +533,7 @@ function belongsTo(stored, wantedIssuer, clientId) {
  * A usable access token without asking the user: the stored one while it is still valid, else what a
  * refresh yields. Null where nobody is signed in.
  */
-async function silentSession({ issuer, clientId } = {}) {
+async function silentSession({ issuer, discoveryUrl, clientId } = {}) {
   const stored = await readStoredTokens();
   // The same check the refresh makes — without it a token from a provider the settings have since
   // moved away from would be handed out for as long as it happened to stay valid.
@@ -532,7 +545,7 @@ async function silentSession({ issuer, clientId } = {}) {
   ) {
     return { accessToken: stored.accessToken, refreshToken: stored.refreshToken, idToken: stored.idToken, expiresAt: stored.expiresAt };
   }
-  return refresh({ issuer, clientId });
+  return refresh({ issuer, discoveryUrl, clientId });
 }
 
 self.EDU_SHARING_OAUTH = {

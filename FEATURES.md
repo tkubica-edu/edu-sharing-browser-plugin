@@ -389,10 +389,13 @@ navigating to it, and closes it again where it stands; the step keeps running be
 
   *SSO-Anmeldung* is folded like the tuning groups but sits above them, next to the repository:
   it decides whether the login card offers a second way in at all, and it applies to whichever
-  repository the panel is pointed at. Four fields, each falling back to what `APP_CONFIG.oauth`
+  repository the panel is pointed at. Five fields, each falling back to what `APP_CONFIG.oauth`
   carries when it is emptied: the **Issuer** (the base its
   `/.well-known/openid-configuration` sits under — the endpoints are read from that document, so the
-  issuer is the only address to enter), the **Client-ID** of the public client registered for this
+  issuer is normally the only address to enter), the **Discovery-URL** for the case where that
+  document sits elsewhere (an authorization server that is not an OIDC provider publishes
+  `/.well-known/oauth-authorization-server` instead, edu-sharing's own included; empty falls back to
+  the issuer's OIDC path), the **Client-ID** of the public client registered for this
   extension, the **Scopes** (`offline_access` among them is what yields the refresh token the session
   is later resumed from — not every provider defines it) and the **Redirect-URI**. *Issuer und Scopes
   prüfen* asks the issuer about itself before anybody signs in: whether it can be reached, whether it

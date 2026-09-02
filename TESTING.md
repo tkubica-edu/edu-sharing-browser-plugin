@@ -274,8 +274,10 @@ extension storage and it resets per session.
 
 ## An identity provider to test the SSO login against
 
-The SSO login needs an OpenID Connect provider that (1) publishes a discovery document at
-`<issuer>/.well-known/openid-configuration`, because that is where the endpoints are read from, and
+The SSO login needs a provider that (1) publishes a discovery document — at
+`<issuer>/.well-known/openid-configuration`, or at any address entered as the *Discovery-URL*, which
+is what an authorization server describing itself under `/.well-known/oauth-authorization-server`
+(RFC 8414) needs — because that is where the endpoints are read from, and
 (2) accepts the token exchange **without a client secret**, because a public client cannot keep one
 (see [ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow)). That rules out some of the
 obvious candidates:

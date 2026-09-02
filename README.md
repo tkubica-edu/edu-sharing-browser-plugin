@@ -120,7 +120,8 @@ flat.
   it so the base version's flow stays reachable against such a repository;
   `browserExtensionEditorialGroups` names the editorial groups contents can be forwarded to.
 - **SSO client** — an OpenID Connect issuer and client id, set in *Einstellungen → SSO-Anmeldung*
-  (defaults in `APP_CONFIG.oauth`, empty as shipped). Configured, the login card offers signing in
+  (defaults in `APP_CONFIG.oauth`, empty as shipped); a *Discovery-URL* there names the metadata
+  document where it does not sit at the issuer's OIDC path. Configured, the login card offers signing in
   through the identity provider next to the credential form — Authorization Code flow with PKCE, see
   [UI-SHELL.md](UI-SHELL.md#login-session-restore-and-the-guest-gate) and
   [ARCHITECTURE.md](ARCHITECTURE.md#the-oauth-flow).

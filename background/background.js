@@ -571,6 +571,9 @@ const ALLOWED_ACTIONS = new Set([
 function oauthParamsOf(message) {
   return {
     issuer: message.issuer,
+    // Where the provider describes itself, for one that does not serve the OpenID Connect path
+    // below its issuer — see `discoveryUrlOf` in background/oauth.js.
+    discoveryUrl: message.discoveryUrl,
     clientId: message.clientId,
     scopes: message.scopes,
     configuredRedirectUri: message.redirectUri,
