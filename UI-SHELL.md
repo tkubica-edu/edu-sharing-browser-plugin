@@ -160,7 +160,7 @@ Which buttons the card shows follows from the repository too. Its login info adv
 it federates against (`oauthEntries`, read by `AuthService.applyOAuthEntries`); each entry with a
 `registrationId` becomes a button that names that provider in the authorization request, so the
 provider goes straight there instead of showing its own chooser. A repository advertising none — the
-ordinary case — leaves a single *Mit SSO anmelden* button and lets the provider ask.
+ordinary case — leaves a single *Anmelden mit OAuth* button and lets the provider ask.
 
 **Resuming an OAuth session.** The flow keeps its refresh token in `browser.storage.local`
 (`eduSharingOAuthTokens`, written only by the worker). `AuthService.init` uses it after the cookie

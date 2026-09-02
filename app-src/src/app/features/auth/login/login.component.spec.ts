@@ -74,7 +74,7 @@ describe('LoginComponent', () => {
     fixture.detectChanges();
 
     // The provider's own chooser is one step further on, which is the same question anyway.
-    expect(labels()).toEqual(['Mit SSO anmelden']);
+    expect(labels()).toEqual(['Anmelden mit OAuth']);
   });
 
   it('offers a button per provider the repository advertises', () => {

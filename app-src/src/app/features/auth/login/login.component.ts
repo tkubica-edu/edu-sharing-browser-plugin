@@ -78,9 +78,9 @@ export class LoginComponent {
     () => !this.auth.needsReload() && !this.loggingIn() && !this.auth.oauthRunning(),
   );
 
-  /** What an SSO button says: the provider's name where there is one. */
+  /** What an SSO button says: the provider's name where the repository gave one. */
   protected oauthLabel(provider: OAuthProvider | null): string {
-    return provider ? `Anmelden mit ${provider.label}` : 'Mit SSO anmelden';
+    return provider ? `Anmelden mit ${provider.label}` : 'Anmelden mit OAuth';
   }
 
   protected togglePassword(): void {
