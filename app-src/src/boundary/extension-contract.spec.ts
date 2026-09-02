@@ -85,6 +85,7 @@ function stringLiterals(source: string): string[] {
 }
 
 const background = read('background/background.js');
+const oauth = read('background/oauth.js');
 const panelHost = read('content/panel-host.js');
 const content = read('content/content.js');
 const browserExtensionService = read('app-src/src/app/services/browser-extension.service.ts');
@@ -210,12 +211,19 @@ describe('the storage keys the two sides meet in', () => {
 
   it.each([
     ['background/background.js', background],
+    ['background/oauth.js', oauth],
     ['content/panel-host.js', panelHost],
     ['content/content.js', content],
   ])('states no key in %s that the panel does not know', (_file, source) => {
     keysIn(source).forEach((key) =>
       expect([...keys, ...EXTENSION_ONLY], key).toContain(key),
     );
+  });
+
+  it('keeps the OAuth tokens under the key the panel names', () => {
+    // The worker's flow is the only side that writes them, so nothing would ever catch a drift here:
+    // the panel names the key merely so its storage keys are all in one place (see APP_CONFIG).
+    expect(stringConstant(oauth, 'TOKEN_STORAGE_KEY')).toBe(APP_CONFIG.storageKeys.oauthTokens);
   });
 
   it('reads the dev mode and the resumed step under the keys the panel writes', () => {

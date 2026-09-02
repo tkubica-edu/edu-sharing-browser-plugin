@@ -4,6 +4,8 @@ import { vi } from 'vitest';
 import {
   AnnouncedPage,
   BrowserExtensionService,
+  OAuthRequest,
+  OAuthSession,
   SaveNodeResponse,
 } from '../../app/services/browser-extension.service';
 
@@ -27,6 +29,11 @@ export function fakeBrowserExtension() {
   /** What the worker answers a `metadata.saveNode` with — see {@link writes} and {@link refuses}. */
   let saved: SaveNodeResponse = { success: true, result: { success: true } };
 
+  /** What the worker answers the interactive OAuth flow with — see {@link oauthYields}. */
+  let oauthLogin: OAuthSession = { success: false, error: 'OAUTH_CANCELLED' };
+  /** And the silent one, whose default is the ordinary case of nobody being signed in. */
+  let oauthSilent: OAuthSession = { success: true, signedIn: false };
+
   const fake = {
     available: true,
     announcedPage: signal<AnnouncedPage | null>(null),
@@ -39,6 +46,12 @@ export function fakeBrowserExtension() {
     saveNode: vi.fn(
       (_body: Record<string, unknown>, _apiUrl?: string): Promise<SaveNodeResponse> =>
         Promise.resolve(saved),
+    ),
+    oauthLogin: vi.fn((_request: OAuthRequest): Promise<OAuthSession> => Promise.resolve(oauthLogin)),
+    oauthSilent: vi.fn((_request: OAuthRequest): Promise<OAuthSession> => Promise.resolve(oauthSilent)),
+    oauthLogout: vi.fn((_request: OAuthRequest): Promise<OAuthSession> => Promise.resolve({ success: true })),
+    oauthRedirectUri: vi.fn((_request: OAuthRequest) =>
+      Promise.resolve({ redirectUri: 'https://abc.chromiumapp.org/', usesIdentityApi: true }),
     ),
   } satisfies Partial<BrowserExtensionService>;
 
@@ -55,7 +68,22 @@ export function fakeBrowserExtension() {
     saved = { success: false, error };
   }
 
-  return { fake, storage, storageGet, writes, refuses };
+  /** The worker's OAuth flow ends in this token — the completed-flow case. */
+  function oauthYields(accessToken: string): void {
+    oauthLogin = { success: true, accessToken };
+  }
+
+  /** It ends without one instead: a cancellation, or one of the flow's own refusals. */
+  function oauthRefuses(error: string): void {
+    oauthLogin = { success: false, error };
+  }
+
+  /** Somebody is still signed in, so the silent attempt answers with a token. */
+  function oauthResumes(accessToken: string): void {
+    oauthSilent = { success: true, signedIn: true, accessToken };
+  }
+
+  return { fake, storage, storageGet, writes, refuses, oauthYields, oauthRefuses, oauthResumes };
 }
 
 export type BrowserExtensionFake = ReturnType<typeof fakeBrowserExtension>;

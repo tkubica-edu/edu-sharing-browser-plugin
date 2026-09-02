@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 
 import { IconDirective } from '../../../directives/icon.directive';
 import { AuthService } from '../../../services/auth.service';
+import { OAuthProvider } from '../../../services/oauth.service';
 import { RepositoryPageService } from '../../../services/repository-page.service';
 
 /**
@@ -14,8 +15,9 @@ const USER_PLACEHOLDER = 'E-Mail-Adresse oder Benutzername';
 
 // The shared login: the credential form while logged out, a compact status row once logged in — and the session is
 // shared, so signing in here unblocks every screen. One form for both places it is asked for, the Login section and
-// a section a guest cannot be served by, whose two lines of text are inputs. Registering and resetting a password
-// are the repository's own forms, opened in the docked tab (RepositoryPageService).
+// a section a guest cannot be served by, whose two lines of text are inputs. Where an OAuth client is configured the
+// same card offers the identity provider as the second way in (see OAuthService). Registering and resetting a
+// password are the repository's own forms, opened in the docked tab (RepositoryPageService).
 @Component({
   selector: 'es-login',
   imports: [FormsModule, IconDirective],
@@ -58,6 +60,27 @@ export class LoginComponent {
     () => !!this.username() && !!this.password() && !this.auth.needsReload() && !this.loggingIn(),
   );
 
+  /**
+   * The identity providers offered as buttons: the ones the repository advertises, else a single
+   * unnamed one that leads to the issuer's own chooser — which is the same question, asked one step
+   * later. Empty where no OAuth client is configured, and the card is then the credential form alone.
+   */
+  protected readonly oauthButtons = computed<readonly (OAuthProvider | null)[]>(() => {
+    if (!this.auth.oauthOffered()) return [];
+    const advertised = this.auth.oauthProviders();
+    return advertised.length ? advertised : [null];
+  });
+
+  /** Locked for the same reasons the credential submit is, and while the IdP's pages are up. */
+  protected readonly canUseOAuth = computed(
+    () => !this.auth.needsReload() && !this.loggingIn() && !this.auth.oauthRunning(),
+  );
+
+  /** What an SSO button says: the provider's name where there is one. */
+  protected oauthLabel(provider: OAuthProvider | null): string {
+    return provider ? `Anmelden mit ${provider.label}` : 'Mit SSO anmelden';
+  }
+
   protected togglePassword(): void {
     this.passwordVisible.update((visible) => !visible);
   }
@@ -74,6 +97,16 @@ export class LoginComponent {
 
   protected logout(): Promise<void> {
     return this.auth.logout();
+  }
+
+  /**
+   * The other way in: the identity provider's pages, then the token traded for a repository session
+   * (see AuthService.loginWithOAuth). The typed password is dropped on success like the credential
+   * login drops it — the session is there, and the field has nothing left to submit.
+   */
+  protected async loginWithOAuth(provider: OAuthProvider | null): Promise<void> {
+    if (!this.canUseOAuth()) return;
+    if (await this.auth.loginWithOAuth(provider ?? undefined)) this.password.set('');
   }
 
   /** Leaves the panel: the page is replaced and the panel comes back once it is there. */

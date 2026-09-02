@@ -41,6 +41,16 @@
 
     <p class="lg-or"><span>oder</span></p>
 
+    <!-- One button per provider the repository advertises; a single unnamed one where it advertises
+         none, which leads to the issuer's own chooser (see LoginComponent.oauthButtons). -->
+    @for (provider of oauthButtons(); track provider?.registrationId ?? 'sso') {
+      <button class="lg-secondary lg-sso" type="button" [disabled]="!canUseOAuth()"
+              (click)="loginWithOAuth(provider)">
+        <i esIcon="vpn_key"></i>
+        {{ auth.oauthRunning() ? 'Anmelden…' : oauthLabel(provider) }}
+      </button>
+    }
+
     <button class="lg-secondary" type="button" (click)="openRegister()">Account erstellen</button>
 
     @if (auth.needsReload()) {

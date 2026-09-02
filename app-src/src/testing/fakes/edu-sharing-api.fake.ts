@@ -35,16 +35,34 @@ export function fakeAuthentication(info: LoginInfo = aLoginInfo()) {
   /** What every observer of the login state is answered with; a spec swaps it per case. */
   let loginInfo: Observable<LoginInfo> = of(info);
 
+  /**
+   * What the bearer-token login answers with, where a spec wants it to differ from the rest — the
+   * repository can refuse an OAuth token it does not know while a password login would have worked.
+   * Unset, it answers like every other login action does.
+   */
+  let tokenLogin: Observable<LoginInfo> | null = null;
+
   const fake = {
     observeLoginInfo: vi.fn(() => loginInfo),
     forceLoginInfoRefresh: vi.fn(),
     login: vi.fn((_username: string, _password: string, _scope?: string) => loginInfo),
+    loginToken: vi.fn((_accessToken: string) => tokenLogin ?? loginInfo),
     logout: vi.fn(() => of(aLoginInfo({ isValidLogin: false, isGuest: true }))),
   } satisfies Partial<AuthenticationService>;
 
   /** The repository answers with this login info from now on. */
   function answers(next: LoginInfo): void {
     loginInfo = of(next);
+  }
+
+  /** It answers a bearer token with this, whatever it answers the other login actions with. */
+  function answersToken(next: LoginInfo): void {
+    tokenLogin = of(next);
+  }
+
+  /** It refuses the bearer token — the OAuth login completed, the repository still says no. */
+  function refusesToken(cause: unknown): void {
+    tokenLogin = throwError(() => cause);
   }
 
   /** The repository cannot be reached, or refuses — every observer sees this error. */
@@ -57,7 +75,7 @@ export function fakeAuthentication(info: LoginInfo = aLoginInfo()) {
     loginInfo = new Observable<LoginInfo>();
   }
 
-  return { fake, answers, fails, silent };
+  return { fake, answers, answersToken, refusesToken, fails, silent };
 }
 
 export type AuthenticationFake = ReturnType<typeof fakeAuthentication>;

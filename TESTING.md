@@ -24,11 +24,15 @@ npm --prefix app-src run test -- --include app/services/history.service.spec.ts
 jsdom — no browser and no extension. The target's `include` is `src/**/*.spec.ts`, and three kinds of
 spec live under it: the service specs, each driving one service through `TestBed` with its
 dependencies replaced, the pure specs next to `src/app/util/`, which need no `TestBed` at all, and
-`src/boundary/extension-contract.spec.ts`, which is about no service — it reads the extension's
-plain-JS files, `sw.js`, the manifests and the root `config.js` off disk and checks each literal
-they share with the panel against the panel's own (see [TEST-PLAN.md § Boundary contract
-specs](TEST-PLAN.md#4-boundary-contract-specs--where-the-sidebar-meets-the-extension)). It is the
-one spec that reads its subject instead of importing it: none of those files exports anything.
+the two under `src/boundary/`, which are about no service (see [TEST-PLAN.md § Boundary contract
+specs](TEST-PLAN.md#4-boundary-contract-specs--where-the-sidebar-meets-the-extension)). They are the
+specs that read their subject instead of importing it, because none of the extension's plain-JS files
+exports anything: `extension-contract.spec.ts` reads those files, `sw.js`, the manifests and the root
+`config.js` off disk and checks each literal they share with the panel against the panel's own, while
+`oauth-flow.spec.ts` goes further and *evaluates* `background/oauth.js` in a sandbox with `browser`,
+`fetch` and `console` handed in — the OAuth flow is unreachable from the panel, so its PKCE pair, its
+`state` check, its redirect matching and the watched-tab fallback Safari needs are exercised there
+with the browser APIs faked.
 `--include` patterns are relative to `src`, and `--list-tests` prints what the builder discovered
 without running it.
 
@@ -268,6 +272,83 @@ exercise the whole flow including *Speichern*. The flag is persisted in `storage
 `onlyOfficePresent()`, so it survives reloads inside the extension — in a plain `ng serve` there is no
 extension storage and it resets per session.
 
+## An identity provider to test the SSO login against
+
+The SSO login needs an OpenID Connect provider that (1) publishes a discovery document at
+`<issuer>/.well-known/openid-configuration`, because that is where the endpoints are read from, and
+(2) accepts the token exchange **without a client secret**, because a public client cannot keep one
+(see [ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow)). That rules out some of the
+obvious candidates:
+
+| Provider | Usable | Why |
+| --- | --- | --- |
+| Keycloak (local) | yes | Public client with `Client authentication` off, PKCE `S256`, `offline_access` for the refresh token, and a `revocation_endpoint` so *Abmelden* is exercised too. Also the shape edu-sharing federates in, so `oauthEntries` → `kc_idp_hint` matches |
+| GitLab.com | yes | A non-confidential application does PKCE without a secret. Note its scopes: there is no `offline_access` — asking for one is an `invalid_scope` |
+| Microsoft Entra ID, Auth0, Okta | yes | Their SPA/native client types are secret-less and PKCE-only |
+| Google | **no** | The token endpoint requires `client_secret` for every client type, and a refresh token additionally needs `access_type=offline` — a query parameter, not a scope, so it cannot be reached through the *Scopes* field |
+| GitHub | **no** | No OIDC discovery document at all (`/.well-known/openid-configuration` is a 404), and the token endpoint requires the client secret |
+| Hosted playgrounds and demo servers (`oauth.net/playground`, `demo.duendesoftware.com`, …) | **no** | Their clients are registered against *their own* redirect URIs, and a browser extension's address is per-installation — so the code never comes back to the extension. The oauth.net playground additionally publishes no discovery document and mints its `client_id` per visitor. Client registration has to be yours, which is what the two recipes below are for |
+
+### Keycloak in one container
+
+```bash
+docker run --rm -p 8080:8080 \
+  -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
+  -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+  quay.io/keycloak/keycloak:26.0 start-dev
+```
+
+On Keycloak 24/25 the variables are `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD`. Then in the admin
+console at `http://localhost:8080`:
+
+1. **Realm** → *Create realm* → name it `edu-sharing`.
+2. **Clients** → *Create client* → Client ID `edu-sharing-browser-extension`. On the next step leave
+   **Client authentication off** — that is what makes it a public client — with *Standard flow*
+   ticked and *Direct access grants* unticked.
+3. On the client's **Advanced** tab set *Proof Key for Code Exchange Code Challenge Method* to
+   `S256`, so the realm refuses a flow that omits the challenge instead of quietly allowing it.
+4. **Valid redirect URIs** — see below; leave the rest of the client alone.
+5. **Users** → *Create user*, then its *Credentials* tab → set a password, *Temporary* off.
+
+Then in the panel, *Einstellungen → SSO-Anmeldung*:
+
+| Field | Value |
+| --- | --- |
+| Issuer | `http://localhost:8080/realms/edu-sharing` |
+| Client-ID | `edu-sharing-browser-extension` |
+| Scopes | `openid profile email offline_access` |
+| Redirect-URI | leave empty for a Chrome-only test, else see below |
+
+`http://localhost` is reachable because the manifest declares `http://*/*` and the CSP names `http:`;
+nothing has to be served over TLS for a local run.
+
+### Which redirect URI to register
+
+The group in *Einstellungen* reports the address this browser will actually use — that is the value
+to paste into Keycloak's *Valid redirect URIs*, and it is the one thing that cannot be guessed.
+
+- **Leaving the field empty** is the least work for a single browser: Chrome and Edge report
+  `https://<extension-id>.chromiumapp.org/`, Firefox reports a per-profile
+  `https://<uuid>.extensions.allizom.org/`. Each is different, so testing all three means
+  registering all three — and Firefox's changes when the profile does.
+- **Filling the field in** makes every browser take the watched-tab path instead of its own API, so
+  **one address serves all three** — including Safari, which has no `identity` API to offer one. Any
+  https address the extension has host permissions for will do; it needs to serve nothing, since the
+  flow matches on the address and closes the tab before the load finishes. The default Safari
+  fallback, `<Repository>/oauth/extension-callback`, is a reasonable choice. Should the request reach
+  that server after all, the authorization code in it is useless on its own: it is single-use and
+  bound to a PKCE verifier that never leaves the extension.
+
+### GitLab.com instead of a container
+
+*User Settings → Applications → Add new application*: paste the redirect URI as above, leave
+**Confidential unticked**, and tick the scopes `openid`, `profile`, `email`. In the panel use issuer
+`https://gitlab.com`, the *Application ID* as the Client-ID, and scopes `openid profile email` —
+**without** `offline_access`, which GitLab does not define. Unverified against a live instance: its
+discovery document does not advertise `none` among `token_endpoint_auth_methods_supported` even
+though the documented PKCE flow sends no secret, so if the token exchange comes back
+`OAUTH_TOKEN_FAILED: 401`, that is the reason and Keycloak is the way on.
+
 ## Manual test checklist
 
 What the unit tests above cannot answer, and what this list is therefore for: anything that needs a
@@ -291,20 +372,31 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
 4. **Login**: required for everything except *Einstellungen*. Enter staging credentials → the session
    bar flips to "Angemeldet: …" and the login option disappears while the rest appear. If the
    repository URL was changed, login is blocked until it is applied in *Einstellungen*.
-5. **Erschließen + speichern**: *Inhalt erschließen* on a content page → the metadata screen shows
+5. **SSO-Anmeldung** (needs an identity provider — see
+   [§ An identity provider to test the SSO login against](#an-identity-provider-to-test-the-sso-login-against)):
+   enter the issuer and the client id under *Einstellungen* → *SSO-Anmeldung*, register the address
+   the group reports as the redirect URI with the client at the provider, then use the button below
+   the credential form on the login card. The provider's pages must open (a `launchWebAuthFlow` window on Chrome, Edge and
+   Firefox; a tab that closes itself on Safari), and the session bar must flip to "Angemeldet: …"
+   afterwards. Then close the panel and reopen it: the session must come back without the provider
+   being shown again — that is the stored refresh token. *Abmelden* must end it for good, i.e. the
+   next open must ask again rather than sign back in. Closing the provider's window instead must
+   leave the login card exactly as it was, with no error on it. **Untested on Safari**, see
+   [TROUBLESHOOTING.md § Browser-specific](TROUBLESHOOTING.md#browser-specific).
+6. **Erschließen + speichern**: *Inhalt erschließen* on a content page → the metadata screen shows
    `fields_extracted / fields_total` and loads the MDS editor with the generated metadata. Edit, then
    the footer's **Speichern** → a node is created in your inbox and the preview opens, and the flow's
    steps become reachable for that content.
-6. **Metadaten anreichern** (OnlyOffice): open a document in the OnlyOffice editor with the
+7. **Metadaten anreichern** (OnlyOffice): open a document in the OnlyOffice editor with the
    edu-sharing plugin active, open the panel → the option appears and names the detected document.
    The footer's **Metadaten anreichern** reads the document and lands on the metadata screen with the
    generated metadata, the menu naming the document under *Inhalt erkannt*. **Speichern** must update
    **that** node — check in the repository that the document's metadata changed, that its
    name/extension is unchanged, and that no new node appeared in the inbox. With the page-side plugin
    switched off (*Plugins im Hintergrund*) the screen must report the timeout instead of hanging.
-7. **Vorschau → Sammlungen**: from the preview, *Sammlung zuordnen* → pick a collection and confirm
+8. **Vorschau → Sammlungen**: from the preview, *Sammlung zuordnen* → pick a collection and confirm
    with *In Sammlung einfügen*; the screen lists what was added.
-8. **An Nostr Relay weiterleiten**: the step is reached in the base version too — against a repository
+9. **An Nostr Relay weiterleiten**: the step is reached in the base version too — against a repository
    *without* `browserExtensionCustomWebComponent` it must show the relay row alone, with no Redaktionen
    list, no „keine Redaktionen konfiguriert" line and no collection request in the network tab. The
    *Nostr-Relay* group in *Einstellungen* must be there in that version too — the step is, so its relay
@@ -324,7 +416,7 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    flow as well, since it has no target left. Ticking it again brings all of it back, with the relay
    row unticked and no receipt carried over.
 
-9. **An Nostr Relay senden** (Inhaltsoptionen, between *Inhalt teilen* and *Interaktionen anzeigen*):
+10. **An Nostr Relay senden** (Inhaltsoptionen, between *Inhalt teilen* and *Interaktionen anzeigen*):
    open a node from the *Verlauf* → the row appears and opens a step of its own — the Inhaltsübersicht
    must **not** grow a tab for it. The screen names the `d` tag and the field count
    it would publish, with the standing card above it. *An Relay senden* publishes it; the button then
@@ -337,7 +429,7 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    relay, not out of the *Verlauf* — labelled „Beim Nostr-Relay hinterlegt". Clearing the *Verlauf* must
    change nothing about that. With the relay pointed at an unreachable address the state must read
    **Unbekannt**, never „Nicht gesendet".
-10. **Verlauf**: every *saved* node is listed (nothing is recorded until you save); entries expand to
+11. **Verlauf**: every *saved* node is listed (nothing is recorded until you save); entries expand to
    show their fields and offer *In Vorschau öffnen*, which reloads the node from the repository;
    *Leeren* clears the list.
 

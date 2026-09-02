@@ -13,6 +13,7 @@ import { CurationService } from '../../../services/curation.service';
 import { DebugService } from '../../../services/debug.service';
 import { DevModeService } from '../../../services/dev-mode.service';
 import { NostrForwardService } from '../../../services/nostr-forward.service';
+import { OAuthService } from '../../../services/oauth.service';
 import { ContentJudgeService } from '../../../services/content-judge.service';
 import { QualityJudgeService } from '../../../services/quality-judge.service';
 import { ThemeService, ThemeSetting } from '../../../services/theme.service';
@@ -24,7 +25,7 @@ import { configuredSchemes } from '../../../util/quality-schemes';
  * with it, what a collection proposal is derived from, which services a quality check asks, and where the
  * forwarding step publishes AMB records to.
  */
-type SettingsSection = 'developer' | 'ai' | 'recommendation' | 'quality' | 'nostr';
+type SettingsSection = 'developer' | 'sso' | 'ai' | 'recommendation' | 'quality' | 'nostr';
 
 // Repository configuration plus the settings of the chat, the checks and the two development switches.
 // Changing the URL requires a reload, because the API library freezes its rootUrl at bootstrap (see
@@ -54,6 +55,7 @@ export class SettingsScreenComponent implements OnDestroy {
   protected readonly contentJudge = inject(ContentJudgeService);
   protected readonly theme = inject(ThemeService);
   protected readonly nostr = inject(NostrForwardService);
+  protected readonly oauth = inject(OAuthService);
 
   /** Whether the credential is legible on screen; masked until it is asked for. */
   protected readonly basicAuthVisible = signal(false);
@@ -66,6 +68,18 @@ export class SettingsScreenComponent implements OnDestroy {
 
   /** The relay the panel ships with, named where the field says what an empty one falls back to. */
   protected readonly defaultNostrRelayUrl = APP_CONFIG.nostrRelayUrl;
+
+  /** The scopes the panel ships with, named where the field says what an empty one falls back to. */
+  protected readonly defaultOAuthScopes = APP_CONFIG.oauth.scopes;
+
+  /**
+   * The redirect address this browser will actually use, as the background worker reports it, and
+   * whether its own `identity` API produced it. Null until it has answered, and where it cannot —
+   * outside an extension, or with no repository to derive one from. Shown because it is what has to
+   * be registered with the client at the identity provider, and with the `identity` API it is an
+   * address the browser makes up that nobody could otherwise look up.
+   */
+  protected readonly redirectUriInUse = signal<{ redirectUri: string; usesIdentityApi: boolean } | null>(null);
 
   /**
    * The checks the measurement is asked for, as its description lists them. Read from the rules rather than
@@ -102,6 +116,7 @@ export class SettingsScreenComponent implements OnDestroy {
    */
   protected readonly changedPerSection = computed<Record<SettingsSection, number>>(() => ({
     developer: this.wlo.changedSettings() + this.devMode.changedSettings() + this.debug.changedSettings(),
+    sso: this.oauth.changedSettings(),
     ai: this.chatStyle.changedSettings() + this.chatSkill.changedSettings(),
     recommendation: this.recommendations.changedSettings(),
     quality: this.qualityJudge.changedSettings() + this.contentJudge.changedSettings(),
@@ -110,6 +125,14 @@ export class SettingsScreenComponent implements OnDestroy {
 
   protected toggleSection(section: SettingsSection): void {
     this.openSection.update((open) => (open === section ? null : section));
+    // Asked when the section is opened rather than on boot: it costs a round trip to the worker, and
+    // it is only ever read here. Re-asked on every open, because the configured redirect address and
+    // the repository it falls back to may have been edited since.
+    if (this.openSection() === 'sso') void this.readRedirectUri();
+  }
+
+  private async readRedirectUri(): Promise<void> {
+    this.redirectUriInUse.set(await this.oauth.redirectUriInUse(this.auth.repositoryUrl()));
   }
 
   /**
@@ -220,6 +243,31 @@ export class SettingsScreenComponent implements OnDestroy {
 
   protected toggleBasicAuthVisible(): void {
     this.basicAuthVisible.update((visible) => !visible);
+  }
+
+  // ---- SSO (OpenID Connect) -----------------------------------------------
+  // Written as it is edited, like every other setting here. An emptied field is not an invalid one: it
+  // puts the configured default back in force (see OAuthService). The redirect address is re-read after
+  // each change, because two of these fields are what it is derived from.
+
+  protected setOAuthIssuer(issuer: string): void {
+    this.changed = true;
+    void this.oauth.setIssuer(issuer).then(() => this.readRedirectUri());
+  }
+
+  protected setOAuthClientId(clientId: string): void {
+    this.changed = true;
+    void this.oauth.setClientId(clientId).then(() => this.readRedirectUri());
+  }
+
+  protected setOAuthScopes(scopes: string): void {
+    this.changed = true;
+    void this.oauth.setScopes(scopes);
+  }
+
+  protected setOAuthRedirectUri(redirectUri: string): void {
+    this.changed = true;
+    void this.oauth.setRedirectUri(redirectUri).then(() => this.readRedirectUri());
   }
 
   // ---- Nostr relay --------------------------------------------------------

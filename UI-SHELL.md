@@ -133,6 +133,34 @@ lands on a view — you don't re-enter credentials when reopening the panel or s
 **no password is stored**. If the cookie is gone (browser restart, explicit logout, or Safari ITP
 blocking the third-party cookie) it resolves to guest and the login gate appears.
 
+**Signing in through an identity provider.** Where an OpenID Connect client is configured
+(*Einstellungen → SSO-Anmeldung*, `OAuthService`), the same login card offers a second way in below
+the credential form. It is the Authorization Code flow with PKCE (RFC 7636) and no client secret,
+which an extension could not keep: the flow runs in the background worker rather than in the panel,
+because the panel is an iframe the host page's navigation destroys and would take an in-flight flow
+with it — see
+[ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow). The access token it ends with is
+traded for an ordinary repository session (`AuthService.loginWithOAuth` →
+`AuthenticationService.loginToken`, which presents it as a bearer token against
+`validateSession`), so everything past the login is the cookie-based session described above and no
+screen knows which way in was used. The trade is the step that can still refuse a completed OAuth
+login: the person is who the provider says they are, and the repository may still not know them.
+
+Which buttons the card shows follows from the repository. Its login info advertises the providers it
+federates against (`oauthEntries`, read by `AuthService.applyOAuthEntries`); each entry with a
+`registrationId` becomes a button that names that provider in the authorization request, so the
+provider goes straight there instead of showing its own chooser. A repository advertising none — the
+ordinary case — leaves a single *Mit SSO anmelden* button and lets the provider ask.
+
+**Resuming an OAuth session.** The flow keeps its refresh token in `browser.storage.local`
+(`eduSharingOAuthTokens`, written only by the worker). `AuthService.init` uses it after the cookie
+restore above has come up empty, so a repository session lost to a timeout or a browser restart is
+put back without anything being shown. It is silent in both directions: a stored token that no
+longer works is not reported, because nobody asked for a login, and the login card it leaves standing
+says the rest. *Abmelden* drops both — the repository session and the stored tokens, with the
+provider's revocation endpoint told where its discovery document names one — since leaving the
+refresh token behind would sign the user straight back in on the next boot.
+
 **Sections a guest cannot be served by** (`AppSection.requiresSession`: *Inhalt hinzufügen*, *Meine
 Inhalte*, and — while the content is past the agent route's two-hour editing window, see
 [ARCHITECTURE.md § Saving a content](ARCHITECTURE.md#saving-a-content) — *Qualitätsprüfung*, *An

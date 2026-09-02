@@ -152,6 +152,38 @@ export const APP_CONFIG = {
   defaultRepositoryUrl: 'https://repository.staging.openeduhub.net/edu-sharing',
  //defaultRepositoryUrl: 'http://repository.127.0.0.1.nip.io:8100/edu-sharing',
   /**
+   * The OpenID Connect client the alternative login signs in with — the Authorization Code flow with
+   * PKCE, run by the background worker (`background/oauth.js`) and traded for a repository session
+   * afterwards (see OAuthService and AuthService.loginWithOAuth).
+   *
+   * Empty by default, which is what leaves the alternative out of the login screen altogether: which
+   * identity provider a deployment federates against belongs to whoever runs it, not into the
+   * checked-in configuration. Only the fallbacks for what the settings hold.
+   */
+  oauth: {
+    /**
+     * The issuer, as it names itself — the base its discovery document sits under
+     * (`<issuer>/.well-known/openid-configuration`). Endpoints are read from that document rather
+     * than assembled here, so an issuer is the single thing that has to be configured.
+     */
+    issuer: '',
+    /** The public client registered for this extension at that issuer. No secret: it cannot keep one. */
+    clientId: '',
+    /**
+     * What is asked for. `offline_access` is what yields the refresh token the session is renewed
+     * from — without it every renewal is another trip through the IdP's pages.
+     */
+    scopes: 'openid profile email offline_access',
+    /**
+     * The address the IdP redirects back to, where it has to be stated explicitly. Empty lets the
+     * browser decide: Chrome, Edge and Firefox answer with their own per-extension address, and
+     * Safari — which has no `identity` API — falls back to `<repository>/oauth/extension-callback`,
+     * which is watched for rather than served (see `background/oauth.js`). Whatever it resolves to
+     * has to be registered with the client at the IdP; the Einstellungen show the current value.
+     */
+    redirectUri: ''
+  },
+  /**
    * The WLO metadata set: the panel's forms are built from it wherever the panel is a WLO one, and from the
    * repository's default set elsewhere. The quality criteria are the exception — no other set defines them, so their
    * view reads this one directly. Named rather than resolved, because a repository's default is not its WLO set.
@@ -235,7 +267,22 @@ export const APP_CONFIG = {
      * flash white in front of a dark panel (`content/panel-host.js`); the literal there has to stay in step
      * with this one.
      */
-    theme: 'eduSharingTheme'
+    theme: 'eduSharingTheme',
+    /**
+     * The OpenID Connect client the alternative login uses, where the settings name one of their own;
+     * each falls back to the matching `APP_CONFIG.oauth` entry (see OAuthService). Without an issuer
+     * and a client id the alternative is not offered at all.
+     */
+    oauthIssuer: 'eduSharingOAuthIssuer',
+    oauthClientId: 'eduSharingOAuthClientId',
+    oauthScopes: 'eduSharingOAuthScopes',
+    oauthRedirectUri: 'eduSharingOAuthRedirectUri',
+    /**
+     * Where the background worker keeps the tokens of the running OAuth session, the refresh token
+     * among them. Written and read only there (`TOKEN_STORAGE_KEY` in `background/oauth.js`, which
+     * has to stay in step with this); named here so the panel's storage keys are all in one place.
+     */
+    oauthTokens: 'eduSharingOAuthTokens'
   },
   maxHistory: 200
 };

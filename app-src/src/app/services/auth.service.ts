@@ -6,6 +6,7 @@ import { APP_CONFIG, toApiRootUrl } from '../config';
 import { BOOT_ROOT_URL } from '../app.config';
 import { BrowserExtensionCustomWebComponentService } from './browser-extension-custom-web-component.service';
 import { BrowserExtensionService } from './browser-extension.service';
+import { OAuthProvider, OAuthService } from './oauth.service';
 
 /** How long to wait for the session check on startup. */
 const RESTORE_TIMEOUT_MS = 8000;
@@ -20,6 +21,7 @@ export class AuthService {
   private readonly browserExtension = inject(BrowserExtensionService);
   private readonly bootRootUrl = inject(BOOT_ROOT_URL);
   private readonly browserExtensionCustomWebComponent = inject(BrowserExtensionCustomWebComponentService);
+  private readonly oauth = inject(OAuthService);
 
   /** The repository base URL (`…/edu-sharing`) the user configured. */
   readonly repositoryUrl = signal(this.bootRootUrl.replace(/\/rest$/, ''));
@@ -53,6 +55,19 @@ export class AuthService {
    */
   readonly loginRequired = computed(() => !this.browserExtensionCustomWebComponent.enabled());
 
+  /**
+   * Whether the panel offers signing in through an identity provider next to the credential form —
+   * see OAuthService.configured. A login has to apply at all for it: where the embedding host brings
+   * the session, no login of either kind is shown.
+   */
+  readonly oauthOffered = computed(() => this.loginRequired() && this.oauth.configured());
+
+  /** The providers to offer, as the repository advertises them — see OAuthService.providers. */
+  readonly oauthProviders = this.oauth.providers;
+
+  /** Set while the identity provider's pages are up — see OAuthService.running. */
+  readonly oauthRunning = this.oauth.running;
+
   /** Load the persisted repository URL (or default), then revalidate any session. */
   async init(): Promise<void> {
     this.repositoryUrl.set(
@@ -62,7 +77,12 @@ export class AuthService {
       ),
     );
     this.needsReload.set(false);
+    await this.oauth.load();
     await this.restoreSession();
+    // The repository session outlives a sidebar reload as a cookie, so this only runs where that
+    // cookie is gone — the repository's own session timeout, or a browser that dropped it. The OAuth
+    // refresh token then puts the session back without asking, which is what holding one is for.
+    if (!this.loggedIn()) await this.resumeOAuthSession();
   }
 
   // Restore an existing repository session on startup: the library authenticates by session cookie, which survives
@@ -73,6 +93,7 @@ export class AuthService {
       const info = await firstValueFrom(
         this.authentication.observeLoginInfo().pipe(timeout(RESTORE_TIMEOUT_MS)),
       );
+      this.applyOAuthEntries(info);
       if (this.isValidUser(info)) this.applyLogin(info.authorityName ?? this.username());
     } catch {
       /* no active session (or unreachable) — stay logged out */
@@ -92,6 +113,7 @@ export class AuthService {
       const info = await firstValueFrom(
         this.authentication.observeLoginInfo().pipe(timeout(RESTORE_TIMEOUT_MS)),
       );
+      this.applyOAuthEntries(info);
       if (this.isValidUser(info)) this.applyLogin(info.authorityName ?? this.username());
       else this.applyLogout(null);
     } catch {
@@ -119,6 +141,7 @@ export class AuthService {
     this.error.set(null);
     try {
       const info = await firstValueFrom(this.authentication.login(username, password));
+      this.applyOAuthEntries(info);
       if (!this.isValidUser(info)) {
         this.applyLogout('Ungültige Anmeldedaten.');
         return false;
@@ -131,17 +154,94 @@ export class AuthService {
     }
   }
 
+  /**
+   * Sign in through an identity provider instead of with a password: the background worker runs the
+   * Authorization Code flow with PKCE, and the access token it ends with is traded here for a
+   * repository session — `loginToken` presents it as a bearer token, and the repository answers with
+   * the session cookie every later request carries. Returns true on a valid, non-guest session.
+   *
+   * The trade is the step that can still refuse a completed OAuth login: the person is who the IdP
+   * says they are, and the repository may still not know them.
+   */
+  async loginWithOAuth(provider?: OAuthProvider): Promise<boolean> {
+    this.error.set(null);
+    const outcome = await this.oauth.login(this.repositoryUrl(), provider);
+    // Nobody completed the flow. Not an error: the screen is left exactly as it was.
+    if (outcome.kind === 'cancelled') return false;
+    if (outcome.kind === 'failed') {
+      this.applyLogout(outcome.error);
+      return false;
+    }
+    return this.exchangeForSession(outcome.accessToken, 'Das Repository hat die SSO-Anmeldung nicht akzeptiert.');
+  }
+
+  /**
+   * Put a session back from the refresh token the worker kept, without showing anything — see
+   * {@link init}. Silent throughout: a stored token that no longer works is not something to report
+   * on a panel nobody has asked for a login on, and the login screen it leaves standing says the rest.
+   */
+  private async resumeOAuthSession(): Promise<boolean> {
+    const accessToken = await this.oauth.silentAccessToken(this.repositoryUrl());
+    if (!accessToken) return false;
+    const restored = await this.exchangeForSession(accessToken, null);
+    // The refusal belongs to a login nobody asked for; the screen stays as the failed restore left it.
+    if (!restored) this.error.set(null);
+    return restored;
+  }
+
+  /**
+   * Trade an OAuth access token for a repository session. `refusal` is what a token the repository
+   * will not take reads as, or null where the attempt is to stay silent about it.
+   */
+  private async exchangeForSession(accessToken: string, refusal: string | null): Promise<boolean> {
+    try {
+      const info = await firstValueFrom(
+        this.authentication.loginToken(accessToken).pipe(timeout(RESTORE_TIMEOUT_MS)),
+      );
+      this.applyOAuthEntries(info);
+      if (!this.isValidUser(info)) {
+        this.applyLogout(refusal);
+        return false;
+      }
+      this.applyLogin(info.authorityName ?? this.username());
+      return true;
+    } catch (cause: unknown) {
+      this.applyLogout(refusal ?? this.describeError(cause));
+      return false;
+    }
+  }
+
   async logout(): Promise<void> {
     try {
       await firstValueFrom(this.authentication.logout());
     } catch {
       /* best-effort — drop the local session either way */
     }
+    // The OAuth session is dropped with the repository one, refresh token included. Leaving it would
+    // make the next boot sign the user straight back in — a logout that does not log out.
+    await this.oauth.logout(this.repositoryUrl());
     this.applyLogout(null);
   }
 
   private isValidUser(info: LoginInfo | undefined): info is LoginInfo {
     return !!info?.isValidLogin && !info.isGuest;
+  }
+
+  /**
+   * Take over the identity providers the repository advertises. `oauthEntries` sits on the primary
+   * login only — a scope login describes a different thing — so the field is narrowed rather than
+   * assumed. An entry without a registration id names nothing the authorization request could pass
+   * on and is dropped: it would produce a button that does the same as the plain one.
+   */
+  private applyOAuthEntries(info: LoginInfo | undefined): void {
+    if (!info || !('oauthEntries' in info)) return;
+    const providers: OAuthProvider[] = (info.oauthEntries ?? [])
+      .filter((entry) => !!entry?.registrationId)
+      .map((entry) => ({
+        label: entry.name?.trim() || String(entry.registrationId),
+        registrationId: entry.registrationId,
+      }));
+    this.oauth.setProviders(providers);
   }
 
   private applyLogin(username: string | null): void {

@@ -29,6 +29,18 @@ The manifest is assembled per target from `manifest.base.json` plus `manifest.<t
 is where the targets differ: Chrome and Safari get a `service_worker` (`sw.js`), Firefox gets
 `background.scripts` (an event page) and its `browser_specific_settings`.
 
+The worker is built from several files, and the two targets name them in two places: `importScripts`
+in `sw.js` for Chrome and Safari, `background.scripts` in `manifest.firefox.json` for Firefox — the
+polyfill, `config.js`, `background/oauth.js`, `background/dev-fixtures.js`, then
+`background/background.js`. The order matters, because each of the first four only assigns to `self`
+and `background.js` is what reads them. A file added to one list alone leaves the other browser's
+worker without it, and the failure shows up as an undefined global far from the cause; the two lists
+are therefore held in step by
+`app-src/src/boundary/extension-contract.spec.ts`, which also checks that every file named is there.
+`manifest.base.json` declares `identity` among the permissions, for the `launchWebAuthFlow` the
+OAuth login uses on Chrome, Edge and Firefox — Safari ignores it and takes the fallback path, see
+[ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow).
+
 Changes to the Angular app only reach the loaded extension through a build — `ng build` in
 `app-src/` alone is not enough, since `scripts/build.mjs` is what refreshes `sidebar/` and assembles
 `dist/`.

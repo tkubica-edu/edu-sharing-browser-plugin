@@ -16,6 +16,18 @@ What is known not to work, known to be unverified, or known to look wrong at fir
   the repository session cookie in the injected-panel context. Guest Erschließung (via the background
   worker) is unaffected; logged-in auth needs verification on Safari and may require a background
   auth fallback.
+- **Safari has no `identity` API.** The namespace Chrome, Edge and Firefox provide
+  (`identity.launchWebAuthFlow`, `identity.getRedirectURL`) is not implemented in Safari web
+  extensions, so the OAuth login falls back to opening the provider in a tab and watching it for the
+  redirect (`background/oauth.js`, branched on `hasIdentityApi()` rather than on the browser). That
+  fallback needs a redirect address the extension can watch a tab navigate to, which is why it is an
+  ordinary https address there — `<repository>/oauth/extension-callback` unless one is configured.
+  Nothing has to be served at it: the address is matched before the load finishes and the tab is
+  closed. **Unverified against a real identity provider on Safari**: the flow is covered by
+  `app-src/src/boundary/oauth-flow.spec.ts` with the browser APIs faked, and the tab-watching path
+  and the redirect registration still need a run against a live provider. A provider that refuses to
+  register the address, or a Safari build that reports the navigation differently, would show up as a
+  flow that never resolves and times out after five minutes.
 - **Firefox: „Could not establish connection. Receiving end does not exist."** The panel's message
   to the background worker occasionally finds no receiver, most often on a page the panel was
   restored onto after a navigation. It is not the event page having been suspended — it happens with
@@ -43,6 +55,12 @@ What is known not to work, known to be unverified, or known to look wrong at fir
   file, and the panel does the same with the object URL of a picture picked in the widget
   (`CurationService`). `img-src` allows `blob:` for the same reason — a panel-created object URL is
   rendered as an image.
+- **`identity`** is declared for `launchWebAuthFlow`, which is how the OAuth login shows the
+  provider's pages on Chrome, Edge and Firefox. It grants no access to an account by itself — the
+  browser only hosts the provider's own window and hands back the address it redirected to — but it
+  is a permission a store reviewer will ask about, and Safari does not implement it at all (see
+  above). The flow is off unless an issuer and a client id are configured, so an installation that
+  does not federate never uses it.
 - **Reading the clipboard** takes two grants, both for one option of the preview widget: it offers
   *Aus der Zwischenablage einfügen* only while it can see an image on the clipboard, which it answers
   with `navigator.permissions.query({name: 'clipboard-read'})` plus a `clipboard.read()`. The

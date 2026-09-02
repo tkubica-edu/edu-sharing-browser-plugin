@@ -1,0 +1,632 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+/**
+ * The OAuth/PKCE flow the background worker runs (`background/oauth.js`).
+ *
+ * That file is plain script the worker loads directly — it exports nothing and assigns to `self`, so
+ * it is evaluated here in a sandbox rather than imported, the way the extension contract spec reads
+ * the worker's other files. What it needs from around it is handed in: a `browser` with the two APIs
+ * the flow branches on, and a `fetch` standing in for the identity provider.
+ *
+ * Worth testing at this level because none of it is reachable from the panel: the PKCE pair, the
+ * state check and the redirect matching are where a mistake either breaks every login or, worse,
+ * accepts an answer it should not.
+ */
+
+/** The repo root, found from the working directory — `npm test` runs from either it or `app-src`. */
+function repoRoot(): string {
+  let dir = process.cwd();
+  while (!existsSync(join(dir, 'manifest.base.json'))) {
+    const parent = dirname(dir);
+    if (parent === dir) throw new Error('no repo root above ' + process.cwd());
+    dir = parent;
+  }
+  return dir;
+}
+
+const SOURCE = readFileSync(join(repoRoot(), 'background/oauth.js'), 'utf8');
+
+/** The issuer every case here signs in against, and the endpoints its discovery document names. */
+const ISSUER = 'https://sso.example/realms/edu';
+const CLIENT_ID = 'edu-sharing-extension';
+const AUTHORIZATION_ENDPOINT = 'https://sso.example/realms/edu/protocol/openid-connect/auth';
+const TOKEN_ENDPOINT = 'https://sso.example/realms/edu/protocol/openid-connect/token';
+const REVOCATION_ENDPOINT = 'https://sso.example/realms/edu/protocol/openid-connect/revoke';
+
+/** The address Chrome's and Firefox's `identity` API hands out for this extension. */
+const IDENTITY_REDIRECT = 'https://abcdef.chromiumapp.org/';
+
+interface OAuthModule {
+  login(request: Record<string, unknown>): Promise<{ accessToken: string; refreshToken: string | null; expiresAt: number | null }>;
+  refresh(request: Record<string, unknown>): Promise<{ accessToken: string } | null>;
+  logout(request: Record<string, unknown>): Promise<{ revoked: boolean }>;
+  silentSession(request: Record<string, unknown>): Promise<{ accessToken: string } | null>;
+  redirectUri(request: Record<string, unknown>): string;
+  hasIdentityApi(): boolean;
+  usesIdentityApi(redirect: string): boolean;
+  TOKEN_STORAGE_KEY: string;
+}
+
+describe('the worker`s OAuth flow', () => {
+  /** Stands in for `storage.local`, which is where the refresh token is kept between sessions. */
+  let stored: Map<string, unknown>;
+  /** Every request the flow made, so a case can assert on what it sent rather than only on the answer. */
+  let requests: { url: string; body: URLSearchParams | null }[];
+  /** What `launchWebAuthFlow` / the watched tab ends up at; a spec sets it per case. */
+  let redirectedTo: (authorizationUrl: string) => string | Promise<string>;
+  /** The tabs the watched-tab fallback opened, and the ones it closed again. */
+  let createdTabs: { id: number; url: string }[];
+  let removedTabs: number[];
+  /** Set for the cases that exercise the `identity`-less path. */
+  let withoutIdentityApi = false;
+  /** Listeners the fallback registered, so a case can drive a navigation by hand. */
+  let updateListeners: ((tabId: number, changeInfo: { url?: string }, tab: { url?: string }) => void)[];
+  let removeListeners: ((tabId: number) => void)[];
+
+  /** The discovery document the issuer answers with; a case can leave endpoints out of it. */
+  let discovery: Record<string, string>;
+  /** Set by the case that asserts on what `launchWebAuthFlow` was handed. */
+  let launchedOptions: Record<string, unknown>[] | null;
+
+  /**
+   * Load `background/oauth.js` with the globals it expects. A fresh module per case, because it caches
+   * discovery documents for the worker's whole lifetime.
+   */
+  function loadModule(): OAuthModule {
+    const self: { EDU_SHARING_OAUTH?: OAuthModule } = {};
+    new Function('self', 'browser', 'fetch', 'console', SOURCE)(
+      self,
+      fakeBrowser(),
+      fakeFetch,
+      { log: () => undefined, warn: () => undefined, error: () => undefined },
+    );
+    if (!self.EDU_SHARING_OAUTH) throw new Error('background/oauth.js assigned no EDU_SHARING_OAUTH');
+    return self.EDU_SHARING_OAUTH;
+  }
+
+  function fakeBrowser() {
+    let nextTabId = 1;
+    return {
+      identity: withoutIdentityApi
+        ? undefined
+        : {
+            getRedirectURL: () => IDENTITY_REDIRECT,
+            launchWebAuthFlow: async (options: { url: string }) => {
+              launchedOptions?.push(options);
+              return redirectedTo(options.url);
+            },
+          },
+      tabs: {
+        create: async ({ url }: { url: string }) => {
+          const tab = { id: nextTabId++, url };
+          createdTabs.push(tab);
+          return tab;
+        },
+        remove: async (tabId: number) => {
+          removedTabs.push(tabId);
+        },
+        onUpdated: {
+          addListener: (fn: (typeof updateListeners)[number]) => updateListeners.push(fn),
+          removeListener: (fn: (typeof updateListeners)[number]) => {
+            updateListeners = updateListeners.filter((listener) => listener !== fn);
+          },
+        },
+        onRemoved: {
+          addListener: (fn: (typeof removeListeners)[number]) => removeListeners.push(fn),
+          removeListener: (fn: (typeof removeListeners)[number]) => {
+            removeListeners = removeListeners.filter((listener) => listener !== fn);
+          },
+        },
+      },
+      storage: {
+        local: {
+          get: async (defaults: Record<string, unknown>) => {
+            const [key] = Object.keys(defaults);
+            return { [key]: stored.has(key) ? stored.get(key) : defaults[key] };
+          },
+          set: async (items: Record<string, unknown>) => {
+            for (const [key, value] of Object.entries(items)) stored.set(key, value);
+          },
+          remove: async (key: string) => {
+            stored.delete(key);
+          },
+        },
+      },
+    };
+  }
+
+  /** The identity provider: its discovery document, its token endpoint and its revocation endpoint. */
+  const fakeFetch = vi.fn(async (url: string, init?: { body?: string }) => {
+    const body = init?.body ? new URLSearchParams(init.body) : null;
+    requests.push({ url, body });
+
+    // Only this issuer describes itself; any other is a host with nothing at that path, which is
+    // what the flow has to report rather than assume endpoints for.
+    if (url === `${ISSUER}/.well-known/openid-configuration`) return jsonResponse(discovery);
+    if (url === TOKEN_ENDPOINT) {
+      if (body?.get('grant_type') === 'refresh_token') {
+        return jsonResponse({ access_token: 'a-renewed-token', refresh_token: 'a-rotated-refresh-token', expires_in: 300 });
+      }
+      return jsonResponse({ access_token: 'an-access-token', refresh_token: 'a-refresh-token', expires_in: 300 });
+    }
+    if (url === REVOCATION_ENDPOINT) return jsonResponse({});
+    return jsonResponse({ error: 'not_found' }, 404);
+  });
+
+  function jsonResponse(payload: unknown, status = 200) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      statusText: String(status),
+      text: async () => JSON.stringify(payload),
+    };
+  }
+
+  /** The parameters every case signs in with. */
+  const request = { issuer: ISSUER, clientId: CLIENT_ID };
+
+  beforeEach(() => {
+    stored = new Map();
+    requests = [];
+    createdTabs = [];
+    removedTabs = [];
+    updateListeners = [];
+    removeListeners = [];
+    withoutIdentityApi = false;
+    launchedOptions = null;
+    discovery = {
+      authorization_endpoint: AUTHORIZATION_ENDPOINT,
+      token_endpoint: TOKEN_ENDPOINT,
+      revocation_endpoint: REVOCATION_ENDPOINT,
+    };
+    // The IdP redirects straight back with the code, echoing the state it was given — the happy path
+    // every case that is not about the redirect itself starts from.
+    redirectedTo = (authorizationUrl) => {
+      const state = new URL(authorizationUrl).searchParams.get('state');
+      return `${IDENTITY_REDIRECT}?code=an-auth-code&state=${state}`;
+    };
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    fakeFetch.mockClear();
+  });
+
+  /** The authorization request the flow sent the user to. */
+  function authorizationRequest(): URL {
+    const sent = createdTabs.at(0)?.url ?? lastLaunchedUrl;
+    if (!sent) throw new Error('no authorization request was made');
+    return new URL(sent);
+  }
+
+  /** Recorded for the `identity` path, which does not open a tab to read the address off. */
+  let lastLaunchedUrl: string | null = null;
+  beforeEach(() => {
+    lastLaunchedUrl = null;
+    const answer = redirectedTo;
+    redirectedTo = (authorizationUrl) => {
+      lastLaunchedUrl = authorizationUrl;
+      return answer(authorizationUrl);
+    };
+  });
+
+  describe('the authorization request', () => {
+    it('carries an S256 challenge and no client secret', async () => {
+      await loadModule().login(request);
+      const query = authorizationRequest().searchParams;
+
+      expect(query.get('response_type')).toBe('code');
+      expect(query.get('code_challenge_method')).toBe('S256');
+      expect(query.get('client_id')).toBe(CLIENT_ID);
+      // base64url of a SHA-256: 43 characters, and none of base64's three unsafe ones.
+      expect(query.get('code_challenge')).toMatch(/^[A-Za-z0-9\-_]{43}$/);
+      expect(query.get('client_secret')).toBeNull();
+    });
+
+    it('sends the verifier only to the token endpoint, never to the authorization one', async () => {
+      await loadModule().login(request);
+
+      // The point of PKCE: what travels through the browser is the hash, the secret follows
+      // out-of-band. A verifier in the address bar would make the challenge pointless.
+      expect(authorizationRequest().searchParams.get('code_verifier')).toBeNull();
+      const exchange = requests.find((sent) => sent.body?.get('grant_type') === 'authorization_code');
+      expect(exchange?.body?.get('code_verifier')).toMatch(/^[A-Za-z0-9\-._~]{128}$/);
+    });
+
+    it('draws a fresh verifier and state for every attempt', async () => {
+      const module = loadModule();
+      await module.login(request);
+      const first = authorizationRequest().searchParams;
+      const firstChallenge = first.get('code_challenge');
+      const firstState = first.get('state');
+
+      createdTabs = [];
+      await module.login(request);
+      const second = authorizationRequest().searchParams;
+
+      expect(second.get('code_challenge')).not.toBe(firstChallenge);
+      expect(second.get('state')).not.toBe(firstState);
+    });
+
+    it('names the identity provider to go straight to, where one was picked', async () => {
+      await loadModule().login({ ...request, registrationId: 'uni' });
+
+      expect(authorizationRequest().searchParams.get('kc_idp_hint')).toBe('uni');
+    });
+
+    it('keeps the parameters an issuer put on its own authorization endpoint', async () => {
+      discovery.authorization_endpoint = `${AUTHORIZATION_ENDPOINT}?tenant=schulen`;
+
+      await loadModule().login(request);
+
+      const query = authorizationRequest().searchParams;
+      expect(query.get('tenant')).toBe('schulen');
+      expect(query.get('code_challenge_method')).toBe('S256');
+    });
+  });
+
+  describe('the answer it accepts', () => {
+    it('exchanges the code and answers with the tokens', async () => {
+      const session = await loadModule().login(request);
+
+      expect(session.accessToken).toBe('an-access-token');
+      expect(session.refreshToken).toBe('a-refresh-token');
+      expect(session.expiresAt).toBeGreaterThan(Date.now());
+    });
+
+    it('refuses an answer carrying somebody else`s state, without exchanging anything', async () => {
+      redirectedTo = () => `${IDENTITY_REDIRECT}?code=an-auth-code&state=not-the-one-we-sent`;
+
+      await expect(loadModule().login(request)).rejects.toThrow('OAUTH_STATE_MISMATCH');
+      expect(requests.some((sent) => sent.url === TOKEN_ENDPOINT)).toBe(false);
+    });
+
+    it('reports the provider`s own refusal, with the reason it gave', async () => {
+      redirectedTo = () => `${IDENTITY_REDIRECT}?error=access_denied&error_description=Nope`;
+
+      await expect(loadModule().login(request)).rejects.toThrow(/OAUTH_REFUSED.*access_denied.*Nope/);
+    });
+
+    it('reads an answer given in the fragment as well as one in the query', async () => {
+      redirectedTo = (authorizationUrl) => {
+        const state = new URL(authorizationUrl).searchParams.get('state');
+        return `${IDENTITY_REDIRECT}#code=an-auth-code&state=${state}`;
+      };
+
+      expect((await loadModule().login(request)).accessToken).toBe('an-access-token');
+    });
+
+    it('refuses an answer with neither a code nor an error', async () => {
+      redirectedTo = (authorizationUrl) =>
+        `${IDENTITY_REDIRECT}?state=${new URL(authorizationUrl).searchParams.get('state')}`;
+
+      await expect(loadModule().login(request)).rejects.toThrow('OAUTH_NO_CODE');
+    });
+
+    it('reads a cancelled `identity` flow as a cancellation', async () => {
+      redirectedTo = () => '';
+
+      await expect(loadModule().login(request)).rejects.toThrow('OAUTH_CANCELLED');
+    });
+  });
+
+  describe('the discovery it reads the endpoints from', () => {
+    it('asks the issuer rather than assembling the endpoints itself', async () => {
+      await loadModule().login(request);
+
+      expect(requests[0]?.url).toBe(`${ISSUER}/.well-known/openid-configuration`);
+    });
+
+    it('appends the well-known path exactly once to an issuer given with a slash', async () => {
+      await loadModule().login({ ...request, issuer: `${ISSUER}/` });
+
+      expect(requests[0]?.url).toBe(`${ISSUER}/.well-known/openid-configuration`);
+    });
+
+    it('asks only once, however many flows run against the same issuer', async () => {
+      const module = loadModule();
+      await module.login(request);
+      await module.login(request);
+
+      const asked = requests.filter((sent) => sent.url.endsWith('/.well-known/openid-configuration'));
+      expect(asked).toHaveLength(1);
+    });
+
+    it('refuses a document without the endpoints the flow needs', async () => {
+      discovery = { authorization_endpoint: AUTHORIZATION_ENDPOINT };
+
+      await expect(loadModule().login(request)).rejects.toThrow('OAUTH_DISCOVERY_INCOMPLETE');
+    });
+
+    it('refuses an issuer whose address serves a web page rather than metadata', async () => {
+      // What a host with no discovery document actually does: 200, and HTML. Reported as the wrong
+      // kind of answer, not as a document that merely lacked endpoints.
+      fakeFetch.mockImplementationOnce(async () => ({
+        ok: true,
+        status: 200,
+        statusText: '200',
+        headers: { get: () => 'text/html' },
+        text: async () => '<!DOCTYPE html><html><body>Not Found</body></html>',
+      }));
+
+      await expect(loadModule().login(request)).rejects.toThrow(/OAUTH_DISCOVERY_FAILED.*text\/html/);
+    });
+
+    it('refuses an issuer that answers nothing', async () => {
+      await expect(loadModule().login({ ...request, issuer: 'https://nowhere.example' })).rejects.toThrow(
+        'OAUTH_DISCOVERY_FAILED',
+      );
+    });
+
+    it('refuses to start without an issuer or without a client', async () => {
+      await expect(loadModule().login({ clientId: CLIENT_ID })).rejects.toThrow('OAUTH_NO_ISSUER');
+      await expect(loadModule().login({ issuer: ISSUER })).rejects.toThrow('OAUTH_NO_CLIENT_ID');
+    });
+  });
+
+  /** Drive the navigation the watched-tab path is waiting for, as `tabs.onUpdated` would report it. */
+  function navigate(tabId: number, url: string): void {
+    for (const listener of [...updateListeners]) listener(tabId, { url }, { url });
+  }
+
+  describe('the redirect address', () => {
+    it('is the browser`s own where there is an `identity` API', () => {
+      const module = loadModule();
+
+      expect(module.hasIdentityApi()).toBe(true);
+      expect(module.redirectUri({})).toBe(IDENTITY_REDIRECT);
+    });
+
+    it('falls back to a path on the repository where there is none — Safari', () => {
+      withoutIdentityApi = true;
+      const module = loadModule();
+
+      expect(module.hasIdentityApi()).toBe(false);
+      expect(module.redirectUri({ repositoryUrl: 'https://repo.example/edu-sharing/' })).toBe(
+        'https://repo.example/edu-sharing/oauth/extension-callback',
+      );
+    });
+
+    it('prefers a configured one over either', () => {
+      expect(
+        loadModule().redirectUri({
+          configuredRedirectUri: 'https://repo.example/callback',
+          repositoryUrl: 'https://repo.example/edu-sharing',
+        }),
+      ).toBe('https://repo.example/callback');
+    });
+
+    it('has none to offer without an `identity` API and without a repository', () => {
+      withoutIdentityApi = true;
+
+      expect(() => loadModule().redirectUri({})).toThrow('OAUTH_NO_REDIRECT_URI');
+    });
+
+    it('takes the watched-tab path for a configured address, even with an `identity` API', async () => {
+      const module = loadModule();
+      // Chrome's launchWebAuthFlow only ever completes on the address it handed out, so a configured
+      // one has to be watched for instead — otherwise the flow hangs until the window is closed.
+      expect(module.hasIdentityApi()).toBe(true);
+      expect(module.usesIdentityApi('https://repo.example/callback')).toBe(false);
+      expect(module.usesIdentityApi(IDENTITY_REDIRECT)).toBe(true);
+
+      const flow = module.login({ ...request, configuredRedirectUri: 'https://repo.example/callback' });
+      await vi.waitUntil(() => createdTabs.length > 0);
+
+      const state = new URL(createdTabs[0].url).searchParams.get('state');
+      navigate(createdTabs[0].id, `https://repo.example/callback?code=an-auth-code&state=${state}`);
+
+      expect((await flow).accessToken).toBe('an-access-token');
+    });
+
+    it('states the redirect address to `launchWebAuthFlow` as well as in the URL', async () => {
+      // Firefox 75 to 86 require the parameter; the others infer it, so passing it is free.
+      const launched: Record<string, unknown>[] = [];
+      launchedOptions = launched;
+
+      await loadModule().login(request);
+
+      expect(launched[0]?.['redirect_uri']).toBe(IDENTITY_REDIRECT);
+    });
+
+    it('is what the authorization request and the token exchange both name', async () => {
+      await loadModule().login(request);
+
+      expect(authorizationRequest().searchParams.get('redirect_uri')).toBe(IDENTITY_REDIRECT);
+      const exchange = requests.find((sent) => sent.body?.get('grant_type') === 'authorization_code');
+      expect(exchange?.body?.get('redirect_uri')).toBe(IDENTITY_REDIRECT);
+    });
+  });
+
+  describe('the watched tab that stands in for the missing `identity` API', () => {
+    beforeEach(() => {
+      withoutIdentityApi = true;
+    });
+
+    it('opens the provider in a tab and resolves on the redirect, then closes it', async () => {
+      const module = loadModule();
+      const flow = module.login({ ...request, repositoryUrl: 'https://repo.example/edu-sharing' });
+      await vi.waitUntil(() => createdTabs.length > 0);
+
+      const state = new URL(createdTabs[0].url).searchParams.get('state');
+      navigate(
+        createdTabs[0].id,
+        `https://repo.example/edu-sharing/oauth/extension-callback?code=an-auth-code&state=${state}`,
+      );
+
+      expect((await flow).accessToken).toBe('an-access-token');
+      // Closed rather than left behind: the page it was heading for is never meant to load.
+      expect(removedTabs).toContain(createdTabs[0].id);
+    });
+
+    it('ignores navigations of the tab to anything but the redirect address', async () => {
+      const module = loadModule();
+      const flow = module.login({ ...request, repositoryUrl: 'https://repo.example/edu-sharing' });
+      await vi.waitUntil(() => createdTabs.length > 0);
+
+      // The provider's own pages: a login form, a consent screen, a federated hop.
+      navigate(createdTabs[0].id, 'https://sso.example/realms/edu/login-actions/authenticate');
+      expect(removedTabs).toHaveLength(0);
+
+      const state = new URL(createdTabs[0].url).searchParams.get('state');
+      navigate(
+        createdTabs[0].id,
+        `https://repo.example/edu-sharing/oauth/extension-callback?code=an-auth-code&state=${state}`,
+      );
+      await flow;
+    });
+
+    it('ignores another tab navigating to the same address', async () => {
+      const module = loadModule();
+      const flow = module.login({ ...request, repositoryUrl: 'https://repo.example/edu-sharing' });
+      await vi.waitUntil(() => createdTabs.length > 0);
+
+      navigate(createdTabs[0].id + 99, 'https://repo.example/edu-sharing/oauth/extension-callback?code=foreign');
+      expect(removedTabs).toHaveLength(0);
+
+      const state = new URL(createdTabs[0].url).searchParams.get('state');
+      navigate(
+        createdTabs[0].id,
+        `https://repo.example/edu-sharing/oauth/extension-callback?code=an-auth-code&state=${state}`,
+      );
+      await flow;
+    });
+
+    it('reads the user closing the tab as a cancellation', async () => {
+      const module = loadModule();
+      const flow = module.login({ ...request, repositoryUrl: 'https://repo.example/edu-sharing' });
+      await vi.waitUntil(() => createdTabs.length > 0);
+
+      for (const listener of [...removeListeners]) listener(createdTabs[0].id);
+
+      await expect(flow).rejects.toThrow('OAUTH_CANCELLED');
+      // Nothing to close: the tab is already gone, and asking again would be an error of its own.
+      expect(removedTabs).toHaveLength(0);
+    });
+  });
+
+  describe('the stored session it renews from', () => {
+    it('renews from the refresh token the login kept', async () => {
+      const module = loadModule();
+      await module.login(request);
+
+      expect((await module.refresh(request))?.accessToken).toBe('a-renewed-token');
+    });
+
+    it('renews with no answer where nobody is signed in', async () => {
+      expect(await loadModule().refresh(request)).toBeNull();
+    });
+
+    it('takes over a rotated refresh token, so the next renewal has one', async () => {
+      const module = loadModule();
+      await module.login(request);
+      await module.refresh(request);
+
+      expect((stored.get(module.TOKEN_STORAGE_KEY) as { refreshToken: string }).refreshToken).toBe(
+        'a-rotated-refresh-token',
+      );
+    });
+
+    it('keeps the token it has where the provider rotates none', async () => {
+      const module = loadModule();
+      await module.login(request);
+      fakeFetch.mockImplementationOnce(async () => jsonResponse({ access_token: 'a-renewed-token', expires_in: 300 }));
+
+      await module.refresh(request);
+
+      expect((stored.get(module.TOKEN_STORAGE_KEY) as { refreshToken: string }).refreshToken).toBe('a-refresh-token');
+    });
+
+    it('discards a stored session belonging to another client', async () => {
+      const module = loadModule();
+      await module.login(request);
+
+      expect(await module.refresh({ issuer: 'https://other.example/realms/edu', clientId: CLIENT_ID })).toBeNull();
+      expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
+    });
+
+    it('clears a refresh token the provider rejects — it will not start working again', async () => {
+      const module = loadModule();
+      await module.login(request);
+      fakeFetch.mockImplementationOnce(async () => jsonResponse({ error: 'invalid_grant' }, 400));
+
+      await expect(module.refresh(request)).rejects.toThrow(/OAUTH_TOKEN_FAILED.*invalid_grant/);
+      expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
+    });
+
+    it('reuses a stored access token that is still valid, without asking the provider', async () => {
+      const module = loadModule();
+      await module.login(request);
+      const before = requests.length;
+
+      expect((await module.silentSession(request))?.accessToken).toBe('an-access-token');
+      expect(requests).toHaveLength(before);
+    });
+
+    it('does not hand out a still-valid token from a provider the settings moved away from', async () => {
+      const module = loadModule();
+      await module.login(request);
+
+      // The fast path skips the refresh, so it has to make the same ownership check the refresh does.
+      expect(await module.silentSession({ issuer: 'https://other.example/realms/edu', clientId: CLIENT_ID })).toBeNull();
+      expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
+    });
+
+    it('renews a stored access token that has lapsed', async () => {
+      const module = loadModule();
+      await module.login(request);
+      const session = stored.get(module.TOKEN_STORAGE_KEY) as { expiresAt: number };
+      stored.set(module.TOKEN_STORAGE_KEY, { ...session, expiresAt: Date.now() - 1 });
+
+      expect((await module.silentSession(request))?.accessToken).toBe('a-renewed-token');
+    });
+  });
+
+  describe('logging out', () => {
+    it('drops the stored session and has the provider revoke the refresh token', async () => {
+      const module = loadModule();
+      await module.login(request);
+
+      expect(await module.logout(request)).toEqual({ revoked: true });
+
+      expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
+      const revoked = requests.find((sent) => sent.url === REVOCATION_ENDPOINT);
+      expect(revoked?.body?.get('token')).toBe('a-refresh-token');
+      expect(revoked?.body?.get('token_type_hint')).toBe('refresh_token');
+    });
+
+    it('counts a revocation answered with no content as done', async () => {
+      const module = loadModule();
+      await module.login(request);
+      // What RFC 7009 §2.2 prescribes and Keycloak sends: 200 and an empty body.
+      fakeFetch.mockImplementationOnce(async () => ({ ok: true, status: 200, statusText: '200', text: async () => '' }));
+
+      expect(await module.logout(request)).toEqual({ revoked: true });
+    });
+
+    it('drops it even where the provider cannot be told', async () => {
+      const module = loadModule();
+      await module.login(request);
+      fakeFetch.mockImplementationOnce(async () => jsonResponse({ error: 'server_error' }, 500));
+
+      expect(await module.logout(request)).toEqual({ revoked: false });
+      // Whether the provider could be told is not allowed to decide whether a credential is still held.
+      expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
+    });
+
+    it('drops it where the issuer has no revocation endpoint at all', async () => {
+      delete discovery['revocation_endpoint'];
+      const module = loadModule();
+      await module.login(request);
+
+      expect(await module.logout(request)).toEqual({ revoked: false });
+      expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
+    });
+
+    it('has nothing to do where nobody is signed in', async () => {
+      expect(await loadModule().logout(request)).toEqual({ revoked: false });
+    });
+  });
+});

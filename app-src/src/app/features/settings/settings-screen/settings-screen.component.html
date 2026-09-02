@@ -22,6 +22,94 @@
   </div>
 </section>
 
+<!-- The OpenID Connect client the alternative login signs in with. Next to the repository rather than
+     among the tuning below: it decides whether the login screen offers a second way in at all, and it
+     applies to whichever repository the panel is pointed at. Folded, because a deployment that does not
+     federate never touches it. -->
+<section class="es-card">
+  <button type="button" class="section-head" (click)="toggleSection('sso')"
+          [attr.aria-expanded]="openSection() === 'sso'">
+    <h2>SSO-Anmeldung</h2>
+    <!-- What was changed in this section, so a folded one says whether it holds anything but the
+         defaults; absent where it holds only those. -->
+    @if (changedPerSection().sso; as changed) {
+      <span class="section-count">{{ changed }} geändert</span>
+    }
+    <i class="section-chevron" [class.is-open]="openSection() === 'sso'" esIcon="expand_more"></i>
+  </button>
+
+  @if (openSection() === 'sso') {
+    <p class="desc">
+      Anmeldung über einen Identity Provider (OpenID Connect) als Alternative zu Benutzername und
+      Passwort — Authorization Code Flow mit <abbr title="Proof Key for Code Exchange">PKCE</abbr>,
+      ohne Client-Secret. Das dabei erhaltene Access Token wird gegen eine Repository-Sitzung
+      eingetauscht. Ohne Issuer und Client-ID wird die Alternative nicht angeboten.
+    </p>
+
+    <label class="es-field-label" for="oauth-issuer">Issuer</label>
+    <input id="oauth-issuer" type="url" class="es-input" autocomplete="off" spellcheck="false"
+           placeholder="https://sso.example.org/realms/edu-sharing"
+           [ngModel]="oauth.configuredIssuer()" (ngModelChange)="setOAuthIssuer($event)" />
+
+    <p class="desc">
+      Die Basis, unter der das Discovery-Dokument des Providers liegt
+      (<code>&lt;Issuer&gt;/.well-known/openid-configuration</code>). Die Endpunkte werden daraus
+      gelesen und nicht geraten — es muss also nur der Issuer eingetragen werden.
+    </p>
+
+    <label class="es-field-label" for="oauth-client">Client-ID</label>
+    <input id="oauth-client" type="text" class="es-input" autocomplete="off" spellcheck="false"
+           placeholder="edu-sharing-browser-extension"
+           [ngModel]="oauth.configuredClientId()" (ngModelChange)="setOAuthClientId($event)" />
+
+    <p class="desc">
+      Der beim Provider registrierte öffentliche Client dieser Extension. Ein Secret wird nicht
+      hinterlegt: eine Extension kann keines geheim halten, dafür gibt es PKCE.
+    </p>
+
+    <label class="es-field-label" for="oauth-scopes">Scopes</label>
+    <input id="oauth-scopes" type="text" class="es-input" autocomplete="off" spellcheck="false"
+           [placeholder]="oauth.scopes()"
+           [ngModel]="oauth.configuredScopes()" (ngModelChange)="setOAuthScopes($event)" />
+
+    <p class="desc">
+      Wonach gefragt wird, durch Leerzeichen getrennt. <code>offline_access</code> liefert das Refresh
+      Token, mit dem die Sitzung später ohne erneute Anmeldung wiederhergestellt wird. Leer gelassen
+      gilt wieder <code>{{ defaultOAuthScopes }}</code>.
+    </p>
+
+    <!-- Die Redirect-URI ist der einzige Wert hier, den man nicht frei wählt, sondern der beim
+         Provider hinterlegt sein muss — deshalb steht darunter, was dieser Browser tatsächlich
+         verwendet. -->
+    <label class="es-field-label" for="oauth-redirect">Redirect-URI</label>
+    <input id="oauth-redirect" type="url" class="es-input" autocomplete="off" spellcheck="false"
+           placeholder="automatisch"
+           [ngModel]="oauth.configuredRedirectUri()" (ngModelChange)="setOAuthRedirectUri($event)" />
+
+    @if (redirectUriInUse(); as inUse) {
+      <div class="es-notice">
+        <span>
+          Beim Provider zu hinterlegen: <code>{{ inUse.redirectUri }}</code>
+          @if (inUse.usesIdentityApi) {
+            — von diesem Browser selbst vergeben (<code>identity</code>-API); sie wird nie aufgerufen.
+          } @else {
+            — dieser Browser hat keine <code>identity</code>-API (Safari), deshalb eine gewöhnliche
+            https-Adresse. Sie muss nichts ausliefern: die Extension liest den Code aus der Adresse
+            und schließt den Tab, bevor die Seite geladen ist.
+          }
+        </span>
+      </div>
+    }
+
+    <p class="desc">
+      Leer gelassen entscheidet der Browser: Chrome, Edge und Firefox vergeben über ihre
+      <code>identity</code>-API eine eigene Adresse pro Extension, Safari fällt auf
+      <code>&lt;Repository&gt;/oauth/extension-callback</code> zurück. Wer beides betreibt, hinterlegt
+      beide Adressen beim Client.
+    </p>
+  }
+</section>
+
 <!-- Not folded away like the tuning below it: this one is about the panel itself rather than about a
      step in it, and the settings are reachable from every screen through the topbar. -->
 <section class="es-card">

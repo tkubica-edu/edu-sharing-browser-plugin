@@ -361,8 +361,8 @@ navigating to it, and closes it again where it stands; the step keeps running be
   view). All of them optional — an entry written before one of them was kept says nothing about it,
   which is not the same as saying no.
 - **Einstellungen** *(dotted while a change waits to be applied)* — the Repository-URL (used for
-  login and every embedded element) at the top, then **Darstellung**, and below those five folded
-  groups, one open at a time:
+  login and every embedded element) at the top, then *SSO-Anmeldung* and **Darstellung**, and below
+  those five folded groups, one open at a time:
   *Entwickler-Optionen* (the switch **WLO-Funktionen verwenden**, plus the dev and the debug mode, see
   [TESTING.md](TESTING.md)), *KI- und
   Chatbot-Optionen* (the corrections to the chat widget's display, the chatbot's master skill as
@@ -373,7 +373,8 @@ navigating to it, and closes it again where it stands; the step keeps running be
   installation publishes under, and above both the switch **Nostr-Relay verwenden** that takes the
   connection out of the panel altogether). *KI- und Chatbot-Optionen*, *Zugehörige Sammlungen empfehlen* and
   *Qualitätsprüfung* configure steps that only the WLO panel has and are shown only there
-  (`browserExtensionCustomWebComponent`); *Entwickler-Optionen* and *Nostr-Relay* are shown in every
+  (`browserExtensionCustomWebComponent`); *Entwickler-Optionen*, *SSO-Anmeldung* and *Nostr-Relay*
+  are shown in every
   panel, the latter because the step it configures is offered in every panel too — an AMB record is
   published from any repository and the relay belongs to none. **WLO-Funktionen verwenden** is what
   decides that: on by default, and off it reads `browserExtensionCustomWebComponent` as unset whatever
@@ -385,6 +386,25 @@ navigating to it, and closes it again where it stands; the step keeps running be
   so a folded group says whether anything in it was touched; a group holding nothing but defaults carries
   none. Every default is compared where it is defined — each service answers for its own settings
   (`changedSettings`), the screen only sums them per group.
+
+  *SSO-Anmeldung* is folded like the tuning groups but sits above them, next to the repository:
+  it decides whether the login card offers a second way in at all, and it applies to whichever
+  repository the panel is pointed at. Four fields, each falling back to what `APP_CONFIG.oauth`
+  carries when it is emptied: the **Issuer** (the base its
+  `/.well-known/openid-configuration` sits under — the endpoints are read from that document, so the
+  issuer is the only address to enter), the **Client-ID** of the public client registered for this
+  extension, the **Scopes** (`offline_access` among them is what yields the refresh token the session
+  is later resumed from) and the **Redirect-URI**. Only the last is not free to choose: it has to be
+  registered with the client at the provider, so the group shows which address *this* browser will
+  actually use and whether the browser's own `identity` API produced it. Left empty the browser
+  decides — Chrome, Edge and Firefox hand out an address per extension, Safari falls back to
+  `<Repository>/oauth/extension-callback` — and each of those has to be registered with the client.
+  Filling it in is therefore also the way to have *one* address serve all three: a configured address
+  is watched for rather than handed to the browser's own API, so every browser takes the same path
+  (see [ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow)). Without an
+  issuer and a client id nothing about SSO is shown on the login card. See
+  [UI-SHELL.md § Login, session restore and the guest gate](UI-SHELL.md#login-session-restore-and-the-guest-gate)
+  and [ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow).
 
   *Darstellung* is not folded away, because it is about the panel rather than about a step in it:
   *System folgen* / *Hell* / *Dunkel*, persisted under `eduSharingTheme` and resolved by

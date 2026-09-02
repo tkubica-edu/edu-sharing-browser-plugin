@@ -102,6 +102,36 @@ export interface SaveNodeResponse {
 }
 
 /**
+ * Which OAuth client the worker is to run the flow against. The panel holds the configuration (see
+ * OAuthService), so every message states it in full rather than the worker keeping a copy that could
+ * fall behind the settings.
+ */
+export interface OAuthRequest {
+  issuer: string;
+  clientId: string;
+  scopes: string;
+  /** The address to redirect back to, where it is configured; empty leaves the choice to the browser. */
+  redirectUri: string;
+  /** The repository base, which is what the redirect address falls back to without an `identity` API. */
+  repositoryUrl: string;
+  /** Which identity provider behind the issuer to go straight to — see `OAuthProvider.registrationId`. */
+  registrationId?: string;
+}
+
+/**
+ * What a completed flow yields. Only the access token comes back: the refresh token stays in the
+ * worker's store, and the repository session is established here with the access token alone.
+ * `signedIn` is false for the silent attempt finding nobody signed in, which is not a failure.
+ */
+export interface OAuthSession {
+  success: boolean;
+  signedIn?: boolean;
+  accessToken?: string;
+  expiresAt?: number | null;
+  error?: string;
+}
+
+/**
  * The node the metadata agent wrote, as `/nodes` reports it. Deliberately the whole thing: along
  * that route it is everything the app knows about the node — a guest may not read it back from the
  * repository — so the flow is seeded from this instead of from a node load (see CurationService).
@@ -245,6 +275,50 @@ export class BrowserExtensionService {
       action: 'tabs.extractPageData',
     });
     return response?.success ? response.data ?? null : null;
+  }
+
+  /**
+   * Have the worker run the interactive OAuth flow — the IdP's pages are shown, and the access token
+   * it ends with comes back. In the worker because this panel is an iframe the host page's navigation
+   * destroys, which would take the flow with it (see `background/oauth.js`).
+   */
+  oauthLogin(request: OAuthRequest): Promise<OAuthSession> {
+    return this.askOAuth('oauth.login', request);
+  }
+
+  /** The same without showing anything, from the refresh token the worker kept. */
+  oauthSilent(request: OAuthRequest): Promise<OAuthSession> {
+    return this.askOAuth('oauth.silent', request);
+  }
+
+  /** Drop the worker's OAuth session and have the issuer revoke the refresh token where it can. */
+  oauthLogout(request: OAuthRequest): Promise<OAuthSession> {
+    return this.askOAuth('oauth.logout', request);
+  }
+
+  /**
+   * The address that has to be registered with the client at the IdP. Asked of the worker rather than
+   * worked out here: with the `identity` API it is an address the browser makes up per extension.
+   * Null where the worker cannot say — no extension around it, or no repository to derive one from.
+   */
+  async oauthRedirectUri(request: OAuthRequest): Promise<{ redirectUri: string; usesIdentityApi: boolean } | null> {
+    const answer = await this.askOrNull<{
+      success?: boolean;
+      redirectUri?: string;
+      usesIdentityApi?: boolean;
+    }>({ action: 'oauth.redirectUri', ...request });
+    if (!answer?.success || !answer.redirectUri) return null;
+    return { redirectUri: answer.redirectUri, usesIdentityApi: answer.usesIdentityApi === true };
+  }
+
+  /**
+   * One of the three OAuth messages. An unreachable worker is reported as such rather than as a
+   * refused login: the flow never ran, and the two read differently to whoever is trying to sign in.
+   */
+  private async askOAuth(action: string, request: OAuthRequest): Promise<OAuthSession> {
+    const response = await this.ask<OAuthSession>({ action, ...request });
+    if (response === UNREACHABLE) return { success: false, error: WORKER_UNREACHABLE };
+    return response ?? { success: false, error: 'NO_RESPONSE' };
   }
 
   async storageGet<T>(key: string, fallback: T): Promise<T> {

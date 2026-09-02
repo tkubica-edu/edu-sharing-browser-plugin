@@ -1,9 +1,14 @@
 // Background worker: toggles the injected sidebar panel, extracts the active tab's
 // content, and proxies the metadata agent's POST /generate (preceded by GET /health) and
-// POST /nodes (from the worker to stay CORS-portable). Auth is handled in the sidebar app,
-// not here.
+// POST /nodes (from the worker to stay CORS-portable).
+//
+// The repository login is the sidebar app's, since the session it establishes is a cookie the
+// sidebar's own requests have to carry. The OAuth/PKCE flow that can precede it runs here (see
+// background/oauth.js): it outlives the sidebar iframe, and only here does a tab-watching
+// fallback for browsers without the `identity` API have the permissions it needs. The worker
+// hands the sidebar an access token and nothing else.
 
-/* global EDU_SHARING_CONFIG, EDU_SHARING_DEV_FIXTURES */
+/* global EDU_SHARING_CONFIG, EDU_SHARING_DEV_FIXTURES, EDU_SHARING_OAUTH */
 
 /**
  * Fallback metadata agent for a call that arrives without one: which repository's B-API proxy the agent is belongs to
@@ -549,8 +554,30 @@ const ALLOWED_ACTIONS = new Set([
   'tabs.navigate',
   'analyze.run',
   'analyze.url',
-  'metadata.saveNode'
+  'metadata.saveNode',
+  'oauth.login',
+  'oauth.silent',
+  'oauth.logout',
+  'oauth.redirectUri'
 ]);
+
+/**
+ * The OAuth parameters a message carries, as the flow takes them. Which issuer and client the panel
+ * signs in against is configured in the sidebar's settings, so every message names them; the
+ * repository base comes along because it is what the redirect address falls back to where the
+ * browser has no `identity` API of its own to provide one.
+ */
+function oauthParamsOf(message) {
+  return {
+    issuer: message.issuer,
+    clientId: message.clientId,
+    scopes: message.scopes,
+    configuredRedirectUri: message.redirectUri,
+    repositoryUrl: message.repositoryUrl,
+    registrationId: message.registrationId,
+    loginHint: message.loginHint
+  };
+}
 
 browser.runtime.onMessage.addListener((message, sender) => {
   if (!message || !ALLOWED_ACTIONS.has(message.action)) return; // not ours
@@ -640,6 +667,39 @@ browser.runtime.onMessage.addListener((message, sender) => {
         case 'metadata.saveNode': {
           const result = await callSaveNode(message.body ?? {}, agentBaseOf(message));
           return { success: true, result };
+        }
+
+        // Run the interactive PKCE flow and hand back the access token it produced. Only the token
+        // crosses back: the refresh token stays in this worker's store, and the repository session
+        // is the sidebar's to establish with it (AuthService.loginWithOAuth).
+        case 'oauth.login': {
+          const session = await EDU_SHARING_OAUTH.login(oauthParamsOf(message));
+          return { success: true, accessToken: session.accessToken, expiresAt: session.expiresAt };
+        }
+
+        // The same without showing anything, from the stored refresh token. `signedIn: false` is the
+        // ordinary answer for nobody being signed in, as opposed to a renewal that was tried and failed.
+        case 'oauth.silent': {
+          const session = await EDU_SHARING_OAUTH.silentSession(oauthParamsOf(message));
+          if (!session) return { success: true, signedIn: false };
+          return { success: true, signedIn: true, accessToken: session.accessToken, expiresAt: session.expiresAt };
+        }
+
+        case 'oauth.logout': {
+          return { success: true, ...(await EDU_SHARING_OAUTH.logout(oauthParamsOf(message))) };
+        }
+
+        // What has to be registered with the client at the IdP. Only this worker can say it: with the
+        // `identity` API it is a per-extension address the browser makes up (see oauth.js).
+        case 'oauth.redirectUri': {
+          const resolved = EDU_SHARING_OAUTH.redirectUri(oauthParamsOf(message));
+          return {
+            success: true,
+            redirectUri: resolved,
+            // For the address as resolved, not for the browser: a configured address takes the
+            // watched-tab path even where the `identity` API exists (see oauth.js).
+            usesIdentityApi: EDU_SHARING_OAUTH.usesIdentityApi(resolved)
+          };
         }
 
         default:

@@ -315,6 +315,214 @@ describe('AuthService', () => {
     });
   });
 
+  describe('signing in through an identity provider', () => {
+    /** An OAuth client, as a previous session's settings would have left it configured. */
+    function configureOAuth(): void {
+      extension.storage.set(APP_CONFIG.storageKeys.oauthIssuer, 'https://sso.example/realms/edu');
+      extension.storage.set(APP_CONFIG.storageKeys.oauthClientId, 'edu-sharing-extension');
+    }
+
+    it('is not offered without a configured client', async () => {
+      await auth.init();
+
+      expect(auth.oauthOffered()).toBe(false);
+    });
+
+    it('is offered once one is configured', async () => {
+      configureOAuth();
+
+      await auth.init();
+
+      expect(auth.oauthOffered()).toBe(true);
+    });
+
+    it('is not offered where the embedding host brings the session — no login is shown at all', async () => {
+      configureOAuth();
+      await auth.init();
+
+      webComponent.fake.offeredByRepository.set(true);
+
+      expect(auth.oauthOffered()).toBe(false);
+    });
+
+    it('trades the access token for a repository session', async () => {
+      configureOAuth();
+      authentication.answers(noSession());
+      authentication.answersToken(aLoginInfo({ authorityName: 'ada' }));
+      userApi.answers(A_PERSON);
+      await auth.init();
+      extension.oauthYields('an-access-token');
+
+      expect(await auth.loginWithOAuth()).toBe(true);
+
+      // The token is presented as a bearer token; the repository answers with the session cookie.
+      expect(authentication.fake.loginToken).toHaveBeenCalledWith('an-access-token');
+      expect(auth.loggedIn()).toBe(true);
+      expect(auth.username()).toBe('ada');
+      expect(auth.currentUser()).toEqual(A_PERSON.person);
+      expect(auth.error()).toBeNull();
+    });
+
+    it('names the provider the login screen picked', async () => {
+      configureOAuth();
+      await auth.init();
+      extension.oauthYields('an-access-token');
+
+      await auth.loginWithOAuth({ label: 'Uni-Login', registrationId: 'uni' });
+
+      expect(extension.fake.oauthLogin).toHaveBeenCalledWith(
+        expect.objectContaining({ registrationId: 'uni', repositoryUrl: auth.repositoryUrl() }),
+      );
+    });
+
+    it('reports a repository that will not take the token', async () => {
+      configureOAuth();
+      authentication.answers(noSession());
+      authentication.answersToken(noSession());
+      await auth.init();
+      extension.oauthYields('an-access-token');
+
+      expect(await auth.loginWithOAuth()).toBe(false);
+
+      expect(auth.loggedIn()).toBe(false);
+      expect(auth.error()).toContain('SSO');
+    });
+
+    it('leaves the screen as it was for a flow nobody completed', async () => {
+      configureOAuth();
+      authentication.answers(noSession());
+      await auth.init();
+      extension.oauthRefuses('OAUTH_CANCELLED');
+
+      expect(await auth.loginWithOAuth()).toBe(false);
+
+      // A cancellation is an answer, not a failure: nothing is reported on the login screen.
+      expect(auth.error()).toBeNull();
+      expect(authentication.fake.loginToken).not.toHaveBeenCalled();
+    });
+
+    it('reports a flow that failed', async () => {
+      configureOAuth();
+      authentication.answers(noSession());
+      await auth.init();
+      extension.oauthRefuses('OAUTH_DISCOVERY_FAILED: 404');
+
+      expect(await auth.loginWithOAuth()).toBe(false);
+
+      expect(auth.error()).toContain('Issuer-URL');
+    });
+
+    it('takes over the providers the repository advertises', async () => {
+      configureOAuth();
+      authentication.answers(
+        aLoginInfo({
+          authorityName: 'ada',
+          oauthEntries: [
+            { registrationId: 'uni', name: 'Uni-Login' },
+            // No registration id: nothing the authorization request could pass on, so it is dropped.
+            { name: 'Namenlos' },
+          ],
+        }),
+      );
+
+      await auth.init();
+
+      expect(auth.oauthProviders()).toEqual([{ label: 'Uni-Login', registrationId: 'uni' }]);
+    });
+
+    it('falls back to the registration id where the repository names no provider', async () => {
+      configureOAuth();
+      authentication.answers(aLoginInfo({ oauthEntries: [{ registrationId: 'uni' }] }));
+
+      await auth.init();
+
+      expect(auth.oauthProviders()).toEqual([{ label: 'uni', registrationId: 'uni' }]);
+    });
+  });
+
+  describe('resuming an OAuth session on startup', () => {
+    function configureOAuth(): void {
+      extension.storage.set(APP_CONFIG.storageKeys.oauthIssuer, 'https://sso.example/realms/edu');
+      extension.storage.set(APP_CONFIG.storageKeys.oauthClientId, 'edu-sharing-extension');
+    }
+
+    it('puts the session back from the stored refresh token, without asking', async () => {
+      configureOAuth();
+      authentication.answers(noSession());
+      authentication.answersToken(aLoginInfo({ authorityName: 'ada' }));
+      extension.oauthResumes('a-renewed-token');
+
+      await auth.init();
+
+      expect(auth.loggedIn()).toBe(true);
+      expect(auth.username()).toBe('ada');
+      expect(extension.fake.oauthLogin).not.toHaveBeenCalled();
+    });
+
+    it('does not ask where the cookie already carried a session', async () => {
+      configureOAuth();
+      authentication.answers(aLoginInfo({ authorityName: 'ada' }));
+
+      await auth.init();
+
+      expect(auth.loggedIn()).toBe(true);
+      expect(extension.fake.oauthSilent).not.toHaveBeenCalled();
+    });
+
+    it('reports nothing where there is nothing to resume from', async () => {
+      configureOAuth();
+      authentication.answers(noSession());
+
+      await auth.init();
+
+      expect(auth.loggedIn()).toBe(false);
+      // Nobody asked for a login, so a renewal that found none says nothing on the screen.
+      expect(auth.error()).toBeNull();
+    });
+
+    it('stays quiet about a stored session the repository refuses', async () => {
+      configureOAuth();
+      authentication.answers(noSession());
+      authentication.refusesToken({ status: 401 });
+      extension.oauthResumes('a-spent-token');
+
+      await auth.init();
+
+      expect(auth.loggedIn()).toBe(false);
+      expect(auth.error()).toBeNull();
+    });
+
+    it('asks nothing at all without a configured client', async () => {
+      authentication.answers(noSession());
+
+      await auth.init();
+
+      expect(extension.fake.oauthSilent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('logging out of both', () => {
+    it('drops the OAuth session with the repository one', async () => {
+      extension.storage.set(APP_CONFIG.storageKeys.oauthIssuer, 'https://sso.example/realms/edu');
+      extension.storage.set(APP_CONFIG.storageKeys.oauthClientId, 'edu-sharing-extension');
+      await auth.init();
+
+      await auth.logout();
+
+      // Leaving the refresh token would sign the user straight back in on the next boot.
+      expect(extension.fake.oauthLogout).toHaveBeenCalled();
+      expect(auth.loggedIn()).toBe(false);
+    });
+
+    it('asks nothing of the worker where no OAuth client is configured', async () => {
+      await auth.init();
+
+      await auth.logout();
+
+      expect(extension.fake.oauthLogout).not.toHaveBeenCalled();
+    });
+  });
+
   // `applyRepositoryChange()` is deliberately not exercised: it calls `location.reload()`, which jsdom
   // does not implement — and reloading the panel is what the manual checklist covers.
 });

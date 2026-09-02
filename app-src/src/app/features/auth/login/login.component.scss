@@ -116,6 +116,17 @@
   font-size: 14px;
 }
 
+// The SSO button carries the provider's icon, so its label is centred next to it rather than in the
+// button — a row of them for a repository advertising several has to read as one list.
+.lg-sso {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  i { font-size: 18px; }
+}
+
 // "oder" between the two ways in, with a rule running out to both sides of it.
 .lg-or {
   display: flex;

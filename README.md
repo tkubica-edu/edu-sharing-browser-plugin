@@ -119,6 +119,11 @@ flat.
   switches the panel login off, and the checkbox *WLO-Funktionen verwenden* in *Einstellungen* refuses
   it so the base version's flow stays reachable against such a repository;
   `browserExtensionEditorialGroups` names the editorial groups contents can be forwarded to.
+- **SSO client** — an OpenID Connect issuer and client id, set in *Einstellungen → SSO-Anmeldung*
+  (defaults in `APP_CONFIG.oauth`, empty as shipped). Configured, the login card offers signing in
+  through the identity provider next to the credential form — Authorization Code flow with PKCE, see
+  [UI-SHELL.md](UI-SHELL.md#login-session-restore-and-the-guest-gate) and
+  [ARCHITECTURE.md](ARCHITECTURE.md#the-oauth-flow).
 - **Defaults and storage keys** live in `config.js` (worker) and `app-src/src/app/config.ts` (app).
 
 ## Contributing

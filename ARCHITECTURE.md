@@ -3,6 +3,7 @@
 - [The parts](#the-parts)
 - [The metadata agent's address](#the-metadata-agents-address)
 - [Network legs & CORS](#network-legs--cors)
+- [The OAuth flow](#the-oauth-flow)
 - [Saving a content](#saving-a-content)
 
 ---
@@ -41,8 +42,12 @@ Browser tab (any https page)
   tab's content (`content/content.js`), and **proxies the `/generate` call** so it runs from the
   service worker (portable across browsers, avoids page-CSP/CORS pitfalls).
 - **Auth** runs inside the Angular app (the library owns its HttpClient); it calls
-  `GET {repo}/edu-sharing/rest/authentication/v1/validateSession` with Basic auth. See
+  `GET {repo}/edu-sharing/rest/authentication/v1/validateSession` with Basic auth — or with a bearer
+  token, where the session was obtained through the OAuth flow below. See
   [UI-SHELL.md](UI-SHELL.md#login-session-restore-and-the-guest-gate).
+- **OAuth/PKCE** (`background/oauth.js`, loaded by `sw.js` and by Firefox's `background.scripts`
+  ahead of `background.js`) — the Authorization Code flow with PKCE that precedes that bearer login,
+  run in the worker rather than in the panel. See [§ The OAuth flow](#the-oauth-flow).
 
 The web components the screens embed are loaded into the sidebar document itself — no iframes; see
 [WEB-COMPONENTS.md](WEB-COMPONENTS.md).
@@ -76,6 +81,7 @@ precedes every `/generate` rather than as a failed extraction a minute later.
 | `POST /extract-field` (Metadata-Agent) | sidebar document (`MetadataAgentService`) | same context the WLO canvas calls `/generate` from, so the request is visible in the panel's own DevTools and there is no worker build that can fall out of sync with the app. Relies on `host_permissions` for the cross-origin call, like the repository login |
 | Page content extraction | `scripting.executeScript` (background) | no cross-origin fetch |
 | Repository login | Angular `HttpClient` (library) | the library owns the call; relies on `host_permissions` bypassing CORS on Chrome/Edge/Firefox |
+| OIDC discovery, token exchange, refresh, revocation | background service worker (`background/oauth.js`) | same reason as `/generate`: a background fetch is gated by `host_permissions`, so the provider's token endpoint is reached without it having to allow the extension origin by CORS. It is also the only context that outlives the panel's iframe for the length of a login |
 | `EVENT` / `REQ` to a nostr relay (AMB, kind 30142) | sidebar document (`NostrForwardService` → `util/nostr-relay.ts`) | nostr has no HTTP path at all: one WebSocket per exchange — `publishToRelay` closes with the relay's `OK`, `queryRelay` with its `EOSE`. Needs `wss:`/`ws:` in the extension's `connect-src`, which the scheme sources for `https:`/`http:` do not have to imply. Neither runs while the settings' *Nostr-Relay verwenden* is off |
 
 Every message to the worker goes through one send path (`BrowserExtensionService.ask`). A rejection
@@ -86,6 +92,48 @@ attempts are used up the caller gets `WORKER_UNREACHABLE` — a state of its own
 worker answering with a failure — and the user is told to reopen the panel. Every other rejection is
 the worker's own and is passed on unchanged. See
 [TROUBLESHOOTING.md § Browser-specific](TROUBLESHOOTING.md#browser-specific).
+
+## The OAuth flow
+
+`background/oauth.js` implements the Authorization Code flow with PKCE (RFC 7636) as a public client
+— no secret, an `S256` challenge in the authorization request and the verifier only in the token
+exchange. The PKCE pair is generated the way
+[`pkce-challenge`](https://github.com/crouchcd/pkce-challenge) does it (a 128-character verifier over
+the unreserved set with the modulo bias cut off, SHA-256 as a base64url challenge), inlined because
+this file is plain script the worker loads directly — there is no bundler on the extension's side.
+Endpoints are never assembled: they come from the issuer's `/.well-known/openid-configuration`,
+cached per issuer for the worker's lifetime, which is what lets one implementation serve Keycloak,
+Shibboleth or edu-sharing's own authorization server. The `state` is checked before the code is
+looked at, so an answer belonging to another request is refused rather than exchanged.
+
+**Showing the provider's pages** is the one part that differs per browser, and it is branched on the
+API rather than on the browser:
+
+| Browser | How | Redirect address |
+| --- | --- | --- |
+| Chrome, Edge, Firefox | `identity.launchWebAuthFlow` (needs the `identity` permission) | `identity.getRedirectURL()` — a per-extension address the browser makes up and never puts on the network |
+| Safari | a watched tab: `tabs.create`, then `tabs.onUpdated` until the tab heads for the redirect address, which then closes it | an ordinary https address, configured or `<repository>/oauth/extension-callback` |
+
+The branch is on the redirect address, not on the browser (`usesIdentityApi()`):
+`launchWebAuthFlow` completes only when the flow reaches the address the browser itself handed out —
+Chrome watches for `https://<id>.chromiumapp.org/` and nothing else — so **a configured address takes
+the watched-tab path everywhere**, which is how one https address can serve all three browsers.
+Left unconfigured, each browser uses its own, and all of them have to be registered with the client.
+
+Safari implements no `identity` namespace at all, which is what the fallback exists for
+(`hasIdentityApi()`, and see
+[TROUBLESHOOTING.md § Browser-specific](TROUBLESHOOTING.md#browser-specific)). The watched tab
+matches on the address *before* the load finishes, so nothing has to be served at the redirect
+target; a tab the user closes instead is a cancellation, which the panel reports as no error at all.
+Both addresses have to be registered with the client at the provider, and *Einstellungen →
+SSO-Anmeldung* shows which one this browser will use.
+
+The worker hands the panel the access token and nothing else. The refresh token stays in
+`browser.storage.local` under `eduSharingOAuthTokens` and is read only there — the panel names the
+key in `APP_CONFIG.storageKeys.oauthTokens` merely so its storage keys are all in one place. A
+provider that rotates refresh tokens is followed; one that rejects a refresh has its stored session
+cleared, since that token will not start working again. Messages: `oauth.login`, `oauth.silent`,
+`oauth.logout`, `oauth.redirectUri`.
 
 ## Saving a content
 
