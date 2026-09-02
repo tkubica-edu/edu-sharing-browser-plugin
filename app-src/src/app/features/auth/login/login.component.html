@@ -46,17 +46,24 @@
       </button>
     }
 
-    <!-- One button per provider the repository advertises; a single unnamed one where it advertises
-         none, which leads to the server's own chooser (see LoginComponent.oauthButtons). -->
+    <!-- One button per provider the repository advertises; a single one where it advertises none,
+         which leads to the server's own chooser (see LoginComponent.oauthButtons). All of them say
+         the same thing: what the repository advertises is a registration id, not a name to put in
+         front of a user. -->
     @for (provider of oauthButtons(); track provider?.registrationId ?? 'sso') {
       <button class="lg-submit lg-sso" type="button" [disabled]="!canUseOAuth()"
               (click)="loginWithOAuth(provider)">
         <i esIcon="vpn_key"></i>
-        {{ auth.oauthRunning() ? 'Anmelden…' : oauthLabel(provider) }}
+        {{ auth.oauthRunning() ? 'Anmelden…' : oauthLabel }}
       </button>
     }
 
-    <button class="lg-secondary" type="button" (click)="openRegister()">Account erstellen</button>
+    <!-- Accounts are the repository's to hand out only while it hands out the identity too: where it
+         federates, whoever needs an account needs it at the identity provider, and its register form
+         would be the wrong door. -->
+    @if (auth.passwordLoginOffered()) {
+      <button class="lg-secondary" type="button" (click)="openRegister()">Account erstellen</button>
+    }
 
     @if (auth.needsReload()) {
       <p class="es-hint">

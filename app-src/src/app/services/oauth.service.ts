@@ -8,10 +8,13 @@ import { errorMessage } from '../util/errors';
  * One identity provider the login screen can offer, as the repository advertises it in the login
  * info's `oauthEntries`. The registration id is what the authorization request passes on so the IdP
  * goes straight to that provider instead of showing its own chooser; a repository that advertises
- * none leaves the panel with the plain "sign in with SSO" button and the server's own chooser.
+ * none leaves the panel with a single button and the server's own chooser.
  */
 export interface OAuthProvider {
-  /** What the button says — the repository's name for the provider, else the registration id. */
+  /**
+   * The repository's own name for the provider, else its registration id. Not what the button says —
+   * that names the flow (see LoginComponent) — but what the panel knows the provider as.
+   */
   readonly label: string;
   readonly registrationId?: string;
 }

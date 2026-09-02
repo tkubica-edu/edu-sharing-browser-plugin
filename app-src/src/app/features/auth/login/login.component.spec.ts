@@ -56,6 +56,7 @@ describe('LoginComponent', () => {
     expect(ssoButtons()).toHaveLength(0);
     expect(fixture.nativeElement.querySelectorAll('input')).toHaveLength(2);
     expect(fixture.nativeElement.querySelector('.lg-submit')).toBeTruthy();
+    expect(fixture.nativeElement.textContent).toContain('Account erstellen');
   });
 
   it('drops the credential form where the repository names one', () => {
@@ -69,7 +70,15 @@ describe('LoginComponent', () => {
     expect(ssoButtons()).toHaveLength(1);
   });
 
-  it('offers one unnamed button where the repository advertises no provider', () => {
+  it('drops the way to an account of the repository`s own along with it', () => {
+    auth.offerOAuth();
+    fixture.detectChanges();
+
+    // An account is created where the identity comes from, which is then not this repository.
+    expect(fixture.nativeElement.textContent).not.toContain('Account erstellen');
+  });
+
+  it('offers one button where the repository advertises no provider', () => {
     auth.offerOAuth();
     fixture.detectChanges();
 
@@ -77,14 +86,16 @@ describe('LoginComponent', () => {
     expect(labels()).toEqual(['Anmelden mit OAuth']);
   });
 
-  it('offers a button per provider the repository advertises', () => {
+  it('offers a button per provider the repository advertises, each naming the flow', () => {
     auth.offerOAuth([
-      { label: 'Uni-Login', registrationId: 'uni' },
+      { label: 'myopenidconnect', registrationId: 'myopenidconnect' },
       { label: 'Schul-Login', registrationId: 'schule' },
     ]);
     fixture.detectChanges();
 
-    expect(labels()).toEqual(['Anmelden mit Uni-Login', 'Anmelden mit Schul-Login']);
+    // What the repository advertises is a registration id — a configuration name — so the buttons
+    // say what they do instead of repeating it.
+    expect(labels()).toEqual(['Anmelden mit OAuth', 'Anmelden mit OAuth']);
   });
 
   it('hands the picked provider to the login', async () => {

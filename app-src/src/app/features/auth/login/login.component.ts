@@ -13,6 +13,13 @@ import { RepositoryPageService } from '../../../services/repository-page.service
  */
 const USER_PLACEHOLDER = 'E-Mail-Adresse oder Benutzername';
 
+/**
+ * What every SSO button says, whichever provider it stands for. The repository advertises its
+ * providers by registration id (`oauthEntries`), which is a configuration name — `myopenidconnect`
+ * and the like — and naming the flow is more use to whoever reads the button than naming that.
+ */
+const OAUTH_LABEL = 'Anmelden mit OAuth';
+
 // The shared login: the way into the repository while logged out, a compact status row once logged in — and the
 // session is shared, so signing in here unblocks every screen. One card for both places it is asked for, the Login
 // section and a section a guest cannot be served by, whose two lines of text are inputs. Which way in it offers
@@ -49,6 +56,7 @@ export class LoginComponent {
   );
 
   protected readonly userPlaceholder = USER_PLACEHOLDER;
+  protected readonly oauthLabel = OAUTH_LABEL;
 
   protected readonly username = signal('');
   protected readonly password = signal('');
@@ -77,11 +85,6 @@ export class LoginComponent {
   protected readonly canUseOAuth = computed(
     () => !this.auth.needsReload() && !this.loggingIn() && !this.auth.oauthRunning(),
   );
-
-  /** What an SSO button says: the provider's name where the repository gave one. */
-  protected oauthLabel(provider: OAuthProvider | null): string {
-    return provider ? `Anmelden mit ${provider.label}` : 'Anmelden mit OAuth';
-  }
 
   protected togglePassword(): void {
     this.passwordVisible.update((visible) => !visible);

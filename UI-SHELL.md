@@ -156,11 +156,15 @@ so everything past the login is the cookie-based session described above and no 
 way in was used. The trade is the step that can still refuse a completed OAuth login: the person is
 who the provider says they are, and the repository may still not know them.
 
-Which buttons the card shows follows from the repository too. Its login info advertises the providers
-it federates against (`oauthEntries`, read by `AuthService.applyOAuthEntries`); each entry with a
-`registrationId` becomes a button that names that provider in the authorization request, so the
-provider goes straight there instead of showing its own chooser. A repository advertising none — the
-ordinary case — leaves a single *Anmelden mit OAuth* button and lets the provider ask.
+How many buttons the card shows follows from the repository too. Its login info advertises the
+providers it federates against (`oauthEntries`, read by `AuthService.applyOAuthEntries`); each entry
+with a `registrationId` becomes a button that names that provider in the authorization request, so
+the provider goes straight there instead of showing its own chooser. A repository advertising none —
+the ordinary case — leaves a single button and lets the provider ask. Every one of them reads
+*Anmelden mit OAuth*: what is advertised is a registration id (`myopenidconnect` and the like), which
+is a configuration name rather than one to put in front of a user. *Account erstellen* is dropped
+along with the credential form, since an account is created where the identity comes from — which in
+that state is not the repository.
 
 **Resuming an OAuth session.** The flow keeps its refresh token in `browser.storage.local`
 (`eduSharingOAuthTokens`, written only by the worker). `AuthService.init` uses it after the cookie
