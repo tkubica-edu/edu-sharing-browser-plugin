@@ -387,29 +387,25 @@ navigating to it, and closes it again where it stands; the step keeps running be
   none. Every default is compared where it is defined — each service answers for its own settings
   (`changedSettings`), the screen only sums them per group.
 
-  *SSO-Anmeldung* is folded like the tuning groups but sits above them, next to the repository:
-  it decides whether the login card offers a second way in at all, and it applies to whichever
-  repository the panel is pointed at. Five fields, each falling back to what `APP_CONFIG.oauth`
-  carries when it is emptied: the **Issuer** (the base its
-  `/.well-known/openid-configuration` sits under — the endpoints are read from that document, so the
-  issuer is normally the only address to enter), the **Discovery-URL** for the case where that
-  document sits elsewhere (an authorization server that is not an OIDC provider publishes
-  `/.well-known/oauth-authorization-server` instead, edu-sharing's own included; empty falls back to
-  the issuer's OIDC path), the **Client-ID** of the public client registered for this
-  extension, the **Scopes** (`offline_access` among them is what yields the refresh token the session
-  is later resumed from — not every provider defines it) and the **Redirect-URI**. *Issuer und Scopes
-  prüfen* asks the issuer about itself before anybody signs in: whether it can be reached, whether it
-  describes the endpoints, whether it can revoke, and which of the configured scopes it does not
-  define. The last is why the button exists — a provider refuses an unknown scope on an error page of
-  its own rather than by redirecting, so the flow would otherwise hang with nothing to read. Only the last is not free to choose: it has to be
-  registered with the client at the provider, so the group shows which address *this* browser will
-  actually use and whether the browser's own `identity` API produced it. Left empty the browser
-  decides — Chrome, Edge and Firefox hand out an address per extension, Safari falls back to
-  `<Repository>/oauth/extension-callback` — and each of those has to be registered with the client.
-  Filling it in is therefore also the way to have *one* address serve all three: a configured address
-  is watched for rather than handed to the browser's own API, so every browser takes the same path
-  (see [ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow)). Without an
-  issuer and a client id nothing about SSO is shown on the login card. See
+  *SSO-Anmeldung* is folded like the tuning groups but sits above them, next to the repository — and
+  unlike them it holds no settings at all, which is why its head carries no `… geändert` pill. What
+  it reports is the repository's own answer: the panel asks for
+  `<Repository>/.well-known/oauth-authorization-server` (RFC 8414) on startup, as the client
+  `browser-plugin` with the scope `profile`, and the group states that address, whether a server was
+  described there, what it calls itself, and what logging out will be able to do — whether it names a
+  revocation endpoint and whether it names one for ending its own session, since without the latter
+  the provider's cookie survives *Abmelden* and the next sign-in does not ask again. A scope the
+  server does not define is named here too: a provider refuses an unknown one on an error page of its
+  own rather than by redirecting, so the flow would otherwise hang with nothing to read. *Erneut
+  fragen* asks again without reloading the panel, which is what whoever has just enabled the server
+  on the repository wants. The one value that has to be *entered* somewhere is entered at the
+  provider, not here: the redirect address the client must have registered, which with the browsers'
+  own `identity` API is an address the browser makes up per installation and nobody could look up —
+  so the group shows the one *this* browser will use (Safari, having no such API, uses
+  `<Repository>/oauth/extension-callback`), and a deployment across several browsers registers all of
+  them. Where the repository describes a server, the login card leads through it **instead of**
+  asking for username and password; where it does not — the ordinary case — the card is the
+  credential form alone. See
   [UI-SHELL.md § Login, session restore and the guest gate](UI-SHELL.md#login-session-restore-and-the-guest-gate)
   and [ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow).
 

@@ -56,15 +56,23 @@ export class AuthService {
   readonly loginRequired = computed(() => !this.browserExtensionCustomWebComponent.enabled());
 
   /**
-   * Whether the login card offers signing in through an identity provider next to the credential
-   * form — see OAuthService.configured.
+   * Whether the login card leads through an identity provider — true exactly where the repository
+   * publishes an authorization server of its own (see OAuthService.available).
    *
    * Deliberately not gated on {@link loginRequired}: the card is reachable where no login is
    * required too (the Login section, whose lead then reads that only public content is available
-   * without one), and it shows the credential form there. Gating only the identity provider on it
-   * would make a password the one way in where both should be, for no reason a reader could see.
+   * without one), and it offers the same way in there.
    */
-  readonly oauthOffered = computed(() => this.oauth.configured());
+  readonly oauthOffered = computed(() => this.oauth.available());
+
+  /**
+   * Whether the card asks for username and password. The other way round from {@link oauthOffered}
+   * rather than beside it: a repository that federates has said which identity it wants to be signed
+   * in with, so its own credential form is not a second way in but a different answer — and one this
+   * panel has no business offering. Where the repository federates against nothing, this is the only
+   * way in and the card is what it always was.
+   */
+  readonly passwordLoginOffered = computed(() => !this.oauth.available());
 
   /** The providers to offer, as the repository advertises them — see OAuthService.providers. */
   readonly oauthProviders = this.oauth.providers;
@@ -81,7 +89,9 @@ export class AuthService {
       ),
     );
     this.needsReload.set(false);
-    await this.oauth.load();
+    // Asked before anything else about a login: the answer decides which way in the card offers, and
+    // it is a fact about this repository rather than a setting (see OAuthService.probe).
+    await this.oauth.probe(this.repositoryUrl());
     await this.restoreSession();
     // The repository session outlives a sidebar reload as a cookie, so this only runs where that
     // cookie is gone — the repository's own session timeout, or a browser that dropped it. The OAuth
@@ -140,9 +150,19 @@ export class AuthService {
     location.reload();
   }
 
-  /** Log in with username/password. Returns true on a valid, non-guest login. */
+  /**
+   * Log in with username/password. Returns true on a valid, non-guest login.
+   *
+   * Refused outright where the repository federates: it has named the identity provider its users
+   * are known by, and a credential presented here would go around it (see
+   * {@link passwordLoginOffered}, which is also what hides the form).
+   */
   async login(username: string, password: string): Promise<boolean> {
     this.error.set(null);
+    if (!this.passwordLoginOffered()) {
+      this.applyLogout('Dieses Repository erlaubt die Anmeldung nur über SSO.');
+      return false;
+    }
     try {
       const info = await firstValueFrom(this.authentication.login(username, password));
       this.applyOAuthEntries(info);

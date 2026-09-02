@@ -22,181 +22,109 @@
   </div>
 </section>
 
-<!-- The OpenID Connect client the alternative login signs in with. Next to the repository rather than
-     among the tuning below: it decides whether the login screen offers a second way in at all, and it
-     applies to whichever repository the panel is pointed at. Folded, because a deployment that does not
-     federate never touches it. -->
+<!-- What the repository says about its own authorization server. Next to the repository rather than
+     among the tuning below, because that is what it is about: whether this repository federates
+     decides which way the login card leads, and nothing in here is a setting. Folded, because a
+     repository that federates against nothing never needs it. -->
 <section class="es-card">
   <button type="button" class="section-head" (click)="toggleSection('sso')"
           [attr.aria-expanded]="openSection() === 'sso'">
     <h2>SSO-Anmeldung</h2>
-    <!-- What was changed in this section, so a folded one says whether it holds anything but the
-         defaults; absent where it holds only those. -->
-    @if (changedPerSection().sso; as changed) {
-      <span class="section-count">{{ changed }} geändert</span>
-    }
     <i class="section-chevron" [class.is-open]="openSection() === 'sso'" esIcon="expand_more"></i>
   </button>
 
   @if (openSection() === 'sso') {
     <p class="desc">
-      Anmeldung über einen Identity Provider (OpenID Connect) als Alternative zu Benutzername und
-      Passwort — Authorization Code Flow mit <abbr title="Proof Key for Code Exchange">PKCE</abbr>,
-      ohne Client-Secret. Das dabei erhaltene Access Token wird gegen eine Repository-Sitzung
-      eingetauscht. Ohne Issuer und Client-ID wird die Alternative nicht angeboten.
+      Anmeldung über den Identity Provider des Repositoriums (OpenID Connect) — Authorization Code
+      Flow mit <abbr title="Proof Key for Code Exchange">PKCE</abbr>, ohne Client-Secret; das dabei
+      erhaltene Access Token wird gegen eine Repository-Sitzung eingetauscht. Es gibt hier nichts
+      einzustellen: das Panel fragt beim Repository nach, ob es einen Authorization Server
+      veröffentlicht, und richtet die Anmeldekarte danach.
     </p>
-
-    <label class="es-field-label" for="oauth-issuer">Issuer</label>
-    <input id="oauth-issuer" type="url" class="es-input" autocomplete="off" spellcheck="false"
-           placeholder="https://sso.example.org/realms/edu-sharing"
-           [ngModel]="oauth.configuredIssuer()" (ngModelChange)="setOAuthIssuer($event)" />
 
     <p class="desc">
-      Die Basis, unter der das Discovery-Dokument des Providers liegt
-      (<code>&lt;Issuer&gt;/.well-known/openid-configuration</code>). Die Endpunkte werden daraus
-      gelesen und nicht geraten — es muss also nur der Issuer eingetragen werden. Am Issuer wird
-      außerdem erkannt, ob eine gespeicherte Sitzung noch zur aktuellen Konfiguration gehört.
+      Gefragt wird unter <code>{{ discoveryUrl() }}</code>
+      (<abbr title="RFC 8414 – OAuth 2.0 Authorization Server Metadata">RFC 8414</abbr>), als Client
+      <code>{{ oauth.clientId }}</code> mit den Scopes <code>{{ oauth.scopes }}</code>.
     </p>
 
-    <!-- Zwei Pfade sind in Gebrauch, und welcher gilt, sagt der Provider nicht vorher: OpenID
-         Connect beschreibt sich unter /.well-known/openid-configuration, ein reiner OAuth
-         Authorization Server unter /.well-known/oauth-authorization-server (RFC 8414). Beide
-         Dokumente tragen dieselben Endpunkt-Felder, nur die Adresse unterscheidet sich. -->
-    <label class="es-field-label" for="oauth-discovery">Discovery-URL</label>
-    <input id="oauth-discovery" type="url" class="es-input" autocomplete="off" spellcheck="false"
-           [placeholder]="discoveryUrlFromIssuer()"
-           [ngModel]="oauth.configuredDiscoveryUrl()" (ngModelChange)="setOAuthDiscoveryUrl($event)" />
+    <!-- Die Antwort selbst, und was sie für die Anmeldekarte bedeutet. Was daran das Panel
+         einschränkt, ist ein fehlender Revocation- bzw. Logout-Endpunkt und ein Scope, den der
+         Server nicht kennt — beides sagt der Server nur hier und nie beim Anmelden. -->
+    @if (oauth.availability(); as answer) {
+      @if (answer.kind === 'available') {
+        <p class="es-hint">
+          Das Repository beschreibt einen Authorization Server — die Anmeldekarte führt darum
+          <strong>ausschließlich</strong> über „Mit SSO anmelden“, Benutzername und Passwort werden
+          nicht angeboten. Sichtbar nur, solange keine Sitzung besteht: gegebenenfalls erst abmelden.
+        </p>
 
-    <p class="desc">
-      Die Adresse des Discovery-Dokuments, falls sie nicht unter dem Issuer liegt. Leer gelassen gilt
-      <code>&lt;Issuer&gt;/.well-known/openid-configuration</code>. Ein Server, der sich nicht als
-      OpenID-Connect-Provider, sondern als OAuth Authorization Server beschreibt, veröffentlicht
-      stattdessen <code>/.well-known/oauth-authorization-server</code> — so auch edu-sharings eigener
-      Authorization Server, dessen Endpunkte unter <code>&lt;Repository&gt;/oauth2server/</code>
-      liegen.
-    </p>
-
-    <label class="es-field-label" for="oauth-client">Client-ID</label>
-    <input id="oauth-client" type="text" class="es-input" autocomplete="off" spellcheck="false"
-           placeholder="edu-sharing-browser-extension"
-           [ngModel]="oauth.configuredClientId()" (ngModelChange)="setOAuthClientId($event)" />
-
-    <p class="desc">
-      Der beim Provider registrierte öffentliche Client dieser Extension. Ein Secret wird nicht
-      hinterlegt: eine Extension kann keines geheim halten, dafür gibt es PKCE.
-    </p>
-
-    <!-- Der Schalter für die ganze Alternative ist keiner, sondern folgt aus diesen zwei Feldern —
-         also wird hier gesagt, woran es liegt, wenn auf der Anmeldekarte keine Schaltfläche steht. -->
-    @if (oauth.configured()) {
-      <p class="es-hint">
-        Die SSO-Anmeldung wird auf der Anmeldekarte angeboten — unter „oder“, neben dem Formular für
-        Benutzername und Passwort. Sichtbar nur, solange keine Sitzung besteht: gegebenenfalls erst
-        abmelden.
-      </p>
-    } @else {
-      <p class="es-hint">
-        Die SSO-Anmeldung wird derzeit <strong>nicht</strong> angeboten: dafür werden
-        @if (!oauth.issuer() && !oauth.clientId()) {
-          Issuer und Client-ID
-        } @else if (!oauth.issuer()) {
-          noch der Issuer
-        } @else {
-          noch die Client-ID
-        }
-        benötigt. Bis dahin zeigt die Anmeldekarte nur Benutzername und Passwort.
-      </p>
-    }
-
-    <label class="es-field-label" for="oauth-scopes">Scopes</label>
-    <input id="oauth-scopes" type="text" class="es-input" autocomplete="off" spellcheck="false"
-           [placeholder]="oauth.scopes()"
-           [ngModel]="oauth.configuredScopes()" (ngModelChange)="setOAuthScopes($event)" />
-
-    <p class="desc">
-      Wonach gefragt wird, durch Leerzeichen getrennt. <code>offline_access</code> liefert das Refresh
-      Token, mit dem die Sitzung später ohne erneute Anmeldung wiederhergestellt wird — <strong>nicht
-      jeder Provider kennt diesen Scope</strong> (GitLab etwa nicht; dort führt er zu
-      „invalid_scope“). Leer gelassen gilt wieder <code>{{ defaultOAuthScopes }}</code>.
-    </p>
-
-    <!-- Der Provider lehnt einen unbekannten Scope auf einer eigenen Fehlerseite ab, statt
-         zurückzuleiten — das Panel erfährt den Grund also nie. Deshalb lässt sich der Issuer hier
-         vorab fragen, was er überhaupt kennt. -->
-    <div class="es-row">
-      <button class="es-btn es-btn--tonal es-btn--small" type="button"
-              [disabled]="!oauth.configured() || oauth.checking()"
-              (click)="checkIssuer()">
-        {{ oauth.checking() ? 'Prüfe…' : 'Issuer und Scopes prüfen' }}
-      </button>
-    </div>
-
-    @if (oauth.checked(); as result) {
-      @switch (result.kind) {
-        @case ('ok') {
-          <p class="es-hint">
-            Issuer erreichbar, Endpunkte gefunden@if (result.scopesSupported) {, und der Server kennt
-            alle angeforderten Scopes}@if (!result.revocable) { — der Provider nennt keinen
-            Revocation-Endpunkt, beim Abmelden wird das Refresh Token dann nur lokal
-            verworfen}.
-            @if (result.scopesSupported) {
-              <br />
-              Das sagt nur, was der <em>Server</em> kann: die Scopes müssen zusätzlich beim
-              <em>Client</em> freigegeben sein. Sind sie es nicht, lehnt der Provider mit derselben
-              Meldung „invalid_scope“ ab (bei GitLab: die Häkchen in der Application).
+        <ul class="desc-list">
+          <li>Issuer: <code>{{ answer.server.issuer }}</code></li>
+          <li>
+            Abmelden:
+            @if (answer.server.revocable && answer.server.sessionEndable) {
+              Das Token wird beim Server verworfen und dessen eigene Sitzung beendet.
+            } @else if (answer.server.sessionEndable) {
+              Die Sitzung beim Provider wird beendet; einen Revocation-Endpunkt nennt er nicht.
+            } @else if (answer.server.revocable) {
+              Das Token wird beim Server verworfen. Einen Logout-Endpunkt nennt er nicht — die
+              Sitzung beim Provider bleibt bestehen, die nächste Anmeldung fragt also nicht erneut.
+            } @else {
+              Der Server nennt weder Revocation- noch Logout-Endpunkt: das Token wird nur lokal
+              verworfen.
             }
-          </p>
-        }
-        @case ('scopes') {
-          <p class="es-error">
-            Der Provider kennt {{ result.unsupported.length === 1 ? 'diesen Scope' : 'diese Scopes' }}
-            nicht: <code>{{ result.unsupported.join(' ') }}</code>. Die Anmeldung würde mit
-            „invalid_scope“ abgelehnt — Scope entfernen.
-          </p>
-        }
-        @case ('failed') {
-          <p class="es-error">{{ result.error }}</p>
-        }
+          </li>
+          @if (answer.server.unsupportedScopes.length) {
+            <li class="es-error">
+              Der Server kennt {{ answer.server.unsupportedScopes.length === 1 ? 'diesen Scope' : 'diese Scopes' }}
+              nicht: <code>{{ answer.server.unsupportedScopes.join(' ') }}</code>. Die Anmeldung
+              würde mit „invalid_scope“ abgelehnt.
+            </li>
+          }
+        </ul>
+      } @else if (answer.kind === 'unavailable') {
+        <p class="es-hint">
+          Das Repository beschreibt dort keinen Authorization Server, deshalb fragt die Anmeldekarte
+          nach Benutzername und Passwort. Das ist der Normalfall und kein Fehler.
+        </p>
+        <p class="desc">{{ answer.error }}</p>
+      } @else {
+        <p class="es-hint">Noch nicht gefragt.</p>
       }
     }
 
-    <!-- Die Redirect-URI ist der einzige Wert hier, den man nicht frei wählt, sondern der beim
-         Provider hinterlegt sein muss — deshalb steht darunter, was dieser Browser tatsächlich
-         verwendet. -->
-    <label class="es-field-label" for="oauth-redirect">Redirect-URI</label>
-    <input id="oauth-redirect" type="url" class="es-input" autocomplete="off" spellcheck="false"
-           placeholder="automatisch"
-           [ngModel]="oauth.configuredRedirectUri()" (ngModelChange)="setOAuthRedirectUri($event)" />
+    <div class="es-row">
+      <button class="es-btn es-btn--tonal es-btn--small" type="button"
+              [disabled]="oauth.probing()" (click)="probeOAuth()">
+        {{ oauth.probing() ? 'Frage…' : 'Erneut fragen' }}
+      </button>
+    </div>
 
-    <!-- Drei Fälle, die für das Hinterlegen beim Provider unterschiedlich zu lesen sind: eine hier
-         eingetragene Adresse, ein Browser ohne `identity`-API, und die Adresse, die der Browser
-         selbst vergibt. -->
+    <!-- Der einzige Wert, der beim Provider hinterlegt sein muss und den niemand nachschlagen kann:
+         mit der `identity`-API vergibt ihn der Browser selbst, pro Installation. -->
     @if (redirectUriInUse(); as inUse) {
       <div class="es-notice">
         <span>
-          <strong>Diese Adresse beim Provider hinterlegen:</strong>
+          <strong>Diese Adresse beim Client im Provider hinterlegen:</strong>
           <code>{{ inUse.redirectUri }}</code>
-          @if (!inUse.usesIdentityApi && inUse.hasIdentityApi) {
-            — die oben eingetragene Adresse. Sie wird in jedem Browser gleich behandelt (die Extension
-            beobachtet den Tab, statt die <code>identity</code>-API des Browsers zu verwenden), eine
-            Registrierung genügt also für Chrome, Firefox und Safari.
-          } @else if (inUse.usesIdentityApi) {
-            — von diesem Browser selbst vergeben (<code>identity</code>-API); sie wird nie aufgerufen.
-            Jeder Browser vergibt eine andere, siehe unten.
+          @if (inUse.usesIdentityApi) {
+            — von diesem Browser selbst vergeben (<code>identity</code>-API); sie wird nie
+            aufgerufen. Jeder Browser vergibt eine andere.
           } @else {
             — dieser Browser hat keine <code>identity</code>-API (Safari), deshalb eine gewöhnliche
-            https-Adresse. Sie muss nichts ausliefern: die Extension liest den Code aus der Adresse
-            und schließt den Tab, bevor die Seite geladen ist.
+            https-Adresse unter dem Repository. Sie muss nichts ausliefern: die Extension liest den
+            Code aus der Adresse und schließt den Tab, bevor die Seite geladen ist.
           }
         </span>
       </div>
     }
 
     <p class="desc">
-      Leer gelassen entscheidet der Browser: Chrome, Edge und Firefox vergeben über ihre
-      <code>identity</code>-API eine eigene Adresse pro Extension, Safari fällt auf
-      <code>&lt;Repository&gt;/oauth/extension-callback</code> zurück. Wer beides betreibt, hinterlegt
-      beide Adressen beim Client.
+      Chrome, Edge und Firefox vergeben über ihre <code>identity</code>-API eine eigene Adresse pro
+      Extension-Installation, Safari verwendet
+      <code>&lt;Repository&gt;/oauth/extension-callback</code>. Wer mehrere Browser einsetzt,
+      hinterlegt alle diese Adressen beim Client.
     </p>
   }
 </section>

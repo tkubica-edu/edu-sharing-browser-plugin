@@ -4,7 +4,7 @@ import { vi } from 'vitest';
 import {
   AnnouncedPage,
   BrowserExtensionService,
-  IssuerCheck,
+  OAuthDiscovery,
   OAuthRequest,
   OAuthSession,
   SaveNodeResponse,
@@ -26,6 +26,10 @@ export function fakeBrowserExtension() {
     (key: string, fallback: unknown): Promise<unknown> =>
       Promise.resolve(storage.has(key) ? storage.get(key) : fallback),
   );
+
+  /** What the repository answers about its authorization server — see {@link federates}. */
+  let oauthDiscovery: () => Promise<OAuthDiscovery> = () =>
+    Promise.reject(new Error('OAUTH_DISCOVERY_FAILED: 404 Not Found'));
 
   /** What the worker answers a `metadata.saveNode` with — see {@link writes} and {@link refuses}. */
   let saved: SaveNodeResponse = { success: true, result: { success: true } };
@@ -51,17 +55,15 @@ export function fakeBrowserExtension() {
     oauthLogin: vi.fn((_request: OAuthRequest): Promise<OAuthSession> => Promise.resolve(oauthLogin)),
     oauthSilent: vi.fn((_request: OAuthRequest): Promise<OAuthSession> => Promise.resolve(oauthSilent)),
     oauthLogout: vi.fn((_request: OAuthRequest): Promise<OAuthSession> => Promise.resolve({ success: true })),
-    // Annotated, not inferred: the default answer's `null` and `[]` would otherwise narrow the mock
-    // to those literal types and refuse every `mockResolvedValue` a spec sets.
-    oauthCheckIssuer: vi.fn(
-      (_request: OAuthRequest): Promise<IssuerCheck> =>
-        Promise.resolve({ revocable: true, scopesSupported: null, unsupportedScopes: [] }),
+    // Refuses by default, which is the ordinary repository: one that publishes no authorization
+    // server, so the panel offers the credential form. `federates` is what turns it round.
+    oauthDiscover: vi.fn(
+      (_request: OAuthRequest): Promise<OAuthDiscovery> => oauthDiscovery(),
     ),
     oauthRedirectUri: vi.fn((_request: OAuthRequest) =>
       Promise.resolve({
         redirectUri: 'https://abc.chromiumapp.org/',
         usesIdentityApi: true,
-        hasIdentityApi: true,
       }),
     ),
   } satisfies Partial<BrowserExtensionService>;
@@ -79,6 +81,23 @@ export function fakeBrowserExtension() {
     saved = { success: false, error };
   }
 
+  /**
+   * The repository publishes an authorization server, so the SSO login is the way in — the state
+   * `OAuthService.probe` reads and everything about the flow is gated on.
+   */
+  function federates(server: Partial<OAuthDiscovery> = {}): void {
+    oauthDiscovery = () =>
+      Promise.resolve({
+        discoveryUrl: 'https://repo.example/edu-sharing/.well-known/oauth-authorization-server',
+        issuer: 'https://repo.example/edu-sharing',
+        revocable: true,
+        sessionEndable: true,
+        scopesSupported: null,
+        unsupportedScopes: [],
+        ...server,
+      });
+  }
+
   /** The worker's OAuth flow ends in this token — the completed-flow case. */
   function oauthYields(accessToken: string): void {
     oauthLogin = { success: true, accessToken };
@@ -94,7 +113,7 @@ export function fakeBrowserExtension() {
     oauthSilent = { success: true, signedIn: true, accessToken };
   }
 
-  return { fake, storage, storageGet, writes, refuses, oauthYields, oauthRefuses, oauthResumes };
+  return { fake, storage, storageGet, writes, refuses, federates, oauthYields, oauthRefuses, oauthResumes };
 }
 
 export type BrowserExtensionFake = ReturnType<typeof fakeBrowserExtension>;

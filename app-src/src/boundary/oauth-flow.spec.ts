@@ -29,18 +29,17 @@ function repoRoot(): string {
 const SOURCE = readFileSync(join(repoRoot(), 'background/oauth.js'), 'utf8');
 
 /**
- * Where an authorization server that is not an OpenID Connect provider describes itself (RFC 8414).
- * Deliberately not below {@link ISSUER}: a case that names it proves the address was taken as given
- * rather than assembled from the issuer.
+ * The repository every case here signs in against, and where it publishes what it federates with
+ * (RFC 8414). The endpoints in that document are the identity provider's own and sit elsewhere
+ * entirely, which is what proves they are read rather than assembled.
  */
-const AUTHORIZATION_SERVER_METADATA = 'https://as.example/.well-known/oauth-authorization-server';
-
-/** The issuer every case here signs in against, and the endpoints its discovery document names. */
-const ISSUER = 'https://sso.example/realms/edu';
-const CLIENT_ID = 'edu-sharing-extension';
+const REPOSITORY = 'https://repo.example/edu-sharing';
+const METADATA_URL = `${REPOSITORY}/.well-known/oauth-authorization-server`;
+const CLIENT_ID = 'browser-plugin';
 const AUTHORIZATION_ENDPOINT = 'https://sso.example/realms/edu/protocol/openid-connect/auth';
 const TOKEN_ENDPOINT = 'https://sso.example/realms/edu/protocol/openid-connect/token';
 const REVOCATION_ENDPOINT = 'https://sso.example/realms/edu/protocol/openid-connect/revoke';
+const END_SESSION_ENDPOINT = 'https://sso.example/realms/edu/protocol/openid-connect/logout';
 
 /** The address Chrome's and Firefox's `identity` API hands out for this extension. */
 const IDENTITY_REDIRECT = 'https://abcdef.chromiumapp.org/';
@@ -48,12 +47,15 @@ const IDENTITY_REDIRECT = 'https://abcdef.chromiumapp.org/';
 interface OAuthModule {
   login(request: Record<string, unknown>): Promise<{ accessToken: string; refreshToken: string | null; expiresAt: number | null }>;
   refresh(request: Record<string, unknown>): Promise<{ accessToken: string } | null>;
-  logout(request: Record<string, unknown>): Promise<{ revoked: boolean }>;
+  logout(request: Record<string, unknown>): Promise<{ revoked: boolean; sessionEnded: boolean }>;
   silentSession(request: Record<string, unknown>): Promise<{ accessToken: string } | null>;
   redirectUri(request: Record<string, unknown>): string;
   hasIdentityApi(): boolean;
-  checkIssuer(request: Record<string, unknown>): Promise<{
+  metadata(request: Record<string, unknown>): Promise<{
+    discoveryUrl: string;
+    issuer: string;
     revocable: boolean;
+    sessionEndable: boolean;
     scopesSupported: string[] | null;
     unsupportedScopes: string[];
   }>;
@@ -157,12 +159,9 @@ describe('the worker`s OAuth flow', () => {
     const body = init?.body ? new URLSearchParams(init.body) : null;
     requests.push({ url, body });
 
-    // Only this issuer describes itself; any other is a host with nothing at that path, which is
-    // what the flow has to report rather than assume endpoints for.
-    if (url === `${ISSUER}/.well-known/openid-configuration`) return jsonResponse(discovery);
-    // The same fields at the address a plain OAuth authorization server describes itself under
-    // (RFC 8414), which is not below the issuer here — nothing but the address distinguishes them.
-    if (url === AUTHORIZATION_SERVER_METADATA) return jsonResponse(discovery);
+    // Only this repository describes an authorization server; any other is a host with nothing at
+    // that path, which is what the flow has to report rather than assume endpoints for.
+    if (url === METADATA_URL) return jsonResponse(discovery);
     if (url === TOKEN_ENDPOINT) {
       if (body?.get('grant_type') === 'refresh_token') {
         return jsonResponse({ access_token: 'a-renewed-token', refresh_token: 'a-rotated-refresh-token', expires_in: 300 });
@@ -182,8 +181,8 @@ describe('the worker`s OAuth flow', () => {
     };
   }
 
-  /** The parameters every case signs in with. */
-  const request = { issuer: ISSUER, clientId: CLIENT_ID };
+  /** The parameters every case signs in with — the repository, and the client the panel ships with. */
+  const request = { repositoryUrl: REPOSITORY, clientId: CLIENT_ID };
 
   beforeEach(() => {
     stored = new Map();
@@ -195,6 +194,7 @@ describe('the worker`s OAuth flow', () => {
     withoutIdentityApi = false;
     launchedOptions = null;
     discovery = {
+      issuer: 'https://sso.example/realms/edu',
       authorization_endpoint: AUTHORIZATION_ENDPOINT,
       token_endpoint: TOKEN_ENDPOINT,
       revocation_endpoint: REVOCATION_ENDPOINT,
@@ -330,52 +330,46 @@ describe('the worker`s OAuth flow', () => {
     });
   });
 
-  describe('the discovery it reads the endpoints from', () => {
-    it('asks the issuer rather than assembling the endpoints itself', async () => {
+  describe('the metadata it reads the endpoints from', () => {
+    it('asks the repository rather than assembling the endpoints itself', async () => {
       await loadModule().login(request);
 
-      expect(requests[0]?.url).toBe(`${ISSUER}/.well-known/openid-configuration`);
+      expect(requests[0]?.url).toBe(METADATA_URL);
     });
 
-    it('appends the well-known path exactly once to an issuer given with a slash', async () => {
-      await loadModule().login({ ...request, issuer: `${ISSUER}/` });
+    it('appends the well-known path exactly once to a repository given with a slash', async () => {
+      await loadModule().login({ ...request, repositoryUrl: `${REPOSITORY}/` });
 
-      expect(requests[0]?.url).toBe(`${ISSUER}/.well-known/openid-configuration`);
-    });
-
-    it('asks only once, however many flows run against the same issuer', async () => {
-      const module = loadModule();
-      await module.login(request);
-      await module.login(request);
-
-      const asked = requests.filter((sent) => sent.url.endsWith('/.well-known/openid-configuration'));
-      expect(asked).toHaveLength(1);
-    });
-
-    it('reads the document the request names instead of the one below the issuer', async () => {
-      await loadModule().login({ ...request, discoveryUrl: AUTHORIZATION_SERVER_METADATA });
-
-      expect(requests[0]?.url).toBe(AUTHORIZATION_SERVER_METADATA);
-      expect(requests.some((sent) => sent.url.endsWith('/.well-known/openid-configuration'))).toBe(false);
+      expect(requests[0]?.url).toBe(METADATA_URL);
     });
 
     it('runs the flow off that document, endpoints and all', async () => {
-      const flow = await loadModule().login({ ...request, discoveryUrl: AUTHORIZATION_SERVER_METADATA });
+      const flow = await loadModule().login(request);
 
       expect(flow.accessToken).toBe('an-access-token');
+      // The endpoints are the provider's own and sit under a different host than the repository, so
+      // nothing here could have been guessed from the base the document was fetched from.
       expect(authorizationRequest().origin + authorizationRequest().pathname).toBe(AUTHORIZATION_ENDPOINT);
     });
 
-    it('caches per document address, so a moved document is not answered from the old one', async () => {
+    it('asks only once, however many flows run against the same repository', async () => {
       const module = loadModule();
       await module.login(request);
-      await module.login({ ...request, discoveryUrl: AUTHORIZATION_SERVER_METADATA });
+      await module.login(request);
+
+      expect(requests.filter((sent) => sent.url === METADATA_URL)).toHaveLength(1);
+    });
+
+    it('caches per document address, so another repository is not answered from the first one', async () => {
+      const module = loadModule();
+      await module.login(request);
+      await module.login({ ...request, repositoryUrl: 'https://other.example/edu-sharing' }).catch(() => undefined);
 
       expect(requests.filter((sent) => sent.url.includes('/.well-known/'))).toHaveLength(2);
     });
 
-    it('still needs somewhere to look: neither an issuer nor an address is refused as such', async () => {
-      await expect(loadModule().login({ ...request, issuer: '' })).rejects.toThrow('OAUTH_NO_ISSUER');
+    it('still needs somewhere to look: no repository is refused as such', async () => {
+      await expect(loadModule().login({ ...request, repositoryUrl: '' })).rejects.toThrow('OAUTH_NO_REPOSITORY');
     });
 
     it('refuses a document without the endpoints the flow needs', async () => {
@@ -384,9 +378,9 @@ describe('the worker`s OAuth flow', () => {
       await expect(loadModule().login(request)).rejects.toThrow('OAUTH_DISCOVERY_INCOMPLETE');
     });
 
-    it('refuses an issuer whose address serves a web page rather than metadata', async () => {
-      // What a host with no discovery document actually does: 200, and HTML. Reported as the wrong
-      // kind of answer, not as a document that merely lacked endpoints.
+    it('refuses a repository whose address serves a web page rather than metadata', async () => {
+      // What a repository with no authorization server actually does: 200, and its own HTML.
+      // Reported as the wrong kind of answer, not as a document that merely lacked endpoints.
       fakeFetch.mockImplementationOnce(async () => ({
         ok: true,
         status: 200,
@@ -398,15 +392,24 @@ describe('the worker`s OAuth flow', () => {
       await expect(loadModule().login(request)).rejects.toThrow(/OAUTH_DISCOVERY_FAILED.*text\/html/);
     });
 
-    it('refuses an issuer that answers nothing', async () => {
-      await expect(loadModule().login({ ...request, issuer: 'https://nowhere.example' })).rejects.toThrow(
-        'OAUTH_DISCOVERY_FAILED',
-      );
+    it('refuses a repository that answers nothing there', async () => {
+      // The ordinary repository, and the answer the panel reads as "no SSO login here".
+      await expect(
+        loadModule().login({ ...request, repositoryUrl: 'https://plain.example/edu-sharing' }),
+      ).rejects.toThrow('OAUTH_DISCOVERY_FAILED');
     });
 
-    it('refuses to start without an issuer or without a client', async () => {
-      await expect(loadModule().login({ clientId: CLIENT_ID })).rejects.toThrow('OAUTH_NO_ISSUER');
-      await expect(loadModule().login({ issuer: ISSUER })).rejects.toThrow('OAUTH_NO_CLIENT_ID');
+    it('refuses to start without a repository or without a client', async () => {
+      await expect(loadModule().login({ clientId: CLIENT_ID })).rejects.toThrow('OAUTH_NO_REPOSITORY');
+      await expect(loadModule().login({ repositoryUrl: REPOSITORY })).rejects.toThrow('OAUTH_NO_CLIENT_ID');
+    });
+
+    it('asks for `profile` alone where the caller names no scopes', async () => {
+      // The token is traded for a repository session rather than read, so nothing else is of use —
+      // and every extra scope is one the server can refuse on a page the panel never sees.
+      await loadModule().login(request);
+
+      expect(authorizationRequest().searchParams.get('scope')).toBe('profile');
     });
   });
 
@@ -415,45 +418,63 @@ describe('the worker`s OAuth flow', () => {
     for (const listener of [...updateListeners]) listener(tabId, { url }, { url });
   }
 
-  describe('asking the issuer about itself before a flow is run', () => {
-    it('names a configured scope the issuer does not define', async () => {
-      // GitLab's shape: OIDC discovery, but no `offline_access` among its scopes. It refuses such a
-      // request on an error page of its own instead of redirecting, so the flow never learns why.
+  describe('asking the repository about its server before a flow is run', () => {
+    it('names where it asked and what the server calls itself', async () => {
+      const answer = await loadModule().metadata(request);
+
+      expect(answer.discoveryUrl).toBe(METADATA_URL);
+      // The document's own `issuer`, which is the provider rather than the repository it is
+      // published under — the two are different things and the panel shows both.
+      expect(answer.issuer).toBe('https://sso.example/realms/edu');
+    });
+
+    it('falls back to the repository where the document names no issuer', async () => {
+      delete discovery['issuer'];
+
+      expect((await loadModule().metadata(request)).issuer).toBe(REPOSITORY);
+    });
+
+    it('names a requested scope the server does not define', async () => {
+      // The shape a Doorkeeper-based server has: metadata, but no `offline_access` among its scopes.
+      // It refuses such a request on an error page of its own instead of redirecting, so the flow
+      // never learns why.
       discovery['scopes_supported'] = ['openid', 'profile', 'email', 'api'];
 
-      const answer = await loadModule().checkIssuer({ ...request, scopes: 'openid profile email offline_access' });
+      const answer = await loadModule().metadata({ ...request, scopes: 'profile offline_access' });
 
       expect(answer.unsupportedScopes).toEqual(['offline_access']);
     });
 
-    it('names nothing where every configured scope is defined', async () => {
-      discovery['scopes_supported'] = ['openid', 'profile', 'email', 'offline_access'];
+    it('names nothing where every requested scope is defined', async () => {
+      discovery['scopes_supported'] = ['openid', 'profile', 'email'];
 
-      const answer = await loadModule().checkIssuer({ ...request, scopes: 'openid profile email offline_access' });
+      const answer = await loadModule().metadata({ ...request, scopes: 'profile' });
 
       expect(answer.unsupportedScopes).toEqual([]);
-      expect(answer.scopesSupported).toEqual(['openid', 'profile', 'email', 'offline_access']);
+      expect(answer.scopesSupported).toEqual(['openid', 'profile', 'email']);
     });
 
-    it('claims nothing about scopes where the issuer lists none', async () => {
-      // `scopes_supported` is optional. Absent means the issuer does not say, which is not a licence
+    it('claims nothing about scopes where the server lists none', async () => {
+      // `scopes_supported` is optional. Absent means the server does not say, which is not a licence
       // to call every scope wrong — the caller distinguishes the two by `scopesSupported`.
-      const answer = await loadModule().checkIssuer({ ...request, scopes: 'openid made_up' });
+      const answer = await loadModule().metadata({ ...request, scopes: 'profile made_up' });
 
       expect(answer.scopesSupported).toBeNull();
       expect(answer.unsupportedScopes).toEqual([]);
     });
 
-    it('reports whether the issuer can revoke, so logout can say what it does', async () => {
-      expect((await loadModule().checkIssuer(request)).revocable).toBe(true);
+    it('reports what logging out will be able to do, so the panel can say it', async () => {
+      discovery['end_session_endpoint'] = END_SESSION_ENDPOINT;
+      expect(await loadModule().metadata(request)).toMatchObject({ revocable: true, sessionEndable: true });
 
       delete discovery['revocation_endpoint'];
-      expect((await loadModule().checkIssuer(request)).revocable).toBe(false);
+      delete discovery['end_session_endpoint'];
+      expect(await loadModule().metadata(request)).toMatchObject({ revocable: false, sessionEndable: false });
     });
 
-    it('fails the way a login would where the issuer cannot be reached', async () => {
+    it('fails the way a login would where the repository publishes nothing', async () => {
       await expect(
-        loadModule().checkIssuer({ ...request, issuer: 'https://nowhere.example' }),
+        loadModule().metadata({ ...request, repositoryUrl: 'https://plain.example/edu-sharing' }),
       ).rejects.toThrow('OAUTH_DISCOVERY_FAILED');
     });
   });
@@ -471,18 +492,9 @@ describe('the worker`s OAuth flow', () => {
       const module = loadModule();
 
       expect(module.hasIdentityApi()).toBe(false);
-      expect(module.redirectUri({ repositoryUrl: 'https://repo.example/edu-sharing/' })).toBe(
-        'https://repo.example/edu-sharing/oauth/extension-callback',
+      expect(module.redirectUri({ repositoryUrl: `${REPOSITORY}/` })).toBe(
+        `${REPOSITORY}/oauth/extension-callback`,
       );
-    });
-
-    it('prefers a configured one over either', () => {
-      expect(
-        loadModule().redirectUri({
-          configuredRedirectUri: 'https://repo.example/callback',
-          repositoryUrl: 'https://repo.example/edu-sharing',
-        }),
-      ).toBe('https://repo.example/callback');
     });
 
     it('has none to offer without an `identity` API and without a repository', () => {
@@ -491,21 +503,13 @@ describe('the worker`s OAuth flow', () => {
       expect(() => loadModule().redirectUri({})).toThrow('OAUTH_NO_REDIRECT_URI');
     });
 
-    it('takes the watched-tab path for a configured address, even with an `identity` API', async () => {
+    it('takes the watched-tab path for any address but the one the browser handed out', () => {
       const module = loadModule();
-      // Chrome's launchWebAuthFlow only ever completes on the address it handed out, so a configured
-      // one has to be watched for instead — otherwise the flow hangs until the window is closed.
+      // Chrome's launchWebAuthFlow only ever completes on the address it handed out, so anything
+      // else has to be watched for instead — otherwise the flow hangs until the window is closed.
       expect(module.hasIdentityApi()).toBe(true);
-      expect(module.usesIdentityApi('https://repo.example/callback')).toBe(false);
+      expect(module.usesIdentityApi(`${REPOSITORY}/oauth/extension-callback`)).toBe(false);
       expect(module.usesIdentityApi(IDENTITY_REDIRECT)).toBe(true);
-
-      const flow = module.login({ ...request, configuredRedirectUri: 'https://repo.example/callback' });
-      await vi.waitUntil(() => createdTabs.length > 0);
-
-      const state = new URL(createdTabs[0].url).searchParams.get('state');
-      navigate(createdTabs[0].id, `https://repo.example/callback?code=an-auth-code&state=${state}`);
-
-      expect((await flow).accessToken).toBe('an-access-token');
     });
 
     it('hands `launchWebAuthFlow` nothing outside the schema Chrome accepts', async () => {
@@ -540,13 +544,13 @@ describe('the worker`s OAuth flow', () => {
 
     it('opens the provider in a tab and resolves on the redirect, then closes it', async () => {
       const module = loadModule();
-      const flow = module.login({ ...request, repositoryUrl: 'https://repo.example/edu-sharing' });
+      const flow = module.login(request);
       await vi.waitUntil(() => createdTabs.length > 0);
 
       const state = new URL(createdTabs[0].url).searchParams.get('state');
       navigate(
         createdTabs[0].id,
-        `https://repo.example/edu-sharing/oauth/extension-callback?code=an-auth-code&state=${state}`,
+        `${REPOSITORY}/oauth/extension-callback?code=an-auth-code&state=${state}`,
       );
 
       expect((await flow).accessToken).toBe('an-access-token');
@@ -556,7 +560,7 @@ describe('the worker`s OAuth flow', () => {
 
     it('ignores navigations of the tab to anything but the redirect address', async () => {
       const module = loadModule();
-      const flow = module.login({ ...request, repositoryUrl: 'https://repo.example/edu-sharing' });
+      const flow = module.login(request);
       await vi.waitUntil(() => createdTabs.length > 0);
 
       // The provider's own pages: a login form, a consent screen, a federated hop.
@@ -566,30 +570,30 @@ describe('the worker`s OAuth flow', () => {
       const state = new URL(createdTabs[0].url).searchParams.get('state');
       navigate(
         createdTabs[0].id,
-        `https://repo.example/edu-sharing/oauth/extension-callback?code=an-auth-code&state=${state}`,
+        `${REPOSITORY}/oauth/extension-callback?code=an-auth-code&state=${state}`,
       );
       await flow;
     });
 
     it('ignores another tab navigating to the same address', async () => {
       const module = loadModule();
-      const flow = module.login({ ...request, repositoryUrl: 'https://repo.example/edu-sharing' });
+      const flow = module.login(request);
       await vi.waitUntil(() => createdTabs.length > 0);
 
-      navigate(createdTabs[0].id + 99, 'https://repo.example/edu-sharing/oauth/extension-callback?code=foreign');
+      navigate(createdTabs[0].id + 99, `${REPOSITORY}/oauth/extension-callback?code=foreign`);
       expect(removedTabs).toHaveLength(0);
 
       const state = new URL(createdTabs[0].url).searchParams.get('state');
       navigate(
         createdTabs[0].id,
-        `https://repo.example/edu-sharing/oauth/extension-callback?code=an-auth-code&state=${state}`,
+        `${REPOSITORY}/oauth/extension-callback?code=an-auth-code&state=${state}`,
       );
       await flow;
     });
 
     it('reads the user closing the tab as a cancellation', async () => {
       const module = loadModule();
-      const flow = module.login({ ...request, repositoryUrl: 'https://repo.example/edu-sharing' });
+      const flow = module.login(request);
       await vi.waitUntil(() => createdTabs.length > 0);
 
       for (const listener of [...removeListeners]) listener(createdTabs[0].id);
@@ -632,11 +636,11 @@ describe('the worker`s OAuth flow', () => {
       expect((stored.get(module.TOKEN_STORAGE_KEY) as { refreshToken: string }).refreshToken).toBe('a-refresh-token');
     });
 
-    it('discards a stored session belonging to another client', async () => {
+    it('discards a stored session obtained against another repository', async () => {
       const module = loadModule();
       await module.login(request);
 
-      expect(await module.refresh({ issuer: 'https://other.example/realms/edu', clientId: CLIENT_ID })).toBeNull();
+      expect(await module.refresh({ repositoryUrl: 'https://other.example/edu-sharing', clientId: CLIENT_ID })).toBeNull();
       expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
     });
 
@@ -658,12 +662,12 @@ describe('the worker`s OAuth flow', () => {
       expect(requests).toHaveLength(before);
     });
 
-    it('does not hand out a still-valid token from a provider the settings moved away from', async () => {
+    it('does not hand out a still-valid token from a repository the panel has left', async () => {
       const module = loadModule();
       await module.login(request);
 
       // The fast path skips the refresh, so it has to make the same ownership check the refresh does.
-      expect(await module.silentSession({ issuer: 'https://other.example/realms/edu', clientId: CLIENT_ID })).toBeNull();
+      expect(await module.silentSession({ repositoryUrl: 'https://other.example/edu-sharing', clientId: CLIENT_ID })).toBeNull();
       expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
     });
 
@@ -682,7 +686,7 @@ describe('the worker`s OAuth flow', () => {
       const module = loadModule();
       await module.login(request);
 
-      expect(await module.logout(request)).toEqual({ revoked: true });
+      expect(await module.logout(request)).toEqual({ revoked: true, sessionEnded: false });
 
       expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
       const revoked = requests.find((sent) => sent.url === REVOCATION_ENDPOINT);
@@ -696,7 +700,7 @@ describe('the worker`s OAuth flow', () => {
       // What RFC 7009 §2.2 prescribes and Keycloak sends: 200 and an empty body.
       fakeFetch.mockImplementationOnce(async () => ({ ok: true, status: 200, statusText: '200', text: async () => '' }));
 
-      expect(await module.logout(request)).toEqual({ revoked: true });
+      expect(await module.logout(request)).toMatchObject({ revoked: true });
     });
 
     it('drops it even where the provider cannot be told', async () => {
@@ -704,22 +708,115 @@ describe('the worker`s OAuth flow', () => {
       await module.login(request);
       fakeFetch.mockImplementationOnce(async () => jsonResponse({ error: 'server_error' }, 500));
 
-      expect(await module.logout(request)).toEqual({ revoked: false });
+      expect(await module.logout(request)).toMatchObject({ revoked: false });
       // Whether the provider could be told is not allowed to decide whether a credential is still held.
       expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
     });
 
-    it('drops it where the issuer has no revocation endpoint at all', async () => {
+    it('drops it where the server has no revocation endpoint at all', async () => {
       delete discovery['revocation_endpoint'];
       const module = loadModule();
       await module.login(request);
 
-      expect(await module.logout(request)).toEqual({ revoked: false });
+      expect(await module.logout(request)).toEqual({ revoked: false, sessionEnded: false });
       expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
     });
 
     it('has nothing to do where nobody is signed in', async () => {
-      expect(await loadModule().logout(request)).toEqual({ revoked: false });
+      expect(await loadModule().logout(request)).toEqual({ revoked: false, sessionEnded: false });
+    });
+
+    describe('ending the provider`s own session, where the metadata names a way to', () => {
+      beforeEach(() => {
+        discovery['end_session_endpoint'] = END_SESSION_ENDPOINT;
+      });
+
+      it('drives that address through the browser, so the provider`s cookie goes with the token', async () => {
+        // Without this the provider answers the next authorization request straight from its cookie:
+        // a logout after which the same user is silently signed back in.
+        const launched: Record<string, unknown>[] = [];
+        launchedOptions = launched;
+        const module = loadModule();
+        await module.login(request);
+
+        expect(await module.logout(request)).toEqual({ revoked: true, sessionEnded: true });
+
+        const logoutCall = launched.find((options) => String(options['url']).startsWith(END_SESSION_ENDPOINT));
+        expect(logoutCall?.['interactive']).toBe(false);
+        expect(new URL(String(logoutCall?.['url'])).searchParams.get('client_id')).toBe(CLIENT_ID);
+      });
+
+      it('names the session to end by id token, where the scopes yielded one', async () => {
+        const launched: Record<string, unknown>[] = [];
+        launchedOptions = launched;
+        const module = loadModule();
+        fakeFetch.mockImplementationOnce(async () => jsonResponse(discovery));
+        fakeFetch.mockImplementationOnce(async () =>
+          jsonResponse({ access_token: 'an-access-token', id_token: 'an-id-token', expires_in: 300 }),
+        );
+        await module.login(request);
+
+        await module.logout(request);
+
+        const logoutCall = launched.find((options) => String(options['url']).startsWith(END_SESSION_ENDPOINT));
+        expect(new URL(String(logoutCall?.['url'])).searchParams.get('id_token_hint')).toBe('an-id-token');
+      });
+
+      it('sends no post-logout address, which only a registered one could be', async () => {
+        // An unregistered `post_logout_redirect_uri` turns the logout into the provider`s error page,
+        // and the address the browser hands this extension is not registered anywhere.
+        const launched: Record<string, unknown>[] = [];
+        launchedOptions = launched;
+        const module = loadModule();
+        await module.login(request);
+
+        await module.logout(request);
+
+        const logoutCall = launched.find((options) => String(options['url']).startsWith(END_SESSION_ENDPOINT));
+        expect(new URL(String(logoutCall?.['url'])).searchParams.get('post_logout_redirect_uri')).toBeNull();
+      });
+
+      it('counts it as done although nothing redirects back — there is nothing to wait for', async () => {
+        const module = loadModule();
+        await module.login(request);
+        // What Chrome answers a non-interactive flow that lands on a page instead of a redirect. The
+        // logout has been performed by then, and neither browser reports more than this.
+        redirectedTo = () => {
+          throw new Error('user interaction required');
+        };
+
+        expect(await module.logout(request)).toMatchObject({ sessionEnded: true });
+      });
+
+      it('opens a background tab where there is no `identity` API — Safari', async () => {
+        withoutIdentityApi = true;
+        const module = loadModule();
+        stored.set(module.TOKEN_STORAGE_KEY, {
+          accessToken: 'an-access-token',
+          refreshToken: 'a-refresh-token',
+          repository: REPOSITORY,
+          clientId: CLIENT_ID,
+        });
+
+        expect(await module.logout(request)).toMatchObject({ sessionEnded: true });
+
+        const opened = createdTabs.find((tab) => tab.url.startsWith(END_SESSION_ENDPOINT));
+        expect(opened).toBeDefined();
+      });
+
+      it('ends the session for a token the scopes left without a refresh token', async () => {
+        // The default scopes ask for none, so this is the ordinary case: there is nothing to revoke
+        // and the provider's session is all that is left to drop.
+        const module = loadModule();
+        stored.set(module.TOKEN_STORAGE_KEY, {
+          accessToken: 'an-access-token',
+          repository: REPOSITORY,
+          clientId: CLIENT_ID,
+        });
+
+        expect(await module.logout(request)).toEqual({ revoked: false, sessionEnded: true });
+        expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
+      });
     });
   });
 });

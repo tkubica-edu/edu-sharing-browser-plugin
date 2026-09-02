@@ -559,25 +559,21 @@ const ALLOWED_ACTIONS = new Set([
   'oauth.silent',
   'oauth.logout',
   'oauth.redirectUri',
-  'oauth.checkIssuer'
+  'oauth.discover'
 ]);
 
 /**
- * The OAuth parameters a message carries, as the flow takes them. Which issuer and client the panel
- * signs in against is configured in the sidebar's settings, so every message names them; the
- * repository base comes along because it is what the redirect address falls back to where the
- * browser has no `identity` API of its own to provide one.
+ * The OAuth parameters a message carries, as the flow takes them. The repository base is the one
+ * that matters: the authorization server is discovered below it, and it is also what the redirect
+ * address falls back to where the browser has no `identity` API of its own to provide one. The
+ * client and the scopes are the panel's shipped constants (`APP_CONFIG.oauth`), stated per message
+ * rather than kept here so the two sides cannot fall out of step.
  */
 function oauthParamsOf(message) {
   return {
-    issuer: message.issuer,
-    // Where the provider describes itself, for one that does not serve the OpenID Connect path
-    // below its issuer — see `discoveryUrlOf` in background/oauth.js.
-    discoveryUrl: message.discoveryUrl,
+    repositoryUrl: message.repositoryUrl,
     clientId: message.clientId,
     scopes: message.scopes,
-    configuredRedirectUri: message.redirectUri,
-    repositoryUrl: message.repositoryUrl,
     registrationId: message.registrationId,
     loginHint: message.loginHint
   };
@@ -693,23 +689,23 @@ browser.runtime.onMessage.addListener((message, sender) => {
           return { success: true, ...(await EDU_SHARING_OAUTH.logout(oauthParamsOf(message))) };
         }
 
-        // What has to be registered with the client at the IdP. Only this worker can say it: with the
-        // `identity` API it is a per-extension address the browser makes up (see oauth.js).
-        // What the issuer says about itself, asked before any flow is run — see oauth.js.
-        case 'oauth.checkIssuer': {
-          return { success: true, ...(await EDU_SHARING_OAUTH.checkIssuer(oauthParamsOf(message))) };
+        // What the repository says about its authorization server, asked before any flow is run: it
+        // is what decides whether the panel offers the SSO login at all — see oauth.js.
+        case 'oauth.discover': {
+          return { success: true, ...(await EDU_SHARING_OAUTH.metadata(oauthParamsOf(message))) };
         }
 
+        // What has to be registered with the client at the IdP. Only this worker can say it: with the
+        // `identity` API it is a per-extension address the browser makes up (see oauth.js).
         case 'oauth.redirectUri': {
           const resolved = EDU_SHARING_OAUTH.redirectUri(oauthParamsOf(message));
           return {
             success: true,
             redirectUri: resolved,
-            // Two separate facts, because three states have to be told apart: a configured address
-            // (watched tab, in every browser), a browser without the API (watched tab, Safari), and
-            // the browser's own address (its API). See oauth.js.
-            usesIdentityApi: EDU_SHARING_OAUTH.usesIdentityApi(resolved),
-            hasIdentityApi: EDU_SHARING_OAUTH.hasIdentityApi()
+            // Which of the two it is, because they register differently: an address the browser
+            // handed out itself (its `identity` API) or the repository path Safari is watched for
+            // on. See oauth.js.
+            usesIdentityApi: EDU_SHARING_OAUTH.usesIdentityApi(resolved)
           };
         }
 

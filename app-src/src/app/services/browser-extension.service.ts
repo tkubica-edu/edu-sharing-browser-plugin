@@ -102,25 +102,17 @@ export interface SaveNodeResponse {
 }
 
 /**
- * Which OAuth client the worker is to run the flow against. The panel holds the configuration (see
- * OAuthService), so every message states it in full rather than the worker keeping a copy that could
- * fall behind the settings.
+ * What the worker is to run the flow against. The repository is the whole of it: the authorization
+ * server is discovered below that base, and the redirect address falls back to a path on it where
+ * the browser provides none. The client and the scopes are the panel's shipped constants, stated
+ * here rather than kept in the worker so the two sides cannot fall out of step.
  */
 export interface OAuthRequest {
-  issuer: string;
-  /**
-   * The address of the provider's discovery document, where it is not the OpenID Connect one below
-   * the issuer — a plain OAuth authorization server describes itself at
-   * `/.well-known/oauth-authorization-server` instead. Empty leaves the issuer's own path standing.
-   */
-  discoveryUrl: string;
+  /** The repository base the panel is pointed at (`…/edu-sharing`). */
+  repositoryUrl: string;
   clientId: string;
   scopes: string;
-  /** The address to redirect back to, where it is configured; empty leaves the choice to the browser. */
-  redirectUri: string;
-  /** The repository base, which is what the redirect address falls back to without an `identity` API. */
-  repositoryUrl: string;
-  /** Which identity provider behind the issuer to go straight to — see `OAuthProvider.registrationId`. */
+  /** Which identity provider behind the server to go straight to — see `OAuthProvider.registrationId`. */
   registrationId?: string;
 }
 
@@ -138,26 +130,32 @@ export interface OAuthSession {
 }
 
 /**
- * The redirect address the flow will use, and how it will be watched for. The two flags are separate
- * because three cases read differently to whoever has to register the address: an address configured
- * here (watched for in every browser), a browser with no `identity` API (watched for as well), and
- * the address the browser's own API handed out.
+ * The redirect address the flow will use, and how it will be watched for. The two read differently
+ * to whoever has to register the address: one the browser's own API handed out (a different one per
+ * browser and per installation), or the repository path a browser without that API is watched for on
+ * instead — false only on Safari.
  */
 export interface RedirectUriInUse {
   readonly redirectUri: string;
   /** Whether `launchWebAuthFlow` is what will show the provider's pages for this address. */
   readonly usesIdentityApi: boolean;
-  /** Whether the browser has the API at all — false only on Safari. */
-  readonly hasIdentityApi: boolean;
 }
 
 /**
- * What the issuer says about itself, asked before a flow is run. `unsupportedScopes` is empty both
- * for scopes that are all fine and for an issuer that lists none of its own — `scopesSupported` is
- * what tells those apart.
+ * What the repository says about its authorization server, asked before a flow is run — and whether
+ * it says anything at all, which is what decides whether the SSO login is offered.
+ *
+ * `unsupportedScopes` is empty both for scopes that are all fine and for a server that lists none of
+ * its own; `scopesSupported` is what tells those apart.
  */
-export interface IssuerCheck {
+export interface OAuthDiscovery {
+  /** The document that was read, as the worker assembled its address. */
+  readonly discoveryUrl: string;
+  /** What the server calls itself, which need not be the repository it is published under. */
+  readonly issuer: string;
   readonly revocable: boolean;
+  /** Whether it names an endpoint for ending its own session — see `endSessionAt` in `oauth.js`. */
+  readonly sessionEndable: boolean;
   readonly scopesSupported: readonly string[] | null;
   readonly unsupportedScopes: readonly string[];
 }
@@ -323,21 +321,31 @@ export class BrowserExtensionService {
   }
 
   /**
-   * Ask the worker what the configured issuer says about itself. Rejects with the flow's own codes
-   * where the issuer cannot be reached or describes no endpoints, so the caller can report the same
-   * sentences a failed login would.
+   * Ask the worker what the repository says about its authorization server. Rejects with the flow's
+   * own codes where the document cannot be read or describes no endpoints — which is the ordinary
+   * answer for a repository that federates against nothing, and what leaves the SSO login unoffered.
    */
-  async oauthCheckIssuer(request: OAuthRequest): Promise<IssuerCheck> {
-    const answer = await this.ask<IssuerCheck & { success: boolean; error?: string }>({
-      action: 'oauth.checkIssuer',
+  async oauthDiscover(request: OAuthRequest): Promise<OAuthDiscovery> {
+    const answer = await this.ask<OAuthDiscovery & { success: boolean; error?: string }>({
+      action: 'oauth.discover',
       ...request,
     });
     if (answer === UNREACHABLE) throw new Error(WORKER_UNREACHABLE);
     if (!answer?.success) throw new Error(answer?.error || 'NO_RESPONSE');
-    return { revocable: answer.revocable, scopesSupported: answer.scopesSupported, unsupportedScopes: answer.unsupportedScopes };
+    return {
+      discoveryUrl: answer.discoveryUrl,
+      issuer: answer.issuer,
+      revocable: answer.revocable,
+      sessionEndable: answer.sessionEndable,
+      scopesSupported: answer.scopesSupported,
+      unsupportedScopes: answer.unsupportedScopes,
+    };
   }
 
-  /** Drop the worker's OAuth session and have the issuer revoke the refresh token where it can. */
+  /**
+   * Drop the worker's OAuth session: the stored tokens, the token's validity at the server where it
+   * can be revoked, and the provider's own session where it names a way to end one.
+   */
   oauthLogout(request: OAuthRequest): Promise<OAuthSession> {
     return this.askOAuth('oauth.logout', request);
   }
@@ -352,14 +360,9 @@ export class BrowserExtensionService {
       success?: boolean;
       redirectUri?: string;
       usesIdentityApi?: boolean;
-      hasIdentityApi?: boolean;
     }>({ action: 'oauth.redirectUri', ...request });
     if (!answer?.success || !answer.redirectUri) return null;
-    return {
-      redirectUri: answer.redirectUri,
-      usesIdentityApi: answer.usesIdentityApi === true,
-      hasIdentityApi: answer.hasIdentityApi === true,
-    };
+    return { redirectUri: answer.redirectUri, usesIdentityApi: answer.usesIdentityApi === true };
   }
 
   /**

@@ -7,7 +7,7 @@ import { OAuthService } from './oauth.service';
 import { provideFake } from '../../testing/provide-fake';
 import { BrowserExtensionFake, fakeBrowserExtension } from '../../testing/fakes';
 
-/** The repository the flow's redirect address falls back to where the browser provides none. */
+/** The repository the flow is discovered below and whose session the token is traded for. */
 const REPOSITORY_URL = 'https://repo.example/edu-sharing';
 
 describe('OAuthService', () => {
@@ -22,68 +22,86 @@ describe('OAuthService', () => {
     oauth = TestBed.inject(OAuthService);
   });
 
-  /** A configured client, as a previous session's settings would have left it. */
-  async function configure(
-    issuer = 'https://sso.example/realms/edu',
-    clientId = 'edu-sharing-extension',
-  ): Promise<void> {
-    extension.storage.set(APP_CONFIG.storageKeys.oauthIssuer, issuer);
-    extension.storage.set(APP_CONFIG.storageKeys.oauthClientId, clientId);
-    await oauth.load();
+  /** A repository that publishes an authorization server, as the probe finds it. */
+  async function federating(server: Parameters<BrowserExtensionFake['federates']>[0] = {}): Promise<void> {
+    extension.federates(server);
+    await oauth.probe(REPOSITORY_URL);
   }
 
-  describe('whether the alternative is offered at all', () => {
-    it('is not, with nothing configured', async () => {
-      await oauth.load();
-
-      expect(oauth.configured()).toBe(false);
+  describe('whether the SSO login is offered at all', () => {
+    it('is not, before the repository has been asked', () => {
+      // Nothing is claimed about a repository that has not answered: the SSO login is a fact about
+      // it, and until then the panel behaves as if there were none.
+      expect(oauth.available()).toBe(false);
+      expect(oauth.availability()).toEqual({ kind: 'unknown' });
     });
 
-    it('is not on an issuer alone — there is no client to name the extension by', async () => {
-      extension.storage.set(APP_CONFIG.storageKeys.oauthIssuer, 'https://sso.example/realms/edu');
-      await oauth.load();
+    it('is not, where the repository publishes no authorization server', async () => {
+      await oauth.probe(REPOSITORY_URL);
 
-      expect(oauth.configured()).toBe(false);
+      expect(oauth.available()).toBe(false);
+      // The ordinary repository, and no error: it says so in the words a failed login would use.
+      expect(oauth.availability()).toEqual({
+        kind: 'unavailable',
+        discoveryUrl: `${REPOSITORY_URL}/.well-known/oauth-authorization-server`,
+        error: expect.stringContaining('OAuth-Konfiguration'),
+      });
     });
 
-    it('is, once both halves of a client are there', async () => {
-      await configure();
+    it('is, where it publishes one', async () => {
+      await federating();
 
-      expect(oauth.configured()).toBe(true);
-    });
-  });
-
-  describe('the configured client', () => {
-    it('falls back to what the panel ships with for the fields left empty', async () => {
-      await configure();
-
-      expect(oauth.scopes()).toBe(APP_CONFIG.oauth.scopes);
-      // Empty is not a value here: it is what leaves the redirect address to the browser.
-      expect(oauth.redirectUri()).toBe('');
+      expect(oauth.available()).toBe(true);
+      expect(oauth.availability().kind).toBe('available');
     });
 
-    it('persists a changed field and reports it as changed', async () => {
-      await configure();
-      await oauth.setScopes('  openid profile  ');
+    it('asks below the repository, as the panel`s shipped client', async () => {
+      await federating();
 
-      expect(oauth.scopes()).toBe('openid profile');
-      expect(extension.storage.get(APP_CONFIG.storageKeys.oauthScopes)).toBe('openid profile');
-      // The issuer, the client and the scopes — the redirect address is still the browser's to pick.
-      expect(oauth.changedSettings()).toBe(3);
+      expect(extension.fake.oauthDiscover).toHaveBeenCalledWith({
+        repositoryUrl: REPOSITORY_URL,
+        clientId: APP_CONFIG.oauth.clientId,
+        scopes: APP_CONFIG.oauth.scopes,
+        registrationId: undefined,
+      });
     });
 
-    it('puts the shipped scopes back in force for an emptied field', async () => {
-      await configure();
-      await oauth.setScopes('openid');
-      await oauth.setScopes('   ');
+    it('keeps what the server said about itself, for the settings to report', async () => {
+      await federating({ issuer: 'https://sso.example/realms/edu', revocable: false, sessionEndable: true });
 
-      expect(oauth.scopes()).toBe(APP_CONFIG.oauth.scopes);
+      const answer = oauth.availability();
+      expect(answer.kind === 'available' && answer.server.issuer).toBe('https://sso.example/realms/edu');
+      expect(answer.kind === 'available' && answer.server.sessionEndable).toBe(true);
+      expect(answer.kind === 'available' && answer.server.revocable).toBe(false);
+    });
+
+    it('reports it as running while the repository is being asked', async () => {
+      let release = (_answer: never) => undefined as void;
+      extension.fake.oauthDiscover.mockImplementation(() => new Promise((_resolve, reject) => (release = reject)));
+
+      const probe = oauth.probe(REPOSITORY_URL);
+      expect(oauth.probing()).toBe(true);
+
+      release(new Error('OAUTH_DISCOVERY_FAILED: 404') as never);
+      await probe;
+      expect(oauth.probing()).toBe(false);
+    });
+
+    it('answers for the repository it was asked about, and no other', async () => {
+      await federating();
+
+      // The panel is pointed elsewhere, and that repository says nothing: the SSO login goes with it
+      // rather than staying on from the previous answer.
+      extension.fake.oauthDiscover.mockRejectedValue(new Error('OAUTH_DISCOVERY_FAILED: 404'));
+      await oauth.probe('https://other.example/edu-sharing');
+
+      expect(oauth.available()).toBe(false);
     });
   });
 
   describe('the interactive flow', () => {
-    it('refuses to start without a configured client, and asks nothing of the worker', async () => {
-      await oauth.load();
+    it('refuses to start where the repository federates against nothing, and asks nothing of the worker', async () => {
+      await oauth.probe(REPOSITORY_URL);
 
       const outcome = await oauth.login(REPOSITORY_URL);
 
@@ -91,45 +109,22 @@ describe('OAuthService', () => {
       expect(extension.fake.oauthLogin).not.toHaveBeenCalled();
     });
 
-    it('states the whole client and the repository in what it asks the worker for', async () => {
-      await configure();
+    it('states the repository, the client and the picked provider in what it asks the worker for', async () => {
+      await federating();
       extension.oauthYields('an-access-token');
 
       await oauth.login(REPOSITORY_URL, { label: 'Uni-Login', registrationId: 'uni' });
 
       expect(extension.fake.oauthLogin).toHaveBeenCalledWith({
-        issuer: 'https://sso.example/realms/edu',
-        discoveryUrl: '',
-        clientId: 'edu-sharing-extension',
-        scopes: APP_CONFIG.oauth.scopes,
-        redirectUri: '',
         repositoryUrl: REPOSITORY_URL,
+        clientId: APP_CONFIG.oauth.clientId,
+        scopes: APP_CONFIG.oauth.scopes,
         registrationId: 'uni',
       });
     });
 
-    it('states the discovery address the settings name, so the worker fetches that document', async () => {
-      // An authorization server that describes itself under the RFC 8414 path rather than the OpenID
-      // Connect one: the issuer stays what it is, only the document moves.
-      extension.storage.set(
-        APP_CONFIG.storageKeys.oauthDiscoveryUrl,
-        'https://sso.example/.well-known/oauth-authorization-server',
-      );
-      await configure();
-      extension.oauthYields('an-access-token');
-
-      await oauth.login(REPOSITORY_URL);
-
-      expect(extension.fake.oauthLogin).toHaveBeenCalledWith(
-        expect.objectContaining({
-          issuer: 'https://sso.example/realms/edu',
-          discoveryUrl: 'https://sso.example/.well-known/oauth-authorization-server',
-        }),
-      );
-    });
-
     it('answers with the token a completed flow produced', async () => {
-      await configure();
+      await federating();
       extension.oauthYields('an-access-token');
 
       expect(await oauth.login(REPOSITORY_URL)).toEqual({
@@ -139,32 +134,31 @@ describe('OAuthService', () => {
     });
 
     it('reads a flow nobody completed as cancelled rather than as a failure', async () => {
-      await configure();
+      await federating();
       extension.oauthRefuses('OAUTH_CANCELLED');
 
       expect(await oauth.login(REPOSITORY_URL)).toEqual({ kind: 'cancelled' });
     });
 
     it('reads the timeout the same way — nobody answered, and nothing failed', async () => {
-      await configure();
+      await federating();
       extension.oauthRefuses('OAUTH_TIMEOUT');
 
       expect(await oauth.login(REPOSITORY_URL)).toEqual({ kind: 'cancelled' });
     });
 
     it('says which step refused, rather than showing the worker`s code', async () => {
-      await configure();
+      await federating();
       extension.oauthRefuses('OAUTH_DISCOVERY_FAILED: 404 Not Found');
 
       const outcome = await oauth.login(REPOSITORY_URL);
 
       expect(outcome.kind).toBe('failed');
-      expect(outcome.kind === 'failed' && outcome.error).toContain('Issuer-URL');
       expect(outcome.kind === 'failed' && outcome.error).not.toContain('OAUTH_');
     });
 
     it('passes an unrecognised refusal through rather than swallowing it', async () => {
-      await configure();
+      await federating();
       extension.oauthRefuses('the worker exploded');
 
       const outcome = await oauth.login(REPOSITORY_URL);
@@ -173,7 +167,7 @@ describe('OAuthService', () => {
     });
 
     it('reports it as running while the identity provider`s pages are up', async () => {
-      await configure();
+      await federating();
       let release = (_session: { success: boolean; accessToken?: string }) => undefined as void;
       extension.fake.oauthLogin.mockImplementation(
         () => new Promise((resolve) => (release = resolve)),
@@ -188,7 +182,7 @@ describe('OAuthService', () => {
     });
 
     it('opens no second window for a second attempt made while the first is up', async () => {
-      await configure();
+      await federating();
       extension.fake.oauthLogin.mockImplementation(() => new Promise(() => undefined));
 
       void oauth.login(REPOSITORY_URL);
@@ -200,103 +194,37 @@ describe('OAuthService', () => {
   });
 
   describe('the silent renewal', () => {
-    it('asks nothing without a configured client', async () => {
-      await oauth.load();
+    it('asks nothing where the repository federates against nothing', async () => {
+      await oauth.probe(REPOSITORY_URL);
 
       expect(await oauth.silentAccessToken(REPOSITORY_URL)).toBeNull();
       expect(extension.fake.oauthSilent).not.toHaveBeenCalled();
     });
 
     it('answers null where nobody is signed in', async () => {
-      await configure();
+      await federating();
 
       expect(await oauth.silentAccessToken(REPOSITORY_URL)).toBeNull();
     });
 
     it('answers with the token the stored session yielded', async () => {
-      await configure();
+      await federating();
       extension.oauthResumes('a-renewed-token');
 
       expect(await oauth.silentAccessToken(REPOSITORY_URL)).toBe('a-renewed-token');
     });
 
     it('answers null rather than throwing where the worker is unreachable', async () => {
-      await configure();
+      await federating();
       extension.fake.oauthSilent.mockRejectedValue(new Error('WORKER_UNREACHABLE'));
 
       expect(await oauth.silentAccessToken(REPOSITORY_URL)).toBeNull();
     });
   });
 
-  describe('checking the issuer', () => {
-    it('asks nothing without a configured client, and says why', async () => {
-      await oauth.load();
-
-      const result = await oauth.check(REPOSITORY_URL);
-
-      expect(result.kind).toBe('failed');
-      expect(extension.fake.oauthCheckIssuer).not.toHaveBeenCalled();
-    });
-
-    it('reports an unsupported scope ahead of everything else about the issuer', async () => {
-      await configure();
-      extension.fake.oauthCheckIssuer.mockResolvedValue({
-        revocable: true,
-        scopesSupported: ['openid', 'profile', 'email'],
-        unsupportedScopes: ['offline_access'],
-      });
-
-      // The one answer that means the flow cannot work, so it outranks a reachable issuer.
-      expect(await oauth.check(REPOSITORY_URL)).toEqual({
-        kind: 'scopes',
-        unsupported: ['offline_access'],
-      });
-    });
-
-    it('reports a healthy issuer, and whether it can revoke', async () => {
-      await configure();
-      extension.fake.oauthCheckIssuer.mockResolvedValue({
-        revocable: false,
-        scopesSupported: ['openid'],
-        unsupportedScopes: [],
-      });
-
-      expect(await oauth.check(REPOSITORY_URL)).toEqual({
-        kind: 'ok',
-        revocable: false,
-        scopesSupported: ['openid'],
-      });
-    });
-
-    it('reports an unreachable issuer in the words a failed login uses', async () => {
-      await configure();
-      extension.fake.oauthCheckIssuer.mockRejectedValue(new Error('OAUTH_DISCOVERY_FAILED: 404'));
-
-      const result = await oauth.check(REPOSITORY_URL);
-
-      expect(result.kind).toBe('failed');
-      expect(result.kind === 'failed' && result.error).toContain('Issuer-URL');
-    });
-
-    it('keeps the last answer, and lets go of it when the client is edited', async () => {
-      await configure();
-      extension.fake.oauthCheckIssuer.mockResolvedValue({
-        revocable: true,
-        scopesSupported: null,
-        unsupportedScopes: [],
-      });
-      await oauth.check(REPOSITORY_URL);
-      expect(oauth.checked()).not.toBeNull();
-
-      oauth.clearCheck();
-
-      expect(oauth.checked()).toBeNull();
-    });
-  });
-
   describe('reporting what the provider refused', () => {
     it('names an unknown scope, which is what a Doorkeeper provider refuses `offline_access` with', async () => {
-      await configure();
+      await federating();
       extension.oauthRefuses('OAUTH_REFUSED: invalid_scope');
 
       const outcome = await oauth.login(REPOSITORY_URL);
@@ -305,7 +233,7 @@ describe('OAuthService', () => {
     });
 
     it('names an unregistered redirect address', async () => {
-      await configure();
+      await federating();
       extension.oauthRefuses('OAUTH_REFUSED: redirect_uri_mismatch');
 
       const outcome = await oauth.login(REPOSITORY_URL);
@@ -314,7 +242,7 @@ describe('OAuthService', () => {
     });
 
     it('names a client the provider does not know, or one registered as confidential', async () => {
-      await configure();
+      await federating();
       extension.oauthRefuses('OAUTH_TOKEN_FAILED: 401 invalid_client');
 
       const outcome = await oauth.login(REPOSITORY_URL);

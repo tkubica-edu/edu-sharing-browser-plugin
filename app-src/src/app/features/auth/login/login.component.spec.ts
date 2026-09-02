@@ -9,9 +9,9 @@ import { AuthFake, fakeAuth } from '../../../../testing/fakes';
 
 /**
  * The login card's own rendering — the one place where what the panel *offers* is decided by a
- * template rather than by a service. `AuthService.oauthOffered` says whether an identity provider is
- * to be offered; whether a button for it actually appears is this component's answer, and only a
- * rendered template can be asked.
+ * template rather than by a service. `AuthService.oauthOffered` and `passwordLoginOffered` say which
+ * of the two ways in the repository has; which controls actually appear is this component's answer,
+ * and only a rendered template can be asked.
  */
 describe('LoginComponent', () => {
   let fixture: ComponentFixture<LoginComponent>;
@@ -51,10 +51,22 @@ describe('LoginComponent', () => {
     });
   }
 
-  it('offers no identity provider while none is configured', () => {
+  it('offers no identity provider where the repository names none', () => {
     // The card as it was before there was an alternative: the credential form alone.
     expect(ssoButtons()).toHaveLength(0);
+    expect(fixture.nativeElement.querySelectorAll('input')).toHaveLength(2);
     expect(fixture.nativeElement.querySelector('.lg-submit')).toBeTruthy();
+  });
+
+  it('drops the credential form where the repository names one', () => {
+    auth.offerOAuth();
+    fixture.detectChanges();
+
+    // The two are alternatives rather than a pair: the repository has said which identity it knows
+    // its users by, so nothing on the card asks for a password (AuthService.passwordLoginOffered).
+    expect(fixture.nativeElement.querySelectorAll('input')).toHaveLength(0);
+    expect(fixture.nativeElement.textContent).not.toContain('Passwort vergessen');
+    expect(ssoButtons()).toHaveLength(1);
   });
 
   it('offers one unnamed button where the repository advertises no provider', () => {

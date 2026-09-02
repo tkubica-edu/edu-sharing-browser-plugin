@@ -1,14 +1,14 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 
 import { APP_CONFIG } from '../config';
-import { BrowserExtensionService, IssuerCheck, OAuthRequest, RedirectUriInUse } from './browser-extension.service';
+import { BrowserExtensionService, OAuthDiscovery, OAuthRequest, RedirectUriInUse } from './browser-extension.service';
 import { errorMessage } from '../util/errors';
 
 /**
  * One identity provider the login screen can offer, as the repository advertises it in the login
  * info's `oauthEntries`. The registration id is what the authorization request passes on so the IdP
  * goes straight to that provider instead of showing its own chooser; a repository that advertises
- * none leaves the panel with the plain "sign in with SSO" button and the issuer's own chooser.
+ * none leaves the panel with the plain "sign in with SSO" button and the server's own chooser.
  */
 export interface OAuthProvider {
   /** What the button says — the repository's name for the provider, else the registration id. */
@@ -26,14 +26,14 @@ export type OAuthOutcome =
   | { readonly kind: 'failed'; readonly error: string };
 
 /**
- * What asking the issuer about itself produced — see {@link OAuthService.check}. `scopeWarning` is
- * the case worth having this for at all: a scope the issuer does not define is refused on the
- * provider's own error page rather than by a redirect, so the flow would otherwise just hang.
+ * What the repository answered about its authorization server — see {@link OAuthService.probe}.
+ * `unknown` is the state before it was asked, in which the panel behaves as if there were none:
+ * the SSO login is a claim about the repository, and nothing is claimed until it answers.
  */
-export type IssuerCheckResult =
-  | { readonly kind: 'ok'; readonly revocable: boolean; readonly scopesSupported: readonly string[] | null }
-  | { readonly kind: 'scopes'; readonly unsupported: readonly string[] }
-  | { readonly kind: 'failed'; readonly error: string };
+export type OAuthAvailability =
+  | { readonly kind: 'unknown' }
+  | { readonly kind: 'available'; readonly server: OAuthDiscovery }
+  | { readonly kind: 'unavailable'; readonly discoveryUrl: string; readonly error: string };
 
 /** The worker's own vocabulary for a flow nobody completed — see `background/oauth.js`. */
 const CANCELLED = /OAUTH_CANCELLED|OAUTH_TIMEOUT/;
@@ -43,12 +43,12 @@ const CANCELLED = /OAUTH_CANCELLED|OAUTH_TIMEOUT/;
  * throws, so a refusal says which step refused rather than showing its internals.
  */
 const ERROR_TEXTS: readonly (readonly [RegExp, string])[] = [
-  [/OAUTH_NO_ISSUER|OAUTH_NO_CLIENT_ID/, 'Die SSO-Anmeldung ist nicht konfiguriert (Issuer und Client-ID in den Einstellungen).'],
-  [/OAUTH_DISCOVERY_INCOMPLETE/, 'Der Identity Provider beschreibt keine nutzbaren OAuth-Endpunkte.'],
-  [/OAUTH_DISCOVERY_FAILED/, 'Der Identity Provider war nicht erreichbar. Issuer-URL prüfen.'],
-  [/OAUTH_NO_REDIRECT_URI/, 'Für diesen Browser muss die Redirect-URI in den Einstellungen gesetzt werden.'],
+  [/OAUTH_NO_REPOSITORY|OAUTH_NO_CLIENT_ID/, 'Die SSO-Anmeldung steht für dieses Repository nicht zur Verfügung.'],
+  [/OAUTH_DISCOVERY_INCOMPLETE/, 'Das Repository beschreibt keine nutzbaren OAuth-Endpunkte.'],
+  [/OAUTH_DISCOVERY_FAILED/, 'Das Repository veröffentlicht keine OAuth-Konfiguration.'],
+  [/OAUTH_NO_REDIRECT_URI/, 'Für diesen Browser lässt sich keine Redirect-URI bilden — Repository-URL prüfen.'],
   [/OAUTH_STATE_MISMATCH/, 'Die Antwort des Identity Providers gehört nicht zu dieser Anmeldung.'],
-  [/invalid_scope/, 'Der Identity Provider kennt einen der angeforderten Scopes nicht — Scopes prüfen (z. B. kennt GitLab kein `offline_access`).'],
+  [/invalid_scope/, 'Der Identity Provider kennt einen der angeforderten Scopes nicht.'],
   [/redirect_uri_mismatch|invalid_redirect/, 'Die Redirect-URI ist beim Provider nicht (so) hinterlegt — den in den Einstellungen angezeigten Wert eintragen.'],
   [/invalid_client|unauthorized_client/, 'Der Provider kennt diese Client-ID nicht, oder der Client ist nicht als öffentlicher Client (ohne Secret) registriert.'],
   [/OAUTH_REFUSED/, 'Der Identity Provider hat die Anmeldung abgelehnt.'],
@@ -57,142 +57,84 @@ const ERROR_TEXTS: readonly (readonly [RegExp, string])[] = [
 ];
 
 /**
- * The OpenID Connect client the alternative login uses, and the panel's side of the flow the
- * background worker runs (`background/oauth.js`).
+ * The panel's side of the OAuth flow the background worker runs (`background/oauth.js`), and the one
+ * question that decides whether it is offered: does the repository publish an authorization server
+ * of its own?
  *
- * Only the configuration and the reporting live here. The flow itself is the worker's, and the
- * repository session the access token is traded for is AuthService's — this service hands one to the
- * other and knows nothing about either.
+ * Nothing here is configured. The server is discovered below the repository the panel is pointed at,
+ * the client and the scopes are shipped constants (`APP_CONFIG.oauth`), and the redirect address is
+ * the browser's. The flow itself is the worker's, and the repository session the access token is
+ * traded for is AuthService's — this service hands one to the other and knows nothing about either.
  */
 @Injectable({ providedIn: 'root' })
 export class OAuthService {
   private readonly browserExtension = inject(BrowserExtensionService);
 
-  private readonly issuerState = signal('');
-  private readonly discoveryUrlState = signal('');
-  private readonly clientIdState = signal('');
-  private readonly scopesState = signal('');
-  private readonly redirectUriState = signal('');
+  /** The client and the scopes every message states — the panel ships with both. */
+  readonly clientId = APP_CONFIG.oauth.clientId;
+  readonly scopes = APP_CONFIG.oauth.scopes;
 
-  /** The issuer the settings name; empty leaves `APP_CONFIG.oauth.issuer` standing. */
-  readonly issuer = computed(() => this.issuerState().trim() || APP_CONFIG.oauth.issuer);
-  /**
-   * Where the provider's discovery document is fetched from; empty leaves the OpenID Connect path
-   * below the issuer standing (see `discoveryUrlOf` in `background/oauth.js`).
-   */
-  readonly discoveryUrl = computed(() => this.discoveryUrlState().trim() || APP_CONFIG.oauth.discoveryUrl);
-  readonly clientId = computed(() => this.clientIdState().trim() || APP_CONFIG.oauth.clientId);
-  readonly scopes = computed(() => this.scopesState().trim() || APP_CONFIG.oauth.scopes);
-  readonly redirectUri = computed(() => this.redirectUriState().trim() || APP_CONFIG.oauth.redirectUri);
+  private readonly availabilityState = signal<OAuthAvailability>({ kind: 'unknown' });
 
-  /** What the fields hold verbatim, for the settings screen to edit — see {@link issuer}. */
-  readonly configuredIssuer = this.issuerState.asReadonly();
-  readonly configuredDiscoveryUrl = this.discoveryUrlState.asReadonly();
-  readonly configuredClientId = this.clientIdState.asReadonly();
-  readonly configuredScopes = this.scopesState.asReadonly();
-  readonly configuredRedirectUri = this.redirectUriState.asReadonly();
+  /** What the repository answered, for the settings screen to render — see {@link probe}. */
+  readonly availability = this.availabilityState.asReadonly();
 
   /**
-   * Whether the alternative login is offered at all. Both halves of a client are needed for it: an
-   * issuer to discover the endpoints from and a client id to name this extension by. Without them the
-   * login screen shows the credential form alone, as it did before there was an alternative.
+   * Whether the SSO login is the way into this repository. It is the *only* way where it is
+   * available at all: a repository that publishes an authorization server has said which identity
+   * it wants to be signed in with, and the credential form would be a second, weaker answer to a
+   * question it has already settled (see AuthService.passwordLoginOffered).
    */
-  readonly configured = computed(() => !!this.issuer() && !!this.clientId());
+  readonly available = computed(() => this.availabilityState().kind === 'available');
+
+  /** Set while the repository is being asked, so the login card can hold still until it answers. */
+  private readonly probingState = signal(false);
+  readonly probing = this.probingState.asReadonly();
 
   /**
    * The providers the repository advertises, fed from the login info (see
    * AuthService.applyOAuthEntries). Empty is the ordinary case: the button then leads to the
-   * issuer's own chooser, which is where a federating IdP asks the same question anyway.
+   * server's own chooser, which is where a federating IdP asks the same question anyway.
    */
   private readonly providersState = signal<readonly OAuthProvider[]>([]);
   readonly providers = this.providersState.asReadonly();
-
-  /** The last answer {@link check} got, for the settings screen to render; null until it is asked. */
-  private readonly checkedState = signal<IssuerCheckResult | null>(null);
-  readonly checked = this.checkedState.asReadonly();
-
-  /** Set while the issuer is being asked, so its button can say so. */
-  private readonly checkingState = signal(false);
-  readonly checking = this.checkingState.asReadonly();
 
   /** Set while the IdP's pages are up, so the login screen can lock its buttons. */
   private readonly runningState = signal(false);
   readonly running = this.runningState.asReadonly();
 
   /**
-   * How many settings stand away from what the panel ships with — see ChatStyleService.changedSettings.
-   * Each field counts while it holds something, the shipped default being what the config carries.
+   * Ask the repository whether it federates, and remember the answer. Before the login screen
+   * decides what to offer, and again whenever the panel is pointed at another repository — the
+   * answer belongs to that repository and to no other.
+   *
+   * A repository that publishes no such document is the ordinary case and no error: the answer is
+   * simply that there is no SSO login here.
    */
-  readonly changedSettings = computed(
-    () =>
-      (this.issuerState().trim() ? 1 : 0) +
-      (this.discoveryUrlState().trim() ? 1 : 0) +
-      (this.clientIdState().trim() ? 1 : 0) +
-      (this.scopesState().trim() ? 1 : 0) +
-      (this.redirectUriState().trim() ? 1 : 0),
-  );
-
-  /** Load the persisted client. Before the login screen decides whether to offer the alternative. */
-  async load(): Promise<void> {
-    const keys = APP_CONFIG.storageKeys;
-    this.issuerState.set((await this.browserExtension.storageGet<string>(keys.oauthIssuer, '')) || '');
-    this.discoveryUrlState.set((await this.browserExtension.storageGet<string>(keys.oauthDiscoveryUrl, '')) || '');
-    this.clientIdState.set((await this.browserExtension.storageGet<string>(keys.oauthClientId, '')) || '');
-    this.scopesState.set((await this.browserExtension.storageGet<string>(keys.oauthScopes, '')) || '');
-    this.redirectUriState.set((await this.browserExtension.storageGet<string>(keys.oauthRedirectUri, '')) || '');
-  }
-
-  async setIssuer(issuer: string): Promise<void> {
-    await this.persist(this.issuerState, APP_CONFIG.storageKeys.oauthIssuer, issuer);
-  }
-
-  async setDiscoveryUrl(discoveryUrl: string): Promise<void> {
-    await this.persist(this.discoveryUrlState, APP_CONFIG.storageKeys.oauthDiscoveryUrl, discoveryUrl);
-  }
-
-  async setClientId(clientId: string): Promise<void> {
-    await this.persist(this.clientIdState, APP_CONFIG.storageKeys.oauthClientId, clientId);
-  }
-
-  async setScopes(scopes: string): Promise<void> {
-    await this.persist(this.scopesState, APP_CONFIG.storageKeys.oauthScopes, scopes);
-  }
-
-  async setRedirectUri(redirectUri: string): Promise<void> {
-    await this.persist(this.redirectUriState, APP_CONFIG.storageKeys.oauthRedirectUri, redirectUri);
+  async probe(repositoryUrl: string): Promise<OAuthAvailability> {
+    this.probingState.set(true);
+    try {
+      const server = await this.browserExtension.oauthDiscover(this.request(repositoryUrl));
+      return this.remember({ kind: 'available', server });
+    } catch (cause: unknown) {
+      return this.remember({
+        kind: 'unavailable',
+        discoveryUrl: this.discoveryUrlOf(repositoryUrl),
+        error: this.describe(errorMessage(cause)),
+      });
+    } finally {
+      this.probingState.set(false);
+    }
   }
 
   /**
-   * Ask the issuer what it is, before anybody tries to sign in: whether it can be reached, whether it
-   * describes the endpoints, and whether it defines the configured scopes. A scope it does not define
-   * outranks the rest of the answer, since that is what would break the flow.
+   * Where the answer was looked for, as the worker assembles the address (`discoveryUrlOf` in
+   * `background/oauth.js`). Repeated here only so the settings can name it for a repository that
+   * answered nothing — where the worker never got as far as reporting it.
    */
-  async check(repositoryUrl: string): Promise<IssuerCheckResult> {
-    if (!this.configured()) {
-      const result: IssuerCheckResult = { kind: 'failed', error: ERROR_TEXTS[0][1] };
-      this.checkedState.set(result);
-      return result;
-    }
-    this.checkingState.set(true);
-    try {
-      const answer: IssuerCheck = await this.browserExtension.oauthCheckIssuer(this.request(repositoryUrl));
-      const result: IssuerCheckResult = answer.unsupportedScopes.length
-        ? { kind: 'scopes', unsupported: answer.unsupportedScopes }
-        : { kind: 'ok', revocable: answer.revocable, scopesSupported: answer.scopesSupported };
-      this.checkedState.set(result);
-      return result;
-    } catch (cause: unknown) {
-      const result: IssuerCheckResult = { kind: 'failed', error: this.describe(errorMessage(cause)) };
-      this.checkedState.set(result);
-      return result;
-    } finally {
-      this.checkingState.set(false);
-    }
-  }
-
-  /** Let go of an answer that describes a client that has since been edited. */
-  clearCheck(): void {
-    this.checkedState.set(null);
+  discoveryUrlOf(repositoryUrl: string): string {
+    const base = repositoryUrl.trim().replace(/\/+$/, '');
+    return base ? `${base}/.well-known/oauth-authorization-server` : '';
   }
 
   /** Take over what the repository advertises — see {@link providers}. */
@@ -206,7 +148,7 @@ export class OAuthService {
    * Guarded against a second concurrent attempt, which would open a second IdP window.
    */
   async login(repositoryUrl: string, provider?: OAuthProvider): Promise<OAuthOutcome> {
-    if (!this.configured()) return { kind: 'failed', error: ERROR_TEXTS[0][1] };
+    if (!this.available()) return { kind: 'failed', error: ERROR_TEXTS[0][1] };
     if (this.runningState()) return { kind: 'cancelled' };
     this.runningState.set(true);
     try {
@@ -224,7 +166,7 @@ export class OAuthService {
    * the reason belongs in the log rather than on a screen nobody asked for a login on.
    */
   async silentAccessToken(repositoryUrl: string): Promise<string | null> {
-    if (!this.configured()) return null;
+    if (!this.available()) return null;
     const session = await this.browserExtension.oauthSilent(this.request(repositoryUrl)).catch(() => null);
     if (!session?.success || session.signedIn === false) return null;
     return session.accessToken ?? null;
@@ -232,7 +174,7 @@ export class OAuthService {
 
   /** Drop the OAuth session the worker holds. Best-effort: the repository logout stands either way. */
   async logout(repositoryUrl: string): Promise<void> {
-    if (!this.configured()) return;
+    if (!this.available()) return;
     await this.browserExtension.oauthLogout(this.request(repositoryUrl)).catch(() => null);
   }
 
@@ -252,14 +194,16 @@ export class OAuthService {
    */
   private request(repositoryUrl: string, provider?: OAuthProvider): OAuthRequest {
     return {
-      issuer: this.issuer(),
-      discoveryUrl: this.discoveryUrl(),
-      clientId: this.clientId(),
-      scopes: this.scopes(),
-      redirectUri: this.redirectUri(),
       repositoryUrl,
+      clientId: this.clientId,
+      scopes: this.scopes,
       registrationId: provider?.registrationId,
     };
+  }
+
+  private remember(availability: OAuthAvailability): OAuthAvailability {
+    this.availabilityState.set(availability);
+    return availability;
   }
 
   /** The worker's answer as an outcome — see {@link OAuthOutcome}. */
@@ -274,11 +218,5 @@ export class OAuthService {
   private describe(error: string): string {
     for (const [pattern, text] of ERROR_TEXTS) if (pattern.test(error)) return text;
     return error || 'Die SSO-Anmeldung ist fehlgeschlagen.';
-  }
-
-  private async persist(state: { set(value: string): void }, key: string, value: string): Promise<void> {
-    const trimmed = value.trim();
-    state.set(trimmed);
-    await this.browserExtension.storageSet(key, trimmed);
   }
 }

@@ -11,40 +11,45 @@
     <h2 class="lg-heading">{{ heading() }}</h2>
     <p class="lg-lead">{{ leadText() }}</p>
 
-    <input type="text" class="es-input" [placeholder]="userPlaceholder" autocomplete="username"
-           [ngModel]="username()" (ngModelChange)="username.set($event)" />
+    <!-- Username and password only where the repository has not named an identity provider of its
+         own; where it has, that provider is the way in and this form is not offered at all (see
+         AuthService.passwordLoginOffered). -->
+    @if (auth.passwordLoginOffered()) {
+      <input type="text" class="es-input" [placeholder]="userPlaceholder" autocomplete="username"
+             [ngModel]="username()" (ngModelChange)="username.set($event)" />
 
-    <!-- The password with the eye that shows it: a password typed into a panel docked in a page is
-         typed without a second try, so being able to read it back is what saves the retry. -->
-    <div class="lg-password">
-      <input class="es-input" [type]="passwordVisible() ? 'text' : 'password'" placeholder="Passwort"
-             autocomplete="current-password" [ngModel]="password()"
-             (ngModelChange)="password.set($event)" (keyup.enter)="login()" />
-      <button class="lg-reveal" type="button" (click)="togglePassword()"
-              [attr.aria-pressed]="passwordVisible()"
-              [title]="passwordVisible() ? 'Passwort verbergen' : 'Passwort anzeigen'"
-              [attr.aria-label]="passwordVisible() ? 'Passwort verbergen' : 'Passwort anzeigen'">
-        <i [esIcon]="passwordVisible() ? 'visibility_off' : 'visibility'"></i>
-      </button>
-    </div>
+      <!-- The password with the eye that shows it: a password typed into a panel docked in a page is
+           typed without a second try, so being able to read it back is what saves the retry. -->
+      <div class="lg-password">
+        <input class="es-input" [type]="passwordVisible() ? 'text' : 'password'" placeholder="Passwort"
+               autocomplete="current-password" [ngModel]="password()"
+               (ngModelChange)="password.set($event)" (keyup.enter)="login()" />
+        <button class="lg-reveal" type="button" (click)="togglePassword()"
+                [attr.aria-pressed]="passwordVisible()"
+                [title]="passwordVisible() ? 'Passwort verbergen' : 'Passwort anzeigen'"
+                [attr.aria-label]="passwordVisible() ? 'Passwort verbergen' : 'Passwort anzeigen'">
+          <i [esIcon]="passwordVisible() ? 'visibility_off' : 'visibility'"></i>
+        </button>
+      </div>
 
-    <!-- The repository's own form, so the tab is taken there — see RepositoryPageService. -->
-    <button class="lg-link" type="button" (click)="openPasswordReset()">Passwort vergessen?</button>
+      <!-- The repository's own form, so the tab is taken there — see RepositoryPageService. -->
+      <button class="lg-link" type="button" (click)="openPasswordReset()">Passwort vergessen?</button>
+    }
 
     @if (auth.error()) {
       <p class="es-error">{{ auth.error() }}</p>
     }
 
-    <button class="lg-submit" [disabled]="!canSubmit()" (click)="login()">
-      {{ loggingIn() ? 'Anmelden…' : 'Anmelden' }}
-    </button>
-
-    <p class="lg-or"><span>oder</span></p>
+    @if (auth.passwordLoginOffered()) {
+      <button class="lg-submit" [disabled]="!canSubmit()" (click)="login()">
+        {{ loggingIn() ? 'Anmelden…' : 'Anmelden' }}
+      </button>
+    }
 
     <!-- One button per provider the repository advertises; a single unnamed one where it advertises
-         none, which leads to the issuer's own chooser (see LoginComponent.oauthButtons). -->
+         none, which leads to the server's own chooser (see LoginComponent.oauthButtons). -->
     @for (provider of oauthButtons(); track provider?.registrationId ?? 'sso') {
-      <button class="lg-secondary lg-sso" type="button" [disabled]="!canUseOAuth()"
+      <button class="lg-submit lg-sso" type="button" [disabled]="!canUseOAuth()"
               (click)="loginWithOAuth(provider)">
         <i esIcon="vpn_key"></i>
         {{ auth.oauthRunning() ? 'Anmelden…' : oauthLabel(provider) }}

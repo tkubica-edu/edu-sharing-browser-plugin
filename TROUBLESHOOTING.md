@@ -21,7 +21,7 @@ What is known not to work, known to be unverified, or known to look wrong at fir
   extensions, so the OAuth login falls back to opening the provider in a tab and watching it for the
   redirect (`background/oauth.js`, branched on `hasIdentityApi()` rather than on the browser). That
   fallback needs a redirect address the extension can watch a tab navigate to, which is why it is an
-  ordinary https address there — `<repository>/oauth/extension-callback` unless one is configured.
+  ordinary https address there — `<repository>/oauth/extension-callback`.
   Nothing has to be served at it: the address is matched before the load finishes and the tab is
   closed. **Unverified against a real identity provider on Safari**: the flow is covered by
   `app-src/src/boundary/oauth-flow.spec.ts` with the browser APIs faked, and the tab-watching path
@@ -72,29 +72,34 @@ What is known not to work, known to be unverified, or known to look wrong at fir
 
 ## No SSO button on the login card
 
-The button is gated on `AuthService.oauthOffered`, which needs **both** an issuer and a client id
-(`OAuthService.configured`) — one alone offers nothing, since neither the endpoints nor the client
-could be named from it. The card is also only rendered while there is no session, so a panel that
-restored one shows the status row instead. *Einstellungen → SSO-Anmeldung* states which of the two
-fields is still missing. Beyond that: the section is new, so a package built before it was added has
-neither the button nor the group — `npm run build` and reload the extension. That the buttons render
-once the gate opens is covered by `app-src/src/app/features/auth/login/login.component.spec.ts`.
+The button is gated on `AuthService.oauthOffered`, which is the repository's own answer rather than a
+setting: the panel asks for `<Repository>/.well-known/oauth-authorization-server` on startup
+(`OAuthService.probe`), and a repository that answers nothing there has no SSO login — the card then
+shows username and password, which is the ordinary case. *Einstellungen → SSO-Anmeldung* names the
+address that was asked for, what came back, and *Erneut fragen* re-asks it without a panel reload
+(useful right after enabling the server on the repository). Note that the document is fetched from
+the worker with the extension's host permissions, so a repository not covered by them answers
+nothing whatever it publishes. The card is also only rendered while there is no session, so a panel
+that restored one shows the status row instead. Beyond that: a package built before the section
+existed has neither the button nor the group — `npm run build` and reload the extension. That the
+buttons render once the gate opens is covered by
+`app-src/src/app/features/auth/login/login.component.spec.ts`.
 
 ## „The requested scope is invalid, unknown, or malformed"
 
 The provider refused the authorization request's `scope`. Two different causes wear the same message,
 and only the second is visible from the extension:
 
-1. **The server does not define the scope.** `offline_access` is the one to expect — GitLab and other
-   Doorkeeper-based providers do not have it, while Keycloak does. *Issuer und Scopes prüfen* in
-   *Einstellungen → SSO-Anmeldung* catches this, since the issuer lists what it defines in its
-   discovery document (`scopes_supported`).
+1. **The server does not define the scope.** The panel asks for `profile` alone, which every OIDC
+   server defines; a server whose metadata lists `scopes_supported` without it is named in
+   *Einstellungen → SSO-Anmeldung* as soon as the document is read, so this is visible before anybody
+   signs in.
 2. **The client is not granted the scope**, even though the server defines it. On GitLab the
    application's own scope checkboxes have to include every scope requested — `openid`, `profile` and
    `email` for an OIDC login — and an application with none ticked falls back to Doorkeeper's default
-   scopes, which do not include them. **The check button cannot see this**: `scopes_supported`
-   describes the server, and per-client grants are not published anywhere. It has to be compared
-   against the client's registration by hand.
+   scopes, which do not include them. **The metadata cannot show this**: `scopes_supported` describes
+   the server, and per-client grants are not published anywhere. It has to be compared against the
+   client's registration by hand.
 
 Either way the provider renders its own error page rather than redirecting, so nothing reaches the
 extension and the flow waits until the window is closed (reported as a cancellation, or the five

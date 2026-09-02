@@ -316,34 +316,47 @@ describe('AuthService', () => {
   });
 
   describe('signing in through an identity provider', () => {
-    /** An OAuth client, as a previous session's settings would have left it configured. */
+    /** The repository publishes an authorization server of its own — see OAuthService.probe. */
     function configureOAuth(): void {
-      extension.storage.set(APP_CONFIG.storageKeys.oauthIssuer, 'https://sso.example/realms/edu');
-      extension.storage.set(APP_CONFIG.storageKeys.oauthClientId, 'edu-sharing-extension');
+      extension.federates();
     }
 
-    it('is not offered without a configured client', async () => {
+    it('is not offered where the repository publishes no authorization server', async () => {
       await auth.init();
 
       expect(auth.oauthOffered()).toBe(false);
+      // Which is what leaves the credential form as the way in.
+      expect(auth.passwordLoginOffered()).toBe(true);
     });
 
-    it('is offered once one is configured', async () => {
+    it('is offered where it publishes one, and is then the only way in', async () => {
       configureOAuth();
 
       await auth.init();
 
       expect(auth.oauthOffered()).toBe(true);
+      // The repository has named the identity its users are known by; a password would go around it.
+      expect(auth.passwordLoginOffered()).toBe(false);
     });
 
-    it('is offered where the embedding host brings the session too, like the credential form', async () => {
+    it('refuses a credential login outright where the repository federates', async () => {
+      configureOAuth();
+      await auth.init();
+
+      expect(await auth.login('ada', 'a-password')).toBe(false);
+
+      expect(authentication.fake.login).not.toHaveBeenCalled();
+      expect(auth.error()).toContain('SSO');
+    });
+
+    it('is offered where the embedding host brings the session too', async () => {
       configureOAuth();
       await auth.init();
 
       webComponent.fake.offeredByRepository.set(true);
 
-      // The card is reachable in that state and shows the password form; hiding only the identity
-      // provider would make a password the one way in, for no reason.
+      // The card is reachable in that state, and which way in it offers is the repository's answer
+      // either way — not something the embedding host has anything to say about.
       expect(auth.loginRequired()).toBe(false);
       expect(auth.oauthOffered()).toBe(true);
     });
@@ -412,7 +425,8 @@ describe('AuthService', () => {
 
       expect(await auth.loginWithOAuth()).toBe(false);
 
-      expect(auth.error()).toContain('Issuer-URL');
+      // The worker's code as the sentence it stands for, not as the code itself.
+      expect(auth.error()).toContain('OAuth-Konfiguration');
     });
 
     it('takes over the providers the repository advertises', async () => {
@@ -445,8 +459,7 @@ describe('AuthService', () => {
 
   describe('resuming an OAuth session on startup', () => {
     function configureOAuth(): void {
-      extension.storage.set(APP_CONFIG.storageKeys.oauthIssuer, 'https://sso.example/realms/edu');
-      extension.storage.set(APP_CONFIG.storageKeys.oauthClientId, 'edu-sharing-extension');
+      extension.federates();
     }
 
     it('puts the session back from the stored refresh token, without asking', async () => {
@@ -495,7 +508,7 @@ describe('AuthService', () => {
       expect(auth.error()).toBeNull();
     });
 
-    it('asks nothing at all without a configured client', async () => {
+    it('asks nothing at all where the repository federates against nothing', async () => {
       authentication.answers(noSession());
 
       await auth.init();
@@ -506,8 +519,7 @@ describe('AuthService', () => {
 
   describe('logging out of both', () => {
     it('drops the OAuth session with the repository one', async () => {
-      extension.storage.set(APP_CONFIG.storageKeys.oauthIssuer, 'https://sso.example/realms/edu');
-      extension.storage.set(APP_CONFIG.storageKeys.oauthClientId, 'edu-sharing-extension');
+      extension.federates();
       await auth.init();
 
       await auth.logout();
@@ -517,7 +529,7 @@ describe('AuthService', () => {
       expect(auth.loggedIn()).toBe(false);
     });
 
-    it('asks nothing of the worker where no OAuth client is configured', async () => {
+    it('asks nothing of the worker where the repository federates against nothing', async () => {
       await auth.init();
 
       await auth.logout();

@@ -81,7 +81,7 @@ precedes every `/generate` rather than as a failed extraction a minute later.
 | `POST /extract-field` (Metadata-Agent) | sidebar document (`MetadataAgentService`) | same context the WLO canvas calls `/generate` from, so the request is visible in the panel's own DevTools and there is no worker build that can fall out of sync with the app. Relies on `host_permissions` for the cross-origin call, like the repository login |
 | Page content extraction | `scripting.executeScript` (background) | no cross-origin fetch |
 | Repository login | Angular `HttpClient` (library) | the library owns the call; relies on `host_permissions` bypassing CORS on Chrome/Edge/Firefox |
-| OIDC discovery, token exchange, refresh, revocation | background service worker (`background/oauth.js`) | same reason as `/generate`: a background fetch is gated by `host_permissions`, so the provider's token endpoint is reached without it having to allow the extension origin by CORS. It is also the only context that outlives the panel's iframe for the length of a login |
+| Server metadata, token exchange, refresh, revocation | background service worker (`background/oauth.js`) | same reason as `/generate`: a background fetch is gated by `host_permissions`, so the provider's token endpoint is reached without it having to allow the extension origin by CORS. It is also the only context that outlives the panel's iframe for the length of a login |
 | `EVENT` / `REQ` to a nostr relay (AMB, kind 30142) | sidebar document (`NostrForwardService` → `util/nostr-relay.ts`) | nostr has no HTTP path at all: one WebSocket per exchange — `publishToRelay` closes with the relay's `OK`, `queryRelay` with its `EOSE`. Needs `wss:`/`ws:` in the extension's `connect-src`, which the scheme sources for `https:`/`http:` do not have to imply. Neither runs while the settings' *Nostr-Relay verwenden* is off |
 
 Every message to the worker goes through one send path (`BrowserExtensionService.ask`). A rejection
@@ -101,15 +101,24 @@ exchange. The PKCE pair is generated the way
 [`pkce-challenge`](https://github.com/crouchcd/pkce-challenge) does it (a 128-character verifier over
 the unreserved set with the modulo bias cut off, SHA-256 as a base64url challenge), inlined because
 this file is plain script the worker loads directly — there is no bundler on the extension's side.
-Endpoints are never assembled: they come from the provider's discovery document, cached per document
-address for the worker's lifetime, which is what lets one implementation serve Keycloak, Shibboleth
-or edu-sharing's own authorization server. Which address that is has to be configurable, because two
-paths are in use and the provider does not say which it serves: an OpenID Connect provider describes
-itself at `<issuer>/.well-known/openid-configuration`, a plain OAuth authorization server at
-`/.well-known/oauth-authorization-server` (RFC 8414) — edu-sharing's own among the latter. The
-issuer's OIDC path is what an empty *Discovery-URL* falls back to; the issuer itself is still what a
-stored session is recognised by, whichever document was read. The `state` is checked before the code is
-looked at, so an answer belonging to another request is refused rather than exchanged.
+The `state` is checked before the code is looked at, so an answer belonging to another request is
+refused rather than exchanged.
+
+**Nothing about the flow is configured.** The authorization server is discovered below the repository
+the panel is already pointed at — `<repository>/.well-known/oauth-authorization-server`, the address
+RFC 8414 gives an authorization server's own metadata — and the endpoints are read from that document
+(cached per address for the worker's lifetime) rather than assembled, which is what lets one
+implementation serve whatever a repository federates against. The client (`browser-plugin`) and the
+scopes (`profile` alone: the access token is traded for a repository session rather than read, so no
+further claim is of any use) are constants in `APP_CONFIG.oauth`, and the redirect address is the
+browser's. A stored session is recognised by the repository and client it was obtained against.
+
+So a repository either offers this login or does not, and the panel finds out by asking: `probe()`
+runs before the login card is shown (`AuthService.init` → `OAuthService.probe`), and its answer
+decides which way in the card offers — **the identity provider where the document is there, username
+and password where it is not, never both** (`AuthService.oauthOffered` / `passwordLoginOffered`, and
+`login()` refuses a credential outright in the first case). A repository publishing no such document
+is the ordinary case and no error.
 
 **Showing the provider's pages** is the one part that differs per browser, and it is branched on the
 API rather than on the browser:
@@ -117,7 +126,7 @@ API rather than on the browser:
 | Browser | How | Redirect address |
 | --- | --- | --- |
 | Chrome, Edge, Firefox | `identity.launchWebAuthFlow` (needs the `identity` permission) | `identity.getRedirectURL()` — a per-extension address the browser makes up and never puts on the network |
-| Safari | a watched tab: `tabs.create`, then `tabs.onUpdated` until the tab heads for the redirect address, which then closes it | an ordinary https address, configured or `<repository>/oauth/extension-callback` |
+| Safari | a watched tab: `tabs.create`, then `tabs.onUpdated` until the tab heads for the redirect address, which then closes it | `<repository>/oauth/extension-callback`, an ordinary https address |
 
 `launchWebAuthFlow` is handed `url` and `interactive` and nothing else: Chrome validates
 `WebAuthFlowDetails` against its own schema and rejects an unknown property outright rather than
@@ -127,26 +136,35 @@ declares as its minimum.)
 
 The branch is on the redirect address, not on the browser (`usesIdentityApi()`):
 `launchWebAuthFlow` completes only when the flow reaches the address the browser itself handed out —
-Chrome watches for `https://<id>.chromiumapp.org/` and nothing else — so **a configured address takes
-the watched-tab path everywhere**, which is how one https address can serve all three browsers.
-Left unconfigured, each browser uses its own, and all of them have to be registered with the client.
+Chrome watches for `https://<id>.chromiumapp.org/` and nothing else — so any other address takes the
+watched-tab path even where the API exists.
 
 Safari implements no `identity` namespace at all, which is what the fallback exists for
 (`hasIdentityApi()`, and see
 [TROUBLESHOOTING.md § Browser-specific](TROUBLESHOOTING.md#browser-specific)). The watched tab
 matches on the address *before* the load finishes, so nothing has to be served at the redirect
 target; a tab the user closes instead is a cancellation, which the panel reports as no error at all.
-Both addresses have to be registered with the client at the provider, and *Einstellungen →
-SSO-Anmeldung* shows which one this browser will use.
+Every address a deployment's browsers use has to be registered with the client at the provider, and
+*Einstellungen → SSO-Anmeldung* shows the one this browser will use.
+
+**Logging out** drops the session in all three places it exists: the stored tokens, the token's
+validity at the server (`revocation_endpoint`, RFC 7009), and the provider's own session
+(`end_session_endpoint`, where the metadata names one). The last is what keeps a logout from being
+undone by the provider's cookie, which would otherwise answer the next authorization request without
+anybody being asked who is signing in. It is driven through the browser rather than by `fetch`, since
+only that carries the cookie: `launchWebAuthFlow` non-interactively, or a background tab that closes
+itself. No `post_logout_redirect_uri` is sent — a provider accepts only registered ones — so nothing
+waits for a redirect, and what is reported is that the provider was asked.
 
 The worker hands the panel the access token and nothing else. The refresh token stays in
 `browser.storage.local` under `eduSharingOAuthTokens` and is read only there — the panel names the
 key in `APP_CONFIG.storageKeys.oauthTokens` merely so its storage keys are all in one place. A
 provider that rotates refresh tokens is followed; one that rejects a refresh has its stored session
-cleared, since that token will not start working again. Messages: `oauth.login`, `oauth.silent`,
-`oauth.logout`, `oauth.redirectUri`, `oauth.checkIssuer` — the last reading the discovery document's
-`scopes_supported` so a scope the issuer does not define is named in the settings rather than
-refused, unreadably, on the provider's own error page.
+cleared, since that token will not start working again. (With `profile` alone there is usually no
+refresh token at all: `offline_access` is what yields one.) Messages: `oauth.login`, `oauth.silent`,
+`oauth.logout`, `oauth.redirectUri`, `oauth.discover` — the last being the probe above, which also
+reads the document's `scopes_supported` so a scope the server does not define is named in the
+settings rather than refused, unreadably, on the provider's own error page.
 
 ## Saving a content
 

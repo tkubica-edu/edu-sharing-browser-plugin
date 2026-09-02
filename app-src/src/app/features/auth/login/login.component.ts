@@ -13,11 +13,12 @@ import { RepositoryPageService } from '../../../services/repository-page.service
  */
 const USER_PLACEHOLDER = 'E-Mail-Adresse oder Benutzername';
 
-// The shared login: the credential form while logged out, a compact status row once logged in — and the session is
-// shared, so signing in here unblocks every screen. One form for both places it is asked for, the Login section and
-// a section a guest cannot be served by, whose two lines of text are inputs. Where an OAuth client is configured the
-// same card offers the identity provider as the second way in (see OAuthService). Registering and resetting a
-// password are the repository's own forms, opened in the docked tab (RepositoryPageService).
+// The shared login: the way into the repository while logged out, a compact status row once logged in — and the
+// session is shared, so signing in here unblocks every screen. One card for both places it is asked for, the Login
+// section and a section a guest cannot be served by, whose two lines of text are inputs. Which way in it offers
+// follows from the repository: its identity provider where it publishes one, username and password where it does not
+// (see AuthService.passwordLoginOffered). Registering and resetting a password are the repository's own forms,
+// opened in the docked tab (RepositoryPageService).
 @Component({
   selector: 'es-login',
   imports: [FormsModule, IconDirective],
@@ -62,8 +63,9 @@ export class LoginComponent {
 
   /**
    * The identity providers offered as buttons: the ones the repository advertises, else a single
-   * unnamed one that leads to the issuer's own chooser — which is the same question, asked one step
-   * later. Empty where no OAuth client is configured, and the card is then the credential form alone.
+   * unnamed one that leads to the server's own chooser — which is the same question, asked one step
+   * later. Empty where the repository federates against nothing, and the card is then the credential
+   * form alone.
    */
   protected readonly oauthButtons = computed<readonly (OAuthProvider | null)[]>(() => {
     if (!this.auth.oauthOffered()) return [];

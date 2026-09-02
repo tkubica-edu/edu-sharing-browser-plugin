@@ -133,28 +133,31 @@ lands on a view — you don't re-enter credentials when reopening the panel or s
 **no password is stored**. If the cookie is gone (browser restart, explicit logout, or Safari ITP
 blocking the third-party cookie) it resolves to guest and the login gate appears.
 
-**Signing in through an identity provider.** Where an OpenID Connect client is configured
-(*Einstellungen → SSO-Anmeldung*, `OAuthService`), the same login card offers a second way in below
-the credential form, under the *oder* rule. Both halves of a client are needed for the button to
-appear — an issuer to discover the endpoints from and a client id to name the extension by
-(`AuthService.oauthOffered` → `OAuthService.configured`) — and the card itself is only up while there
-is no session. Since that gate is otherwise invisible, the settings group states which of the two is
-still missing rather than leaving the card silently unchanged. It is deliberately *not* gated on
-`loginRequired`: the card is reachable where no login is required either, and shows the credential
-form there, so hiding only the identity provider would make a password the one way in for no reason
-a reader could see. It is the Authorization Code flow with PKCE (RFC 7636) and no client secret,
-which an extension could not keep: the flow runs in the background worker rather than in the panel,
-because the panel is an iframe the host page's navigation destroys and would take an in-flight flow
-with it — see
-[ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow). The access token it ends with is
-traded for an ordinary repository session (`AuthService.loginWithOAuth` →
-`AuthenticationService.loginToken`, which presents it as a bearer token against
-`validateSession`), so everything past the login is the cookie-based session described above and no
-screen knows which way in was used. The trade is the step that can still refuse a completed OAuth
-login: the person is who the provider says they are, and the repository may still not know them.
+**Signing in through an identity provider.** Which way in the login card offers is the repository's
+answer, not a setting: `AuthService.init` asks it whether it publishes an authorization server of its
+own (`OAuthService.probe` → `<Repository>/.well-known/oauth-authorization-server`), and where it
+does, the card leads through that provider **instead of** asking for username and password
+(`AuthService.oauthOffered` / `passwordLoginOffered`, which are each other's opposite). A repository
+that federates has said which identity its users are known by, so a credential typed here would go
+around it — `AuthService.login` refuses one outright in that state, and the form is not rendered at
+all. Where the repository publishes nothing there, the card is the credential form it always was;
+that is the ordinary case and no error. *Einstellungen → SSO-Anmeldung* reports the answer, since the
+card itself only shows the consequence.
 
-Which buttons the card shows follows from the repository. Its login info advertises the providers it
-federates against (`oauthEntries`, read by `AuthService.applyOAuthEntries`); each entry with a
+The card is up only while there is no session. The offer is deliberately *not* gated on
+`loginRequired`: the card is reachable where no login is required either, and the repository's answer
+is the same there. It is the Authorization Code flow with PKCE (RFC 7636) and no client secret, which
+an extension could not keep: the flow runs in the background worker rather than in the panel, because
+the panel is an iframe the host page's navigation destroys and would take an in-flight flow with it —
+see [ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow). The access token it ends with
+is traded for an ordinary repository session (`AuthService.loginWithOAuth` →
+`AuthenticationService.loginToken`, which presents it as a bearer token against `validateSession`),
+so everything past the login is the cookie-based session described above and no screen knows which
+way in was used. The trade is the step that can still refuse a completed OAuth login: the person is
+who the provider says they are, and the repository may still not know them.
+
+Which buttons the card shows follows from the repository too. Its login info advertises the providers
+it federates against (`oauthEntries`, read by `AuthService.applyOAuthEntries`); each entry with a
 `registrationId` becomes a button that names that provider in the authorization request, so the
 provider goes straight there instead of showing its own chooser. A repository advertising none — the
 ordinary case — leaves a single *Mit SSO anmelden* button and lets the provider ask.
@@ -164,9 +167,13 @@ ordinary case — leaves a single *Mit SSO anmelden* button and lets the provide
 restore above has come up empty, so a repository session lost to a timeout or a browser restart is
 put back without anything being shown. It is silent in both directions: a stored token that no
 longer works is not reported, because nobody asked for a login, and the login card it leaves standing
-says the rest. *Abmelden* drops both — the repository session and the stored tokens, with the
-provider's revocation endpoint told where its discovery document names one — since leaving the
-refresh token behind would sign the user straight back in on the next boot.
+says the rest. (With the `profile` scope the panel asks for there is usually no refresh token at
+all — `offline_access` is what yields one — so this puts a session back only where the server issues
+them.) *Abmelden* drops everything: the repository session, the stored tokens, the token's validity
+at the server where it names a revocation endpoint, and the provider's own session where it names an
+`end_session_endpoint`. The last matters because the provider's cookie would otherwise answer the
+next authorization request on its own — a logout after which the same user is signed straight back
+in.
 
 **Sections a guest cannot be served by** (`AppSection.requiresSession`: *Inhalt hinzufügen*, *Meine
 Inhalte*, and — while the content is past the agent route's two-hour editing window, see

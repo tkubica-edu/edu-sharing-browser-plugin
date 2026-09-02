@@ -11,8 +11,11 @@
 // depended on because this file is plain script the worker loads directly — there is no bundler on
 // this side of the extension.
 //
-// Endpoints are never guessed: they come from the issuer's OpenID Connect discovery document, so the
-// same code serves Keycloak, Shibboleth or edu-sharing's own authorization server.
+// Endpoints are neither guessed nor configured: they come from the document the repository publishes
+// about its own authorization server (`<repository>/.well-known/oauth-authorization-server`, RFC
+// 8414), which is derived from the repository base the panel already works against. So the same code
+// serves whatever that repository federates against, and a repository publishing no such document
+// has no SSO login at all — which is what leaves the credential form as the way in.
 
 /* global browser */
 
@@ -37,10 +40,20 @@ const OAUTH_REQUEST_TIMEOUT_MS = 20000;
  */
 const EXPIRY_SKEW_S = 30;
 
-/** What is asked for when nothing else is configured; `offline_access` is what yields a refresh token. */
-const DEFAULT_SCOPES = 'openid profile email offline_access';
+/**
+ * How long a tab opened only to carry the provider's logout is left standing. Nothing is read off
+ * it: the request is the point, and the page it ends on is the provider's own business.
+ */
+const LOGOUT_TAB_MS = 3000;
 
-/** Discovery documents already fetched, by issuer — they are static, and the worker outlives a flow. */
+/**
+ * What the authorization request asks for where the caller names nothing. `profile` alone, because
+ * the access token is traded for a repository session rather than read here — no claim of it is
+ * inspected, so a wider request would only add scopes the server can refuse.
+ */
+const DEFAULT_SCOPES = 'profile';
+
+/** Metadata documents already fetched, by address — they are static, and the worker outlives a flow. */
 const discoveryCache = new Map();
 
 // PKCE
@@ -82,43 +95,49 @@ async function pkcePair() {
 
 // DISCOVERY
 
-/** The issuer without a trailing slash, so the well-known path is appended to it exactly once. */
-function normalizeIssuer(issuer) {
-  return String(issuer || '').trim().replace(/\/+$/, '');
+/**
+ * Where an authorization server publishes its own metadata, relative to the base that fronts it
+ * (RFC 8414). The OpenID Connect path (`/.well-known/openid-configuration`) carries the same fields
+ * this flow reads, but it is the *provider's* address rather than the repository's — and the
+ * repository base is the only address the panel has.
+ */
+const DISCOVERY_PATH = '/.well-known/oauth-authorization-server';
+
+/** A base URL without its trailing slashes, so a path is appended to it exactly once. */
+function normalizeBase(url) {
+  return String(url || '').trim().replace(/\/+$/, '');
+}
+
+/** Where the repository describes the authorization server the panel signs in against. */
+function discoveryUrlOf(repositoryUrl) {
+  const base = normalizeBase(repositoryUrl);
+  return base ? `${base}${DISCOVERY_PATH}` : '';
 }
 
 /**
- * Where the provider describes itself. The address as configured, else the OpenID Connect path below
- * the issuer — which is the one an OIDC provider serves, while a plain OAuth authorization server
- * describes itself at `/.well-known/oauth-authorization-server` instead (RFC 8414) and has to be
- * named. Both documents carry the endpoint fields this flow reads, so only the address differs.
+ * The authorization server's metadata, cached per document address for the worker's lifetime — the
+ * document is static, and every step of a flow needs it. Only what this flow uses is taken from it;
+ * a document missing the two required endpoints is rejected here rather than at the request that
+ * would have used them.
  */
-function discoveryUrlOf(issuer, discoveryUrl) {
-  const stated = String(discoveryUrl || '').trim();
-  if (stated) return stated;
-  const base = normalizeIssuer(issuer);
-  return base ? `${base}/.well-known/openid-configuration` : '';
-}
-
-/**
- * The provider's metadata, cached per document address rather than per issuer — the address is what
- * was fetched, and an issuer whose document moved would otherwise keep answering from the old one.
- * Only the endpoints this flow uses are taken from it; a document missing the two required ones is
- * rejected here rather than at the request that would have used them.
- */
-async function discover(issuer, discoveryUrl) {
-  const url = discoveryUrlOf(issuer, discoveryUrl);
-  if (!url) throw new Error('OAUTH_NO_ISSUER');
+async function discover(repositoryUrl) {
+  const url = discoveryUrlOf(repositoryUrl);
+  if (!url) throw new Error('OAUTH_NO_REPOSITORY');
   const cached = discoveryCache.get(url);
   if (cached) return cached;
 
   const document = await fetchJson(url, { method: 'GET' }, 'OAUTH_DISCOVERY_FAILED');
   const endpoints = {
+    url,
+    // What the server calls itself, for the log; the stored session is identified by the repository
+    // it was obtained against, which is what the panel asks in terms of.
+    issuer: document.issuer || normalizeBase(repositoryUrl),
     authorization: document.authorization_endpoint,
     token: document.token_endpoint,
+    // Where the provider ends its own session — see {@link endSessionAt}.
     endSession: document.end_session_endpoint || null,
     revocation: document.revocation_endpoint || null,
-    // Optional in the spec, so absent is "the issuer does not say" rather than "no scopes".
+    // Optional in the spec, so absent is "the server does not say" rather than "no scopes".
     scopesSupported: Array.isArray(document.scopes_supported) ? document.scopes_supported : null,
   };
   if (!endpoints.authorization || !endpoints.token) throw new Error('OAUTH_DISCOVERY_INCOMPLETE');
@@ -181,9 +200,9 @@ function hasIdentityApi() {
  *
  * Having the API is not enough: `launchWebAuthFlow` completes only when the flow reaches the address
  * the browser itself handed out — Chrome watches for `https://<id>.chromiumapp.org/` and nothing else
- * — so a deployment that configures an address of its own has to take the watched-tab path even where
- * the API exists. Without this, a configured address would leave the flow hanging on Chrome until the
- * user closed the window, and report that as a cancellation.
+ * — so any other address has to take the watched-tab path even where the API exists. Without this,
+ * such an address would leave the flow hanging on Chrome until the user closed the window, and
+ * report that as a cancellation.
  */
 function usesIdentityApi(redirect) {
   return hasIdentityApi() && redirect === browser.identity.getRedirectURL();
@@ -195,15 +214,13 @@ function usesIdentityApi(redirect) {
  * With the `identity` API it is the browser's own loopback for this extension
  * (`https://<id>.chromiumapp.org/`, and Firefox's equivalent), which never reaches the network.
  * Without it the redirect has to land on a page the extension can watch a tab navigate to, so an
- * ordinary https address is used — the configured one, else a path on the repository itself. Nothing
- * needs to be served there: the flow reads the authorization code off the address and closes the tab
- * before the page has a chance to load.
+ * ordinary https address is used: a path on the repository itself. Nothing needs to be served there —
+ * the flow reads the authorization code off the address and closes the tab before the page has a
+ * chance to load.
  */
-function redirectUri({ configuredRedirectUri, repositoryUrl } = {}) {
-  const configured = String(configuredRedirectUri || '').trim();
-  if (configured) return configured;
+function redirectUri({ repositoryUrl } = {}) {
   if (hasIdentityApi()) return browser.identity.getRedirectURL();
-  const base = String(repositoryUrl || '').trim().replace(/\/+$/, '');
+  const base = normalizeBase(repositoryUrl);
   if (!base) throw new Error('OAUTH_NO_REDIRECT_URI');
   return `${base}/oauth/extension-callback`;
 }
@@ -350,10 +367,10 @@ function postToken(endpoint, params) {
  * provider behind its authorization server by `kc_idp_hint`-style registration id, which is what its
  * `oauthEntries` advertise.
  */
-async function login({ issuer, discoveryUrl, clientId, scopes, configuredRedirectUri, repositoryUrl, registrationId, loginHint } = {}) {
+async function login({ repositoryUrl, clientId, scopes, registrationId, loginHint } = {}) {
   if (!clientId) throw new Error('OAUTH_NO_CLIENT_ID');
-  const endpoints = await discover(issuer, discoveryUrl);
-  const redirect = redirectUri({ configuredRedirectUri, repositoryUrl });
+  const endpoints = await discover(repositoryUrl);
+  const redirect = redirectUri({ repositoryUrl });
   const { verifier, challenge } = await pkcePair();
   const state = randomString(32);
   const nonce = randomString(32);
@@ -371,7 +388,7 @@ async function login({ issuer, discoveryUrl, clientId, scopes, configuredRedirec
   });
   if (registrationId) query.set('kc_idp_hint', registrationId);
   if (loginHint) query.set('login_hint', loginHint);
-  // Merged rather than assigned: an issuer whose authorization endpoint already carries parameters
+  // Merged rather than assigned: a server whose authorization endpoint already carries parameters
   // of its own would otherwise lose them.
   for (const [key, value] of query) request.searchParams.set(key, value);
 
@@ -394,27 +411,30 @@ async function login({ issuer, discoveryUrl, clientId, scopes, configuredRedirec
       code_verifier: verifier,
     }),
   );
-  await storeTokens({ ...session, issuer: normalizeIssuer(issuer), clientId });
+  await storeTokens({ ...session, repository: normalizeBase(repositoryUrl), clientId });
   return session;
 }
 
 /**
  * Renew the session from the stored refresh token, without showing anything. Answers null where there
- * is nothing to renew from — no stored token, or one belonging to a different issuer or client than
- * the one now configured — so a caller can tell "nobody is signed in" from "the renewal failed".
+ * is nothing to renew from — no stored token, or one belonging to a different repository or client
+ * than the one now in use — so a caller can tell "nobody is signed in" from "the renewal failed".
  * A refresh the IdP rejects clears the store: that token will not start working again.
+ *
+ * There is a refresh token to renew from only where the server issues one, which it does for
+ * `offline_access`; the default scopes do not ask for it, and this then finds nothing to do.
  */
-async function refresh({ issuer, discoveryUrl, clientId } = {}) {
+async function refresh({ repositoryUrl, clientId } = {}) {
   const stored = await readStoredTokens();
   if (!stored?.refreshToken) return null;
-  const wanted = normalizeIssuer(issuer);
+  const wanted = normalizeBase(repositoryUrl);
   if (!belongsTo(stored, wanted, clientId)) {
     console.log(`${OAUTH_LOG} stored session belongs to another client — discarding`);
     await clearTokens();
     return null;
   }
 
-  const endpoints = await discover(wanted || stored.issuer, discoveryUrl);
+  const endpoints = await discover(wanted || stored.repository);
   try {
     const session = toSession(
       await postToken(endpoints.token, {
@@ -424,7 +444,11 @@ async function refresh({ issuer, discoveryUrl, clientId } = {}) {
       }),
       stored.refreshToken,
     );
-    await storeTokens({ ...session, issuer: wanted || stored.issuer, clientId: clientId || stored.clientId });
+    await storeTokens({
+      ...session,
+      repository: wanted || stored.repository,
+      clientId: clientId || stored.clientId,
+    });
     return session;
   } catch (cause) {
     console.warn(`${OAUTH_LOG} refresh failed — the stored session is spent:`, cause?.message || cause);
@@ -434,49 +458,108 @@ async function refresh({ issuer, discoveryUrl, clientId } = {}) {
 }
 
 /**
- * Drop the OAuth session. The store is cleared first and unconditionally: whether the IdP could be
- * told is not allowed to decide whether this extension still holds a credential. Telling it is then
- * best-effort — the revocation endpoint where the issuer has one, so the refresh token stops working
- * for anyone who did get hold of it.
+ * Drop the OAuth session, in all three places it exists. The store is cleared first and
+ * unconditionally: whether the provider could be told is not allowed to decide whether this
+ * extension still holds a credential. Telling it is then best-effort, and two separate things —
+ * revoking the token so it stops working for anyone who got hold of it, and ending the provider's
+ * own session so the next sign-in asks who is signing in (see {@link endSessionAt}). Either is done
+ * only where the metadata names an endpoint for it, which is what the two flags report.
  */
-async function logout({ issuer, discoveryUrl, clientId } = {}) {
+async function logout({ repositoryUrl, clientId } = {}) {
   const stored = await readStoredTokens();
   await clearTokens();
-  if (!stored?.refreshToken) return { revoked: false };
+  if (!stored) return { revoked: false, sessionEnded: false };
 
-  const base = normalizeIssuer(issuer) || stored.issuer;
+  const repository = normalizeBase(repositoryUrl) || stored.repository;
+  let endpoints;
   try {
-    const endpoints = await discover(base, discoveryUrl);
-    if (!endpoints.revocation) return { revoked: false };
-    await postToken(endpoints.revocation, {
-      token: stored.refreshToken,
-      token_type_hint: 'refresh_token',
-      client_id: clientId || stored.clientId,
-    });
-    return { revoked: true };
+    endpoints = await discover(repository);
   } catch (cause) {
-    console.warn(`${OAUTH_LOG} revocation failed (session is dropped locally anyway):`, cause?.message || cause);
-    return { revoked: false };
+    console.warn(`${OAUTH_LOG} cannot reach the provider (session is dropped locally anyway):`, cause?.message || cause);
+    return { revoked: false, sessionEnded: false };
   }
+
+  let revoked = false;
+  if (endpoints.revocation && stored.refreshToken) {
+    try {
+      await postToken(endpoints.revocation, {
+        token: stored.refreshToken,
+        token_type_hint: 'refresh_token',
+        client_id: clientId || stored.clientId,
+      });
+      revoked = true;
+    } catch (cause) {
+      console.warn(`${OAUTH_LOG} revocation failed (session is dropped locally anyway):`, cause?.message || cause);
+    }
+  }
+
+  const sessionEnded = endpoints.endSession
+    ? await endSessionAt(endpoints.endSession, {
+        clientId: clientId || stored.clientId,
+        idToken: stored.idToken,
+      })
+    : false;
+  return { revoked, sessionEnded };
 }
 
 /**
- * Ask the issuer what it is, without starting a flow: whether it can be reached, whether it
- * describes the endpoints the flow needs, and which of the configured scopes it does not define.
+ * Drive the provider's own logout, where its metadata names one (`end_session_endpoint`, OpenID
+ * Connect RP-Initiated Logout). Dropping the tokens is not enough on its own: the provider's session
+ * cookie outlives them, and the next authorization request is then answered straight from that
+ * cookie — a logout after which the same user is silently signed back in.
  *
- * The last is the one a deployment gets wrong in practice and cannot see coming — a provider that
- * does not define `offline_access` (Doorkeeper-based ones, GitLab among them) answers the
- * authorization request with `invalid_scope`, and does so on a page of its own rather than by
- * redirecting, so the panel never learns why. Checking it here turns that into a sentence in the
- * settings before anybody tries to sign in.
+ * The request has to carry the browser's cookies to be about that session at all, so it is driven
+ * through the browser rather than by `fetch`: non-interactively through the `identity` API where
+ * there is one, and in a background tab that closes itself where there is not. No
+ * `post_logout_redirect_uri` is sent, because a provider accepts only addresses registered with the
+ * client and an unregistered one turns the logout into an error page — so nothing here waits for a
+ * redirect that is not coming. What is reported is therefore that the provider was asked, which is
+ * as much as either browser says.
  */
-async function checkIssuer({ issuer, discoveryUrl, scopes } = {}) {
-  const endpoints = await discover(issuer, discoveryUrl);
+async function endSessionAt(endpoint, { clientId, idToken } = {}) {
+  const request = new URL(endpoint);
+  // Which session to end. `id_token_hint` is the one the spec asks for and is present only where the
+  // scopes yielded an id token; `client_id` is what a provider falls back to.
+  if (idToken) request.searchParams.set('id_token_hint', idToken);
+  if (clientId) request.searchParams.set('client_id', clientId);
+  const url = request.toString();
+
+  try {
+    if (hasIdentityApi()) {
+      // Ends in a rejection once the page it lands on is not a redirect it can follow, which is the
+      // ordinary outcome here — the logout has been performed by then.
+      await browser.identity.launchWebAuthFlow({ url, interactive: false });
+    } else {
+      const tab = await browser.tabs.create({ url, active: false });
+      setTimeout(() => browser.tabs.remove(tab.id).catch(() => {}), LOGOUT_TAB_MS);
+    }
+  } catch {
+    /* see above: neither browser reports the provider's answer, only that nothing redirected */
+  }
+  console.log(`${OAUTH_LOG} asked the provider to end its session: ${endpoint}`);
+  return true;
+}
+
+/**
+ * What the repository says about its authorization server, without starting a flow. Asked before
+ * anything else: whether that document is there at all is what decides whether the SSO login is
+ * offered, since a repository that publishes none federates against nothing (see OAuthService).
+ *
+ * `unsupportedScopes` is the one a deployment gets wrong in practice and cannot see coming — a
+ * server that does not define a requested scope answers the authorization request with
+ * `invalid_scope`, and does so on a page of its own rather than by redirecting, so the panel would
+ * never learn why. Naming it here turns that into a sentence before anybody tries to sign in.
+ */
+async function metadata({ repositoryUrl, scopes } = {}) {
+  const endpoints = await discover(repositoryUrl);
   const wanted = String(scopes || DEFAULT_SCOPES).split(/\s+/).filter(Boolean);
   return {
+    discoveryUrl: endpoints.url,
+    issuer: endpoints.issuer,
     revocable: !!endpoints.revocation,
+    sessionEndable: !!endpoints.endSession,
     scopesSupported: endpoints.scopesSupported,
-    // Empty where the issuer lists none: nothing is known to be wrong, which is not the same as
+    // Empty where the server lists none: nothing is known to be wrong, which is not the same as
     // everything being right, and the caller says so.
     unsupportedScopes: endpoints.scopesSupported
       ? wanted.filter((scope) => !endpoints.scopesSupported.includes(scope))
@@ -519,13 +602,14 @@ async function clearTokens() {
 }
 
 /**
- * Whether a stored session was obtained for the client now configured. A session says which issuer
- * and client it came from, and the settings may name others since — a token from the previous
- * provider is not a session against this one, however unexpired it is. A stored session naming
- * neither is taken as belonging: it predates the fields, and the refresh will settle it.
+ * Whether a stored session was obtained against the repository and client now in use. A session says
+ * which pair it came from, and the panel may have been pointed elsewhere since — a token from the
+ * previous repository's provider is not a session against this one, however unexpired it is. A
+ * stored session naming neither is taken as belonging: it predates the fields, and the refresh will
+ * settle it.
  */
-function belongsTo(stored, wantedIssuer, clientId) {
-  if (wantedIssuer && stored.issuer && stored.issuer !== wantedIssuer) return false;
+function belongsTo(stored, repository, clientId) {
+  if (repository && stored.repository && stored.repository !== repository) return false;
   return !(clientId && stored.clientId && stored.clientId !== clientId);
 }
 
@@ -533,19 +617,19 @@ function belongsTo(stored, wantedIssuer, clientId) {
  * A usable access token without asking the user: the stored one while it is still valid, else what a
  * refresh yields. Null where nobody is signed in.
  */
-async function silentSession({ issuer, discoveryUrl, clientId } = {}) {
+async function silentSession({ repositoryUrl, clientId } = {}) {
   const stored = await readStoredTokens();
-  // The same check the refresh makes — without it a token from a provider the settings have since
-  // moved away from would be handed out for as long as it happened to stay valid.
+  // The same check the refresh makes — without it a token from the provider of a repository the
+  // panel has since left would be handed out for as long as it happened to stay valid.
   if (
     stored?.accessToken &&
     stored.expiresAt &&
     stored.expiresAt > Date.now() &&
-    belongsTo(stored, normalizeIssuer(issuer), clientId)
+    belongsTo(stored, normalizeBase(repositoryUrl), clientId)
   ) {
     return { accessToken: stored.accessToken, refreshToken: stored.refreshToken, idToken: stored.idToken, expiresAt: stored.expiresAt };
   }
-  return refresh({ issuer, discoveryUrl, clientId });
+  return refresh({ repositoryUrl, clientId });
 }
 
 self.EDU_SHARING_OAUTH = {
@@ -554,7 +638,7 @@ self.EDU_SHARING_OAUTH = {
   logout,
   silentSession,
   redirectUri,
-  checkIssuer,
+  metadata,
   hasIdentityApi,
   usesIdentityApi,
   TOKEN_STORAGE_KEY,

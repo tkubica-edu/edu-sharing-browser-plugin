@@ -27,10 +27,11 @@ export function fakeAuth(repositoryUrl = FAKE_REPOSITORY_URL) {
     username: signal<string | null>(null),
     error: signal<string | null>(null),
     needsReload: signal(false),
-    // The two the login card reads to decide what it offers: whether a login applies at all, and
-    // whether an identity provider is configured to offer beside the credential form.
+    // What the login card reads to decide what it offers: whether a login applies at all, and which
+    // of the two ways in this repository has — the identity provider it publishes, or a password.
     loginRequired: signal(true),
     oauthOffered: signal(false),
+    passwordLoginOffered: signal(true),
     oauthProviders: signal<readonly OAuthProvider[]>([]),
     oauthRunning: signal(false),
     login: vi.fn((_username: string, _password: string) => Promise.resolve(true)),
@@ -44,9 +45,13 @@ export function fakeAuth(repositoryUrl = FAKE_REPOSITORY_URL) {
     authorized.set(true);
   }
 
-  /** An identity provider is configured, so the login card offers it beside the credential form. */
+  /**
+   * The repository publishes an identity provider, so the card leads through it *instead of* asking
+   * for a password — the two are alternatives, not a pair (see AuthService.passwordLoginOffered).
+   */
   function offerOAuth(providers: readonly OAuthProvider[] = []): void {
     fake.oauthOffered.set(true);
+    fake.passwordLoginOffered.set(false);
     fake.oauthProviders.set(providers);
   }
 

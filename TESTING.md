@@ -274,22 +274,54 @@ extension storage and it resets per session.
 
 ## An identity provider to test the SSO login against
 
-The SSO login needs a provider that (1) publishes a discovery document — at
-`<issuer>/.well-known/openid-configuration`, or at any address entered as the *Discovery-URL*, which
-is what an authorization server describing itself under `/.well-known/oauth-authorization-server`
-(RFC 8414) needs — because that is where the endpoints are read from, and
-(2) accepts the token exchange **without a client secret**, because a public client cannot keep one
-(see [ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow)). That rules out some of the
-obvious candidates:
+Since nothing about the flow is configurable, the SSO login is only offered where the **repository**
+publishes an authorization server at `<Repository>/.well-known/oauth-authorization-server` (RFC
+8414). So the question is not only which provider to use but how to get the repository to name it:
+the document is fetched from that address and every endpoint is read out of it (see
+[ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow)).
+
+Two ways to get there, both of them local:
+
+1. **edu-sharing's own authorization server** — `security.authentication.oauth2.enabled` plus a
+   client `browser-plugin` in its configuration, which is what makes that well-known path answer.
+   The client has to be registered as a public one (`clientAuthenticationMethod: "none"`, and
+   `requireProofKey: true` so a flow without a challenge is refused rather than allowed); the sample
+   configuration ships `client_secret_basic`, which a browser extension cannot use. This is the
+   shape the feature is for, and it is a change to your repository, not to this repo.
+2. **A metadata document in front of another provider** — write the JSON yourself at that path on the
+   repository's host and put a provider's endpoints in it. This is what makes a Keycloak container
+   testable at all now, and it is the cheaper of the two:
+
+   ```json
+   {
+     "issuer": "http://localhost:8080/realms/edu-sharing",
+     "authorization_endpoint": "http://localhost:8080/realms/edu-sharing/protocol/openid-connect/auth",
+     "token_endpoint": "http://localhost:8080/realms/edu-sharing/protocol/openid-connect/token",
+     "revocation_endpoint": "http://localhost:8080/realms/edu-sharing/protocol/openid-connect/revoke",
+     "end_session_endpoint": "http://localhost:8080/realms/edu-sharing/protocol/openid-connect/logout",
+     "scopes_supported": ["openid", "profile", "email", "offline_access"]
+   }
+   ```
+
+   Only `authorization_endpoint` and `token_endpoint` are required — a document without them is
+   refused as `OAUTH_DISCOVERY_INCOMPLETE`. `revocation_endpoint` and `end_session_endpoint` are what
+   make *Abmelden* do more than forget locally, and `scopes_supported` is what lets the settings name
+   a scope the server does not define. Note that this only exercises the panel's half: the repository
+   will still refuse the access token unless it trusts that issuer
+   (`security.authentication.oauth2.trustedIssuers`).
+
+Whichever provider stands behind it has to (1) register `browser-plugin` as a client whose token
+endpoint takes no secret, because a public client cannot keep one, and (2) accept the redirect address
+this browser hands out (below). That rules out some of the obvious candidates:
 
 | Provider | Usable | Why |
 | --- | --- | --- |
-| Keycloak (local) | yes | Public client with `Client authentication` off, PKCE `S256`, `offline_access` for the refresh token, and a `revocation_endpoint` so *Abmelden* is exercised too. Also the shape edu-sharing federates in, so `oauthEntries` → `kc_idp_hint` matches |
-| GitLab.com | yes | A non-confidential application does PKCE without a secret. Note its scopes: there is no `offline_access` — asking for one is an `invalid_scope` |
+| Keycloak (local) | yes | Public client with `Client authentication` off, PKCE `S256`, and both a `revocation_endpoint` and an `end_session_endpoint`, so *Abmelden* is exercised in full. Also the shape edu-sharing federates in, so `oauthEntries` → `kc_idp_hint` matches |
+| GitLab.com | yes | A non-confidential application does PKCE without a secret. Note its scopes: there is no `offline_access`, so nothing resumes silently |
 | Microsoft Entra ID, Auth0, Okta | yes | Their SPA/native client types are secret-less and PKCE-only |
-| Google | **no** | The token endpoint requires `client_secret` for every client type, and a refresh token additionally needs `access_type=offline` — a query parameter, not a scope, so it cannot be reached through the *Scopes* field |
-| GitHub | **no** | No OIDC discovery document at all (`/.well-known/openid-configuration` is a 404), and the token endpoint requires the client secret |
-| Hosted playgrounds and demo servers (`oauth.net/playground`, `demo.duendesoftware.com`, …) | **no** | Their clients are registered against *their own* redirect URIs, and a browser extension's address is per-installation — so the code never comes back to the extension. The oauth.net playground additionally publishes no discovery document and mints its `client_id` per visitor. Client registration has to be yours, which is what the two recipes below are for |
+| Google | **no** | The token endpoint requires `client_secret` for every client type |
+| GitHub | **no** | No OIDC endpoints of this shape, and the token endpoint requires the client secret |
+| Hosted playgrounds and demo servers (`oauth.net/playground`, …) | mostly **no** | Their clients are registered against *their own* redirect URIs, and a browser extension's address is per-installation, so the code never comes back. `demo.duendesoftware.com` is the exception — its `interactive.public` client accepts any well-formed redirect address and needs no registration at all, credentials `alice/alice` — but the client id is theirs, not `browser-plugin`, so it only fits with the client name changed in `APP_CONFIG.oauth` |
 
 ### Keycloak in one container
 
@@ -300,70 +332,38 @@ docker run --rm -p 8080:8080 \
   quay.io/keycloak/keycloak:26.0 start-dev
 ```
 
-On Keycloak 24/25 the variables are `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD`. Then in the admin
-console at `http://localhost:8080`:
+On Keycloak 24/25 the variables are `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD`; pick another host
+port if 8080 is taken. Then in the admin console at `http://localhost:8080`:
 
 1. **Realm** → *Create realm* → name it `edu-sharing`.
-2. **Clients** → *Create client* → Client ID `edu-sharing-browser-extension`. On the next step leave
-   **Client authentication off** — that is what makes it a public client — with *Standard flow*
-   ticked and *Direct access grants* unticked.
+2. **Clients** → *Create client* → Client ID `browser-plugin`, the name the panel signs in under. On
+   the next step leave **Client authentication off** — that is what makes it a public client — with
+   *Standard flow* ticked and *Direct access grants* unticked.
 3. On the client's **Advanced** tab set *Proof Key for Code Exchange Code Challenge Method* to
    `S256`, so the realm refuses a flow that omits the challenge instead of quietly allowing it.
 4. **Valid redirect URIs** — see below; leave the rest of the client alone.
 5. **Users** → *Create user*, then its *Credentials* tab → set a password, *Temporary* off.
 
-Then in the panel, *Einstellungen → SSO-Anmeldung*:
-
-| Field | Value |
-| --- | --- |
-| Issuer | `http://localhost:8080/realms/edu-sharing` |
-| Client-ID | `edu-sharing-browser-extension` |
-| Scopes | `openid profile email offline_access` |
-| Redirect-URI | leave empty for a Chrome-only test, else see below |
-
 `http://localhost` is reachable because the manifest declares `http://*/*` and the CSP names `http:`;
-nothing has to be served over TLS for a local run.
+nothing has to be served over TLS for a local run. Where the repository runs in a container too, the
+address has to resolve the same from the browser *and* from that container — `localhost` does not, so
+use the compose network's gateway address for the endpoints in the document above.
 
 ### Which redirect URI to register
 
 The address cannot be guessed — the browser mints it per installation — so the panel reports it:
-**Einstellungen** (topbar) **→ SSO-Anmeldung** (click the heading to unfold it) **→** under the
-*Redirect-URI* field, in the highlighted box beginning *„Diese Adresse beim Provider hinterlegen"*.
-It needs no issuer or client id to appear, so it can be read before anything else is configured. The
-box also says which of the three cases applies, because they register differently: an address typed
-into the field above it (one registration covers every browser), an address this browser handed out
-itself (a different one per browser), or the Safari fallback. Paste that value into Keycloak's
+**Einstellungen** (topbar) **→ SSO-Anmeldung** (click the heading to unfold it) **→** the highlighted
+box beginning *„Diese Adresse beim Client im Provider hinterlegen"*. It appears whatever the
+repository answered, so it can be read before anything is set up. Paste that value into Keycloak's
 *Valid redirect URIs*.
 
-- **Leaving the field empty** is the least work for a single browser: Chrome and Edge report
-  `https://<extension-id>.chromiumapp.org/`, Firefox reports a per-profile
-  `https://<uuid>.extensions.allizom.org/`. Each is different, so testing all three means
-  registering all three — and Firefox's changes when the profile does.
-- **Filling the field in** makes every browser take the watched-tab path instead of its own API, so
-  **one address serves all three** — including Safari, which has no `identity` API to offer one. Any
-  https address the extension has host permissions for will do; it needs to serve nothing, since the
-  flow matches on the address and closes the tab before the load finishes. The default Safari
-  fallback, `<Repository>/oauth/extension-callback`, is a reasonable choice. Should the request reach
-  that server after all, the authorization code in it is useless on its own: it is single-use and
-  bound to a PKCE verifier that never leaves the extension.
-
-### GitLab.com instead of a container
-
-*User Settings → Applications → Add new application*: paste the redirect URI as above, leave
-**Confidential unticked**, and tick the scopes `openid`, `profile`, `email`. In the panel use issuer
-`https://gitlab.com`, the *Application ID* as the Client-ID, and scopes `openid profile email` —
-**without** `offline_access`, which GitLab does not define. Leaving the shipped default in place is
-the mistake to expect here: GitLab runs on Doorkeeper, which refuses an unknown scope with *„The
-requested scope is invalid, unknown, or malformed"* on a page of its own instead of redirecting, so
-the panel never learns why and the flow simply hangs until the window is closed. *Issuer und Scopes
-prüfen* in the settings names such a scope before a login is attempted; without `offline_access`
-there is no refresh token, so the silent resume does not apply and *Abmelden* is the only way the
-session ends early.
-
-Also unverified against a live instance: GitLab's discovery document does not advertise `none` among
-`token_endpoint_auth_methods_supported` even though the documented PKCE flow sends no secret, so if
-the token exchange comes back `OAUTH_TOKEN_FAILED: 401`, that is the reason and Keycloak is the way
-on.
+Chrome and Edge report `https://<extension-id>.chromiumapp.org/`, Firefox a per-profile
+`https://<uuid>.extensions.allizom.org/`, and Safari — which has no `identity` API to hand one out —
+uses `<Repository>/oauth/extension-callback`. Each is different, so testing all three means
+registering all three, and Firefox's changes when the profile does. The Safari address needs to serve
+nothing: the flow matches on it and closes the tab before the load finishes. Should the request reach
+that server after all, the authorization code in it is useless on its own — single-use and bound to a
+PKCE verifier that never leaves the extension.
 
 ## Manual test checklist
 
@@ -388,15 +388,18 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
 4. **Login**: required for everything except *Einstellungen*. Enter staging credentials → the session
    bar flips to "Angemeldet: …" and the login option disappears while the rest appear. If the
    repository URL was changed, login is blocked until it is applied in *Einstellungen*.
-5. **SSO-Anmeldung** (needs an identity provider — see
+5. **SSO-Anmeldung** (needs a repository that publishes an authorization server — see
    [§ An identity provider to test the SSO login against](#an-identity-provider-to-test-the-sso-login-against)):
-   enter the issuer and the client id under *Einstellungen* → *SSO-Anmeldung*, register the address
-   the group reports as the redirect URI with the client at the provider, then use the button below
-   the credential form on the login card. The provider's pages must open (a `launchWebAuthFlow` window on Chrome, Edge and
-   Firefox; a tab that closes itself on Safari), and the session bar must flip to "Angemeldet: …"
-   afterwards. Then close the panel and reopen it: the session must come back without the provider
-   being shown again — that is the stored refresh token. *Abmelden* must end it for good, i.e. the
-   next open must ask again rather than sign back in. Closing the provider's window instead must
+   register the address *Einstellungen* → *SSO-Anmeldung* reports with the client at the provider,
+   then open the login card. It must now show **only** the SSO button — no username, no password, no
+   *Passwort vergessen?* — and *Einstellungen* → *SSO-Anmeldung* must say which server was found. The
+   provider's pages must open (a `launchWebAuthFlow` window on Chrome, Edge and Firefox; a tab that
+   closes itself on Safari), and the session bar must flip to "Angemeldet: …" afterwards. Point the
+   panel at a repository that publishes nothing there and the card must be the credential form alone
+   again, with no error anywhere. *Abmelden* must end the session for good: with an
+   `end_session_endpoint` in the document the next attempt must ask for credentials again rather than
+   sign back in from the provider's cookie — that is the case to watch, since it is the one that
+   silently does nothing when the endpoint is missing. Closing the provider's window instead must
    leave the login card exactly as it was, with no error on it. **Untested on Safari**, see
    [TROUBLESHOOTING.md § Browser-specific](TROUBLESHOOTING.md#browser-specific).
 6. **Erschließen + speichern**: *Inhalt erschließen* on a content page → the metadata screen shows

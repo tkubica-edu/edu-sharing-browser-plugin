@@ -119,10 +119,11 @@ flat.
   switches the panel login off, and the checkbox *WLO-Funktionen verwenden* in *Einstellungen* refuses
   it so the base version's flow stays reachable against such a repository;
   `browserExtensionEditorialGroups` names the editorial groups contents can be forwarded to.
-- **SSO client** — an OpenID Connect issuer and client id, set in *Einstellungen → SSO-Anmeldung*
-  (defaults in `APP_CONFIG.oauth`, empty as shipped); a *Discovery-URL* there names the metadata
-  document where it does not sit at the issuer's OIDC path. Configured, the login card offers signing in
-  through the identity provider next to the credential form — Authorization Code flow with PKCE, see
+- **SSO login** — nothing to configure: the panel asks the repository whether it publishes an
+  authorization server (`<Repository>/.well-known/oauth-authorization-server`) and offers the identity
+  provider *instead of* the credential form where it does. Client and scopes are constants in
+  `APP_CONFIG.oauth` (`browser-plugin`, `profile`); *Einstellungen → SSO-Anmeldung* reports the answer
+  and the redirect address to register with the client. Authorization Code flow with PKCE, see
   [UI-SHELL.md](UI-SHELL.md#login-session-restore-and-the-guest-gate) and
   [ARCHITECTURE.md](ARCHITECTURE.md#the-oauth-flow).
 - **Defaults and storage keys** live in `config.js` (worker) and `app-src/src/app/config.ts` (app).

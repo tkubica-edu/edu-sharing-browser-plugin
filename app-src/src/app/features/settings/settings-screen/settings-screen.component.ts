@@ -28,6 +28,12 @@ import { configuredSchemes } from '../../../util/quality-schemes';
  */
 type SettingsSection = 'developer' | 'sso' | 'ai' | 'recommendation' | 'quality' | 'nostr';
 
+/**
+ * The sections that hold settings at all, and can therefore say how many of them stand away from the
+ * shipped defaults. *SSO-Anmeldung* holds none: it reports what the repository answered.
+ */
+type TunableSection = Exclude<SettingsSection, 'sso'>;
+
 // Repository configuration plus the settings of the chat, the checks and the two development switches.
 // Changing the URL requires a reload, because the API library freezes its rootUrl at bootstrap (see
 // AuthService).
@@ -70,18 +76,11 @@ export class SettingsScreenComponent implements OnDestroy {
   /** The relay the panel ships with, named where the field says what an empty one falls back to. */
   protected readonly defaultNostrRelayUrl = APP_CONFIG.nostrRelayUrl;
 
-  /** The scopes the panel ships with, named where the field says what an empty one falls back to. */
-  protected readonly defaultOAuthScopes = APP_CONFIG.oauth.scopes;
-
   /**
-   * The discovery address the issuer implies, as the empty field's placeholder — the same assembly
-   * the worker makes of it (`discoveryUrlOf` in `background/oauth.js`). Without an issuer there is
-   * nothing to imply, and the placeholder says what the field is for instead.
+   * Where the SSO login is looked for, as the worker assembles the address — shown because a
+   * repository that answers nothing there is the whole reason the login card asks for a password.
    */
-  protected readonly discoveryUrlFromIssuer = computed(() => {
-    const issuer = this.oauth.issuer().replace(/\/+$/, '');
-    return issuer ? `${issuer}/.well-known/openid-configuration` : 'aus dem Issuer abgeleitet';
-  });
+  protected readonly discoveryUrl = computed(() => this.oauth.discoveryUrlOf(this.auth.repositoryUrl()));
 
   /**
    * The redirect address this browser will actually use, as the background worker reports it, and
@@ -125,9 +124,8 @@ export class SettingsScreenComponent implements OnDestroy {
    * ChatStyleService.changedSettings). Stated per section of this screen, since the sections are how they
    * are grouped for the reader and not how the services are split.
    */
-  protected readonly changedPerSection = computed<Record<SettingsSection, number>>(() => ({
+  protected readonly changedPerSection = computed<Record<TunableSection, number>>(() => ({
     developer: this.wlo.changedSettings() + this.devMode.changedSettings() + this.debug.changedSettings(),
-    sso: this.oauth.changedSettings(),
     ai: this.chatStyle.changedSettings() + this.chatSkill.changedSettings(),
     recommendation: this.recommendations.changedSettings(),
     quality: this.qualityJudge.changedSettings() + this.contentJudge.changedSettings(),
@@ -137,8 +135,8 @@ export class SettingsScreenComponent implements OnDestroy {
   protected toggleSection(section: SettingsSection): void {
     this.openSection.update((open) => (open === section ? null : section));
     // Asked when the section is opened rather than on boot: it costs a round trip to the worker, and
-    // it is only ever read here. Re-asked on every open, because the configured redirect address and
-    // the repository it falls back to may have been edited since.
+    // it is only ever read here. Re-asked on every open, because the repository it is derived from
+    // may have been edited since.
     if (this.openSection() === 'sso') void this.readRedirectUri();
   }
 
@@ -257,42 +255,16 @@ export class SettingsScreenComponent implements OnDestroy {
   }
 
   // ---- SSO (OpenID Connect) -----------------------------------------------
-  // Written as it is edited, like every other setting here. An emptied field is not an invalid one: it
-  // puts the configured default back in force (see OAuthService). The redirect address is re-read after
-  // each change, because two of these fields are what it is derived from.
+  // Nothing to set: the section reports what the repository answered about its own authorization
+  // server, which is what decides whether the login card leads through it (see OAuthService).
 
-  /** Ask the issuer what it is, so a wrong scope or an unreachable issuer is named before a login. */
-  protected checkIssuer(): void {
-    void this.oauth.check(this.auth.repositoryUrl());
-  }
-
-  protected setOAuthIssuer(issuer: string): void {
-    this.changed = true;
-    // The previous answer described a different client, so it is dropped rather than left standing.
-    this.oauth.clearCheck();
-    void this.oauth.setIssuer(issuer).then(() => this.readRedirectUri());
-  }
-
-  protected setOAuthDiscoveryUrl(discoveryUrl: string): void {
-    this.changed = true;
-    void this.oauth.setDiscoveryUrl(discoveryUrl);
-  }
-
-  protected setOAuthClientId(clientId: string): void {
-    this.changed = true;
-    this.oauth.clearCheck();
-    void this.oauth.setClientId(clientId).then(() => this.readRedirectUri());
-  }
-
-  protected setOAuthScopes(scopes: string): void {
-    this.changed = true;
-    this.oauth.clearCheck();
-    void this.oauth.setScopes(scopes);
-  }
-
-  protected setOAuthRedirectUri(redirectUri: string): void {
-    this.changed = true;
-    void this.oauth.setRedirectUri(redirectUri).then(() => this.readRedirectUri());
+  /**
+   * Ask the repository again. The one thing worth a button here: the answer is a fact about the
+   * repository rather than a setting, so it changes when *it* changes — and having enabled its
+   * authorization server, whoever runs it wants to see that without reloading the panel.
+   */
+  protected probeOAuth(): void {
+    void this.oauth.probe(this.auth.repositoryUrl());
   }
 
   // ---- Nostr relay --------------------------------------------------------
