@@ -1,11 +1,10 @@
 import { Injectable, inject } from '@angular/core';
-import { HOME_REPOSITORY, MdsDefinition, MdsService, MdsWidget } from 'ngx-edu-sharing-api';
-import {
-  EduSharingLlmService, EduSharingLlmWidgetAiConfigRequest, WidgetAiConfigInfo
-} from 'ngx-edu-sharing-b-api';
+import { ConfigService, HOME_REPOSITORY, MdsDefinition, MdsService } from 'ngx-edu-sharing-api';
+import { EduSharingLlmService, EduSharingLlmWidgetAiConfigRequest } from 'ngx-edu-sharing-b-api';
 import { firstValueFrom } from 'rxjs';
 
 import { AuthService } from './auth.service';
+import { aiConfigWidgets } from '../util/mds-form-widgets';
 import { NodeSuggestions, proposedAiSuggestions } from '../util/mds-suggestions';
 
 /** Log prefix for the generation run and what it was asked for. */
@@ -13,9 +12,6 @@ const LOG = '[edu-sharing][mds-ai]';
 
 /** The prompt configuration the MDS editor's own „Metadaten generieren" runs under. */
 const CONFIG_ID = { type: 'mds', id: 'suggestion_ai' };
-
-/** The `aiConfig` a widget is generated under, as the MDS editor asks for it — see {@link aiConfigOf}. */
-const DEFAULT_AI_CONFIG = 'default';
 
 /**
  * How much of the page's text a run is given as a variable. The prompts of a metadata set are written for
@@ -29,8 +25,8 @@ export type SuggestionVariables = Record<string, string[]>;
 
 /**
  * The repository's own metadata generation, as the MDS editor's „Für alle Metadaten-Felder, welche über die
- * KI generiert werden können, Vorschläge erzeugen" triggers it: a run over every widget of the metadata set
- * that carries an `aiConfig`, whose findings the repository stores as KI-Vorschläge on the node.
+ * KI generiert werden können, Vorschläge erzeugen" triggers it: a run over the fields of the rendered form
+ * that carry an `aiConfig`, whose findings the repository stores as KI-Vorschläge on the node.
  *
  * The panel asks for it itself rather than letting the editor's toggle do it, because the toggle only appears
  * where the editor decides it should and starts a run the panel cannot give its own inputs. The inputs are the
@@ -44,6 +40,7 @@ export type SuggestionVariables = Record<string, string[]>;
 @Injectable({ providedIn: 'root' })
 export class MdsAiSuggestionService {
   private readonly auth = inject(AuthService);
+  private readonly config = inject(ConfigService);
   private readonly mds = inject(MdsService);
   // The generation itself: `POST {bApiUrl}/api/v1/edu-sharing/suggestions`, addressed through the
   // b-API client the repository publishes for it (see app.config.ts).
@@ -58,7 +55,11 @@ export class MdsAiSuggestionService {
   /**
    * Have the repository generate what the metadata set can generate for this node, from the values handed
    * in. Answers what the run proposed, in the shape the widgets read; null where there was nothing to ask
-   * for, where the set names no generatable field, or where the run failed or proposed nothing.
+   * for, where the repository names no set or no generatable field, or where the run failed or proposed
+   * nothing. The set is the one the repository's client config names for the home repository (see
+   * {@link configuredSetId}), and the fields are the ones the named group's form is built from (see
+   * `aiConfigWidgets`) — a run is asked for what the person in front of the form can see, not for the
+   * whole vocabulary of the set.
    *
    * The answer is the run's own report of what it wrote. The proposals are read from the node behind this
    * (SuggestionService.load), which is the better source — those carry the ids an acceptance is recorded
@@ -66,7 +67,7 @@ export class MdsAiSuggestionService {
    */
   async generate(
     nodeId: string,
-    setId: string,
+    groupId: string,
     variables: SuggestionVariables,
   ): Promise<NodeSuggestions | null> {
     if (this.generated.has(nodeId)) return null;
@@ -74,13 +75,16 @@ export class MdsAiSuggestionService {
       console.log(`${LOG} nothing to generate from for ${nodeId} — no variable carries a value`);
       return null;
     }
+    const setId = await this.configuredSetId();
+    if (!setId) return null;
     const set = await this.metadataSet(setId);
     if (!set) return null;
-    // Never the fields the caller already has an answer for: they are what the run works *from*.
-    const widgets = generatableWidgets(set, Object.keys(variables));
+    // The form's own fields, minus the ones the caller already has an answer for: those are what the run
+    // works *from*.
+    const widgets = aiConfigWidgets(set, groupId, Object.keys(variables));
     if (!widgets.length) {
       console.log(
-        `${LOG} the metadata set ${set.id} names no field left to generate — no widget carries an aiConfig`,
+        `${LOG} the ${groupId} form of ${setId} has no field left to generate — no widget carries an aiConfig`,
       );
       return null;
     }
@@ -89,14 +93,14 @@ export class MdsAiSuggestionService {
     this.generated.add(nodeId);
     const body: EduSharingLlmWidgetAiConfigRequest = {
       user: this.auth.username() ?? '',
-      metadataSet: set.id,
+      metadataSet: setId,
       configIds: [CONFIG_ID],
       widgetAiConfigs: widgets,
       contextNodeId: nodeId,
       variables
     };
     console.log(
-      `${LOG} → generating ${widgets.length} fields for ${nodeId}`,
+      `${LOG} → generating ${widgets.length} fields of the ${groupId} form for ${nodeId}`,
       { fields: widgets.map((widget) => widget.widgetId), body },
     );
     try {
@@ -122,6 +126,27 @@ export class MdsAiSuggestionService {
     }
   }
 
+  /**
+   * The metadata set a run is made under: the first one the client config's `availableMds` names for the
+   * home repository. The set has to be named by its own id — `-default-` addresses a set on the MDS
+   * endpoints but is no id the generation can be configured under, so a repository whose config names
+   * none leaves the run unmade rather than asking under a placeholder.
+   */
+  private async configuredSetId(): Promise<string | null> {
+    try {
+      const config = await firstValueFrom(this.config.observeConfig());
+      const home = config?.availableMds?.find(
+        (entry) => !entry.repository || entry.repository === HOME_REPOSITORY,
+      );
+      const setId = home?.mds?.find((id) => !!id) ?? null;
+      if (!setId) console.log(`${LOG} the client config names no metadata set for ${HOME_REPOSITORY}`);
+      return setId;
+    } catch (cause: unknown) {
+      console.warn(`${LOG} could not read the client config:`, cause);
+      return null;
+    }
+  }
+
   /** The metadata set the fields are read off; null where the repository will not hand it over. */
   private async metadataSet(setId: string): Promise<MdsDefinition | null> {
     try {
@@ -133,33 +158,4 @@ export class MdsAiSuggestionService {
       return null;
     }
   }
-}
-
-/**
- * The set's widgets a run can fill: the ones carrying an `aiConfig`, each named once however many templates
- * it appears in, minus the ones `settled` already answers. The editor picks the config named `default` and so
- * does this; a widget that names its configs differently is asked for under the first it offers.
- */
-function generatableWidgets(set: MdsDefinition, settled: readonly string[]): WidgetAiConfigInfo[] {
-  const named = new Map<string, WidgetAiConfigInfo>();
-  for (const widget of set.widgets ?? []) {
-    const widgetId = widget.id;
-    if (!widgetId || named.has(widgetId) || settled.includes(widgetId)) continue;
-    const aiConfigId = aiConfigOf(widget);
-    if (aiConfigId) named.set(widgetId, { widgetId, aiConfigId });
-  }
-  return [...named.values()];
-}
-
-/**
- * The `aiConfig` a widget is generated under; null for a widget that carries none. The one named
- * `default` — which is the only one the MDS editor ever asks for — else the first the widget offers,
- * and that name again for a config that states none: a run under the name the set is written for
- * stands a better chance than one refused for the sake of a missing id.
- */
-function aiConfigOf(widget: MdsWidget): string | null {
-  const configs = widget.aiConfigs ?? [];
-  if (!configs.length) return null;
-  const named = configs.find((config) => config.id === DEFAULT_AI_CONFIG);
-  return named?.id ?? configs[0].id ?? DEFAULT_AI_CONFIG;
 }

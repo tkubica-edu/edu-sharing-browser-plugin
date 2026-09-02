@@ -4,12 +4,16 @@
 
 .mds-host { display: block; width: 100%; }
 
-// In the bundle's own KI colour, so the sentence and the values it is about read as one thing.
-.ai-note {
-  margin: 0 0 var(--es-space-3);
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--aiColor, var(--es-blue));
+// The core's own KI banner (`.ai-info` of es-mds-editor-core): the bar in the KI colour above the views,
+// with the toggle that starts a generation run of its own. The panel runs the generation itself, before
+// the form is built (see MdsAiSuggestionService), so the bar offers a second way into what has already
+// happened — and the note it carries is written for the repository's UI, not for this step.
+//
+// `!important` because the bar's own rule (`.ai-info[_ngcontent-…] { display: flex }`) carries the same
+// specificity as this one and is injected with the bundle, which is loaded after the panel's styles — so
+// without it the later rule wins.
+:host ::ng-deep .ai-info {
+  display: none !important;
 }
 
 // The picture, the file name and the title are already on screen above this form, rendered by the
@@ -27,6 +31,15 @@
   [data-element='preview'],
   [data-element='cm:name'],
   [data-element='cclom:title'] {
+    display: none;
+  }
+
+  // The caption the view writes as a plain <label> before the preview widget, rather than as the widget's
+  // own, and the one or two <br> it spaces the widget from the next field with. Nothing in the DOM ties
+  // either to the widget, so both are addressed through what does: their place beside it.
+  label:has(+ [data-element='preview']),
+  [data-element='preview'] + br,
+  [data-element='preview'] + br + br {
     display: none;
   }
 }

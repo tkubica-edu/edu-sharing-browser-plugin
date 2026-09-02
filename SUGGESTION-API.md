@@ -74,6 +74,10 @@ wäre dort also verfügbar.
   Property **und Wert**, `description: 'METHODOLOGY'`, `confidence: 1`), `storedAiSuggestions()`
   formt die Antwort des Repositories in die Form, die die Widgets lesen. `aiSuggestionsFor()` baut
   dieselbe Form rein im Speicher — der Rückfall, wo das Repository keine Vorschläge hält.
+- `app-src/src/app/util/mds-form-widgets.ts` — `formWidgets()` liest die Widgets des gerenderten
+  Formulars aus dem Satz: die Gruppe nennt die Views, das `html` einer View platziert die Widgets
+  über ihre Id als Element. `aiConfigWidgets()` nimmt davon die mit `aiConfigs` — das sind die
+  `widgetAiConfigs` des [b-API-Laufs](#erzeugen-lassen-der-b-api-lauf).
 - `app-src/src/app/services/suggestion.service.ts` — `propose()` und `load()`, beide bestenfalls:
   jede Seite meldet, was sie erreicht hat, und wirft nicht. `propose()` löscht vorher die eigene
   `version` (`browser-extension`), damit eine wiederholte Erschließung die Vorschläge ersetzt statt
@@ -126,7 +130,8 @@ bearbeiten*, **bevor** das Formular gebaut wird (`MdsAiSuggestionService`, geruf
 | Endpunkt | `POST {rootUrl}/bapi/api/v1/edu-sharing/suggestions` — `rootUrl` ist der der REST-API (`…/edu-sharing/rest`), weshalb der Interceptor der Bibliothek die Session mitschickt |
 | Repository | das **konfigurierte**, nicht das des Metadaten-Agenten: die Vorschläge hängen am Node, und der liegt dort (anders als `MetadataAgentApiService`, siehe [ARCHITECTURE.md](ARCHITECTURE.md#the-metadata-agents-address)) |
 | Body | `EduSharingLlmWidgetAiConfigRequest`: `user` (`authorityName`), `metadataSet`, `configIds: [{ type: 'mds', id: 'suggestion_ai' }]`, `widgetAiConfigs: [{ widgetId, aiConfigId }]`, `contextNodeId`, `variables` |
-| `widgetAiConfigs` | jedes Widget des Metadatensatzes mit `aiConfigs` (aus `GET /mds/v1/metadatasets/…`), je einmal, `aiConfigId: 'default'` wie im Core |
+| `metadataSet` | der Satz, den die Client-Konfiguration unter `availableMds` fürs Heim-Repository (`-home-`) nennt, z. B. `mds_oeh` — nicht der des Formulars: `-default-` adressiert einen Satz an den MDS-Endpunkten, ist aber keine Id, unter der die Generierung konfiguriert ist. Nennt die Konfiguration keinen, bleibt der Lauf aus |
+| `widgetAiConfigs` | die Widgets **des gerenderten Formulars** mit `aiConfigs`: die Gruppe (`io`) nennt die Views, deren `html` die Widgets platziert (`aiConfigWidgets()` in `app-src/src/app/util/mds-form-widgets.ts`, Satz aus `GET /mds/v1/metadatasets/…`), je einmal, `aiConfigId: 'default'` wie im Core — nicht das ganze Vokabular des Satzes |
 | `variables` | was der Lauf **liest**: `cclom:title` (der aktuelle Titel) und `textContent` (der Text der Seite) |
 | Ergebnis | steht danach am Node und wird über `getSuggestionsByNodeId` gelesen; die Antwort des Laufs (`SuggestionResponseDto[]`) ist der **Rückfall**, falls der Speicher sie nicht herausgibt (`proposedAiSuggestions()`) |
 

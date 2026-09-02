@@ -1,6 +1,6 @@
 import {
-  afterRenderEffect, ChangeDetectionStrategy, Component, computed, CUSTOM_ELEMENTS_SCHEMA,
-  ElementRef, OnDestroy, OnInit, inject, input, output, signal, viewChild
+  afterRenderEffect, ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, ElementRef,
+  OnDestroy, OnInit, inject, input, output, signal, viewChild
 } from '@angular/core';
 import { HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 
@@ -112,9 +112,6 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
   /** While the repository is generating the missing fields, so the wait says what is being waited for. */
   protected readonly generating = signal(false);
 
-  /** Whether the form carries KI-Vorschläge — the note above it says what that means for them. */
-  protected readonly hasAiSuggestions = computed(() => this.aiFields().length > 0);
-
   private element: MdsEditorElement | null = null;
   /** The full normalized metadata handed to the editor (all generated fields). */
   private initialValues: MdsValues = {};
@@ -181,8 +178,8 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
 
   /**
    * Have the repository fill what the content does not say about itself yet, before the form is built from
-   * what it does: the metadata set's own generation over every field it can generate, run on this node and
-   * given what the content already states — its title and the text it was read off (see
+   * what it does: the metadata set's own generation over the fields of this form it can generate, run on
+   * this node and given what the content already states — its title and the text it was read off (see
    * MdsAiSuggestionService). What comes back is stored on the node, so it is read by the load behind this.
    *
    * Awaited rather than started: a form built while the run is still going would offer none of it, and the
@@ -193,11 +190,7 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
     if (!Object.keys(variables).length) return null;
     this.generating.set(true);
     try {
-      return await this.aiSuggestions.generate(
-        nodeId,
-        this.setId() ?? this.webComponent.metadataSet(),
-        variables,
-      );
+      return await this.aiSuggestions.generate(nodeId, this.groupId(), variables);
     } finally {
       this.generating.set(false);
     }
