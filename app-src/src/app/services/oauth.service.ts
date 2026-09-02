@@ -175,9 +175,16 @@ export class OAuthService {
     return session.accessToken ?? null;
   }
 
-  /** Drop the OAuth session the worker holds. Best-effort: the repository logout stands either way. */
+  /**
+   * Drop the OAuth session the worker holds. Best-effort: the repository logout stands either way.
+   *
+   * Deliberately not gated on {@link available}, unlike everything else here. The worker's store
+   * outlives any one boot, so a probe that happened to fail on this one would leave a refresh token
+   * standing that the next boot — where the probe succeeds — signs the user straight back in with.
+   * Whether a token is held is not a question about the repository, and dropping one costs nothing
+   * where there is none.
+   */
   async logout(repositoryUrl: string): Promise<void> {
-    if (!this.available()) return;
     await this.browserExtension.oauthLogout(this.request(repositoryUrl)).catch(() => null);
   }
 

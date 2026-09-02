@@ -39,6 +39,7 @@ const CLIENT_ID = 'browser-plugin';
 const AUTHORIZATION_ENDPOINT = 'https://sso.example/realms/edu/protocol/openid-connect/auth';
 const TOKEN_ENDPOINT = 'https://sso.example/realms/edu/protocol/openid-connect/token';
 const REVOCATION_ENDPOINT = 'https://sso.example/realms/edu/protocol/openid-connect/revoke';
+const USERINFO_ENDPOINT = 'https://sso.example/realms/edu/protocol/openid-connect/userinfo';
 const END_SESSION_ENDPOINT = 'https://sso.example/realms/edu/protocol/openid-connect/logout';
 
 /** The address Chrome's and Firefox's `identity` API hands out for this extension. */
@@ -86,6 +87,9 @@ describe('the worker`s OAuth flow', () => {
   let discovery: Record<string, string | string[]>;
   /** Set by the case that asserts on what `launchWebAuthFlow` was handed. */
   let launchedOptions: Record<string, unknown>[] | null;
+
+  /** What the userinfo endpoint answers — how a case says whether the provider still holds a session. */
+  let userInfoAnswer: { payload: unknown; status: number };
 
   /**
    * Load `background/oauth.js` with the globals it expects. A fresh module per case, because it caches
@@ -169,6 +173,9 @@ describe('the worker`s OAuth flow', () => {
       return jsonResponse({ access_token: 'an-access-token', refresh_token: 'a-refresh-token', expires_in: 300 });
     }
     if (url === REVOCATION_ENDPOINT) return jsonResponse({});
+    // The provider's answer about its own session, which is what a stored access token is held
+    // against before it is reused — see `stillSignedIn` in background/oauth.js.
+    if (url === USERINFO_ENDPOINT) return jsonResponse(userInfoAnswer.payload, userInfoAnswer.status);
     return jsonResponse({ error: 'not_found' }, 404);
   });
 
@@ -193,11 +200,13 @@ describe('the worker`s OAuth flow', () => {
     removeListeners = [];
     withoutIdentityApi = false;
     launchedOptions = null;
+    userInfoAnswer = { payload: { sub: 'ada' }, status: 200 };
     discovery = {
       issuer: 'https://sso.example/realms/edu',
       authorization_endpoint: AUTHORIZATION_ENDPOINT,
       token_endpoint: TOKEN_ENDPOINT,
       revocation_endpoint: REVOCATION_ENDPOINT,
+      userinfo_endpoint: USERINFO_ENDPOINT,
     };
     // The IdP redirects straight back with the code, echoing the state it was given — the happy path
     // every case that is not about the redirect itself starts from.
@@ -406,7 +415,8 @@ describe('the worker`s OAuth flow', () => {
 
     it('asks for `profile` alone where the caller names no scopes', async () => {
       // The token is traded for a repository session rather than read, so nothing else is of use —
-      // and every extra scope is one the server can refuse on a page the panel never sees.
+      // and every extra scope is one the server can refuse on a page the panel never sees, which is
+      // why `offline_access` is left out even though it would yield a refresh token.
       await loadModule().login(request);
 
       expect(authorizationRequest().searchParams.get('scope')).toBe('profile');
@@ -653,20 +663,67 @@ describe('the worker`s OAuth flow', () => {
       expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
     });
 
-    it('reuses a stored access token that is still valid, without asking the provider', async () => {
+    it('renews rather than reusing a stored access token, so the provider gets to refuse', async () => {
       const module = loadModule();
       await module.login(request);
-      const before = requests.length;
 
-      expect((await module.silentSession(request))?.accessToken).toBe('an-access-token');
-      expect(requests).toHaveLength(before);
+      // The refresh is the grant the provider invalidates when the user logs out; the access token
+      // stays cryptographically fine either way, so reusing it would resume a session that is over.
+      expect((await module.silentSession(request))?.accessToken).toBe('a-renewed-token');
+    });
+
+    describe('a session with no refresh token, which is what the shipped scopes yield', () => {
+      /** Sign in against a provider that issues no refresh token, and leave the access token stored. */
+      async function signInWithoutRefreshToken(module: OAuthModule): Promise<void> {
+        fakeFetch.mockImplementationOnce(async (url: string) => {
+          requests.push({ url, body: null });
+          return jsonResponse(discovery);
+        });
+        fakeFetch.mockImplementationOnce(async (url: string) => {
+          requests.push({ url, body: null });
+          return jsonResponse({ access_token: 'an-access-token', expires_in: 300 });
+        });
+        await module.login(request);
+      }
+
+      it('holds the token against the provider before reusing it', async () => {
+        const module = loadModule();
+        await signInWithoutRefreshToken(module);
+
+        expect((await module.silentSession(request))?.accessToken).toBe('an-access-token');
+        expect(requests.at(-1)?.url).toBe(USERINFO_ENDPOINT);
+      });
+
+      it('resumes nothing once the provider has ended that session, and forgets the token', async () => {
+        const module = loadModule();
+        await signInWithoutRefreshToken(module);
+        // What a provider answers for a token whose session was logged out elsewhere — in
+        // edu-sharing's own pages, or at the provider itself.
+        userInfoAnswer = { payload: { error: 'invalid_token' }, status: 401 };
+
+        expect(await module.silentSession(request)).toBeNull();
+        expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
+      });
+
+      it('resumes nothing where the provider names no way to ask', async () => {
+        const module = loadModule();
+        // Before the login: the document is read once and kept for the worker's lifetime.
+        delete discovery.userinfo_endpoint;
+        await signInWithoutRefreshToken(module);
+
+        // A token that cannot be checked is not evidence of a session, and the login card is the
+        // honest answer. The store is kept: nothing said the session is over.
+        expect(await module.silentSession(request)).toBeNull();
+        expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(true);
+      });
     });
 
     it('does not hand out a still-valid token from a repository the panel has left', async () => {
       const module = loadModule();
       await module.login(request);
 
-      // The fast path skips the refresh, so it has to make the same ownership check the refresh does.
+      // Checked before either way of asking the provider, so a token from elsewhere is never held
+      // against this repository's server.
       expect(await module.silentSession({ repositoryUrl: 'https://other.example/edu-sharing', clientId: CLIENT_ID })).toBeNull();
       expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
     });

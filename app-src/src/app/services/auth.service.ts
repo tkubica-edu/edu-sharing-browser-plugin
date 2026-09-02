@@ -6,10 +6,26 @@ import { APP_CONFIG, toApiRootUrl } from '../config';
 import { BOOT_ROOT_URL } from '../app.config';
 import { BrowserExtensionCustomWebComponentService } from './browser-extension-custom-web-component.service';
 import { BrowserExtensionService } from './browser-extension.service';
+import { LogoutService } from './logout.service';
 import { OAuthProvider, OAuthService } from './oauth.service';
 
 /** How long to wait for the session check on startup. */
 const RESTORE_TIMEOUT_MS = 8000;
+
+/**
+ * What the login screen says after the repository ended the session on its own. Always stated,
+ * unlike edu-sharing's own frontend, which puts the same notice behind the `sessionExpiredDialog`
+ * config: what that config suppresses there is a modal in the user's way, while here it is the one
+ * line that explains why a panel that was signed in is asking for a login again.
+ */
+const SESSION_EXPIRED_TEXT =
+  'Die Sitzung ist wegen Inaktivität beendet worden. Bitte erneut anmelden.';
+
+/** How often the time left in the session is recomputed for the countdown. */
+const SESSION_TICK_MS = 1000;
+
+/** How much of the session has to be left for {@link AuthService.sessionEndingSoon} to stay false. */
+const SESSION_WARNING_MS = 5 * 60 * 1000;
 
 // Login against a user-supplied edu-sharing repository via ngx-edu-sharing-api.
 // The library freezes rootUrl at bootstrap, so switching repositories reloads the
@@ -22,6 +38,7 @@ export class AuthService {
   private readonly bootRootUrl = inject(BOOT_ROOT_URL);
   private readonly browserExtensionCustomWebComponent = inject(BrowserExtensionCustomWebComponentService);
   private readonly oauth = inject(OAuthService);
+  private readonly logoutPolicy = inject(LogoutService);
 
   /** The repository base URL (`…/edu-sharing`) the user configured. */
   readonly repositoryUrl = signal(this.bootRootUrl.replace(/\/rest$/, ''));
@@ -37,6 +54,33 @@ export class AuthService {
   readonly error = signal<string | null>(null);
   /** True when the repository URL was edited to differ from the bootstrapped one. */
   readonly needsReload = signal(false);
+
+  /**
+   * How long the repository will hold this session without another request, in milliseconds; null
+   * where there is no session to lose. The repository resets the timer on every API call, so this
+   * follows the panel's own traffic — see {@link sessionEndingSoon}.
+   */
+  private readonly sessionRemainingState = signal<number | null>(null);
+  readonly sessionRemaining = this.sessionRemainingState.asReadonly();
+
+  /**
+   * Whether the session is close enough to its end to say so. The countdown is tracked all along but
+   * only worth showing once it is short: a panel that displays the remaining hour of a fresh session
+   * says nothing a user needs.
+   */
+  readonly sessionEndingSoon = computed(() => {
+    const remaining = this.sessionRemainingState();
+    return this.loggedIn() && remaining !== null && remaining > 0 && remaining <= SESSION_WARNING_MS;
+  });
+
+  /** The time left as `mm:ss`, or null while there is no session — see {@link sessionRemaining}. */
+  readonly sessionRemainingText = computed(() => {
+    const remaining = this.sessionRemainingState();
+    if (remaining === null || remaining < 0) return null;
+    const seconds = Math.ceil(remaining / 1000);
+    const pad = (value: number) => String(value).padStart(2, '0');
+    return `${pad(Math.floor(seconds / 60))}:${pad(seconds % 60)}`;
+  });
 
   /** The library's rootUrl for the configured repository (`…/edu-sharing/rest`). */
   readonly apiRootUrl = computed(() => toApiRootUrl(this.repositoryUrl()));
@@ -79,6 +123,10 @@ export class AuthService {
 
   /** Set while the identity provider's pages are up — see OAuthService.running. */
   readonly oauthRunning = this.oauth.running;
+
+  constructor() {
+    this.watchSession();
+  }
 
   /** Load the persisted repository URL (or default), then revalidate any session. */
   async init(): Promise<void> {
@@ -235,16 +283,52 @@ export class AuthService {
     }
   }
 
+  /**
+   * Log the user out, the way the repository asks for it: LogoutService carries out the policy the
+   * client config publishes — ending the session, and calling the repository's own or the identity
+   * provider's logout address where it names one.
+   *
+   * The three sessions are ended in the order they depend on each other: the repository's policy
+   * first, while the session it may have to present still exists, then the OAuth session, then the
+   * panel's own state. Where the config names where a logged-out user belongs (`logout.next`), that
+   * is opened last, once the panel is a logged-out one.
+   */
   async logout(): Promise<void> {
-    try {
-      await firstValueFrom(this.authentication.logout());
-    } catch {
-      /* best-effort — drop the local session either way */
-    }
+    const repositoryUrl = this.repositoryUrl();
+    const outcome = await this.logoutPolicy.run(repositoryUrl);
     // The OAuth session is dropped with the repository one, refresh token included. Leaving it would
     // make the next boot sign the user straight back in — a logout that does not log out.
-    await this.oauth.logout(this.repositoryUrl());
+    await this.oauth.logout(repositoryUrl);
     this.applyLogout(null);
+    if (outcome.next) await this.logoutPolicy.openNext(outcome.next, repositoryUrl);
+  }
+
+  /**
+   * Watch the session the repository holds: the countdown to its automatic end, and the moment it is
+   * reached. Both come from the library, which derives them from the session timeout every login
+   * info states and resets them on every API call the panel makes.
+   */
+  private watchSession(): void {
+    this.authentication
+      .observeTimeUntilAutoLogout(SESSION_TICK_MS)
+      .subscribe((remaining) => this.sessionRemainingState.set(remaining));
+    this.authentication.observeAutoLogout().subscribe(() => void this.sessionExpired());
+  }
+
+  /**
+   * The repository ended the session because nothing was asked of it for too long. Nothing is asked
+   * of the repository about that — it has already logged this session out; what is left is to stop
+   * showing a session that is gone, and to say why.
+   *
+   * The OAuth session goes with it, exactly as in {@link logout}. Keeping it would put the panel's
+   * boot in the way of the timeout: the panel is rebuilt on every page navigation, and
+   * {@link resumeOAuthSession} would silently mint a new repository session from the refresh token —
+   * a timeout that expires nothing, and a panel the user cannot get logged out of.
+   */
+  private async sessionExpired(): Promise<void> {
+    this.sessionRemainingState.set(null);
+    this.applyLogout(SESSION_EXPIRED_TEXT);
+    await this.oauth.logout(this.repositoryUrl());
   }
 
   private isValidUser(info: LoginInfo | undefined): info is LoginInfo {

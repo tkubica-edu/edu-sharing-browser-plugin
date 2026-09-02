@@ -19,6 +19,13 @@ const API_URL = (typeof EDU_SHARING_CONFIG !== 'undefined' && EDU_SHARING_CONFIG
 const DEFAULT_TIMEOUT_MS = (typeof EDU_SHARING_CONFIG !== 'undefined' && EDU_SHARING_CONFIG.network?.defaultTimeoutMs) || 20000;
 const GENERATE_TIMEOUT_MS = (typeof EDU_SHARING_CONFIG !== 'undefined' && EDU_SHARING_CONFIG.network?.generateTimeoutMs) || 60000;
 
+/**
+ * The window a repository's logout page is opened in (`tabs.visit` with `window`). Sized like the
+ * sign-in windows the `identity` API puts up, since it shows the same kind of page: a form of the
+ * repository's or of the identity provider's, filling a window of its own rather than a browser tab.
+ */
+const LOGOUT_WINDOW = { width: 520, height: 700 };
+
 // DEV MODE
 
 /**
@@ -552,6 +559,7 @@ const ALLOWED_ACTIONS = new Set([
   'tabs.getActive',
   'tabs.extractPageData',
   'tabs.navigate',
+  'tabs.visit',
   'analyze.run',
   'analyze.url',
   'metadata.saveNode',
@@ -614,6 +622,23 @@ browser.runtime.onMessage.addListener((message, sender) => {
           // The panel is what asked, so it is open — recorded explicitly in case that state was lost.
           await setPanelOpen(tab.id, true);
           await browser.tabs.update(tab.id, { url });
+          return { success: true };
+        }
+
+        // Have the browser load a URL of its own, so the request carries the cookies the browser
+        // holds — how a repository's logout is driven (see LogoutService). `window` puts it in a
+        // window of its own, the way the sign-in pages come up; without it, in a tab.
+        //
+        // Whatever it opens is left standing. The address is a page of the repository's or the
+        // identity provider's, it may well ask the user something, and it is the user who closes it.
+        case 'tabs.visit': {
+          const url = typeof message.url === 'string' ? message.url : '';
+          if (!/^https?:\/\//i.test(url)) return { success: false, error: 'INVALID_URL' };
+          if (message.window === true) {
+            await browser.windows.create({ url, type: 'popup', width: LOGOUT_WINDOW.width, height: LOGOUT_WINDOW.height });
+            return { success: true };
+          }
+          await browser.tabs.create({ url, active: message.active === true });
           return { success: true };
         }
 

@@ -50,6 +50,11 @@ const LOGOUT_TAB_MS = 3000;
  * What the authorization request asks for where the caller names nothing. `profile` alone, because
  * the access token is traded for a repository session rather than read here — no claim of it is
  * inspected, so a wider request would only add scopes the server can refuse.
+ *
+ * `offline_access` would yield the refresh token a silent resume is best made from, and is left out
+ * all the same: the deployments this runs against do not define it, and an undefined scope fails the
+ * whole request. {@link silentSession} therefore falls back to the userinfo endpoint. Has to stay in
+ * step with `APP_CONFIG.oauth.scopes` in the panel, which states the scopes on every message.
  */
 const DEFAULT_SCOPES = 'profile';
 
@@ -137,6 +142,8 @@ async function discover(repositoryUrl) {
     // Where the provider ends its own session — see {@link endSessionAt}.
     endSession: document.end_session_endpoint || null,
     revocation: document.revocation_endpoint || null,
+    // Where a token can be held against the provider's own session — see {@link stillSignedIn}.
+    userInfo: document.userinfo_endpoint || null,
     // Optional in the spec, so absent is "the server does not say" rather than "no scopes".
     scopesSupported: Array.isArray(document.scopes_supported) ? document.scopes_supported : null,
   };
@@ -614,22 +621,92 @@ function belongsTo(stored, repository, clientId) {
 }
 
 /**
- * A usable access token without asking the user: the stored one while it is still valid, else what a
- * refresh yields. Null where nobody is signed in.
+ * A usable access token without asking the user, for putting a lost repository session back on a
+ * boot (`AuthService.resumeOAuthSession`). Null where nobody is signed in.
+ *
+ * The stored access token is **not** taken as evidence on its own, however far its `expiresAt` still
+ * is away. Nothing outside this extension can reach that store: signing out of edu-sharing's own
+ * pages does not clear it, and neither does signing out at the provider — so a token trusted for its
+ * nominal lifetime would keep minting fresh repository sessions for a user who has logged out
+ * everywhere they can see, which is a panel that cannot be logged out of.
+ *
+ * So the provider is asked, every time, and only its answer is trusted: a refresh where there is a
+ * refresh token (the grant it invalidates on logout), else the token held against its userinfo
+ * endpoint (see {@link stillSignedIn}). Where neither can be done — no refresh token and no such
+ * endpoint — nothing is resumed, because there is then no way to tell a live session from a logged-out
+ * one, and the login card is the honest answer.
  */
 async function silentSession({ repositoryUrl, clientId } = {}) {
   const stored = await readStoredTokens();
-  // The same check the refresh makes — without it a token from the provider of a repository the
-  // panel has since left would be handed out for as long as it happened to stay valid.
-  if (
-    stored?.accessToken &&
-    stored.expiresAt &&
-    stored.expiresAt > Date.now() &&
-    belongsTo(stored, normalizeBase(repositoryUrl), clientId)
-  ) {
-    return { accessToken: stored.accessToken, refreshToken: stored.refreshToken, idToken: stored.idToken, expiresAt: stored.expiresAt };
+  if (!stored) return null;
+  const wanted = normalizeBase(repositoryUrl);
+  // Without this a token from the provider of a repository the panel has since left would be handed
+  // out for as long as it happened to stay valid.
+  if (!belongsTo(stored, wanted, clientId)) {
+    console.log(`${OAUTH_LOG} stored session belongs to another client — discarding`);
+    await clearTokens();
+    return null;
   }
-  return refresh({ repositoryUrl, clientId });
+  // A refresh is the stronger check of the two — the provider validates the grant *and* answers with
+  // a fresh token — so it is preferred wherever there is a refresh token to make it with.
+  if (stored.refreshToken) return refresh({ repositoryUrl, clientId });
+  if (!stored.accessToken || !stored.expiresAt || stored.expiresAt <= Date.now()) return null;
+
+  let endpoints;
+  try {
+    endpoints = await discover(wanted || stored.repository);
+  } catch (cause) {
+    console.warn(`${OAUTH_LOG} cannot reach the provider to check the stored session:`, cause?.message || cause);
+    return null;
+  }
+  if (!(await stillSignedIn(endpoints, stored.accessToken))) return null;
+  return {
+    accessToken: stored.accessToken,
+    refreshToken: stored.refreshToken,
+    idToken: stored.idToken,
+    expiresAt: stored.expiresAt,
+  };
+}
+
+/**
+ * Whether the provider still holds the session the stored access token was issued for. Asked at the
+ * userinfo endpoint, which answers for the *session* rather than for the token's signature: a
+ * provider that ended the session refuses it (401/403) while the token itself is still inside its
+ * nominal lifetime, and that difference is the whole point of asking.
+ *
+ * A refusal clears the store — that session is over and no later boot should try again. Anything else
+ * (no such endpoint, the provider unreachable, an answer that is neither) leaves the store alone and
+ * reports "cannot say", which stops the resume without throwing the token away over a network blip.
+ */
+async function stillSignedIn(endpoints, accessToken) {
+  if (!endpoints.userInfo) {
+    console.log(`${OAUTH_LOG} the provider names no userinfo endpoint — not resuming from a stored token`);
+    return false;
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OAUTH_REQUEST_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(endpoints.userInfo, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+      credentials: 'omit',
+      signal: controller.signal,
+    });
+  } catch (cause) {
+    console.warn(`${OAUTH_LOG} could not check the stored session:`, cause?.name === 'AbortError' ? 'timeout' : cause?.message || cause);
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+  if (response.ok) return true;
+  if (response.status === 401 || response.status === 403) {
+    console.log(`${OAUTH_LOG} the provider has ended that session (${response.status}) — dropping the stored one`);
+    await clearTokens();
+    return false;
+  }
+  console.warn(`${OAUTH_LOG} the userinfo endpoint answered ${response.status} — not resuming`);
+  return false;
 }
 
 self.EDU_SHARING_OAUTH = {

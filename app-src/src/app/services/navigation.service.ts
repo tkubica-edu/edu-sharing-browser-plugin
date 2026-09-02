@@ -217,9 +217,16 @@ export class NavigationService {
     // (a content was detected for this page while "Inhalt erschließen" was open), don't strand the
     // user on a dead screen — re-land on a valid view.
     effect(() => {
-      const id = this.section();
-      if (id === 'menu') return;
       const conditions = this.conditions.snapshot();
+      const id = this.section();
+      if (id === 'menu') {
+        // The main menu is not a view for a panel with no session either. Its entries are the steps
+        // of a flow that needs one, so what is left of it once the session goes is a list of steps
+        // that say nothing — and a boot in that state lands on the login instead ({@link land}).
+        // A session that falls away under an open menu has to do the same.
+        if (!conditions.loggedIn) this.land();
+        return;
+      }
       const section = this.sectionOf(id);
       if (!section?.visible(conditions) || !this.isEnabled(section, conditions)) this.land();
     });

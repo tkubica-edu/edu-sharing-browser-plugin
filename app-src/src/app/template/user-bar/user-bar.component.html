@@ -5,6 +5,7 @@
     <!-- Disabled while a write is in flight: what this row folds out ends the session the save's
          follow-up requests run under (see BusyService). -->
     <button class="ub-row" (click)="toggle()" [attr.aria-expanded]="expanded()"
+            [class.is-ending]="endingSoon()"
             [disabled]="busy.busy()" [title]="busy.hint() ?? hint()">
       <i class="ub-avatar" esIcon="person"></i>
       <span class="ub-main">
@@ -20,6 +21,11 @@
         @if (guest()) {
           <button class="ub-action" (click)="login()">Anmelden</button>
         } @else {
+          <!-- The repository drops a session nothing is asked of; the row above carries the same
+               countdown once it is short. -->
+          @if (sessionHint(); as sessionHint) {
+            <p class="ub-session">{{ sessionHint }}</p>
+          }
           <button class="ub-action" (click)="logout()">Abmelden</button>
         }
       </div>

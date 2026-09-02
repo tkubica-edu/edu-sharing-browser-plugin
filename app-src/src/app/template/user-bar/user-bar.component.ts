@@ -44,8 +44,31 @@ export class UserBarComponent {
    */
   protected readonly guest = computed(() => !this.auth.loggedIn());
 
-  /** What the bar says, in the two states it has. */
-  protected readonly title = computed(() => (this.guest() ? 'Gastzugang' : 'Angemeldet'));
+  /**
+   * What the bar says. Once the session is close to its automatic end the countdown is part of it:
+   * the repository drops a session nothing has been asked of, and the bar naming the session is
+   * where that is noticed without opening anything (see AuthService.sessionEndingSoon).
+   */
+  protected readonly title = computed(() => {
+    if (this.guest()) return 'Gastzugang';
+    const remaining = this.auth.sessionEndingSoon() ? this.auth.sessionRemainingText() : null;
+    return remaining ? `Angemeldet · ${remaining}` : 'Angemeldet';
+  });
+
+  /** Whether the session's remaining time is short enough to be pointed out — the row turns on it. */
+  protected readonly endingSoon = computed(() => this.auth.sessionEndingSoon());
+
+  /**
+   * What the folded-out panel says about the session's remaining time. Said only once the time is
+   * short, like the countdown in {@link title}: the hour a fresh session has left is not something
+   * anybody needs to read.
+   */
+  protected readonly sessionHint = computed(() => {
+    const remaining = this.auth.sessionRemainingText();
+    if (!this.endingSoon() || !remaining) return null;
+    return `Sitzung endet in ${remaining} ohne weitere Aktivität`;
+  });
+
   /**
    * Who the session belongs to, said the way the repository says it everywhere else — the profile's
    * name via {@link AuthorityNamePipe}, not the login name. The login name is the fallback the pipe
@@ -64,9 +87,9 @@ export class UserBarComponent {
   /** The row's tooltip: what folding it out would offer. */
   protected readonly hint = computed(() => {
     if (this.expanded()) return 'Schließen';
-    return this.guest()
-      ? 'Als Gast unterwegs — hier anmelden, um alle Funktionen zu nutzen'
-      : `Angemeldet als ${this.subtitle()}`;
+    if (this.guest()) return 'Als Gast unterwegs — hier anmelden, um alle Funktionen zu nutzen';
+    const hint = this.sessionHint();
+    return hint ? `Angemeldet als ${this.subtitle()} — ${hint}` : `Angemeldet als ${this.subtitle()}`;
   });
 
   /** The session's actions are folded away until asked for — the bar itself is the answer. */

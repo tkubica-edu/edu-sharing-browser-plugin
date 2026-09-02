@@ -169,15 +169,43 @@ that state is not the repository.
 **Resuming an OAuth session.** The flow keeps its refresh token in `browser.storage.local`
 (`eduSharingOAuthTokens`, written only by the worker). `AuthService.init` uses it after the cookie
 restore above has come up empty, so a repository session lost to a timeout or a browser restart is
-put back without anything being shown. It is silent in both directions: a stored token that no
+put back without anything being shown. The provider is asked first, every time — a refresh where
+there is a refresh token, else the stored access token held against the userinfo endpoint — because
+nothing outside the extension can clear that store, and a token trusted for its nominal lifetime
+would put back a session the user has already logged out of elsewhere (see
+[ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow)). It is silent in both directions: a stored token that no
 longer works is not reported, because nobody asked for a login, and the login card it leaves standing
-says the rest. (With the `profile` scope the panel asks for there is usually no refresh token at
-all — `offline_access` is what yields one — so this puts a session back only where the server issues
-them.) *Abmelden* drops everything: the repository session, the stored tokens, the token's validity
+says the rest. (The panel asks for `profile` alone — `offline_access`, which is what would yield a
+refresh token, is not defined by the deployments this runs against — so the check is normally the
+userinfo one, and where a server publishes no such endpoint nothing is resumed at all.) *Abmelden*
+drops everything: the repository session, the stored tokens, the token's validity
 at the server where it names a revocation endpoint, and the provider's own session where it names an
 `end_session_endpoint`. The last matters because the provider's cookie would otherwise answer the
 next authorization request on its own — a logout after which the same user is signed straight back
 in.
+
+**Where a logout leaves the panel.** On the login card. The main menu is not a view for a panel
+without a session — its entries are the steps of a flow that needs one, so what would be left is a
+list of steps saying nothing — and a boot in that state lands on the login anyway
+(`NavigationService.land`). A session that falls away *under* an open menu therefore lands the same
+way, which the navigation guard does (`NavigationService`'s constructor, the same guard that re-lands
+when any open step falls away). Where no login is required at all — the browser extension custom web
+component brings the session with it — there is nothing to land on and the menu stays.
+
+**Signing out.** *Abmelden* carries out the repository's own logout policy before any of that: its
+client config decides whether ending the session is the whole of it, or whether the repository's
+logout page or the identity provider's single logout has to be called as well, and which of the three
+addresses it publishes applies to this user. The address opens in a window of its own, the way the
+sign-in pages come up, and is left standing for you to close — never by navigating the panel's tab.
+See
+[ARCHITECTURE.md § Logging out of the repository](ARCHITECTURE.md#logging-out-of-the-repository).
+
+**The session's own end.** The repository drops a session nothing has been asked of, and the session
+bar names the last five minutes of one (*Angemeldet · 04:31*, and the folded-out row says why). When
+the time is up the panel goes back to the login card with one line saying the session ended for
+inactivity, and the stored OAuth tokens go with the session. They have to: the panel is rebuilt on
+every page navigation, and the silent resume above would otherwise put the timed-out session straight
+back — nothing would ever expire, and the panel could not be logged out of.
 
 **Sections a guest cannot be served by** (`AppSection.requiresSession`: *Inhalt hinzufügen*, *Meine
 Inhalte*, and — while the content is past the agent route's two-hour editing window, see

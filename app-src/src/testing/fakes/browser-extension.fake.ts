@@ -48,6 +48,8 @@ export function fakeBrowserExtension() {
       return Promise.resolve();
     }),
     navigateTab: vi.fn((): Promise<void> => Promise.resolve()),
+    openWindow: vi.fn((_url: string): Promise<void> => Promise.resolve()),
+    openTab: vi.fn((_url: string, _options?: { active?: boolean }): Promise<void> => Promise.resolve()),
     saveNode: vi.fn(
       (_body: Record<string, unknown>, _apiUrl?: string): Promise<SaveNodeResponse> =>
         Promise.resolve(saved),

@@ -156,15 +156,98 @@ only that carries the cookie: `launchWebAuthFlow` non-interactively, or a backgr
 itself. No `post_logout_redirect_uri` is sent — a provider accepts only registered ones — so nothing
 waits for a redirect, and what is reported is that the provider was asked.
 
+**Resuming from the store, and why the provider is always asked.** Nothing outside this extension can
+reach `eduSharingOAuthTokens`: signing out of edu-sharing's own pages does not clear it, and neither
+does signing out at the provider. So a stored access token is never taken as evidence of a live
+session, however far its `expiresAt` still is away — it would keep minting fresh repository sessions
+for a user who has logged out everywhere they can see, which is a panel that cannot be logged out of.
+`silentSession` therefore asks the provider every time: a **refresh** where there is a refresh token
+(that is the grant a logout invalidates; the access token stays cryptographically fine either way),
+else the token held against the **userinfo endpoint**, which answers for the session rather than for
+the signature and refuses one that has been ended (401/403 → the store is dropped). Where neither can
+be done — no refresh token and no `userinfo_endpoint` in the document — nothing is resumed, because
+there is then no way to tell a live session from a logged-out one. In practice the userinfo endpoint
+is the path: the shipped scopes are `profile` alone, since `offline_access` — which is what would
+yield a refresh token — is not defined by the deployments this runs against, and an undefined scope
+fails the whole authorization request. A server that publishes no userinfo endpoint either leaves the
+panel asking for a login whenever the repository's session cookie is gone.
+
 The worker hands the panel the access token and nothing else. The refresh token stays in
 `browser.storage.local` under `eduSharingOAuthTokens` and is read only there — the panel names the
 key in `APP_CONFIG.storageKeys.oauthTokens` merely so its storage keys are all in one place. A
 provider that rotates refresh tokens is followed; one that rejects a refresh has its stored session
-cleared, since that token will not start working again. (With `profile` alone there is usually no
-refresh token at all: `offline_access` is what yields one.) Messages: `oauth.login`, `oauth.silent`,
+cleared, since that token will not start working again. (There is a refresh token to follow only
+where the server issues one without being asked for `offline_access`; see the scopes above.)
+Messages: `oauth.login`, `oauth.silent`,
 `oauth.logout`, `oauth.redirectUri`, `oauth.discover` — the last being the probe above, which also
 reads the document's `scopes_supported` so a scope the server does not define is named in the
 settings rather than refused, unreadably, on the provider's own error page.
+
+## Logging out of the repository
+
+*Abmelden* is not one request. What ends a session is the repository's own policy, and the panel
+carries it out the way edu-sharing's own frontend does (`UiService.handleLogout` there,
+`LogoutService.run` here): the client config's `logout` block decides whether ending the session is
+the whole of it, or whether an address of the repository's — its own logout page, or the identity
+provider's single logout — has to be called as well.
+
+- **No `logout` block** — the ordinary case. The session is ended through the API
+  (`AuthenticationService.logout`) and nothing else happens.
+- **`destroySession`** is read but does not decide anything: the session is ended through the API
+  either way, see the deviation below.
+- **`ajax`** calls the address without leaving the panel. `withCredentials` is set explicitly, since
+  the library's own interceptor sets it for the API root alone and a logout that arrives without the
+  session cookie logs nobody out. A repository whose CORS rules do not name the extension's origin
+  refuses that request, so it falls back to the window below.
+- **`ssoUrl` / `localUrl` / `url`** are the three addresses, and which applies is a fact about the
+  user: `ssoUrl` for one known through Shibboleth (`cm:esssotype`), since only that ends the session
+  they also hold at the identity provider; `localUrl` for one the repository holds itself; `url` for
+  both where it publishes only one.
+- **`next`** is where the repository wants a logged-out user to end up.
+
+Three things are done differently here than in a frontend that owns its tab.
+
+The session is **always** ended through the API, where the frontend leaves that to the logout address
+unless `destroySession` says otherwise. The frontend can: it hands the browser to that address in its
+own top-level tab, and the whole redirect chain runs there. This panel opens a window it does not
+follow and cannot wait for — one the user may close unread — so leaving the session to it means a
+panel that shows a login card while the session cookie is still alive, and **the next boot takes that
+cookie straight back up** (`AuthService.restoreSession`, and the panel is rebuilt on every page
+navigation). A logout that can be undone by navigating to another page is not a logout.
+
+The address is opened in a **window of its own** (`tabs.visit` with `window`, sized like the
+`identity` API's sign-in windows) rather than by navigating the panel's tab: the panel is an iframe
+that does not survive that, and the page the user is working on is not the logout's to take away. The
+window is left standing — the address is a page of the repository's or of the identity provider's, it
+may well ask the user something, and closing it is theirs to do. It is opened *before* the session is
+ended, so it is carried by the session it may have to identify.
+
+`next` is opened in a **tab beside the docked one**, being a page the user is to carry on in rather
+than one that carries a logout. Both are driven through the browser rather than by `fetch`, because
+only that carries the cookies the session lives in — the same reason the OAuth
+`end_session_endpoint` is driven that way above.
+
+The OAuth session is dropped with the repository one, refresh token included (see *Logging out*
+above); `AuthService.logout` is what puts the three in order — the repository's policy first, while
+the session it may have to present still exists, then the OAuth session, then the panel's own state.
+
+**The session's own end.** The repository drops a session nothing has been asked of for its
+`sessionTimeout`, and the library reports both the countdown and the moment it is reached
+(`observeTimeUntilAutoLogout`, `observeAutoLogout`, reset by every API call the panel makes).
+`AuthService.watchSession` follows them: the last five minutes are named in the session bar
+(`sessionEndingSoon`, `sessionRemainingText`), and when the time is up the panel stops showing a
+session that is gone and says why. Nothing is asked of the repository then — it has already logged
+this session out — but the OAuth session goes with it, exactly as on *Abmelden*. Keeping the refresh
+token would put the panel's own boot in the way of the timeout: the panel is rebuilt on every page
+navigation, and the silent resume would mint a new repository session from that token, so nothing
+would ever expire.
+
+The countdown can be pessimistic. It is derived from the requests the *panel* makes, while the
+embedded edu-sharing and WLO web components carry their own API client and reset the repository's
+timer without the library learning of it (`AuthenticationService.reportOutsideApiRequest` is the hook
+for that, and nothing reports through it yet). So the bar may count down through a session that has
+in fact been renewed; the moment it announces as the end is then simply not reached, and the session
+carries on.
 
 ## Saving a content
 

@@ -727,6 +727,27 @@ describe('NavigationService', () => {
       expect(navigation.section()).toBe('menu');
     });
 
+    it('re-lands from the main menu when the session goes, rather than listing steps that need one', () => {
+      expect(navigation.section()).toBe('menu');
+
+      // What *Abmelden* leaves behind (AuthService.applyLogout).
+      auth.fake.authorized.set(false);
+      auth.fake.loggedIn.set(false);
+      TestBed.tick();
+
+      expect(navigation.section()).toBe('login');
+    });
+
+    it('stays on the menu without a session where none is required', () => {
+      // The browser extension custom web component brings the session with it, so there is no login
+      // to land on — see ConditionsService.loggedIn.
+      withWebComponent();
+      auth.fake.loggedIn.set(false);
+      TestBed.tick();
+
+      expect(navigation.section()).toBe('menu');
+    });
+
     it('re-lands where the open step falls away underneath the user', () => {
       contentInHand();
       navigation.go('overview');

@@ -418,6 +418,29 @@ export class BrowserExtensionService {
     }
   }
 
+  /**
+   * Have the browser open `url` in a window of its own, the way the sign-in pages come up. The way
+   * to make the browser carry an address with the cookies it holds — a repository's logout, which
+   * does nothing when it arrives without them (see LogoutService) — and a window rather than a tab
+   * because what it shows is a page of the repository's that may well ask the user something.
+   */
+  async openWindow(url: string): Promise<void> {
+    if ((await this.ask({ action: 'tabs.visit', url, window: true })) === UNREACHABLE) {
+      throw new Error(WORKER_UNREACHABLE);
+    }
+  }
+
+  /**
+   * Have the browser open `url` in a tab beside the one the panel is docked in — for a page the user
+   * is to carry on in, as opposed to the panel's own tab, which the panel does not survive being
+   * navigated. `active` decides whether they are taken there straight away.
+   */
+  async openTab(url: string, { active = true }: { active?: boolean } = {}): Promise<void> {
+    if ((await this.ask({ action: 'tabs.visit', url, active })) === UNREACHABLE) {
+      throw new Error(WORKER_UNREACHABLE);
+    }
+  }
+
   /** Tell the host page the sidebar has booted, so it can replay a buffered inbound event. */
   signalReady(): void {
     this.postToHost({ type: 'edusharing-sidebar-ready' });

@@ -7,15 +7,19 @@ import { AuthService } from './auth.service';
 import { BOOT_ROOT_URL } from '../app.config';
 import { BrowserExtensionCustomWebComponentService } from './browser-extension-custom-web-component.service';
 import { BrowserExtensionService } from './browser-extension.service';
+import { LogoutService } from './logout.service';
 import { provideFake } from '../../testing/provide-fake';
 import {
   AuthenticationFake,
   BrowserExtensionFake,
+  LogoutFake,
   UserApiFake,
   WebComponentFake,
   aLoginInfo,
+  aLogoutOutcome,
   fakeAuthentication,
   fakeBrowserExtension,
+  fakeLogout,
   fakeUserApi,
   fakeWebComponent,
 } from '../../testing/fakes';
@@ -34,12 +38,14 @@ describe('AuthService', () => {
   let userApi: UserApiFake;
   let extension: BrowserExtensionFake;
   let webComponent: WebComponentFake;
+  let logout: LogoutFake;
 
   beforeEach(() => {
     authentication = fakeAuthentication();
     userApi = fakeUserApi();
     extension = fakeBrowserExtension();
     webComponent = fakeWebComponent();
+    logout = fakeLogout();
     TestBed.configureTestingModule({
       providers: [
         { provide: BOOT_ROOT_URL, useValue: BOOT_URL },
@@ -47,6 +53,7 @@ describe('AuthService', () => {
         provideFake(UserService, userApi.fake),
         provideFake(BrowserExtensionService, extension.fake),
         provideFake(BrowserExtensionCustomWebComponentService, webComponent.fake),
+        provideFake(LogoutService, logout.fake),
       ],
     });
     auth = TestBed.inject(AuthService);
@@ -303,15 +310,86 @@ describe('AuthService', () => {
       expect(auth.error()).toBeNull();
     });
 
-    it('drops it even when the repository refuses to be told', async () => {
+    it('leaves the repository policy to carry out the logout', async () => {
       await auth.init();
-      authentication.fake.logout.mockImplementation(() => {
-        throw new Error('502 Bad Gateway');
-      });
+
+      await auth.logout();
+
+      // The policy is the repository's, and the URL it is resolved against is the one the panel runs
+      // against — see LogoutService.run.
+      expect(logout.fake.run).toHaveBeenCalledWith(auth.repositoryUrl());
+    });
+
+    it('drops it even where the policy could not end the session', async () => {
+      logout.ends(aLogoutOutcome({ sessionDestroyed: false }));
+      await auth.init();
 
       await auth.logout();
 
       expect(auth.loggedIn()).toBe(false);
+    });
+
+    it('takes the user where the repository wants them afterwards', async () => {
+      logout.ends(aLogoutOutcome({ next: 'https://portal.example/goodbye' }));
+      await auth.init();
+
+      await auth.logout();
+
+      expect(logout.fake.openNext).toHaveBeenCalledWith(
+        'https://portal.example/goodbye',
+        auth.repositoryUrl(),
+      );
+    });
+
+    it('opens nothing where it names no such page', async () => {
+      await auth.init();
+
+      await auth.logout();
+
+      expect(logout.fake.openNext).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the session the repository holds', () => {
+    it('reports the time left as a countdown', async () => {
+      await auth.init();
+
+      authentication.reportsTimeUntilLogout(4 * 60 * 1000 + 31 * 1000);
+
+      expect(auth.sessionRemainingText()).toBe('04:31');
+      expect(auth.sessionEndingSoon()).toBe(true);
+    });
+
+    it('says nothing about a session that has plenty of time left', async () => {
+      await auth.init();
+
+      authentication.reportsTimeUntilLogout(59 * 60 * 1000);
+
+      expect(auth.sessionEndingSoon()).toBe(false);
+    });
+
+    it('drops the session when the repository ends it for inactivity', async () => {
+      await auth.init();
+      expect(auth.loggedIn()).toBe(true);
+
+      authentication.timesOut();
+
+      expect(auth.loggedIn()).toBe(false);
+      expect(auth.error()).toContain('Inaktivität');
+      expect(auth.sessionRemaining()).toBeNull();
+    });
+
+    it('drops the OAuth session with it, so the next boot cannot sign the user back in', async () => {
+      extension.federates();
+      await auth.init();
+      extension.fake.oauthLogout.mockClear();
+
+      authentication.timesOut();
+      await Promise.resolve();
+
+      // The panel is rebuilt on every page navigation, and a kept refresh token would silently mint
+      // a new session there — a timeout that expires nothing.
+      expect(extension.fake.oauthLogout).toHaveBeenCalled();
     });
   });
 
@@ -529,12 +607,14 @@ describe('AuthService', () => {
       expect(auth.loggedIn()).toBe(false);
     });
 
-    it('asks nothing of the worker where the repository federates against nothing', async () => {
+    it('has the worker drop its store even where the repository federates against nothing', async () => {
       await auth.init();
 
       await auth.logout();
 
-      expect(extension.fake.oauthLogout).not.toHaveBeenCalled();
+      // The store outlives a boot, so a probe that failed on this one must not leave a refresh token
+      // standing for the next one to sign the user back in with — see OAuthService.logout.
+      expect(extension.fake.oauthLogout).toHaveBeenCalled();
     });
   });
 

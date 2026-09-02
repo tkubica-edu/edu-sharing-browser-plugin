@@ -171,8 +171,17 @@ export const APP_CONFIG = {
     /**
      * What the authorization request asks for. `profile` alone: the access token is traded for a
      * repository session rather than read here, so no further claim is of any use — and every extra
-     * scope is one the server can refuse. Has to stay in step with `DEFAULT_SCOPES` in
-     * `background/oauth.js`, which is what a message naming none falls back to.
+     * scope is one the server can refuse.
+     *
+     * `offline_access` is deliberately absent, although it is what would make a server issue a
+     * refresh token: the deployments this panel runs against do not support it, and a scope the
+     * server does not define fails the whole authorization request. Without a refresh token there is
+     * nothing to ask the provider with but the stored access token, so the silent resume rests on the
+     * userinfo endpoint (`silentSession` in `background/oauth.js`) and does not happen at all where a
+     * server publishes none.
+     *
+     * Has to stay in step with `DEFAULT_SCOPES` in `background/oauth.js`, which is what a message
+     * naming none falls back to.
      */
     scopes: 'profile'
   },

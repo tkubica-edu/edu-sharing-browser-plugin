@@ -299,14 +299,17 @@ Two ways to get there, both of them local:
      "token_endpoint": "http://localhost:8080/realms/edu-sharing/protocol/openid-connect/token",
      "revocation_endpoint": "http://localhost:8080/realms/edu-sharing/protocol/openid-connect/revoke",
      "end_session_endpoint": "http://localhost:8080/realms/edu-sharing/protocol/openid-connect/logout",
+     "userinfo_endpoint": "http://localhost:8080/realms/edu-sharing/protocol/openid-connect/userinfo",
      "scopes_supported": ["openid", "profile", "email", "offline_access"]
    }
    ```
 
    Only `authorization_endpoint` and `token_endpoint` are required — a document without them is
    refused as `OAUTH_DISCOVERY_INCOMPLETE`. `revocation_endpoint` and `end_session_endpoint` are what
-   make *Abmelden* do more than forget locally, and `scopes_supported` is what lets the settings name
-   a scope the server does not define. Note that this only exercises the panel's half: the repository
+   make *Abmelden* do more than forget locally, `userinfo_endpoint` is what lets a stored access token
+   be held against the provider's own session — the panel asks for no `offline_access`, so there is
+   normally no refresh token and this is the only way the silent resume can check one — and
+   `scopes_supported` is what lets the settings name a scope the server does not define. Note that this only exercises the panel's half: the repository
    will still refuse the access token unless it trusts that issuer
    (`security.authentication.oauth2.trustedIssuers`).
 
@@ -317,7 +320,7 @@ this browser hands out (below). That rules out some of the obvious candidates:
 | Provider | Usable | Why |
 | --- | --- | --- |
 | Keycloak (local) | yes | Public client with `Client authentication` off, PKCE `S256`, and both a `revocation_endpoint` and an `end_session_endpoint`, so *Abmelden* is exercised in full. Also the shape edu-sharing federates in, so `oauthEntries` → `kc_idp_hint` matches |
-| GitLab.com | yes | A non-confidential application does PKCE without a secret. Note its scopes: there is no `offline_access`, so nothing resumes silently |
+| GitLab.com | yes | A non-confidential application does PKCE without a secret. Note its scopes: Doorkeeper defines no `offline_access`, which is one reason the panel does not ask for it |
 | Microsoft Entra ID, Auth0, Okta | yes | Their SPA/native client types are secret-less and PKCE-only |
 | Google | **no** | The token endpoint requires `client_secret` for every client type |
 | GitHub | **no** | No OIDC endpoints of this shape, and the token endpoint requires the client secret |
@@ -402,20 +405,45 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    silently does nothing when the endpoint is missing. Closing the provider's window instead must
    leave the login card exactly as it was, with no error on it. **Untested on Safari**, see
    [TROUBLESHOOTING.md § Browser-specific](TROUBLESHOOTING.md#browser-specific).
-6. **Erschließen + speichern**: *Inhalt erschließen* on a content page → the metadata screen shows
+6. **Abmelden gegen eine Repository-Logout-Policy** (needs a repository whose client config carries a
+   `logout` block — see
+   [ARCHITECTURE.md § Logging out of the repository](ARCHITECTURE.md#logging-out-of-the-repository)):
+   *Abmelden* must leave the page the panel is docked in exactly where it was, and open the logout
+   address in a **window** of its own that stays put until you close it — a docked page that navigates
+   away, or a window that vanishes before the page has shown anything, is the failure to watch for.
+   With `ajax: true` no window must appear at all unless the request is refused; check the console for
+   the fallback. With `next` set, that page must open in a tab beside the docked one while the panel
+   shows the login card. Against a repository that publishes no `logout` block, *Abmelden* must do
+   what it always did. In every case the check that matters is what happens **next**: navigate the
+   docked tab to another page, so the panel is rebuilt, and it must still show the login card. A panel
+   that comes back signed in means the session cookie survived, or the worker's token store did.
+7. **Sitzungsende**: with a session open, leave the panel untouched past the repository's
+   `sessionTimeout` (shorten it on a test instance to make this bearable). The session bar must count
+   the last five minutes down (*Angemeldet · 04:31*), and when the time is up the panel must fall back
+   to the login card naming inactivity as the reason. Then navigate the docked tab, so the panel is
+   rebuilt: it must still show the login card. The stored tokens are dropped with a timed-out session
+   precisely so the boot cannot put it back.
+8. **Abmelden außerhalb des Panels**: sign in through the provider, then log out in edu-sharing's own
+   web UI *and* at the provider, leaving the panel alone. Navigate the docked tab so the panel is
+   rebuilt: it must show the login card. It asks the provider before resuming from its own store — a
+   refresh where the server issues refresh tokens, else the userinfo endpoint — so a panel that comes
+   back signed in means the provider still answers for that session, or its document names neither way
+   of asking (check `userinfo_endpoint` in
+   `<Repository>/.well-known/oauth-authorization-server`).
+9. **Erschließen + speichern**: *Inhalt erschließen* on a content page → the metadata screen shows
    `fields_extracted / fields_total` and loads the MDS editor with the generated metadata. Edit, then
    the footer's **Speichern** → a node is created in your inbox and the preview opens, and the flow's
    steps become reachable for that content.
-7. **Metadaten anreichern** (OnlyOffice): open a document in the OnlyOffice editor with the
+10. **Metadaten anreichern** (OnlyOffice): open a document in the OnlyOffice editor with the
    edu-sharing plugin active, open the panel → the option appears and names the detected document.
    The footer's **Metadaten anreichern** reads the document and lands on the metadata screen with the
    generated metadata, the menu naming the document under *Inhalt erkannt*. **Speichern** must update
    **that** node — check in the repository that the document's metadata changed, that its
    name/extension is unchanged, and that no new node appeared in the inbox. With the page-side plugin
    switched off (*Plugins im Hintergrund*) the screen must report the timeout instead of hanging.
-8. **Vorschau → Sammlungen**: from the preview, *Sammlung zuordnen* → pick a collection and confirm
+11. **Vorschau → Sammlungen**: from the preview, *Sammlung zuordnen* → pick a collection and confirm
    with *In Sammlung einfügen*; the screen lists what was added.
-9. **An Nostr Relay weiterleiten**: the step is reached in the base version too — against a repository
+12. **An Nostr Relay weiterleiten**: the step is reached in the base version too — against a repository
    *without* `browserExtensionCustomWebComponent` it must show the relay row alone, with no Redaktionen
    list, no „keine Redaktionen konfiguriert" line and no collection request in the network tab. The
    *Nostr-Relay* group in *Einstellungen* must be there in that version too — the step is, so its relay
@@ -435,7 +463,7 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    flow as well, since it has no target left. Ticking it again brings all of it back, with the relay
    row unticked and no receipt carried over.
 
-10. **An Nostr Relay senden** (Inhaltsoptionen, between *Inhalt teilen* and *Interaktionen anzeigen*):
+13. **An Nostr Relay senden** (Inhaltsoptionen, between *Inhalt teilen* and *Interaktionen anzeigen*):
    open a node from the *Verlauf* → the row appears and opens a step of its own — the Inhaltsübersicht
    must **not** grow a tab for it. The screen names the `d` tag and the field count
    it would publish, with the standing card above it. *An Relay senden* publishes it; the button then
@@ -448,7 +476,7 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    relay, not out of the *Verlauf* — labelled „Beim Nostr-Relay hinterlegt". Clearing the *Verlauf* must
    change nothing about that. With the relay pointed at an unreachable address the state must read
    **Unbekannt**, never „Nicht gesendet".
-11. **Verlauf**: every *saved* node is listed (nothing is recorded until you save); entries expand to
+14. **Verlauf**: every *saved* node is listed (nothing is recorded until you save); entries expand to
    show their fields and offer *In Vorschau öffnen*, which reloads the node from the repository;
    *Leeren* clears the list.
 

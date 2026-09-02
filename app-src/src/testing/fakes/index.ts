@@ -5,6 +5,7 @@ export * from './debug.fake';
 export * from './dev-mode.fake';
 export * from './edu-sharing-api.fake';
 export * from './history.fake';
+export * from './logout.fake';
 export * from './navigation.fake';
 export * from './nostr.fake';
 export * from './page-recognition.fake';
