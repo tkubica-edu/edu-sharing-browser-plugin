@@ -135,7 +135,14 @@ blocking the third-party cookie) it resolves to guest and the login gate appears
 
 **Signing in through an identity provider.** Where an OpenID Connect client is configured
 (*Einstellungen → SSO-Anmeldung*, `OAuthService`), the same login card offers a second way in below
-the credential form. It is the Authorization Code flow with PKCE (RFC 7636) and no client secret,
+the credential form, under the *oder* rule. Both halves of a client are needed for the button to
+appear — an issuer to discover the endpoints from and a client id to name the extension by
+(`AuthService.oauthOffered` → `OAuthService.configured`) — and the card itself is only up while there
+is no session. Since that gate is otherwise invisible, the settings group states which of the two is
+still missing rather than leaving the card silently unchanged. It is deliberately *not* gated on
+`loginRequired`: the card is reachable where no login is required either, and shows the credential
+form there, so hiding only the identity provider would make a password the one way in for no reason
+a reader could see. It is the Authorization Code flow with PKCE (RFC 7636) and no client secret,
 which an extension could not keep: the flow runs in the background worker rather than in the panel,
 because the panel is an iframe the host page's navigation destroys and would take an in-flight flow
 with it — see

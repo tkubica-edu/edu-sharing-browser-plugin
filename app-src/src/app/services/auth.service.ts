@@ -56,11 +56,15 @@ export class AuthService {
   readonly loginRequired = computed(() => !this.browserExtensionCustomWebComponent.enabled());
 
   /**
-   * Whether the panel offers signing in through an identity provider next to the credential form —
-   * see OAuthService.configured. A login has to apply at all for it: where the embedding host brings
-   * the session, no login of either kind is shown.
+   * Whether the login card offers signing in through an identity provider next to the credential
+   * form — see OAuthService.configured.
+   *
+   * Deliberately not gated on {@link loginRequired}: the card is reachable where no login is
+   * required too (the Login section, whose lead then reads that only public content is available
+   * without one), and it shows the credential form there. Gating only the identity provider on it
+   * would make a password the one way in where both should be, for no reason a reader could see.
    */
-  readonly oauthOffered = computed(() => this.loginRequired() && this.oauth.configured());
+  readonly oauthOffered = computed(() => this.oauth.configured());
 
   /** The providers to offer, as the repository advertises them — see OAuthService.providers. */
   readonly oauthProviders = this.oauth.providers;

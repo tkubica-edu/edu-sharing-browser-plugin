@@ -45,6 +45,11 @@ interface OAuthModule {
   silentSession(request: Record<string, unknown>): Promise<{ accessToken: string } | null>;
   redirectUri(request: Record<string, unknown>): string;
   hasIdentityApi(): boolean;
+  checkIssuer(request: Record<string, unknown>): Promise<{
+    revocable: boolean;
+    scopesSupported: string[] | null;
+    unsupportedScopes: string[];
+  }>;
   usesIdentityApi(redirect: string): boolean;
   TOKEN_STORAGE_KEY: string;
 }
@@ -65,8 +70,11 @@ describe('the worker`s OAuth flow', () => {
   let updateListeners: ((tabId: number, changeInfo: { url?: string }, tab: { url?: string }) => void)[];
   let removeListeners: ((tabId: number) => void)[];
 
-  /** The discovery document the issuer answers with; a case can leave endpoints out of it. */
-  let discovery: Record<string, string>;
+  /**
+   * The discovery document the issuer answers with; a case can leave endpoints out of it or add the
+   * scope list. Values are strings or lists of them, which is what the document itself holds.
+   */
+  let discovery: Record<string, string | string[]>;
   /** Set by the case that asserts on what `launchWebAuthFlow` was handed. */
   let launchedOptions: Record<string, unknown>[] | null;
 
@@ -371,6 +379,49 @@ describe('the worker`s OAuth flow', () => {
     for (const listener of [...updateListeners]) listener(tabId, { url }, { url });
   }
 
+  describe('asking the issuer about itself before a flow is run', () => {
+    it('names a configured scope the issuer does not define', async () => {
+      // GitLab's shape: OIDC discovery, but no `offline_access` among its scopes. It refuses such a
+      // request on an error page of its own instead of redirecting, so the flow never learns why.
+      discovery['scopes_supported'] = ['openid', 'profile', 'email', 'api'];
+
+      const answer = await loadModule().checkIssuer({ ...request, scopes: 'openid profile email offline_access' });
+
+      expect(answer.unsupportedScopes).toEqual(['offline_access']);
+    });
+
+    it('names nothing where every configured scope is defined', async () => {
+      discovery['scopes_supported'] = ['openid', 'profile', 'email', 'offline_access'];
+
+      const answer = await loadModule().checkIssuer({ ...request, scopes: 'openid profile email offline_access' });
+
+      expect(answer.unsupportedScopes).toEqual([]);
+      expect(answer.scopesSupported).toEqual(['openid', 'profile', 'email', 'offline_access']);
+    });
+
+    it('claims nothing about scopes where the issuer lists none', async () => {
+      // `scopes_supported` is optional. Absent means the issuer does not say, which is not a licence
+      // to call every scope wrong — the caller distinguishes the two by `scopesSupported`.
+      const answer = await loadModule().checkIssuer({ ...request, scopes: 'openid made_up' });
+
+      expect(answer.scopesSupported).toBeNull();
+      expect(answer.unsupportedScopes).toEqual([]);
+    });
+
+    it('reports whether the issuer can revoke, so logout can say what it does', async () => {
+      expect((await loadModule().checkIssuer(request)).revocable).toBe(true);
+
+      delete discovery['revocation_endpoint'];
+      expect((await loadModule().checkIssuer(request)).revocable).toBe(false);
+    });
+
+    it('fails the way a login would where the issuer cannot be reached', async () => {
+      await expect(
+        loadModule().checkIssuer({ ...request, issuer: 'https://nowhere.example' }),
+      ).rejects.toThrow('OAUTH_DISCOVERY_FAILED');
+    });
+  });
+
   describe('the redirect address', () => {
     it('is the browser`s own where there is an `identity` API', () => {
       const module = loadModule();
@@ -421,14 +472,20 @@ describe('the worker`s OAuth flow', () => {
       expect((await flow).accessToken).toBe('an-access-token');
     });
 
-    it('states the redirect address to `launchWebAuthFlow` as well as in the URL', async () => {
-      // Firefox 75 to 86 require the parameter; the others infer it, so passing it is free.
+    it('hands `launchWebAuthFlow` nothing outside the schema Chrome accepts', async () => {
+      // Chrome validates WebAuthFlowDetails and rejects any unknown property outright — a
+      // `redirect_uri` among them is an "Unexpected property" error, not an ignored hint. Both
+      // browsers read the address out of the authorization URL, so nothing else has to be passed.
+      const accepted = ['url', 'interactive', 'abortOnLoadForNonInteractive', 'timeoutMsForNonInteractive'];
       const launched: Record<string, unknown>[] = [];
       launchedOptions = launched;
 
       await loadModule().login(request);
 
-      expect(launched[0]?.['redirect_uri']).toBe(IDENTITY_REDIRECT);
+      expect(Object.keys(launched[0] ?? {})).toEqual(['url', 'interactive']);
+      expect(Object.keys(launched[0] ?? {}).filter((key) => !accepted.includes(key))).toEqual([]);
+      // The address is in the URL, which is where both browsers take it from.
+      expect(new URL(String(launched[0]?.['url'])).searchParams.get('redirect_uri')).toBe(IDENTITY_REDIRECT);
     });
 
     it('is what the authorization request and the token exchange both name', async () => {

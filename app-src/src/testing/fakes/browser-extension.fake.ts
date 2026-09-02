@@ -4,6 +4,7 @@ import { vi } from 'vitest';
 import {
   AnnouncedPage,
   BrowserExtensionService,
+  IssuerCheck,
   OAuthRequest,
   OAuthSession,
   SaveNodeResponse,
@@ -50,8 +51,18 @@ export function fakeBrowserExtension() {
     oauthLogin: vi.fn((_request: OAuthRequest): Promise<OAuthSession> => Promise.resolve(oauthLogin)),
     oauthSilent: vi.fn((_request: OAuthRequest): Promise<OAuthSession> => Promise.resolve(oauthSilent)),
     oauthLogout: vi.fn((_request: OAuthRequest): Promise<OAuthSession> => Promise.resolve({ success: true })),
+    // Annotated, not inferred: the default answer's `null` and `[]` would otherwise narrow the mock
+    // to those literal types and refuse every `mockResolvedValue` a spec sets.
+    oauthCheckIssuer: vi.fn(
+      (_request: OAuthRequest): Promise<IssuerCheck> =>
+        Promise.resolve({ revocable: true, scopesSupported: null, unsupportedScopes: [] }),
+    ),
     oauthRedirectUri: vi.fn((_request: OAuthRequest) =>
-      Promise.resolve({ redirectUri: 'https://abc.chromiumapp.org/', usesIdentityApi: true }),
+      Promise.resolve({
+        redirectUri: 'https://abc.chromiumapp.org/',
+        usesIdentityApi: true,
+        hasIdentityApi: true,
+      }),
     ),
   } satisfies Partial<BrowserExtensionService>;
 

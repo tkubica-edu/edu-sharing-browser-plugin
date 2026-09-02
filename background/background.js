@@ -558,7 +558,8 @@ const ALLOWED_ACTIONS = new Set([
   'oauth.login',
   'oauth.silent',
   'oauth.logout',
-  'oauth.redirectUri'
+  'oauth.redirectUri',
+  'oauth.checkIssuer'
 ]);
 
 /**
@@ -691,14 +692,21 @@ browser.runtime.onMessage.addListener((message, sender) => {
 
         // What has to be registered with the client at the IdP. Only this worker can say it: with the
         // `identity` API it is a per-extension address the browser makes up (see oauth.js).
+        // What the issuer says about itself, asked before any flow is run — see oauth.js.
+        case 'oauth.checkIssuer': {
+          return { success: true, ...(await EDU_SHARING_OAUTH.checkIssuer(oauthParamsOf(message))) };
+        }
+
         case 'oauth.redirectUri': {
           const resolved = EDU_SHARING_OAUTH.redirectUri(oauthParamsOf(message));
           return {
             success: true,
             redirectUri: resolved,
-            // For the address as resolved, not for the browser: a configured address takes the
-            // watched-tab path even where the `identity` API exists (see oauth.js).
-            usesIdentityApi: EDU_SHARING_OAUTH.usesIdentityApi(resolved)
+            // Two separate facts, because three states have to be told apart: a configured address
+            // (watched tab, in every browser), a browser without the API (watched tab, Safari), and
+            // the browser's own address (its API). See oauth.js.
+            usesIdentityApi: EDU_SHARING_OAUTH.usesIdentityApi(resolved),
+            hasIdentityApi: EDU_SHARING_OAUTH.hasIdentityApi()
           };
         }
 

@@ -13,6 +13,7 @@ import { CurationService } from '../../../services/curation.service';
 import { DebugService } from '../../../services/debug.service';
 import { DevModeService } from '../../../services/dev-mode.service';
 import { NostrForwardService } from '../../../services/nostr-forward.service';
+import { RedirectUriInUse } from '../../../services/browser-extension.service';
 import { OAuthService } from '../../../services/oauth.service';
 import { ContentJudgeService } from '../../../services/content-judge.service';
 import { QualityJudgeService } from '../../../services/quality-judge.service';
@@ -79,7 +80,7 @@ export class SettingsScreenComponent implements OnDestroy {
    * be registered with the client at the identity provider, and with the `identity` API it is an
    * address the browser makes up that nobody could otherwise look up.
    */
-  protected readonly redirectUriInUse = signal<{ redirectUri: string; usesIdentityApi: boolean } | null>(null);
+  protected readonly redirectUriInUse = signal<RedirectUriInUse | null>(null);
 
   /**
    * The checks the measurement is asked for, as its description lists them. Read from the rules rather than
@@ -250,18 +251,27 @@ export class SettingsScreenComponent implements OnDestroy {
   // puts the configured default back in force (see OAuthService). The redirect address is re-read after
   // each change, because two of these fields are what it is derived from.
 
+  /** Ask the issuer what it is, so a wrong scope or an unreachable issuer is named before a login. */
+  protected checkIssuer(): void {
+    void this.oauth.check(this.auth.repositoryUrl());
+  }
+
   protected setOAuthIssuer(issuer: string): void {
     this.changed = true;
+    // The previous answer described a different client, so it is dropped rather than left standing.
+    this.oauth.clearCheck();
     void this.oauth.setIssuer(issuer).then(() => this.readRedirectUri());
   }
 
   protected setOAuthClientId(clientId: string): void {
     this.changed = true;
+    this.oauth.clearCheck();
     void this.oauth.setClientId(clientId).then(() => this.readRedirectUri());
   }
 
   protected setOAuthScopes(scopes: string): void {
     this.changed = true;
+    this.oauth.clearCheck();
     void this.oauth.setScopes(scopes);
   }
 

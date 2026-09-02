@@ -132,6 +132,31 @@ export interface OAuthSession {
 }
 
 /**
+ * The redirect address the flow will use, and how it will be watched for. The two flags are separate
+ * because three cases read differently to whoever has to register the address: an address configured
+ * here (watched for in every browser), a browser with no `identity` API (watched for as well), and
+ * the address the browser's own API handed out.
+ */
+export interface RedirectUriInUse {
+  readonly redirectUri: string;
+  /** Whether `launchWebAuthFlow` is what will show the provider's pages for this address. */
+  readonly usesIdentityApi: boolean;
+  /** Whether the browser has the API at all — false only on Safari. */
+  readonly hasIdentityApi: boolean;
+}
+
+/**
+ * What the issuer says about itself, asked before a flow is run. `unsupportedScopes` is empty both
+ * for scopes that are all fine and for an issuer that lists none of its own — `scopesSupported` is
+ * what tells those apart.
+ */
+export interface IssuerCheck {
+  readonly revocable: boolean;
+  readonly scopesSupported: readonly string[] | null;
+  readonly unsupportedScopes: readonly string[];
+}
+
+/**
  * The node the metadata agent wrote, as `/nodes` reports it. Deliberately the whole thing: along
  * that route it is everything the app knows about the node — a guest may not read it back from the
  * repository — so the flow is seeded from this instead of from a node load (see CurationService).
@@ -291,6 +316,21 @@ export class BrowserExtensionService {
     return this.askOAuth('oauth.silent', request);
   }
 
+  /**
+   * Ask the worker what the configured issuer says about itself. Rejects with the flow's own codes
+   * where the issuer cannot be reached or describes no endpoints, so the caller can report the same
+   * sentences a failed login would.
+   */
+  async oauthCheckIssuer(request: OAuthRequest): Promise<IssuerCheck> {
+    const answer = await this.ask<IssuerCheck & { success: boolean; error?: string }>({
+      action: 'oauth.checkIssuer',
+      ...request,
+    });
+    if (answer === UNREACHABLE) throw new Error(WORKER_UNREACHABLE);
+    if (!answer?.success) throw new Error(answer?.error || 'NO_RESPONSE');
+    return { revocable: answer.revocable, scopesSupported: answer.scopesSupported, unsupportedScopes: answer.unsupportedScopes };
+  }
+
   /** Drop the worker's OAuth session and have the issuer revoke the refresh token where it can. */
   oauthLogout(request: OAuthRequest): Promise<OAuthSession> {
     return this.askOAuth('oauth.logout', request);
@@ -301,14 +341,19 @@ export class BrowserExtensionService {
    * worked out here: with the `identity` API it is an address the browser makes up per extension.
    * Null where the worker cannot say — no extension around it, or no repository to derive one from.
    */
-  async oauthRedirectUri(request: OAuthRequest): Promise<{ redirectUri: string; usesIdentityApi: boolean } | null> {
+  async oauthRedirectUri(request: OAuthRequest): Promise<RedirectUriInUse | null> {
     const answer = await this.askOrNull<{
       success?: boolean;
       redirectUri?: string;
       usesIdentityApi?: boolean;
+      hasIdentityApi?: boolean;
     }>({ action: 'oauth.redirectUri', ...request });
     if (!answer?.success || !answer.redirectUri) return null;
-    return { redirectUri: answer.redirectUri, usesIdentityApi: answer.usesIdentityApi === true };
+    return {
+      redirectUri: answer.redirectUri,
+      usesIdentityApi: answer.usesIdentityApi === true,
+      hasIdentityApi: answer.hasIdentityApi === true,
+    };
   }
 
   /**

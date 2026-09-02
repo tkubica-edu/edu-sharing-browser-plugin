@@ -394,7 +394,11 @@ navigating to it, and closes it again where it stands; the step keeps running be
   `/.well-known/openid-configuration` sits under — the endpoints are read from that document, so the
   issuer is the only address to enter), the **Client-ID** of the public client registered for this
   extension, the **Scopes** (`offline_access` among them is what yields the refresh token the session
-  is later resumed from) and the **Redirect-URI**. Only the last is not free to choose: it has to be
+  is later resumed from — not every provider defines it) and the **Redirect-URI**. *Issuer und Scopes
+  prüfen* asks the issuer about itself before anybody signs in: whether it can be reached, whether it
+  describes the endpoints, whether it can revoke, and which of the configured scopes it does not
+  define. The last is why the button exists — a provider refuses an unknown scope on an error page of
+  its own rather than by redirecting, so the flow would otherwise hang with nothing to read. Only the last is not free to choose: it has to be
   registered with the client at the provider, so the group shows which address *this* browser will
   actually use and whether the browser's own `identity` API produced it. Left empty the browser
   decides — Chrome, Edge and Firefox hand out an address per extension, Safari falls back to

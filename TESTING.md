@@ -324,8 +324,14 @@ nothing has to be served over TLS for a local run.
 
 ### Which redirect URI to register
 
-The group in *Einstellungen* reports the address this browser will actually use — that is the value
-to paste into Keycloak's *Valid redirect URIs*, and it is the one thing that cannot be guessed.
+The address cannot be guessed — the browser mints it per installation — so the panel reports it:
+**Einstellungen** (topbar) **→ SSO-Anmeldung** (click the heading to unfold it) **→** under the
+*Redirect-URI* field, in the highlighted box beginning *„Diese Adresse beim Provider hinterlegen"*.
+It needs no issuer or client id to appear, so it can be read before anything else is configured. The
+box also says which of the three cases applies, because they register differently: an address typed
+into the field above it (one registration covers every browser), an address this browser handed out
+itself (a different one per browser), or the Safari fallback. Paste that value into Keycloak's
+*Valid redirect URIs*.
 
 - **Leaving the field empty** is the least work for a single browser: Chrome and Edge report
   `https://<extension-id>.chromiumapp.org/`, Firefox reports a per-profile
@@ -344,10 +350,18 @@ to paste into Keycloak's *Valid redirect URIs*, and it is the one thing that can
 *User Settings → Applications → Add new application*: paste the redirect URI as above, leave
 **Confidential unticked**, and tick the scopes `openid`, `profile`, `email`. In the panel use issuer
 `https://gitlab.com`, the *Application ID* as the Client-ID, and scopes `openid profile email` —
-**without** `offline_access`, which GitLab does not define. Unverified against a live instance: its
-discovery document does not advertise `none` among `token_endpoint_auth_methods_supported` even
-though the documented PKCE flow sends no secret, so if the token exchange comes back
-`OAUTH_TOKEN_FAILED: 401`, that is the reason and Keycloak is the way on.
+**without** `offline_access`, which GitLab does not define. Leaving the shipped default in place is
+the mistake to expect here: GitLab runs on Doorkeeper, which refuses an unknown scope with *„The
+requested scope is invalid, unknown, or malformed"* on a page of its own instead of redirecting, so
+the panel never learns why and the flow simply hangs until the window is closed. *Issuer und Scopes
+prüfen* in the settings names such a scope before a login is attempted; without `offline_access`
+there is no refresh token, so the silent resume does not apply and *Abmelden* is the only way the
+session ends early.
+
+Also unverified against a live instance: GitLab's discovery document does not advertise `none` among
+`token_endpoint_auth_methods_supported` even though the documented PKCE flow sends no secret, so if
+the token exchange comes back `OAUTH_TOKEN_FAILED: 401`, that is the reason and Keycloak is the way
+on.
 
 ## Manual test checklist
 

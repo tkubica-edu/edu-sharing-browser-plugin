@@ -67,6 +67,28 @@
       hinterlegt: eine Extension kann keines geheim halten, dafür gibt es PKCE.
     </p>
 
+    <!-- Der Schalter für die ganze Alternative ist keiner, sondern folgt aus diesen zwei Feldern —
+         also wird hier gesagt, woran es liegt, wenn auf der Anmeldekarte keine Schaltfläche steht. -->
+    @if (oauth.configured()) {
+      <p class="es-hint">
+        Die SSO-Anmeldung wird auf der Anmeldekarte angeboten — unter „oder“, neben dem Formular für
+        Benutzername und Passwort. Sichtbar nur, solange keine Sitzung besteht: gegebenenfalls erst
+        abmelden.
+      </p>
+    } @else {
+      <p class="es-hint">
+        Die SSO-Anmeldung wird derzeit <strong>nicht</strong> angeboten: dafür werden
+        @if (!oauth.issuer() && !oauth.clientId()) {
+          Issuer und Client-ID
+        } @else if (!oauth.issuer()) {
+          noch der Issuer
+        } @else {
+          noch die Client-ID
+        }
+        benötigt. Bis dahin zeigt die Anmeldekarte nur Benutzername und Passwort.
+      </p>
+    }
+
     <label class="es-field-label" for="oauth-scopes">Scopes</label>
     <input id="oauth-scopes" type="text" class="es-input" autocomplete="off" spellcheck="false"
            [placeholder]="oauth.scopes()"
@@ -74,9 +96,50 @@
 
     <p class="desc">
       Wonach gefragt wird, durch Leerzeichen getrennt. <code>offline_access</code> liefert das Refresh
-      Token, mit dem die Sitzung später ohne erneute Anmeldung wiederhergestellt wird. Leer gelassen
-      gilt wieder <code>{{ defaultOAuthScopes }}</code>.
+      Token, mit dem die Sitzung später ohne erneute Anmeldung wiederhergestellt wird — <strong>nicht
+      jeder Provider kennt diesen Scope</strong> (GitLab etwa nicht; dort führt er zu
+      „invalid_scope“). Leer gelassen gilt wieder <code>{{ defaultOAuthScopes }}</code>.
     </p>
+
+    <!-- Der Provider lehnt einen unbekannten Scope auf einer eigenen Fehlerseite ab, statt
+         zurückzuleiten — das Panel erfährt den Grund also nie. Deshalb lässt sich der Issuer hier
+         vorab fragen, was er überhaupt kennt. -->
+    <div class="es-row">
+      <button class="es-btn es-btn--tonal es-btn--small" type="button"
+              [disabled]="!oauth.configured() || oauth.checking()"
+              (click)="checkIssuer()">
+        {{ oauth.checking() ? 'Prüfe…' : 'Issuer und Scopes prüfen' }}
+      </button>
+    </div>
+
+    @if (oauth.checked(); as result) {
+      @switch (result.kind) {
+        @case ('ok') {
+          <p class="es-hint">
+            Issuer erreichbar, Endpunkte gefunden@if (result.scopesSupported) {, und der Server kennt
+            alle angeforderten Scopes}@if (!result.revocable) { — der Provider nennt keinen
+            Revocation-Endpunkt, beim Abmelden wird das Refresh Token dann nur lokal
+            verworfen}.
+            @if (result.scopesSupported) {
+              <br />
+              Das sagt nur, was der <em>Server</em> kann: die Scopes müssen zusätzlich beim
+              <em>Client</em> freigegeben sein. Sind sie es nicht, lehnt der Provider mit derselben
+              Meldung „invalid_scope“ ab (bei GitLab: die Häkchen in der Application).
+            }
+          </p>
+        }
+        @case ('scopes') {
+          <p class="es-error">
+            Der Provider kennt {{ result.unsupported.length === 1 ? 'diesen Scope' : 'diese Scopes' }}
+            nicht: <code>{{ result.unsupported.join(' ') }}</code>. Die Anmeldung würde mit
+            „invalid_scope“ abgelehnt — Scope entfernen.
+          </p>
+        }
+        @case ('failed') {
+          <p class="es-error">{{ result.error }}</p>
+        }
+      }
+    }
 
     <!-- Die Redirect-URI ist der einzige Wert hier, den man nicht frei wählt, sondern der beim
          Provider hinterlegt sein muss — deshalb steht darunter, was dieser Browser tatsächlich
@@ -86,12 +149,21 @@
            placeholder="automatisch"
            [ngModel]="oauth.configuredRedirectUri()" (ngModelChange)="setOAuthRedirectUri($event)" />
 
+    <!-- Drei Fälle, die für das Hinterlegen beim Provider unterschiedlich zu lesen sind: eine hier
+         eingetragene Adresse, ein Browser ohne `identity`-API, und die Adresse, die der Browser
+         selbst vergibt. -->
     @if (redirectUriInUse(); as inUse) {
       <div class="es-notice">
         <span>
-          Beim Provider zu hinterlegen: <code>{{ inUse.redirectUri }}</code>
-          @if (inUse.usesIdentityApi) {
+          <strong>Diese Adresse beim Provider hinterlegen:</strong>
+          <code>{{ inUse.redirectUri }}</code>
+          @if (!inUse.usesIdentityApi && inUse.hasIdentityApi) {
+            — die oben eingetragene Adresse. Sie wird in jedem Browser gleich behandelt (die Extension
+            beobachtet den Tab, statt die <code>identity</code>-API des Browsers zu verwenden), eine
+            Registrierung genügt also für Chrome, Firefox und Safari.
+          } @else if (inUse.usesIdentityApi) {
             — von diesem Browser selbst vergeben (<code>identity</code>-API); sie wird nie aufgerufen.
+            Jeder Browser vergibt eine andere, siehe unten.
           } @else {
             — dieser Browser hat keine <code>identity</code>-API (Safari), deshalb eine gewöhnliche
             https-Adresse. Sie muss nichts ausliefern: die Extension liest den Code aus der Adresse

@@ -70,6 +70,39 @@ What is known not to work, known to be unverified, or known to look wrong at fir
   `content/panel-host.js`). Pasting itself needs neither: the widget listens for the `paste` event as
   well, which is why Cmd+V worked all along.
 
+## No SSO button on the login card
+
+The button is gated on `AuthService.oauthOffered`, which needs **both** an issuer and a client id
+(`OAuthService.configured`) — one alone offers nothing, since neither the endpoints nor the client
+could be named from it. The card is also only rendered while there is no session, so a panel that
+restored one shows the status row instead. *Einstellungen → SSO-Anmeldung* states which of the two
+fields is still missing. Beyond that: the section is new, so a package built before it was added has
+neither the button nor the group — `npm run build` and reload the extension. That the buttons render
+once the gate opens is covered by `app-src/src/app/features/auth/login/login.component.spec.ts`.
+
+## „The requested scope is invalid, unknown, or malformed"
+
+The provider refused the authorization request's `scope`. Two different causes wear the same message,
+and only the second is visible from the extension:
+
+1. **The server does not define the scope.** `offline_access` is the one to expect — GitLab and other
+   Doorkeeper-based providers do not have it, while Keycloak does. *Issuer und Scopes prüfen* in
+   *Einstellungen → SSO-Anmeldung* catches this, since the issuer lists what it defines in its
+   discovery document (`scopes_supported`).
+2. **The client is not granted the scope**, even though the server defines it. On GitLab the
+   application's own scope checkboxes have to include every scope requested — `openid`, `profile` and
+   `email` for an OIDC login — and an application with none ticked falls back to Doorkeeper's default
+   scopes, which do not include them. **The check button cannot see this**: `scopes_supported`
+   describes the server, and per-client grants are not published anywhere. It has to be compared
+   against the client's registration by hand.
+
+Either way the provider renders its own error page rather than redirecting, so nothing reaches the
+extension and the flow waits until the window is closed (reported as a cancellation, or the five
+minute timeout). The authorization request as actually sent is logged by the background worker —
+`[edu-sharing][oauth] authorizing via …:` followed by the full URL — which is where to read off what
+`scope`, `client_id` and `redirect_uri` really were. See
+[TESTING.md § Where errors show up](TESTING.md#where-errors-show-up) for which console that is.
+
 ## Dependencies and runtime limits
 
 - **`ngx-edu-sharing-api`** (11.0.2) is Angular-only and declares a peer dep of Angular >= 18, while

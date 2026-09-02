@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 
 import { APP_CONFIG } from '../config';
-import { BrowserExtensionService, OAuthRequest } from './browser-extension.service';
+import { BrowserExtensionService, IssuerCheck, OAuthRequest, RedirectUriInUse } from './browser-extension.service';
 import { errorMessage } from '../util/errors';
 
 /**
@@ -25,6 +25,16 @@ export type OAuthOutcome =
   | { readonly kind: 'cancelled' }
   | { readonly kind: 'failed'; readonly error: string };
 
+/**
+ * What asking the issuer about itself produced — see {@link OAuthService.check}. `scopeWarning` is
+ * the case worth having this for at all: a scope the issuer does not define is refused on the
+ * provider's own error page rather than by a redirect, so the flow would otherwise just hang.
+ */
+export type IssuerCheckResult =
+  | { readonly kind: 'ok'; readonly revocable: boolean; readonly scopesSupported: readonly string[] | null }
+  | { readonly kind: 'scopes'; readonly unsupported: readonly string[] }
+  | { readonly kind: 'failed'; readonly error: string };
+
 /** The worker's own vocabulary for a flow nobody completed — see `background/oauth.js`. */
 const CANCELLED = /OAUTH_CANCELLED|OAUTH_TIMEOUT/;
 
@@ -38,6 +48,9 @@ const ERROR_TEXTS: readonly (readonly [RegExp, string])[] = [
   [/OAUTH_DISCOVERY_FAILED/, 'Der Identity Provider war nicht erreichbar. Issuer-URL prüfen.'],
   [/OAUTH_NO_REDIRECT_URI/, 'Für diesen Browser muss die Redirect-URI in den Einstellungen gesetzt werden.'],
   [/OAUTH_STATE_MISMATCH/, 'Die Antwort des Identity Providers gehört nicht zu dieser Anmeldung.'],
+  [/invalid_scope/, 'Der Identity Provider kennt einen der angeforderten Scopes nicht — Scopes prüfen (z. B. kennt GitLab kein `offline_access`).'],
+  [/redirect_uri_mismatch|invalid_redirect/, 'Die Redirect-URI ist beim Provider nicht (so) hinterlegt — den in den Einstellungen angezeigten Wert eintragen.'],
+  [/invalid_client|unauthorized_client/, 'Der Provider kennt diese Client-ID nicht, oder der Client ist nicht als öffentlicher Client (ohne Secret) registriert.'],
   [/OAUTH_REFUSED/, 'Der Identity Provider hat die Anmeldung abgelehnt.'],
   [/OAUTH_TOKEN_FAILED/, 'Der Identity Provider hat kein Token ausgegeben. Client-ID und Redirect-URI prüfen.'],
   [/OAUTH_TAB_FAILED/, 'Das Anmeldefenster konnte nicht geöffnet werden.'],
@@ -87,6 +100,14 @@ export class OAuthService {
   private readonly providersState = signal<readonly OAuthProvider[]>([]);
   readonly providers = this.providersState.asReadonly();
 
+  /** The last answer {@link check} got, for the settings screen to render; null until it is asked. */
+  private readonly checkedState = signal<IssuerCheckResult | null>(null);
+  readonly checked = this.checkedState.asReadonly();
+
+  /** Set while the issuer is being asked, so its button can say so. */
+  private readonly checkingState = signal(false);
+  readonly checking = this.checkingState.asReadonly();
+
   /** Set while the IdP's pages are up, so the login screen can lock its buttons. */
   private readonly runningState = signal(false);
   readonly running = this.runningState.asReadonly();
@@ -126,6 +147,39 @@ export class OAuthService {
 
   async setRedirectUri(redirectUri: string): Promise<void> {
     await this.persist(this.redirectUriState, APP_CONFIG.storageKeys.oauthRedirectUri, redirectUri);
+  }
+
+  /**
+   * Ask the issuer what it is, before anybody tries to sign in: whether it can be reached, whether it
+   * describes the endpoints, and whether it defines the configured scopes. A scope it does not define
+   * outranks the rest of the answer, since that is what would break the flow.
+   */
+  async check(repositoryUrl: string): Promise<IssuerCheckResult> {
+    if (!this.configured()) {
+      const result: IssuerCheckResult = { kind: 'failed', error: ERROR_TEXTS[0][1] };
+      this.checkedState.set(result);
+      return result;
+    }
+    this.checkingState.set(true);
+    try {
+      const answer: IssuerCheck = await this.browserExtension.oauthCheckIssuer(this.request(repositoryUrl));
+      const result: IssuerCheckResult = answer.unsupportedScopes.length
+        ? { kind: 'scopes', unsupported: answer.unsupportedScopes }
+        : { kind: 'ok', revocable: answer.revocable, scopesSupported: answer.scopesSupported };
+      this.checkedState.set(result);
+      return result;
+    } catch (cause: unknown) {
+      const result: IssuerCheckResult = { kind: 'failed', error: this.describe(errorMessage(cause)) };
+      this.checkedState.set(result);
+      return result;
+    } finally {
+      this.checkingState.set(false);
+    }
+  }
+
+  /** Let go of an answer that describes a client that has since been edited. */
+  clearCheck(): void {
+    this.checkedState.set(null);
   }
 
   /** Take over what the repository advertises — see {@link providers}. */
@@ -174,7 +228,7 @@ export class OAuthService {
    * `identity` API is what produced it. Null where the worker cannot say — see
    * BrowserExtensionService.oauthRedirectUri.
    */
-  redirectUriInUse(repositoryUrl: string): Promise<{ redirectUri: string; usesIdentityApi: boolean } | null> {
+  redirectUriInUse(repositoryUrl: string): Promise<RedirectUriInUse | null> {
     return this.browserExtension.oauthRedirectUri(this.request(repositoryUrl));
   }
 

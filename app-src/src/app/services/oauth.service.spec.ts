@@ -207,6 +207,101 @@ describe('OAuthService', () => {
     });
   });
 
+  describe('checking the issuer', () => {
+    it('asks nothing without a configured client, and says why', async () => {
+      await oauth.load();
+
+      const result = await oauth.check(REPOSITORY_URL);
+
+      expect(result.kind).toBe('failed');
+      expect(extension.fake.oauthCheckIssuer).not.toHaveBeenCalled();
+    });
+
+    it('reports an unsupported scope ahead of everything else about the issuer', async () => {
+      await configure();
+      extension.fake.oauthCheckIssuer.mockResolvedValue({
+        revocable: true,
+        scopesSupported: ['openid', 'profile', 'email'],
+        unsupportedScopes: ['offline_access'],
+      });
+
+      // The one answer that means the flow cannot work, so it outranks a reachable issuer.
+      expect(await oauth.check(REPOSITORY_URL)).toEqual({
+        kind: 'scopes',
+        unsupported: ['offline_access'],
+      });
+    });
+
+    it('reports a healthy issuer, and whether it can revoke', async () => {
+      await configure();
+      extension.fake.oauthCheckIssuer.mockResolvedValue({
+        revocable: false,
+        scopesSupported: ['openid'],
+        unsupportedScopes: [],
+      });
+
+      expect(await oauth.check(REPOSITORY_URL)).toEqual({
+        kind: 'ok',
+        revocable: false,
+        scopesSupported: ['openid'],
+      });
+    });
+
+    it('reports an unreachable issuer in the words a failed login uses', async () => {
+      await configure();
+      extension.fake.oauthCheckIssuer.mockRejectedValue(new Error('OAUTH_DISCOVERY_FAILED: 404'));
+
+      const result = await oauth.check(REPOSITORY_URL);
+
+      expect(result.kind).toBe('failed');
+      expect(result.kind === 'failed' && result.error).toContain('Issuer-URL');
+    });
+
+    it('keeps the last answer, and lets go of it when the client is edited', async () => {
+      await configure();
+      extension.fake.oauthCheckIssuer.mockResolvedValue({
+        revocable: true,
+        scopesSupported: null,
+        unsupportedScopes: [],
+      });
+      await oauth.check(REPOSITORY_URL);
+      expect(oauth.checked()).not.toBeNull();
+
+      oauth.clearCheck();
+
+      expect(oauth.checked()).toBeNull();
+    });
+  });
+
+  describe('reporting what the provider refused', () => {
+    it('names an unknown scope, which is what a Doorkeeper provider refuses `offline_access` with', async () => {
+      await configure();
+      extension.oauthRefuses('OAUTH_REFUSED: invalid_scope');
+
+      const outcome = await oauth.login(REPOSITORY_URL);
+
+      expect(outcome.kind === 'failed' && outcome.error).toContain('Scopes');
+    });
+
+    it('names an unregistered redirect address', async () => {
+      await configure();
+      extension.oauthRefuses('OAUTH_REFUSED: redirect_uri_mismatch');
+
+      const outcome = await oauth.login(REPOSITORY_URL);
+
+      expect(outcome.kind === 'failed' && outcome.error).toContain('Redirect-URI');
+    });
+
+    it('names a client the provider does not know, or one registered as confidential', async () => {
+      await configure();
+      extension.oauthRefuses('OAUTH_TOKEN_FAILED: 401 invalid_client');
+
+      const outcome = await oauth.login(REPOSITORY_URL);
+
+      expect(outcome.kind === 'failed' && outcome.error).toContain('Client-ID');
+    });
+  });
+
   describe('the providers the repository advertises', () => {
     it('offers none until it is told of any', () => {
       expect(oauth.providers()).toEqual([]);

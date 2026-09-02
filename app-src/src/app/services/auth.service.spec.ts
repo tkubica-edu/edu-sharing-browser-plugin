@@ -336,13 +336,16 @@ describe('AuthService', () => {
       expect(auth.oauthOffered()).toBe(true);
     });
 
-    it('is not offered where the embedding host brings the session — no login is shown at all', async () => {
+    it('is offered where the embedding host brings the session too, like the credential form', async () => {
       configureOAuth();
       await auth.init();
 
       webComponent.fake.offeredByRepository.set(true);
 
-      expect(auth.oauthOffered()).toBe(false);
+      // The card is reachable in that state and shows the password form; hiding only the identity
+      // provider would make a password the one way in, for no reason.
+      expect(auth.loginRequired()).toBe(false);
+      expect(auth.oauthOffered()).toBe(true);
     });
 
     it('trades the access token for a repository session', async () => {

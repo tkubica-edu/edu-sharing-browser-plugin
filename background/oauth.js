@@ -105,6 +105,8 @@ async function discover(issuer) {
     token: document.token_endpoint,
     endSession: document.end_session_endpoint || null,
     revocation: document.revocation_endpoint || null,
+    // Optional in the spec, so absent is "the issuer does not say" rather than "no scopes".
+    scopesSupported: Array.isArray(document.scopes_supported) ? document.scopes_supported : null,
   };
   if (!endpoints.authorization || !endpoints.token) throw new Error('OAUTH_DISCOVERY_INCOMPLETE');
   discoveryCache.set(base, endpoints);
@@ -202,14 +204,12 @@ function redirectUri({ configuredRedirectUri, repositoryUrl } = {}) {
  */
 async function authorize(authorizationUrl, redirect) {
   if (usesIdentityApi(redirect)) {
-    // `redirect_uri` is stated as well as being in the URL: Firefox 75 to 86 require the parameter to
-    // be the address `getRedirectURL()` gave, and passing it changes nothing for the browsers that
-    // infer it themselves.
-    const result = await browser.identity.launchWebAuthFlow({
-      url: authorizationUrl,
-      redirect_uri: redirect,
-      interactive: true,
-    });
+    // Only `url` and `interactive`. Chrome validates `WebAuthFlowDetails` against its own schema and
+    // rejects any property outside it — a `redirect_uri` here is a hard error, not an ignored hint —
+    // and Firefox needs none: the parameter was required only between Firefox 75 and 86, well below
+    // the 128 this extension declares as its minimum. Both browsers take the address from the
+    // authorization URL, where the flow has already put it.
+    const result = await browser.identity.launchWebAuthFlow({ url: authorizationUrl, interactive: true });
     if (!result) throw new Error('OAUTH_CANCELLED');
     return result;
   }
@@ -362,7 +362,14 @@ async function login({ issuer, clientId, scopes, configuredRedirectUri, reposito
   // of its own would otherwise lose them.
   for (const [key, value] of query) request.searchParams.set(key, value);
 
-  console.log(`${OAUTH_LOG} authorizing via ${hasIdentityApi() ? 'identity API' : 'watched tab'} → ${redirect}`);
+  // Logged in full because a provider that refuses the request renders its own error page and tells
+  // the extension nothing — this line is then the only record of what was actually asked for. Safe
+  // to log: the challenge is a hash and the state is single-use. The verifier is the secret here and
+  // is deliberately absent.
+  console.log(
+    `${OAUTH_LOG} authorizing via ${usesIdentityApi(redirect) ? 'identity API' : 'watched tab'}:`,
+    request.toString(),
+  );
   const code = parseCallback(await authorize(request.toString(), redirect), state);
 
   const session = toSession(
@@ -440,6 +447,30 @@ async function logout({ issuer, clientId } = {}) {
   }
 }
 
+/**
+ * Ask the issuer what it is, without starting a flow: whether it can be reached, whether it
+ * describes the endpoints the flow needs, and which of the configured scopes it does not define.
+ *
+ * The last is the one a deployment gets wrong in practice and cannot see coming — a provider that
+ * does not define `offline_access` (Doorkeeper-based ones, GitLab among them) answers the
+ * authorization request with `invalid_scope`, and does so on a page of its own rather than by
+ * redirecting, so the panel never learns why. Checking it here turns that into a sentence in the
+ * settings before anybody tries to sign in.
+ */
+async function checkIssuer({ issuer, scopes } = {}) {
+  const endpoints = await discover(issuer);
+  const wanted = String(scopes || DEFAULT_SCOPES).split(/\s+/).filter(Boolean);
+  return {
+    revocable: !!endpoints.revocation,
+    scopesSupported: endpoints.scopesSupported,
+    // Empty where the issuer lists none: nothing is known to be wrong, which is not the same as
+    // everything being right, and the caller says so.
+    unsupportedScopes: endpoints.scopesSupported
+      ? wanted.filter((scope) => !endpoints.scopesSupported.includes(scope))
+      : [],
+  };
+}
+
 // TOKEN STORE
 
 /**
@@ -510,6 +541,7 @@ self.EDU_SHARING_OAUTH = {
   logout,
   silentSession,
   redirectUri,
+  checkIssuer,
   hasIdentityApi,
   usesIdentityApi,
   TOKEN_STORAGE_KEY,

@@ -114,6 +114,12 @@ API rather than on the browser:
 | Chrome, Edge, Firefox | `identity.launchWebAuthFlow` (needs the `identity` permission) | `identity.getRedirectURL()` — a per-extension address the browser makes up and never puts on the network |
 | Safari | a watched tab: `tabs.create`, then `tabs.onUpdated` until the tab heads for the redirect address, which then closes it | an ordinary https address, configured or `<repository>/oauth/extension-callback` |
 
+`launchWebAuthFlow` is handed `url` and `interactive` and nothing else: Chrome validates
+`WebAuthFlowDetails` against its own schema and rejects an unknown property outright rather than
+ignoring it, and both browsers read the redirect address out of the authorization URL. (Firefox
+wanted an explicit `redirect_uri` between versions 75 and 86, below the 128 the Firefox manifest
+declares as its minimum.)
+
 The branch is on the redirect address, not on the browser (`usesIdentityApi()`):
 `launchWebAuthFlow` completes only when the flow reaches the address the browser itself handed out —
 Chrome watches for `https://<id>.chromiumapp.org/` and nothing else — so **a configured address takes
@@ -133,7 +139,9 @@ The worker hands the panel the access token and nothing else. The refresh token 
 key in `APP_CONFIG.storageKeys.oauthTokens` merely so its storage keys are all in one place. A
 provider that rotates refresh tokens is followed; one that rejects a refresh has its stored session
 cleared, since that token will not start working again. Messages: `oauth.login`, `oauth.silent`,
-`oauth.logout`, `oauth.redirectUri`.
+`oauth.logout`, `oauth.redirectUri`, `oauth.checkIssuer` — the last reading the discovery document's
+`scopes_supported` so a scope the issuer does not define is named in the settings rather than
+refused, unreadably, on the provider's own error page.
 
 ## Saving a content
 
