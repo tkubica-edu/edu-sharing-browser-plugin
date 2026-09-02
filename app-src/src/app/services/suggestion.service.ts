@@ -98,8 +98,20 @@ export class SuggestionService {
         }),
       );
       const suggestions = storedAiSuggestions(response);
+      // The properties by name, and what the store holds that this does not offer: a proposal already
+      // accepted or declined, or a person's, is dropped here, and a form showing none of them is then
+      // reporting a decision rather than a failure (see storedAiSuggestions).
       console.log(
         `${LOG} ← ${Object.keys(suggestions?.suggestions ?? {}).length} proposed properties for ${nodeId}`,
+        {
+          offered: Object.keys(suggestions?.suggestions ?? {}),
+          stored: Object.entries(response?.suggestions ?? {}).map(
+            ([propertyId, entries]) =>
+              `${propertyId}: ${(entries ?? [])
+                .map((entry) => `${entry.type}/${entry.status}`)
+                .join(', ')}`,
+          )
+        },
       );
       return suggestions;
     } catch (cause: unknown) {

@@ -1,17 +1,20 @@
 import {
-  afterRenderEffect, ChangeDetectionStrategy, Component, computed, CUSTOM_ELEMENTS_SCHEMA,
-  ElementRef, OnDestroy, OnInit, inject, input, output, signal, viewChild
+  afterRenderEffect, ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, ElementRef,
+  OnDestroy, OnInit, inject, input, output, signal, viewChild
 } from '@angular/core';
 import { HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 
-import { MdsValues, toMdsEditorValues } from '../../../util/mds-values';
+import { MdsValues, firstString, toMdsEditorValues } from '../../../util/mds-values';
+import { sourceTextOf } from '../../../util/agent-payload';
 import { NodeSuggestions, aiSuggestionsFor } from '../../../util/mds-suggestions';
+import { TEXT_VARIABLE_MAX } from '../../../services/mds-ai-suggestion.service';
 import { EDITOR_MODE_FOR_DRAFT, forMdsEditor, isDraftNode } from '../../../util/mds-node';
 import { LICENSE_FIELDS, mapAgentFields } from '../../../util/agent-fields';
 import { MetadataEditor, MetadataSeed } from '../../../model/metadata-editor';
 import {
   BrowserExtensionCustomWebComponentService
 } from '../../../services/browser-extension-custom-web-component.service';
+import { MdsAiSuggestionService, SuggestionVariables } from '../../../services/mds-ai-suggestion.service';
 import { SuggestionService } from '../../../services/suggestion.service';
 import { loadWebComponentBundle } from '../../../services/web-component-bundle.service';
 
@@ -35,7 +38,9 @@ interface MdsEditorElement extends HTMLElement {
 // set; the footer then drives commit() and the values are read from `currentValuesChange`, since Angular Elements
 // proxies no methods. It runs on a node where the caller has one and on a plain values map otherwise, which
 // renders less of the view. What the agent filled is handed over as KI-Vorschläge — the ones the repository
-// stores for the node where it has them, the run's own findings otherwise (see {@link loadSuggestions}).
+// stores for the node where it has them, the run's own findings otherwise (see {@link loadSuggestions}), and
+// on a node the repository is first asked to generate what nothing has answered yet (see
+// {@link generateSuggestions}).
 @Component({
   selector: 'es-mds-editor',
   templateUrl: './mds-editor.component.html',
@@ -73,6 +78,10 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
   // Reads the node's proposals out of the repository — see {@link loadSuggestions}.
   private readonly suggestions = inject(SuggestionService);
 
+  // Has the repository generate what is still missing, before the proposals are read — see
+  // {@link generateSuggestions}.
+  private readonly aiSuggestions = inject(MdsAiSuggestionService);
+
   protected readonly bundle = loadWebComponentBundle('edu', EDITOR_TAG);
 
   /** True once the element is mounted and can be committed. */
@@ -91,11 +100,17 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
    */
   private readonly storedSuggestions = signal<NodeSuggestions | null>(null);
 
+  /**
+   * What the repository's generation run reports it proposed; null where none was made. The offer for a
+   * store that will not hand its proposals back — the run wrote them, so it knows them.
+   */
+  private readonly generatedSuggestions = signal<NodeSuggestions | null>(null);
+
   /** The repository has been asked — the mount waits for this, whatever the answer was. */
   private readonly suggestionsRead = signal(false);
 
-  /** Whether the form carries KI-Vorschläge — the note above it says what that means for them. */
-  protected readonly hasAiSuggestions = computed(() => this.aiFields().length > 0);
+  /** While the repository is generating the missing fields, so the wait says what is being waited for. */
+  protected readonly generating = signal(false);
 
   private element: MdsEditorElement | null = null;
   /** The full normalized metadata handed to the editor (all generated fields). */
@@ -155,9 +170,44 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
   private async loadSuggestions(): Promise<void> {
     const node = this.node();
     if (node && !isDraftNode(node)) {
+      this.generatedSuggestions.set(await this.generateSuggestions(node.ref.id));
       this.storedSuggestions.set(await this.suggestions.load(node.ref.id));
     }
     this.suggestionsRead.set(true);
+  }
+
+  /**
+   * Have the repository fill what the content does not say about itself yet, before the form is built from
+   * what it does: the metadata set's own generation over the fields of this form it can generate, run on
+   * this node and given what the content already states — its title and the text it was read off (see
+   * MdsAiSuggestionService). What comes back is stored on the node, so it is read by the load behind this.
+   *
+   * Awaited rather than started: a form built while the run is still going would offer none of it, and the
+   * step exists to describe the content, not to be walked past. Nothing hangs on the outcome.
+   */
+  private async generateSuggestions(nodeId: string): Promise<NodeSuggestions | null> {
+    const variables = this.suggestionVariables();
+    if (!Object.keys(variables).length) return null;
+    this.generating.set(true);
+    try {
+      return await this.aiSuggestions.generate(nodeId, this.groupId(), variables);
+    } finally {
+      this.generating.set(false);
+    }
+  }
+
+  /**
+   * What the generation is given to work from: what the content is called and what its page says. Both are
+   * left out where the content has neither — a run given nothing to read has nothing to write.
+   */
+  private suggestionVariables(): SuggestionVariables {
+    const metadata = this.metadata();
+    const title = firstString(mapAgentFields(metadata)['cclom:title']);
+    const text = sourceTextOf(metadata);
+    return {
+      ...(title ? { 'cclom:title': [title] } : {}),
+      ...(text ? { textContent: [text.slice(0, TEXT_VARIABLE_MAX)] } : {})
+    };
   }
 
   /** Create the element, set every input as a property, THEN append (see the class comment). */
@@ -187,8 +237,13 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
     // form built on a values map never sees them (`nodes` is what decides that, not `editorMode` — a
     // draft's form is built on its stand-in node too). Set before the element connects, like every other
     // input.
+    // What the repository stores for the node leads: those carry the ids an acceptance is recorded under.
+    // Behind it what the run itself reported, for a store that will not hand its proposals back, and last
+    // the findings of the panel's own Erschließung — which only a `/generate` result has.
     const suggestions = node
-      ? this.storedSuggestions() ?? aiSuggestionsFor(metadata, node.ref.id)
+      ? this.storedSuggestions() ??
+        this.generatedSuggestions() ??
+        aiSuggestionsFor(metadata, node.ref.id)
       : null;
     // The licence is set rather than proposed: dropping it from the offer is what keeps it on the node,
     // so its widget shows a licence chosen instead of one to accept first.

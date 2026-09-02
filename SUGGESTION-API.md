@@ -2,11 +2,12 @@
 
 Was die edu-sharing Suggestion-API kann, wie der Core-MDS-Editor sie benutzt und wie das Panel sie
 benutzt: die Erschließung legt die Felder des Agenten als KI-Vorschläge am Node ab, der Schritt
-*Metadaten bearbeiten* liest sie von dort.
+*Metadaten bearbeiten* lässt das Repository ergänzen, was noch fehlt, und liest beides von dort.
 
 - [Die API](#die-api)
 - [Wie der Core-Editor sie benutzt](#wie-der-core-editor-sie-benutzt)
 - [Wie das Panel sie benutzt](#wie-das-panel-sie-benutzt)
+- [Erzeugen lassen: der b-API-Lauf](#erzeugen-lassen-der-b-api-lauf)
 - [Der Ablauf](#der-ablauf)
 - [Drei Haken](#drei-haken)
 - [Was der Weg einbringt](#was-der-weg-einbringt)
@@ -73,10 +74,20 @@ wäre dort also verfügbar.
   Property **und Wert**, `description: 'METHODOLOGY'`, `confidence: 1`), `storedAiSuggestions()`
   formt die Antwort des Repositories in die Form, die die Widgets lesen. `aiSuggestionsFor()` baut
   dieselbe Form rein im Speicher — der Rückfall, wo das Repository keine Vorschläge hält.
+- `app-src/src/app/util/mds-form-widgets.ts` — `formWidgets()` liest die Widgets des gerenderten
+  Formulars aus dem Satz: die Gruppe nennt die Views, das `html` einer View platziert die Widgets
+  über ihre Id als Element. `aiConfigWidgets()` nimmt davon die mit `aiConfigs` — das sind die
+  `widgetAiConfigs` des [b-API-Laufs](#erzeugen-lassen-der-b-api-lauf).
 - `app-src/src/app/services/suggestion.service.ts` — `propose()` und `load()`, beide bestenfalls:
   jede Seite meldet, was sie erreicht hat, und wirft nicht. `propose()` löscht vorher die eigene
   `version` (`browser-extension`), damit eine wiederholte Erschließung die Vorschläge ersetzt statt
   sie zu stapeln. Die Lizenz wird nie vorgeschlagen — sie wird gesetzt.
+
+  Das betrifft nur den WLO-Weg: nur ein `/generate`-Ergebnis trägt `_origins` mit `'ai'`. Ist
+  *WLO-Funktionen verwenden* aus, liest die Erschließung die Seite (`MetadataAgentService.readPage`),
+  und Titel, Bild und Text stehen als **Werte** ohne `_origins` da — `aiFieldsOf()` findet nichts,
+  `propose()` schreibt nichts, und die Vorschläge kommen allein aus dem
+  [b-API-Lauf](#erzeugen-lassen-der-b-api-lauf).
 
 Was das Backend annimmt, entscheidet `MongoSuggestionService.createSuggestion` **für die ganze Liste
 auf einmal**, bevor irgendetwas geschrieben wird — ein Eintrag, den es nicht mag, kostet also alle
@@ -94,14 +105,54 @@ Agent sonst noch führt (`schema:datePublished`, `oeh:new_lrt`), ist sein Vokabu
 eines Nodes. Und weil die Prüfung die ganze Liste betrifft, schickt `propose()` erst den Stapel und
 bei einer Absage Eintrag für Eintrag nach, wie `RepositoryNodeService.writeExtendedData` — so kommt
 durch, was durchkommt, und das Log nennt die abgelehnten Properties beim Namen.
-- `app-src/src/app/features/metadata/mds-editor/mds-editor.component.ts` — `ngOnInit()` lädt die
-  Vorschläge des Nodes, `mount()` setzt sie als `element.suggestions` und reicht den Node über
-  `withoutAiFields()` **ohne** die vorgeschlagenen Properties hinein, damit die Widgets leer sind.
+- `app-src/src/app/features/metadata/mds-editor/mds-editor.component.ts` — `ngOnInit()` lässt erst
+  erzeugen ([b-API-Lauf](#erzeugen-lassen-der-b-api-lauf)) und lädt dann die Vorschläge des Nodes;
+  `mount()` setzt sie als `element.suggestions` und reicht den Node über `withoutAiFields()`
+  **ohne** die vorgeschlagenen Properties hinein, damit die Widgets leer sind. Solange der Lauf läuft,
+  steht statt des Formulars „Metadaten werden vorgeschlagen…".
 
 Warum weiter über den Input, obwohl der Wrapper sie selbst holt: nur `setExternalSuggestions()` —
 der Patch im vendorten Bundle — setzt `suggestionMetadata$` **und** `showAiSuggestions`. Der
 Ladeweg des Editors setzt den Schalter nicht, und ohne ihn zeigt kein Widget einen Vorschlag an
 (Haken a).
+
+## Erzeugen lassen: der b-API-Lauf
+
+Der Vorschlags-Speicher hält, was jemand hineinlegt — *erzeugt* werden die Vorschläge von einem
+zweiten Dienst, dem die b-API vorsteht. Ihn stößt im Repository-UI der Schalter *Metadaten
+generieren* an ([Haken a](#drei-haken)); das Panel stößt ihn selbst an, im Schritt *Metadaten
+bearbeiten*, **bevor** das Formular gebaut wird (`MdsAiSuggestionService`, gerufen aus
+`MdsEditorComponent.loadSuggestions`).
+
+| | |
+|---|---|
+| Client | `EduSharingLlmService.suggestions()` aus `ngx-edu-sharing-b-api`; die `rootUrl` setzt `BApiModule.forRoot(…)` in `app.config.ts` auf die der REST-API plus `/bapi` |
+| Endpunkt | `POST {rootUrl}/bapi/api/v1/edu-sharing/suggestions` — `rootUrl` ist der der REST-API (`…/edu-sharing/rest`), weshalb der Interceptor der Bibliothek die Session mitschickt |
+| Repository | das **konfigurierte**, nicht das des Metadaten-Agenten: die Vorschläge hängen am Node, und der liegt dort (anders als `MetadataAgentApiService`, siehe [ARCHITECTURE.md](ARCHITECTURE.md#the-metadata-agents-address)) |
+| Body | `EduSharingLlmWidgetAiConfigRequest`: `user` (`authorityName`), `metadataSet`, `configIds: [{ type: 'mds', id: 'suggestion_ai' }]`, `widgetAiConfigs: [{ widgetId, aiConfigId }]`, `contextNodeId`, `variables` |
+| `metadataSet` | der Satz, den die Client-Konfiguration unter `availableMds` fürs Heim-Repository (`-home-`) nennt, z. B. `mds_oeh` — nicht der des Formulars: `-default-` adressiert einen Satz an den MDS-Endpunkten, ist aber keine Id, unter der die Generierung konfiguriert ist. Nennt die Konfiguration keinen, bleibt der Lauf aus |
+| `widgetAiConfigs` | die Widgets **des gerenderten Formulars** mit `aiConfigs`: die Gruppe (`io`) nennt die Views, deren `html` die Widgets platziert (`aiConfigWidgets()` in `app-src/src/app/util/mds-form-widgets.ts`, Satz aus `GET /mds/v1/metadatasets/…`), je einmal, `aiConfigId: 'default'` wie im Core — nicht das ganze Vokabular des Satzes |
+| `variables` | was der Lauf **liest**: `cclom:title` (der aktuelle Titel) und `textContent` (der Text der Seite) |
+| Ergebnis | steht danach am Node und wird über `getSuggestionsByNodeId` gelesen; die Antwort des Laufs (`SuggestionResponseDto[]`) ist der **Rückfall**, falls der Speicher sie nicht herausgibt (`proposedAiSuggestions()`) |
+
+Der Unterschied zum Schalter des Core-Editors ist genau das `variables`: der Core reicht die Werte
+des Formulars hinein, das Panel reicht hinein, was es über den Inhalt weiß — den Titel und den Text
+der erschlossenen Seite. Dagegen werden die Prompts des Metadatensatzes geschrieben
+(`var(cclom:title)`, `var(textContent)`).
+
+Ohne die WLO-Funktionen ist dieser Lauf die **einzige** Erzeugung im Ablauf: `/generate` wird dann
+nicht gerufen, die Erschließung liest nur die Seite, und alles, was über Titel, Bild und Text
+hinausgeht, kommt von hier.
+
+Best-effort wie der Speicher daneben: kein Dienst, kein `aiConfig` im Satz, ein fehlgeschlagener Lauf
+— das Formular zeigt dann, was der Node ohnehin schon trägt. Ein Lauf pro Node und Sitzung; die
+Felder, die schon in `variables` stehen, werden nicht noch einmal erzeugt, und `textContent` wird bei
+`TEXT_VARIABLE_MAX` (20 000 Zeichen) abgeschnitten.
+
+Das Log sagt, woran es liegt, wenn ein Feld leer bleibt: `→ generating` nennt die Felder, für die
+gefragt wurde (`fields`) und den ganzen Body, `← the run proposed` nennt je Property die
+vorgeschlagenen Werte und unter `withoutProposal` die Felder, für die der Lauf nichts geliefert hat.
+Steht ein Feld dort, fehlt dem Widget der Prompt — nicht dem Panel die Anfrage.
 
 ## Der Ablauf
 
@@ -110,10 +161,15 @@ Ladeweg des Editors setzt den Schalter nicht, und ohne ihn zeigt kein Widget ein
 2. **Vorschläge hinterlegen.** Direkt danach `CurationService.proposeGeneratedMetadata()` →
    `POST /suggestions/v1/-home-/{nodeId}?type=AI&version=browser-extension`, ein Eintrag pro
    Property und Wert. Nur auf der eigenen Schreibroute: der Node der Agent-Route gehört dem Agenten.
-3. **Der Editor lädt sie mit dem Formular.** Der Schritt *Metadaten bearbeiten* holt sie über
+   Und nur mit den WLO-Funktionen: ohne sie hat der Lauf nichts erzeugt, was vorzuschlagen wäre.
+3. **Erzeugen lassen.** Der Schritt *Metadaten bearbeiten* lässt zuerst das Repository erzeugen, was
+   der Inhalt noch nicht über sich sagt — der [b-API-Lauf](#erzeugen-lassen-der-b-api-lauf), mit dem
+   Titel und dem Seitentext als `variables`. Abgewartet, nicht nebenher: ein Formular, das während
+   des Laufs steht, böte nichts davon an.
+4. **Der Editor lädt sie mit dem Formular.** Derselbe Schritt holt sie dann über
    `getSuggestionsByNodeId` (Status `PENDING`) und reicht sie dem Wrapper als `suggestions` hinein.
-4. **Jedes Widget bekommt seine** über `initWithNodes` → `updateSuggestions()`.
-5. **Übernommen** wird über `setSuggestionState`; das PATCH zurück ins Repository setzt das Panel
+5. **Jedes Widget bekommt seine** über `initWithNodes` → `updateSuggestions()`.
+6. **Übernommen** wird über `setSuggestionState`; das PATCH zurück ins Repository setzt das Panel
    nicht ab (siehe [Grenzen](#grenzen)).
 
 ## Drei Haken
@@ -135,8 +191,21 @@ Vorschlag markiert — daher `withoutAiFields()`, das die vorgeschlagenen Proper
 nimmt, mit dem das Formular gebaut wird. Der in Schritt 1 geschriebene **Titel** steht auf dem Node;
 ein Titel-Vorschlag wäre ohne dieses Herausnehmen unsichtbar.
 
-**c) Multivalue-Chips können es nicht.** `cclom:general_keyword` hat in keinem der beiden Wege eine
-Vorschlagsdarstellung. Die Schlagworte lägen im Store und würden im Formular nicht angeboten.
+**c) Ein Vorschlag wird sofort übernommen, nicht angeboten.** Das gilt für jeden Widget-Typ und ist der
+Punkt, an dem „es kommt kein Vorschlag" meist eine Fehldiagnose ist — der Wert *steht* schon im Feld:
+
+| Widget | Was mit einem `PENDING`-`AI`-Vorschlag passiert |
+|---|---|
+| Text/Textarea | füllt das **leere** Feld und markiert es (`applySuggestion`); ein Feld mit Inhalt bleibt unberührt |
+| Select, Radio, Tree (einwertig) | setzt den Wert und schaltet den Vorschlag auf `ACCEPTED`; ein Wert außerhalb des Valuespace wird verworfen — im Log: `Invalid suggestion "…" received for <widget>, not in valuespace` |
+| Slider, Duration | dasselbe, solange das Widget nicht `dirty` ist |
+| Chips (mehrwertig, z. B. `cclom:general_keyword`) | `addSuggestion()` → `add()` **plus** `ACCEPTED`; im Log steht dann je Wert ein `set value {key: …}` |
+
+Markiert wird das Ergebnis über die Klassen `chip-is-suggestion` / `chip-is-suggestion-ai`
+(`--aiColor`, lila) — sichtbar wird also ein *übernommener* Vorschlag, kein wartender. Was das Formular
+gar nicht zeigt, hat auch keinen Vorschlag bekommen: dann fehlt dem Widget der `aiConfig` im
+Metadatensatz, oder der Lauf hat für dieses Feld nichts geliefert (siehe das `withoutProposal` im Log
+von `MdsAiSuggestionService`).
 
 ## Was der Weg einbringt
 
