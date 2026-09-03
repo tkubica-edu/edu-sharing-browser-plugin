@@ -131,3 +131,51 @@ describe('PageDerivationService', () => {
     await expect(service.derive(null)).resolves.toBeNull();
   });
 });
+
+describe('PageDerivationService.deriveUnder', () => {
+  let clientUtils: ClientUtilsFake;
+  let service: PageDerivationService;
+
+  beforeEach(() => {
+    clientUtils = fakeClientUtils({});
+    TestBed.configureTestingModule({
+      providers: [provideFake(ClientutilsV1Service, clientUtils.fake)],
+    });
+    service = TestBed.inject(PageDerivationService);
+  });
+
+  /** A generated answer of the kind `/generate` returns for the same page. */
+  const generated = {
+    'cclom:title': 'Optik im Unterricht der Sekundarstufe',
+    'cclom:general_description': 'Der Beitrag führt in die geometrische Optik ein und erklärt …',
+    'cclom:general_keyword': ['Optik', 'Strahlenoptik'],
+    _origins: { 'cclom:title': 'ai', 'cclom:general_description': 'ai', 'cclom:general_keyword': 'ai' },
+  };
+
+  it('leaves what the model generated standing', async () => {
+    const derived = await service.deriveUnder(aPage(), generated);
+    expect(derived?.payload['cclom:title']).toBe(generated['cclom:title']);
+    expect(derived?.payload['cclom:general_description']).toBe(generated['cclom:general_description']);
+  });
+
+  it('adds what the page declares and the run does not produce', async () => {
+    const derived = await service.deriveUnder(aPage(), generated);
+    expect(derived?.payload['cclom:general_language']).toEqual(['de']);
+    expect(derived?.payload['ccm:author_freetext']).toEqual(['Dr. Anna Beispiel']);
+    expect(derived?.payload['ccm:commonlicense_key']).toEqual(['CC_BY_SA']);
+    expect(derived?.payload['_page_terms']).toEqual({ learningResourceType: ['Arbeitsblatt'] });
+  });
+
+  it('keeps the generated fields marked as the model’s proposals', async () => {
+    const derived = await service.deriveUnder(aPage(), generated);
+    expect(derived?.payload['_origins']).toMatchObject({
+      'cclom:title': 'ai',
+      'cclom:general_description': 'ai',
+      'cclom:general_keyword': 'ai',
+    });
+  });
+
+  it('leaves the generated answer alone for a page nothing could be read off', async () => {
+    await expect(service.deriveUnder(null, generated)).resolves.toBeNull();
+  });
+});

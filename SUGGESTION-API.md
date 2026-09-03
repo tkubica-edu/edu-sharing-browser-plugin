@@ -145,26 +145,39 @@ bearbeiten*, **bevor** das Formular gebaut wird (`MdsAiSuggestionService`, geruf
 | Body | `EduSharingLlmWidgetAiConfigRequest`: `user` (`authorityName`), `metadataSet`, `configIds: [{ type: 'mds', id: 'suggestion_ai' }]`, `widgetAiConfigs: [{ widgetId, aiConfigId }]`, `contextNodeId`, `variables` |
 | `metadataSet` | der Satz, den die Client-Konfiguration unter `availableMds` fürs Heim-Repository (`-home-`) nennt, z. B. `mds_oeh` — nicht der des Formulars: `-default-` adressiert einen Satz an den MDS-Endpunkten, ist aber keine Id, unter der die Generierung konfiguriert ist. Nennt die Konfiguration keinen, bleibt der Lauf aus |
 | `widgetAiConfigs` | die Widgets **des gerenderten Formulars** mit `aiConfigs`: die Gruppe (`io`) nennt die Views, deren `html` die Widgets platziert (`aiConfigWidgets()` in `app-src/src/app/util/mds-form-widgets.ts`, Satz aus `GET /mds/v1/metadatasets/…`), je einmal, `aiConfigId: 'default'` wie im Core — nicht das ganze Vokabular des Satzes |
-| `variables` | was der Lauf **liest**: `cclom:title` (der aktuelle Titel) und `textContent` (der Text der Seite) |
+| `variables` | was der Lauf **liest**: jede Property, für die das Formular schon einen Wert hält (bei `VARIABLE_MAX` = 2 000 Zeichen je Wert abgeschnitten), dazu `textContent` (der Text der Seite) |
 | Ergebnis | steht danach am Node und wird über `getSuggestionsByNodeId` gelesen; die Antwort des Laufs (`SuggestionResponseDto[]`) ist der **Rückfall**, falls der Speicher sie nicht herausgibt (`proposedAiSuggestions()`) |
 
-Der Unterschied zum Schalter des Core-Editors ist genau das `variables`: der Core reicht die Werte
-des Formulars hinein, das Panel reicht hinein, was es über den Inhalt weiß — den Titel und den Text
-der erschlossenen Seite. Dagegen werden die Prompts des Metadatensatzes geschrieben
-(`var(cclom:title)`, `var(textContent)`).
+Der Unterschied zum Schalter des Core-Editors ist genau das `variables`: das Panel reicht hinein, was
+es über den Inhalt weiß — alles, was das Formular schon hält, samt dem, was die Seite über sich
+aussagt, plus den Text der erschlossenen Seite. Dagegen sind die Prompts des Metadatensatzes
+geschrieben: der Core-Prompt liest `var(cclom:title)`, `var(cclom:general_description)`,
+`var(cclom:general_keyword)`, `var(cm:name)`, `var(ccm:wwwurl)`,
+`var(ccm:educationallearningresourcetype)` und `node(textContent)` namentlich, und je mehr davon
+belegt ist, desto weniger muss ein Lauf erschließen.
+
+**Kontext und Verzicht sind dabei zweierlei.** `variables` ist, was die Prompts lesen dürfen;
+`settled` (das zweite Argument von `MdsAiSuggestionService.generate`) ist, wonach gar nicht erst
+gefragt wird. Nur ein Feld, das im Formular als **entschiedener Wert** steht, wird ausgelassen — ein
+Feld, das als Vorschlag markiert ist (`_origins` = `'ai'` oder `'page'`), bleibt im Lauf, denn ein
+Vorschlag ist genau das, wofür eine Generierung da ist, und der Prompt des Satzes beantwortet ihn
+womöglich besser (`MdsEditorComponent.decidedFields`).
 
 Ohne die WLO-Funktionen ist dieser Lauf die **einzige** Erzeugung im Ablauf: `/generate` wird dann
-nicht gerufen, die Erschließung liest nur die Seite, und alles, was über Titel, Bild und Text
-hinausgeht, kommt von hier.
+nicht gerufen. Was die Seite über sich aussagt, steht dann schon im Formular
+([FEATURES.md § Metadata without a model](FEATURES.md#metadata-without-a-model)) — und weil es dort
+als entschiedener Wert steht, wird es hier nicht noch einmal erzeugt, sondern als Kontext
+mitgereicht.
 
 Best-effort wie der Speicher daneben: kein Dienst, kein `aiConfig` im Satz, ein fehlgeschlagener Lauf
-— das Formular zeigt dann, was der Node ohnehin schon trägt. Ein Lauf pro Node und Sitzung; die
-Felder, die schon in `variables` stehen, werden nicht noch einmal erzeugt, und `textContent` wird bei
-`TEXT_VARIABLE_MAX` (20 000 Zeichen) abgeschnitten.
+— das Formular zeigt dann, was der Node ohnehin schon trägt. Ein Lauf pro Node und Sitzung, und
+`textContent` wird bei `TEXT_VARIABLE_MAX` (20 000 Zeichen) abgeschnitten.
 
-Das Log sagt, woran es liegt, wenn ein Feld leer bleibt: `→ generating` nennt die Felder, für die
-gefragt wurde (`fields`) und den ganzen Body, `← the run proposed` nennt je Property die
-vorgeschlagenen Werte und unter `withoutProposal` die Felder, für die der Lauf nichts geliefert hat.
+Das Log sagt, woran es liegt, wenn ein Feld leer bleibt: die Zeile über den Satz nennt unter
+`toGenerate`, wonach gefragt wird, unter `alreadyDecided` die Felder, die das Formular schon
+entschieden hält, unter `withoutAiConfig` die, für die der Satz keine Generierung beschreibt, und
+unter `context` die Variablennamen; `← the run proposed` nennt je Property die vorgeschlagenen Werte
+und unter `withoutProposal` die Felder, für die der Lauf nichts geliefert hat.
 Steht ein Feld dort, fehlt dem Widget der Prompt — nicht dem Panel die Anfrage.
 
 ## Der Ablauf

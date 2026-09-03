@@ -23,8 +23,8 @@ of what the options *do*.
   with the page depends on the WLO functions (*Einstellungen → WLO-Funktionen verwenden*, and the
   repository's `browserExtensionCustomWebComponent`): **with them on** it calls
   `POST {apiUrl}/generate` through the background worker. **With them off no `/generate` is called at
-  all** — the worker's `page.read` reads the page and `PageDerivationService` describes the content
-  from what the page says about itself (`MetadataAgentService.readPage`); see
+  all** — the worker's `page.read` reads the page and nothing else generates. Either way the page's
+  own declarations are read out of it (`PageDerivationService`), see
   [§ Metadata without a model](#metadata-without-a-model). It stays listed but is **disabled** on two
   kinds of page, saying which in its tooltip: **on Edu-Sharing itself**, whose pages show what the
   repository already holds and are never a source to read metadata off — so there for good, not only
@@ -58,6 +58,16 @@ repository's own generation is available, and the form would otherwise open with
 else. `PageDerivationService` fills it from the page's own declarations instead — the meta tags, Open
 Graph, Dublin Core, LRMI, the `ld+json` blocks, the licence link, the page's tags and breadcrumbs,
 all of which `content/content.js` already reads and `PageData` carries.
+
+The same reading is made **where a model does run**, and laid underneath its answer
+(`deriveUnder` → `withPageStatements`): the generated value stands wherever the run answered — a
+generated description is written for a metadata set, `meta[description]` for a search engine — and
+what the page declares fills every field the run left empty, which is most of what a page states
+machine-readably (its publication date, an identifier, a learning time, the fields a run leaves to a
+person). The exception is the licence: a `link[rel=license]` naming a Creative Commons address *is*
+the licence, so it outranks a generated one. For this the worker hands the page it read back beside
+the generated result (`analyze.run` → `AnalyzeResponse.data`). A content erschlossen by address alone
+has no page to read, so there the run's answer stands by itself.
 
 The split between a statement and a derivation is what the whole path turns on, and it decides how a
 field appears (`util/derived-metadata.ts`). What the page **declares** enters the form as a **value**,

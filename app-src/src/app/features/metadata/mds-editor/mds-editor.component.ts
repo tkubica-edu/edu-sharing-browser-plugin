@@ -4,9 +4,11 @@ import {
 } from '@angular/core';
 import { HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 
-import { MdsValues, firstString, toMdsEditorValues } from '../../../util/mds-values';
+import { MdsValues, toMdsEditorValues } from '../../../util/mds-values';
 import { sourceTextOf } from '../../../util/agent-payload';
-import { MdsSuggestion, NodeSuggestions, aiSuggestionsFor } from '../../../util/mds-suggestions';
+import {
+  MdsSuggestion, NodeSuggestions, aiSuggestionsFor, proposedFieldsOf
+} from '../../../util/mds-suggestions';
 import { TEXT_VARIABLE_MAX } from '../../../services/mds-ai-suggestion.service';
 import { EDITOR_MODE_FOR_DRAFT, forMdsEditor, isDraftNode } from '../../../util/mds-node';
 import { LICENSE_FIELDS, mapAgentFields } from '../../../util/agent-fields';
@@ -14,7 +16,9 @@ import { MetadataEditor, MetadataSeed } from '../../../model/metadata-editor';
 import {
   BrowserExtensionCustomWebComponentService
 } from '../../../services/browser-extension-custom-web-component.service';
-import { MdsAiSuggestionService, SuggestionVariables } from '../../../services/mds-ai-suggestion.service';
+import {
+  MdsAiSuggestionService, SuggestionVariables, VARIABLE_MAX
+} from '../../../services/mds-ai-suggestion.service';
 import { SuggestionService } from '../../../services/suggestion.service';
 import { MdsValuespaceService } from '../../../services/mds-valuespace.service';
 import { pageTermsOf } from '../../../util/derived-metadata';
@@ -245,8 +249,8 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
   /**
    * Have the repository fill what the content does not say about itself yet, before the form is built from
    * what it does: the metadata set's own generation over the fields of this form it can generate, run on
-   * this node and given what the content already states — its title and the text it was read off (see
-   * MdsAiSuggestionService). What comes back is stored on the node, so it is read by the load behind this.
+   * this node and given everything already known about the content (see MdsAiSuggestionService). What
+   * comes back is stored on the node, so it is read by the load behind this.
    *
    * Awaited rather than started: a form built while the run is still going would offer none of it, and the
    * step exists to describe the content, not to be walked past. Nothing hangs on the outcome.
@@ -262,6 +266,7 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
         nodeId,
         this.groupId(),
         variables,
+        this.decidedFields(),
         this.setId() ?? this.webComponent.metadataSet(),
       );
     } finally {
@@ -270,17 +275,42 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
   }
 
   /**
-   * What the generation is given to work from: what the content is called and what its page says. Both are
-   * left out where the content has neither — a run given nothing to read has nothing to write.
+   * What the generation is given to work from: every property the form already holds a value for, plus the
+   * text of the page under the variable name the set's prompts read it as. The metadata set's prompts are
+   * written against these — the core set's asks for the title, the description, the keywords, the file
+   * name, the link, the material type, the level and the subject by name — so a run that is handed what
+   * the page already declared infers less and reads better. A prompt that names none of them is unaffected;
+   * an unused variable costs a line in the request.
+   *
+   * Empty where the content states nothing at all: a run given nothing to read has nothing to write.
    */
   private suggestionVariables(): SuggestionVariables {
-    const metadata = this.metadata();
-    const title = firstString(mapAgentFields(metadata)['cclom:title']);
+    const metadata = mapAgentFields(this.metadata());
+    const variables: SuggestionVariables = {};
+    for (const [property, stated] of Object.entries(toMdsEditorValues(metadata))) {
+      const values = stated
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .map((value) => value.slice(0, VARIABLE_MAX));
+      if (values.length) variables[property] = values;
+    }
     const text = sourceTextOf(metadata);
-    return {
-      ...(title ? { 'cclom:title': [title] } : {}),
-      ...(text ? { textContent: [text.slice(0, TEXT_VARIABLE_MAX)] } : {})
-    };
+    if (text) variables['textContent'] = [text.slice(0, TEXT_VARIABLE_MAX)];
+    return variables;
+  }
+
+  /**
+   * The fields the run must not be asked for: the ones the form holds as a decided value. A field marked as
+   * a proposal — a model's or one derived from the page — is left in the run, because a proposal is exactly
+   * what a generation is for and the set's own prompt may answer it better; a value nobody still has to
+   * decide is not to be generated over.
+   */
+  private decidedFields(): readonly string[] {
+    const metadata = this.metadata();
+    const proposed = new Set(proposedFieldsOf(metadata));
+    return Object.keys(toMdsEditorValues(mapAgentFields(metadata))).filter(
+      (property) => !proposed.has(property),
+    );
   }
 
   /** Create the element, set every input as a property, THEN append (see the class comment). */

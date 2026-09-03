@@ -24,6 +24,13 @@ export const TEXT_VARIABLE_MAX = 20_000;
 export type SuggestionVariables = Record<string, string[]>;
 
 /**
+ * How much of one variable's value travels. A prompt reads a variable as a line of context, so a value far
+ * beyond this says no more about the content than its beginning does. The page's text is the exception and
+ * has a budget of its own ({@link TEXT_VARIABLE_MAX}).
+ */
+export const VARIABLE_MAX = 2_000;
+
+/**
  * The repository's own metadata generation, as the MDS editor's „Für alle Metadaten-Felder, welche über die
  * KI generiert werden können, Vorschläge erzeugen" triggers it: a run over the fields of the rendered form
  * that carry an `aiConfig`, whose findings the repository stores as KI-Vorschläge on the node.
@@ -54,9 +61,12 @@ export class MdsAiSuggestionService {
 
   /**
    * Have the repository generate what the metadata set can generate for this node, from the values handed
-   * in. Answers what the run proposed, in the shape the widgets read; null where there was nothing to ask
-   * for, where the repository names no set or no generatable field, or where the run failed or proposed
-   * nothing. The set is the one the form is built from, which the caller names — else the one the client
+   * in. `variables` is what the prompts may read — the metadata set's own prompts are written against
+   * them, so the more of what is already known travels, the less a run has to infer — and `settled` names
+   * the fields not to ask for at all, which is what makes a run shorter rather than merely better
+   * informed. Answers what the run proposed, in the shape the widgets read; null where there was nothing
+   * to ask for, where the repository names no set or no generatable field, or where the run failed or
+   * proposed nothing. The set is the one the form is built from, which the caller names — else the one the client
    * config names for the home repository (see {@link configuredSetId}) — and the fields are the ones the
    * named group's form is built from (see `aiConfigWidgets`): a run is asked for what the person in front
    * of the form can see, not for the whole vocabulary of the set.
@@ -69,6 +79,7 @@ export class MdsAiSuggestionService {
     nodeId: string,
     groupId: string,
     variables: SuggestionVariables,
+    settled: readonly string[] = Object.keys(variables),
     formSetId?: string | null,
   ): Promise<NodeSuggestions | null> {
     if (this.generated.has(nodeId)) return null;
@@ -94,20 +105,21 @@ export class MdsAiSuggestionService {
       `${LOG} the ${setId} set describes a generation for ${declared.length} fields`,
       declared.map((field) => `${field.widgetId} (${field.aiConfigId})`),
     );
-    // The form's own fields, minus the ones the caller already has an answer for: those are what the run
-    // works *from*.
-    const fields = aiConfigBreakdown(set, groupId, Object.keys(variables));
+    // The form's own fields, minus the ones the caller already has a decided answer for. That is a
+    // narrower set than the variables: everything the form holds travels as context, so the prompts can
+    // read it, but only a field nobody still has to decide is taken off the run.
+    const fields = aiConfigBreakdown(set, groupId, settled);
     const widgets = fields.generatable;
     // What the set says can be generated for this form, and what it says cannot: a field missing from the
     // form's proposals is answered here rather than in the run's result — either the set names no aiConfig
-    // for it, or a variable already carries its value.
+    // for it, or the form already holds a decided value for it.
     console.log(
       `${LOG} the ${groupId} form of ${setId} offers ${widgets.length} fields to generate for ${nodeId}`,
       {
         toGenerate: widgets.map((widget) => `${widget.widgetId} (${widget.aiConfigId})`),
-        answeredByVariables: fields.answered,
+        alreadyDecided: fields.answered,
         withoutAiConfig: fields.withoutAiConfig,
-        from: Object.keys(variables)
+        context: Object.keys(variables)
       },
     );
     if (!widgets.length) {

@@ -41,8 +41,9 @@ Browser tab (any https page)
 - **Background** (`background/background.js` via `sw.js`) — toggles the panel, extracts the active
   tab's content (`content/content.js`), and **proxies the `/generate` call** so it runs from the
   service worker (portable across browsers, avoids page-CSP/CORS pitfalls). Its `page.read` is the
-  same extraction without that call — the Erschließung with the WLO functions switched off, which
-  describes the content from the page's own declarations instead of from a model (see
+  same extraction without that call — the Erschließung with the WLO functions switched off. Both
+  replies carry the extraction itself (`data`), because the panel reads the page's own declarations
+  out of it either way (see
   [FEATURES.md § Metadata without a model](FEATURES.md#metadata-without-a-model)).
 
 `extractPageData()` returns one flat object per run, and it is the same object for both routes: the

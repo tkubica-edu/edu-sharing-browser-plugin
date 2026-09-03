@@ -113,18 +113,30 @@ export class MetadataAgentService {
         LANGUAGE,
         this.agentApi.baseUrl(),
       );
-      return this.remember(
-        response.success
-          ? {
-              ok: true,
-              source: response.source,
-              // Stripped as the answer comes in, which is the only place a generated payload enters the
-              // flow: everything downstream — the editors it seeds, the node the save writes, the
-              // quality criteria's boxes — then reads a payload that answers no criterion.
-              parsed: this.parse(withoutQualityCriteria(response.result ?? {}))
-            }
-          : { ok: false, error: this.describeError(response.error) },
-      );
+      if (!response.success) {
+        return this.remember({ ok: false, error: this.describeError(response.error) });
+      }
+      // Stripped as the answer comes in, which is the only place a generated payload enters the flow:
+      // everything downstream — the editors it seeds, the node the save writes, the quality criteria's
+      // boxes — then reads a payload that answers no criterion.
+      const generated = withoutQualityCriteria(response.result ?? {});
+      // And the page's own statements underneath it: what the page declares about itself is no less true
+      // for a model having described it, and the run fills fields the page never states while the page
+      // states fields no run produces (see PageDerivationService.deriveUnder).
+      const derived = await this.derivation.deriveUnder(response.data, generated);
+      if (derived) {
+        console.log(`${LOG} the page's own statements were read beside the generated answer`, {
+          url: response.source?.url,
+          fields: derived.report.fields.map(
+            (field) => `${field.property} (${field.standing}, ${field.source})`,
+          )
+        });
+      }
+      return this.remember({
+        ok: true,
+        source: response.source,
+        parsed: this.parse(derived?.payload ?? generated)
+      });
     } catch (cause: unknown) {
       return this.remember({ ok: false, error: errorMessage(cause) });
     } finally {

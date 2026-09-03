@@ -211,10 +211,15 @@ export interface PageImages {
   favicon?: PageImage;
 }
 
-/** Reply of the background worker's `analyze.run` message. */
+/**
+ * Reply of the background worker's `analyze.run` message. `data` is the page the generation was made
+ * from, carried back so the panel can read the declarations the page states itself out of it — a
+ * generated answer is about the content, not a transcript of what the page already said.
+ */
 export interface AnalyzeResponse {
   success: boolean;
   result?: Record<string, unknown>;
+  data?: PageData;
   source?: PageSource;
   error?: string;
 }

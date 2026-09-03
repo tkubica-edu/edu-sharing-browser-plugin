@@ -4,7 +4,8 @@ import { KeywordRankingService } from './keyword-ranking.service';
 import { PageData } from './browser-extension.service';
 import { WebsiteInformationService } from './website-information.service';
 import {
-  DerivationReport, derivedPayload, inferredFields, pageTermsEnvelope, rejectedFields, statedFields
+  DerivationReport, derivedPayload, inferredFields, pageTermsEnvelope, rejectedFields, statedFields,
+  withPageStatements
 } from '../util/derived-metadata';
 import { PageStatements, pageStatementsOf } from '../util/page-statements';
 import { candidateKeywords, rankingTextOf } from '../util/text-keywords';
@@ -82,6 +83,31 @@ export class PageDerivationService {
       terms: statements.terms
     });
     return { payload, report, statements };
+  }
+
+  /**
+   * A generated payload with the page's own statements underneath it — the way in *with* a model. The run's
+   * answer stands wherever it answered; what the page declares fills the fields it left empty, and the few
+   * where a declaration outranks a generated guess replace it (see {@link withPageStatements}).
+   *
+   * The same reading of the same page either way, so a field means the same thing on both routes and the
+   * report says where it came from. `null` for a page nothing could be read off, which leaves the caller
+   * with the generated answer alone.
+   */
+  async deriveUnder(
+    data: PageData | null | undefined,
+    generated: Record<string, unknown>,
+  ): Promise<PageDerivation | null> {
+    const derived = await this.derive(data);
+    if (!derived) return null;
+    const payload = withPageStatements(generated, derived.payload);
+    console.log(`${LOG} the page's statements laid under the generated answer`, {
+      addedByPage: Object.keys(derived.payload).filter(
+        (key) => key.includes(':') && payload[key] === derived.payload[key],
+      ),
+      generated: Object.keys(generated).filter((key) => key.includes(':')).length
+    });
+    return { ...derived, payload };
   }
 
   /**

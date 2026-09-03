@@ -693,6 +693,10 @@ browser.runtime.onMessage.addListener((message, sender) => {
           return {
             success: true,
             result,
+            // The page as it was read, beside what was generated from it: the panel reads the
+            // declarations the page carries itself out of it (see PageDerivationService), which the
+            // generated answer neither repeats nor replaces.
+            data: pageData,
             source: {
               url: pageData?.url || tab.url,
               title: pageData?.title || tab.title,

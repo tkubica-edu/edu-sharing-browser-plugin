@@ -246,6 +246,60 @@ export function derivedPayload(
 }
 
 /**
+ * The properties where the page's own declaration outranks a generated value. The licence is the case
+ * that matters: a `link[rel=license]` naming a Creative Commons address *is* the licence, while a model
+ * reading the page can only infer one — and a wrong licence is the most damaging field on a node. The
+ * page's statement only reaches this list where it was declared for the page itself (see `statedFields`),
+ * so a licence merely mentioned in the running text never displaces a generated one.
+ */
+const PAGE_OUTRANKS_GENERATED: readonly string[] = [LICENSE_KEY, LICENSE_VERSION_FIELD];
+
+/**
+ * A generated payload with the page's own statements underneath it: the model's answer stands wherever it
+ * answered, and what the page declares fills every field it left empty.
+ *
+ * That order is the point. A generated description is written for a metadata set — the length, the
+ * structure, the register — while `meta[description]` is written for a search engine, so replacing the
+ * former with the latter would be a downgrade. But the page states a good deal no model produces at all
+ * (its publication date, an identifier, a learning time, the fields the run left to a person), and that
+ * was being thrown away. {@link PAGE_OUTRANKS_GENERATED} names the few the other way round.
+ *
+ * `_origins` is merged along with the values, each field keeping the provenance of whichever side supplied
+ * it, so the form goes on showing a generated field as a proposal and a declared one as decided.
+ */
+export function withPageStatements(
+  generated: Record<string, unknown> | null | undefined,
+  page: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  const fromRun = generated ?? {};
+  const fromPage = page ?? {};
+  const merged: Record<string, unknown> = { ...fromPage };
+  const origins: Record<string, unknown> = { ...((fromPage['_origins'] ?? {}) as object) };
+  const runOrigins = (fromRun['_origins'] ?? {}) as Record<string, unknown>;
+
+  for (const [key, value] of Object.entries(fromRun)) {
+    if (key === '_origins') continue;
+    if (!hasValue(value)) continue;
+    if (PAGE_OUTRANKS_GENERATED.includes(key) && hasValue(fromPage[key])) continue;
+    merged[key] = value;
+    // The provenance travels with the value it is about, and only with it: a field the page supplied
+    // must not carry the run's marking, or a declared licence would read as a machine's proposal.
+    if (runOrigins[key] !== undefined) origins[key] = runOrigins[key];
+    else delete origins[key];
+  }
+  if (Object.keys(origins).length) merged['_origins'] = origins;
+  return merged;
+}
+
+/** Whether a property value says anything — an empty list and a blank string do not. */
+function hasValue(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (Array.isArray(value)) return value.some((entry) => hasValue(entry));
+  if (typeof value === 'string') return value.trim().length > 0;
+  return true;
+}
+
+/**
  * The page's own vocabulary words, as they travel until a metadata set can resolve them. An envelope key,
  * so it is neither rendered as a metadata field nor able to reach a widget — `toMdsEditorValues` keeps only
  * namespaced keys.

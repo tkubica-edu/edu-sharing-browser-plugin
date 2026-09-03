@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DerivedField, derivedPayload, inferredFields, mergeDerived, pageTermsEnvelope, pageTermsOf,
-  rejectedFields, statedFields
+  rejectedFields, statedFields, withPageStatements
 } from './derived-metadata';
 import { PageStatements } from './page-statements';
 import { mapAgentFields } from './agent-fields';
@@ -182,5 +182,92 @@ describe('pageTermsEnvelope', () => {
       pageTermsEnvelope({ learningResourceType: [], educationalContext: [], intendedEndUserRole: [], discipline: [] }),
     ).toEqual({});
     expect(pageTermsOf(null)).toEqual({});
+  });
+});
+
+describe('withPageStatements', () => {
+  /** What a `/generate` run answers: values plus its own provenance per field of its schema. */
+  const generated = {
+    'cclom:title': 'Optik – Licht, Linsen und Spiegel im Unterricht',
+    'cclom:general_description': 'Der Beitrag führt in die geometrische Optik ein und erklärt …',
+    'cclom:general_keyword': ['Optik', 'Strahlenoptik'],
+    'ccm:commonlicense_key': 'CC BY',
+    'ccm:taxonid': ['http://w3id.org/openeduhub/vocabs/discipline/460'],
+    'ccm:educationalintendedenduserrole': '',
+    _origins: {
+      'cclom:title': 'ai',
+      'cclom:general_description': 'ai',
+      'cclom:general_keyword': 'ai',
+      'ccm:commonlicense_key': 'ai',
+      'ccm:taxonid': 'ai',
+      'ccm:educationalintendedenduserrole': 'user',
+    },
+  };
+
+  /** And what the page states about itself, as the derivation puts it. */
+  const page = {
+    'cclom:title': ['Optik'],
+    'cclom:general_description': ['Ein Überblick über Licht.'],
+    'cclom:general_language': ['de'],
+    'schema:datePublished': ['2024-05-06'],
+    'ccm:commonlicense_key': ['CC_BY_SA'],
+    'ccm:commonlicense_cc_version': ['4.0'],
+    'cclom:typicallearningtime': ['2700000'],
+    _source_text: 'Licht breitet sich geradlinig aus.',
+    _page_terms: { discipline: ['Physik'] },
+    _origins: { 'cclom:typicallearningtime': 'page' },
+  };
+
+  it('leaves the generated answer standing where the run answered', () => {
+    const merged = withPageStatements(generated, page);
+    expect(merged['cclom:title']).toBe(generated['cclom:title']);
+    expect(merged['cclom:general_description']).toBe(generated['cclom:general_description']);
+    expect(merged['ccm:taxonid']).toBe(generated['ccm:taxonid']);
+  });
+
+  it('fills what the run left empty with what the page declares', () => {
+    const merged = withPageStatements(generated, page);
+    expect(merged['cclom:general_language']).toEqual(['de']);
+    expect(merged['schema:datePublished']).toEqual(['2024-05-06']);
+    expect(merged['cclom:typicallearningtime']).toEqual(['2700000']);
+    // A field the run names but states nothing for is not an answer.
+    expect(merged['ccm:educationalintendedenduserrole']).toBeUndefined();
+  });
+
+  it('lets a declared licence outrank a generated one — the page names it, the run infers it', () => {
+    const merged = withPageStatements(generated, page);
+    expect(merged['ccm:commonlicense_key']).toEqual(['CC_BY_SA']);
+    expect(merged['ccm:commonlicense_cc_version']).toEqual(['4.0']);
+  });
+
+  it('takes the generated licence where the page declares none', () => {
+    const withoutLicence = Object.fromEntries(
+      Object.entries(page).filter(([key]) => !key.startsWith('ccm:commonlicense')),
+    );
+    expect(withPageStatements(generated, withoutLicence)['ccm:commonlicense_key']).toBe('CC BY');
+  });
+
+  it('keeps each field’s provenance with the side that supplied it', () => {
+    expect(withPageStatements(generated, page)['_origins']).toEqual({
+      'cclom:title': 'ai',
+      'cclom:general_description': 'ai',
+      'cclom:general_keyword': 'ai',
+      'ccm:taxonid': 'ai',
+      // From the page: declared values carry no origin, the derived learning time carries its own, and
+      // the licence lost its `'ai'` along with the generated value it was about.
+      'cclom:typicallearningtime': 'page',
+    });
+  });
+
+  it('carries the page’s envelope along — the text and the words for the vocabularies', () => {
+    const merged = withPageStatements(generated, page);
+    expect(merged['_source_text']).toBe(page['_source_text']);
+    expect(merged['_page_terms']).toEqual({ discipline: ['Physik'] });
+  });
+
+  it('answers with each side alone where the other has nothing', () => {
+    expect(withPageStatements(generated, null)['cclom:title']).toBe(generated['cclom:title']);
+    expect(withPageStatements(null, page)['cclom:general_language']).toEqual(['de']);
+    expect(withPageStatements(null, null)).toEqual({});
   });
 });
