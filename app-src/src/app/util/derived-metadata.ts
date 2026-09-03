@@ -113,6 +113,12 @@ export function statedFields(statements: PageStatements): DerivedField[] {
     add('ccm:general_identifier', [statements.identifier.value], statements.identifier.source, 'stated',
       'Kennung, die die Seite für den Inhalt nennt');
   }
+  if (statements.learningTimeMs) {
+    const minutes = Math.round(statements.learningTimeMs.value / 60000);
+    add('cclom:typicallearningtime', [String(statements.learningTimeMs.value)],
+      statements.learningTimeMs.source, 'stated',
+      `Bearbeitungsdauer, die die Seite angibt (${minutes} Minuten)`);
+  }
   // Only a licence the page declares for itself. One found in the running text may be another resource's,
   // and a wrongly recorded licence is the most damaging thing this derivation could do — it is reported as
   // found instead (see rejectedFields).
@@ -171,16 +177,6 @@ export function inferredFields(
     }
   }
 
-  const learningTime = statements.learningTimeMs;
-  if (learningTime && !held.has('cclom:typicallearningtime')) {
-    fields.push({
-      property: 'cclom:typicallearningtime',
-      values: [String(learningTime.value)],
-      source: learningTime.source,
-      standing: 'inferred',
-      evidence: `Bearbeitungsdauer, die die Seite angibt (${Math.round(learningTime.value / 60000)} Minuten)`
-    });
-  }
   return fields;
 }
 
@@ -215,8 +211,10 @@ export function mergeDerived(fields: readonly DerivedField[]): DerivedField[] {
 /**
  * The merged fields as a payload contribution. `stated` fields become plain values and carry no origin —
  * `fieldOrigins` then marks them as decided, which is what a declared licence or description is. `inferred`
- * fields are marked `'page'`, which is what turns them into pending proposals in the widgets
- * (`proposedFieldsOf` → `aiSuggestionsFor`) without asking the suggestion API for anything.
+ * fields are marked `'page'`, which is what turns them into pending proposals in the widgets: they are
+ * written to the repository's suggestion store like a model's (`proposedFieldsOf` →
+ * `aiSuggestionRequests`), and `aiSuggestionsFor` builds the same offer in memory for a store that
+ * answers nothing.
  *
  * `capable` says whether a property's widget can show a proposal at all. One that cannot would swallow the
  * offer silently, so the field is dropped and reported rather than quietly promoted to a value: a proposal

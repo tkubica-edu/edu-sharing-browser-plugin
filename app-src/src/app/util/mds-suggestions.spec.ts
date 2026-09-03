@@ -215,9 +215,17 @@ describe('the two readings of `_origins`', () => {
     expect(proposedFieldsOf(null)).toEqual([]);
   });
 
-  it('asks the repository’s suggestion store for nothing about a page-derived field', () => {
-    // The regression guard for the KI-free way: no suggestion API is available there, and none is called.
-    expect(aiSuggestionRequests(pageDerived)).toEqual([]);
+  it('proposes a page-derived field to the repository’s suggestion store like a model’s', () => {
+    // A derived value is a machine's proposal whatever derived it, and the store is where an acceptance
+    // of it is recorded. What the page states is not in there: it is a value, not a proposal.
+    expect(aiSuggestionRequests(pageDerived).map((entry) => entry.propertyId)).toEqual([
+      'cclom:general_keyword', 'cclom:general_keyword',
+    ]);
+    expect(
+      aiSuggestionRequests(pageDerived).some(
+        (entry) => entry.propertyId === 'cclom:general_description',
+      ),
+    ).toBe(false);
   });
 
   it('builds the form’s offer for a page-derived field without asking anything', () => {

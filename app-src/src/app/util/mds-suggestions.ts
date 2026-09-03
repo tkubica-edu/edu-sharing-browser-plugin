@@ -36,10 +36,9 @@ export interface NodeSuggestions {
  * proposed. Only what the map says, and only namespaced keys: a payload without `_origins` yields nothing
  * here rather than declaring everything the agent's.
  *
- * Deliberately `'ai'` alone: this is what decides what is written to the repository's suggestion store
- * ({@link aiSuggestionRequests}), and a value derived from the page's own statements is nothing to ask that
- * store about — it is re-derived from the page whenever the page is read. For what the *form* offers, which
- * covers both kinds, see {@link proposedFieldsOf}.
+ * Deliberately `'ai'` alone, for the one question that is about a model rather than about a proposal: the
+ * file name a form shows for a generated title (see MdsPreviewWidgetComponent). What is proposed, in the
+ * form and to the repository's suggestion store alike, is the wider {@link proposedFieldsOf}.
  */
 export function aiFieldsOf(payload: Record<string, unknown> | null | undefined): string[] {
   const origins = (payload?.['_origins'] ?? {}) as Record<string, unknown>;
@@ -115,15 +114,17 @@ function isProposable(propertyId: string): boolean {
 }
 
 /**
- * The agent's fields of a payload as the repository's suggestion API takes them — one entry per property
- * and value, which is the grain a suggestion has (it is always single-valued). The licence is left out:
- * it is set rather than proposed, so the form shows a licence chosen instead of one still to be accepted.
+ * The proposed fields of a payload as the repository's suggestion API takes them — one entry per property
+ * and value, which is the grain a suggestion has (it is always single-valued). Both proposal kinds go the
+ * same way: a value a model generated and one derived from the page are equally a machine's proposal, and
+ * the store is what records the acceptance of either. The licence is left out: it is set rather than
+ * proposed, so the form shows a licence chosen instead of one still to be accepted.
  */
 export function aiSuggestionRequests(
   payload: Record<string, unknown> | null | undefined,
 ): CreateSuggestionRequestDto[] {
   const values = toMdsEditorValues(payload);
-  return aiFieldsOf(payload)
+  return proposedFieldsOf(payload)
     .filter((propertyId) => isProposable(propertyId) && !LICENSE_FIELDS.includes(propertyId))
     .flatMap((propertyId) =>
       (values[propertyId] ?? [])

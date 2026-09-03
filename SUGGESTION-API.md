@@ -69,12 +69,14 @@ wäre dort also verfügbar.
 
 ## Wie das Panel sie benutzt
 
-- `app-src/src/app/util/mds-suggestions.ts` — `aiFieldsOf()` zieht die `_origins`-Schlüssel mit
-  `'ai'`; `aiSuggestionRequests()` macht daraus `CreateSuggestionRequestDto[]` (ein Eintrag pro
-  Property **und Wert**, `description: 'METHODOLOGY'`, `confidence: 1`), `storedAiSuggestions()`
-  formt die Antwort des Repositories in die Form, die die Widgets lesen. `aiSuggestionsFor()` baut
-  dieselbe Form rein im Speicher — der Rückfall, wo das Repository keine Vorschläge hält — und liest
-  dafür `proposedFieldsOf()`, also `'ai'` **und** `'page'`.
+- `app-src/src/app/util/mds-suggestions.ts` — `proposedFieldsOf()` zieht die `_origins`-Schlüssel, die
+  einen Vorschlag bezeichnen, also `'ai'` **und** `'page'`; `aiSuggestionRequests()` macht daraus
+  `CreateSuggestionRequestDto[]` (ein Eintrag pro Property **und Wert**, `description: 'METHODOLOGY'`,
+  `confidence: 1`), `storedAiSuggestions()` formt die Antwort des Repositories in die Form, die die
+  Widgets lesen. `aiSuggestionsFor()` baut dieselbe Form rein im Speicher — der Rückfall, wo das
+  Repository keine Vorschläge hält. `aiFieldsOf()` meint dagegen **nur** `'ai'` und beantwortet die
+  eine Frage, die wirklich nach einem Modell fragt: den Dateinamen zu einem erzeugten Titel
+  (`MdsPreviewWidgetComponent`).
 - `app-src/src/app/util/mds-form-widgets.ts` — `formWidgets()` liest die Widgets des gerenderten
   Formulars aus dem Satz: die Gruppe nennt die Views, das `html` einer View platziert die Widgets
   über ihre Id als Element. `aiConfigWidgets()` nimmt davon die mit `aiConfigs` — das sind die
@@ -91,17 +93,14 @@ wäre dort also verfügbar.
   `version` (`browser-extension`), damit eine wiederholte Erschließung die Vorschläge ersetzt statt
   sie zu stapeln. Die Lizenz wird nie vorgeschlagen — sie wird gesetzt.
 
-  Das betrifft nur den WLO-Weg: nur ein `/generate`-Ergebnis trägt `_origins` mit `'ai'`. Ist
-  *WLO-Funktionen verwenden* aus, beschreibt die Erschließung den Inhalt aus den Aussagen der Seite
-  (`MetadataAgentService.readPage` → `PageDerivationService`, siehe
-  [FEATURES.md § Metadata without a model](FEATURES.md#metadata-without-a-model)). Deren Ableitungen
-  tragen `_origins` mit `'page'`, und die beiden Lesungen dieser Karte gehen hier auseinander:
-  `aiFieldsOf()` meint weiterhin **nur** `'ai'` und ist die Eingabe von `aiSuggestionRequests()` —
-  `propose()` läuft für einen seitenabgeleiteten Payload in sein `if (!body.length) return true` und
-  schreibt nichts, was auch richtig ist, denn diese Werte werden bei jedem Lesen der Seite neu
-  abgeleitet. `proposedFieldsOf()` meint beide und speist `aiSuggestionsFor()`: das Angebot, das die
-  Widgets zeigen, entsteht dort vollständig im Speicher, ohne den Vorschlagsspeicher überhaupt zu
-  fragen.
+  Beide Wege gehen hier durch. Ist *WLO-Funktionen verwenden* aus, beschreibt die Erschließung den
+  Inhalt aus den Aussagen der Seite (`MetadataAgentService.readPage` → `PageDerivationService`, siehe
+  [FEATURES.md § Metadata without a model](FEATURES.md#metadata-without-a-model)). Was die Seite
+  **auszeichnet**, wird 1:1 übernommen und trägt gar kein `_origins` — es steht als Wert im Formular.
+  Was aus der Seite **abgeleitet** ist (Schlagworte aus ihrem Text, eine Beschreibung aus ihrem ersten
+  Absatz), trägt `_origins` mit `'page'` und wird wie ein Modellvorschlag vorgeschlagen: derselbe
+  `propose()`-Aufruf, derselbe `type: 'AI'`, dieselbe Annahme über den Vorschlagsspeicher. Hält das
+  Repository keine Vorschläge, baut `aiSuggestionsFor()` dasselbe Angebot im Speicher.
 
 Was das Backend annimmt, entscheidet `MongoSuggestionService.createSuggestion` **für die ganze Liste
 auf einmal**, bevor irgendetwas geschrieben wird — ein Eintrag, den es nicht mag, kostet also alle
@@ -231,8 +230,8 @@ Die Anzeige im Panel gab es schon vorher, rein im Speicher. Der Unterschied lieg
   Vorschlägen, gefiltert nach Status und Typ.
 - Angenommen/abgelehnt wird **protokolliert** und ist auswertbar.
 - `description` und `confidence` pro Feld sind vorgesehen. Der Agent liefert beides nicht, deshalb
-  steht überall `'METHODOLOGY'` und `1`: `_origins` kennt nur `'ai' | 'user'`, und
-  `processing.llm_model`/`llm_provider` werden verworfen.
+  steht überall `'METHODOLOGY'` und `1`: `_origins` sagt nur, woher ein Wert kommt, nicht wie sicher er
+  ist, und `processing.llm_model`/`llm_provider` werden verworfen.
 - `MetadataSuggestionEvent` in den Benachrichtigungen.
 
 ## Grenzen

@@ -63,13 +63,14 @@ The split between a statement and a derivation is what the whole path turns on, 
 field appears (`util/derived-metadata.ts`). What the page **declares** enters the form as a **value**,
 because it is as much a fact as the page's title: the description out of `meta[description]`/Open
 Graph/Dublin Core/`ld+json`, the keywords out of `meta[keywords]`/`rel=tag`/`DC.subject`, the language
-out of `html lang`, the author, the publisher, the publication date, an identifier, and the licence —
+out of `html lang`, the author, the publisher, the publication date, an identifier, the learning time
+out of an ISO-8601 `timeRequired`, and the licence —
 the last only from a `link[rel=license]` or `meta[DC.rights]` naming a Creative Commons address, which
 `util/page-license.ts` maps back to `ccm:commonlicense_key` plus its version (the mirror of
 `licenseUri` in `util/amb-event.ts`). What is **derived** from the page enters as a **pending
 proposal** the widgets offer for acceptance: keywords counted out of its text
-(`util/text-keywords.ts`, ranked by `KeywordRankingService`), a description taken from its first
-paragraph, the learning time out of an ISO-8601 duration. A licence found only in the running text is
+(`util/text-keywords.ts`, ranked by `KeywordRankingService`) or read off its breadcrumb, a description
+taken from its first paragraph. A licence found only in the running text is
 reported as found and **never written** — a wrongly recorded licence is the most damaging thing this
 path could do.
 
@@ -77,9 +78,17 @@ A property is one or the other, never both: a widget offers a suggestion only wh
 empty, and `MdsEditorComponent` withholds every proposed property from the node to make that so — so
 where the page states something, the derivations for that property are dropped and the report says
 which. The marking rides on `_origins`, whose third value `'page'` distinguishes a page-derived
-proposal from a model's `'ai'` (`fieldOrigins` in `util/curation-node.ts`). Only `'ai'` is written to
-the repository's suggestion store, so this path asks the store for nothing; the form's offer is built
-in memory by `aiSuggestionsFor`, over the wider reading `proposedFieldsOf`.
+proposal from a model's `'ai'` (`fieldOrigins` in `util/curation-node.ts`). Both are proposed the same
+way: `aiSuggestionRequests` reads the wider `proposedFieldsOf`, so a page-derived value goes to the
+repository's suggestion store like a generated one and an acceptance of it is recorded there. Where
+the store holds nothing, `aiSuggestionsFor` builds the same offer in memory.
+
+The stated values reach the form through the node the editor is built on. Once the content is created
+the first save has written only its title and address, so the editor's node is assembled by
+`toEditorNode`: the findings underneath, the node's stored properties over them, what a step recorded
+last. Without that layer a form built on a freshly created node would show those two fields and
+nothing else — the findings live in `CurationService.editorMetadata`, which the MDS editor reads only
+in value mode, while a content with a node is edited in node mode.
 
 Two things beyond the page are used. `getWebsiteInformation` is the lookup *Inhalt erkannt* makes
 anyway, and four of its six fields were being discarded: `WebsiteInformationService` holds the answer

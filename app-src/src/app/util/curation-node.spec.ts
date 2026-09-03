@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { fieldOrigins } from './curation-node';
+import { Node } from 'ngx-edu-sharing-api';
+
+import { fieldOrigins, toEditorNode } from './curation-node';
 
 describe('fieldOrigins', () => {
   const values = {
@@ -37,5 +39,52 @@ describe('fieldOrigins', () => {
 
   it('states an origin only for the fields, not for the envelope', () => {
     expect(Object.keys(fieldOrigins(values, {}, {}))).not.toContain('preview_image_url');
+  });
+});
+
+describe('toEditorNode', () => {
+  // A node as the first save reports it back: the two properties `createContent` writes and no more.
+  const saved = {
+    ref: { id: 'abc', repo: '-home-' },
+    name: 'Oliver',
+    properties: { 'cm:name': ['Oliver'], 'ccm:wwwurl': ['https://beispiel.de/oliver/'] },
+  } as unknown as Node;
+
+  // What reading the page produced for it — the fields no save has written yet.
+  const found = {
+    'cclom:title': ['Oliver'],
+    'ccm:wwwurl': ['https://beispiel.de/oliver/'],
+    'cclom:general_description': ['Oliver zeigt eine barrierefreie Vorlesung.'],
+    'cclom:general_keyword': ['Barrierefreiheit', 'ADHS'],
+  };
+
+  it('shows the findings the node does not carry yet', () => {
+    expect(toEditorNode(saved, found, {}).properties).toEqual({
+      'cm:name': ['Oliver'],
+      'ccm:wwwurl': ['https://beispiel.de/oliver/'],
+      'cclom:title': ['Oliver'],
+      'cclom:general_description': ['Oliver zeigt eine barrierefreie Vorlesung.'],
+      'cclom:general_keyword': ['Barrierefreiheit', 'ADHS'],
+    });
+  });
+
+  it('lets what the repository stores outrank a finding about the same property', () => {
+    const stored = {
+      ...saved,
+      properties: { ...saved.properties, 'cclom:general_description': ['Von Hand geschrieben.'] },
+    } as Node;
+    expect(toEditorNode(stored, found, {}).properties?.['cclom:general_description']).toEqual([
+      'Von Hand geschrieben.'
+    ]);
+  });
+
+  it('lets a value a step settled outrank both', () => {
+    const node = toEditorNode(saved, found, { 'cclom:general_keyword': ['Inklusion'] });
+    expect(node.properties?.['cclom:general_keyword']).toEqual(['Inklusion']);
+  });
+
+  it('leaves the node itself untouched', () => {
+    toEditorNode(saved, found, {});
+    expect(Object.keys(saved.properties ?? {})).toEqual(['cm:name', 'ccm:wwwurl']);
   });
 });

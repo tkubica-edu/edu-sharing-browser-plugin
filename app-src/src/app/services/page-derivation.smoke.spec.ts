@@ -101,9 +101,9 @@ describe('the KI-free way, end to end', () => {
       'ccm:general_identifier': ['https://beispiel.de/optik'],
       'ccm:commonlicense_key': ['CC_BY_SA'],
       'ccm:commonlicense_cc_version': ['4.0'],
-      // Derived, so proposed rather than stated.
+      // Read off `lrmi:timeRequired`, so stated like the rest — the page declares every field it fills
+      // here, which is why the payload marks nothing as a proposal.
       'cclom:typicallearningtime': ['2700000'],
-      _origins: { 'cclom:typicallearningtime': 'page' },
       // The page's own words for the vocabulary fields, for the metadata set to resolve.
       _page_terms: { learningResourceType: ['Arbeitsblatt', 'article'], discipline: ['Physik'] },
     });

@@ -78,7 +78,11 @@ describe('inferredFields', () => {
     // The page states keywords and a description, so neither is proposed again.
     expect(inferred.some((field) => field.property === 'cclom:general_keyword')).toBe(false);
     expect(inferred.some((field) => field.property === 'cclom:general_description')).toBe(false);
-    expect(inferred.find((field) => field.property === 'cclom:typicallearningtime')?.values).toEqual(['2700000']);
+    // The learning time is a reading of the page's own `timeRequired`, so it is stated, not derived.
+    expect(inferred.some((field) => field.property === 'cclom:typicallearningtime')).toBe(false);
+    expect(
+      statedFields(statements()).find((field) => field.property === 'cclom:typicallearningtime')?.values,
+    ).toEqual(['2700000']);
   });
 
   it('proposes keywords and a description for a page that declares neither', () => {
@@ -125,11 +129,16 @@ describe('mergeDerived', () => {
 
 describe('derivedPayload', () => {
   it('marks only the derived fields, so the stated ones read as decided', () => {
-    const stated = statedFields(statements());
-    const inferred = inferredFields(statements(), stated.map((field) => field.property), []);
+    // A page that declares neither keywords nor a description, so both are derived from its text.
+    const bare = statements({ keywords: [], description: null });
+    const stated = statedFields(bare);
+    const inferred = inferredFields(bare, stated.map((field) => field.property), ['Brechung']);
     const { values, origins } = derivedPayload([...stated, ...inferred]);
-    expect(values['cclom:general_description']).toEqual(['Ein Überblick über Licht.']);
-    expect(origins).toEqual({ 'cclom:typicallearningtime': 'page' });
+    expect(values['cclom:general_language']).toEqual(['de']);
+    expect(origins).toEqual({
+      'cclom:general_keyword': 'page',
+      'cclom:general_description': 'page'
+    });
   });
 
   it('drops a proposal whose widget cannot show one, and says so', () => {

@@ -6,7 +6,8 @@ import type { SectionId } from '../model/navigation';
 import { REVIEW_RECEIVER, WorkflowStatus } from '../model/workflow';
 import {
   createdAtOf, fieldOrigins, isPickedPicture, previewImageOf, previewSrcOfNode, toDataUrl,
-  toDraftNode, toPartialNode, toSavedMetadata, toWrittenNode, withCanvasScalars, withReadablePreview
+  toDraftNode, toEditorNode, toPartialNode, toSavedMetadata, toWrittenNode, withCanvasScalars,
+  withReadablePreview
 } from '../util/curation-node';
 import { MdsValues, firstString, stringValues, toMdsEditorValues } from '../util/mds-values';
 import { AmbSource } from '../util/amb-event';
@@ -650,15 +651,17 @@ export class CurationService {
 
   /**
    * The node the Qualitätsprüfung's editor works on: the content's own, else the draft. Null leaves the
-   * editor on a plain values map. A method for the same reason as {@link draftNode}; what other steps
-   * recorded is laid over the stored properties, so the editor never commits the older values back.
+   * editor on a plain values map. A method for the same reason as {@link draftNode}.
+   *
+   * Built on {@link editorMetadata} rather than on the node's stored properties alone, because the first
+   * save writes only picture and title: a form seeded from the node would show none of what the
+   * Erschließung found and the next save would commit that emptiness back. The order is the precedence —
+   * the findings underneath, the node's stored properties over them, and what other steps recorded last.
    */
   editorNode(): Node | null {
     const node = this.previewNode();
     if (!node) return this.draftNode();
-    const recorded = this.recordedValues();
-    if (!Object.keys(recorded).length) return node;
-    return { ...node, properties: { ...node.properties, ...recorded } };
+    return toEditorNode(node, toMdsEditorValues(this.editorMetadata()), this.recordedValues());
   }
 
   /**

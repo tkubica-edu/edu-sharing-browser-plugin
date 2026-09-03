@@ -36,8 +36,9 @@ export function createdAtOf(node: Node | null | undefined): number | null {
  * by an earlier step, or already on the node. The two proposal kinds are offered for acceptance in the form;
  * `'user'` is shown as decided.
  *
- * The distinction between the two is not cosmetic: only `'ai'` is written to the repository's suggestion
- * store (see `aiFieldsOf`), which the page-derived route neither needs nor should reach for.
+ * Both proposal kinds are offered the same way and written to the repository's suggestion store alike
+ * (see `proposedFieldsOf`); the distinction says where the value came from, which is what the report and
+ * the log go by.
  */
 export type FieldOrigin = 'ai' | 'page' | 'user';
 
@@ -277,4 +278,21 @@ export function toDraftNode(
     preview: toDraftPreview(previewSrc)
   };
   return node as unknown as Node;
+}
+
+/**
+ * The node a metadata editor is built on: the content's node with the flow's own findings underneath its
+ * stored properties, and what other steps recorded over both.
+ *
+ * The findings have to be laid under it because the first save writes only picture and title — a form
+ * seeded from the node's properties alone would show none of what the Erschließung found, and the next
+ * save would commit that emptiness back. The order *is* the precedence: a property the node stores is a
+ * value the repository holds and outranks a finding about it, and a value a step settled outranks both.
+ */
+export function toEditorNode(
+  node: Node,
+  found: MdsValues,
+  recorded: MdsValues,
+): Node {
+  return { ...node, properties: { ...found, ...node.properties, ...recorded } };
 }

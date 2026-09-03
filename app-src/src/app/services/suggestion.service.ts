@@ -3,7 +3,7 @@ import { CreateSuggestionRequestDto, HOME_REPOSITORY, SuggestionsV1Service } fro
 import { firstValueFrom } from 'rxjs';
 
 import {
-  NodeSuggestions, aiFieldsOf, aiSuggestionRequests, storedAiSuggestions
+  NodeSuggestions, aiSuggestionRequests, proposedFieldsOf, storedAiSuggestions
 } from '../util/mds-suggestions';
 
 /** Log prefix for what the panel proposes for a node and what it reads back. */
@@ -30,7 +30,9 @@ export class SuggestionService {
   private readonly suggestions = inject(SuggestionsV1Service);
 
   /**
-   * Propose the run's findings for the node, replacing what this panel proposed for it before. Answers
+   * Propose the run's findings for the node, replacing what this panel proposed for it before — a model's
+   * generated values and the ones derived from the page alike, since both are a machine's proposal and the
+   * store is where an acceptance of either is recorded. Answers
    * whether anything was written; a payload with nothing to propose is no failure and writes nothing.
    *
    * The endpoint validates the whole list before it stores any of it, so one property it will not take
@@ -39,17 +41,17 @@ export class SuggestionService {
    */
   async propose(nodeId: string, payload: Record<string, unknown> | null): Promise<boolean> {
     const body = aiSuggestionRequests(payload);
-    // The agent's fields against the ones a proposal is made of: a field of the payload that is not
-    // proposed was left out on purpose — the licence, which is set rather than proposed, a name from a
+    // The payload's proposed fields against the ones a request is made of: a proposed field that is not
+    // in the body was left out on purpose — the licence, which is set rather than proposed, a name from a
     // vocabulary the repository cannot resolve to a property, or a field carrying no value at all
     // (see aiSuggestionRequests).
     const proposable = new Set(body.map((entry) => entry.propertyId));
-    console.log(`${LOG} ${proposable.size} of the agent's fields are to be proposed for ${nodeId}`, {
+    console.log(`${LOG} ${proposable.size} proposed fields are to be proposed for ${nodeId}`, {
       toPropose: [...proposable],
-      notProposed: aiFieldsOf(payload).filter((propertyId) => !proposable.has(propertyId))
+      notProposed: proposedFieldsOf(payload).filter((propertyId) => !proposable.has(propertyId))
     });
     if (!body.length) {
-      console.log(`${LOG} nothing to propose for ${nodeId} — the run marked no field as the agent's`);
+      console.log(`${LOG} nothing to propose for ${nodeId} — the run marked no field as a proposal`);
       return true;
     }
     // An earlier run's proposals first: the same node would otherwise carry both, and the form would
