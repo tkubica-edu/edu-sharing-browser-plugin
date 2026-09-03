@@ -1,18 +1,12 @@
 <div class="mds-wrap">
   @if (bundle.error()) {
     <p class="es-error">Editor konnte nicht geladen werden: {{ bundle.error() }}</p>
+  } @else if (generating()) {
+    <!-- The repository's own generation runs before the form is built, so its findings are in the form
+         the moment it appears — see MdsEditorComponent.generateSuggestions. -->
+    <p class="es-muted">Metadaten werden vorgeschlagen…</p>
   } @else if (!ready()) {
     <p class="es-muted">Editor wird geladen…</p>
-  }
-
-  @if (hasAiSuggestions()) {
-    <!-- What the colour means, and what the fields that are not filled in yet are waiting for: a
-         multi-value widget (Schlagwörter, Themenbaum) offers each proposal as a chip and takes it
-         over only when it is pressed — see MdsEditorComponent.withoutAiFields. -->
-    <p class="ai-note">
-      Farbig markierte Werte sind KI-Vorschläge. Vorschläge für mehrwertige Felder werden als
-      Chips angeboten und erst mit dem Übernehmen Teil des Inhalts.
-    </p>
   }
 
   <!--

@@ -18,8 +18,16 @@ of what the options *do*.
 
 - **Login** — the shared `es-login` gate; shown while logged out and reused inline by the
   screens that need a session.
-- **Inhalt erschließen** — reads the active tab, calls `POST {apiUrl}/generate` through the
-  background worker and advances to the metadata screen. It stays listed but is **disabled** on two
+- **Inhalt erschließen** — reads the active tab and advances to the metadata screen. What it does
+  with the page depends on the WLO functions (*Einstellungen → WLO-Funktionen verwenden*, and the
+  repository's `browserExtensionCustomWebComponent`): **with them on** it calls
+  `POST {apiUrl}/generate` through the background worker, as before. **With them off no `/generate`
+  is called at all** — the worker's `page.read` reads the page and nothing more
+  (`MetadataAgentService.readPage`), and what the page states about itself becomes the content:
+  its title, the picture it declares (`og:image`, else the largest picture inside the content, else
+  `twitter:image`) and its text, as **values** rather than proposals — nothing generated them, so
+  none of them is marked as KI. The fields the page does not answer are proposed at the next step
+  (see *Metadaten editieren*). It stays listed but is **disabled** on two
   kinds of page, saying which in its tooltip: **on Edu-Sharing itself**, whose pages show what the
   repository already holds and are never a source to read metadata off — so there for good, not only
   where a node was recognised; and **while a content was detected for the page** (see *Inhalt
@@ -31,7 +39,12 @@ of what the options *do*.
   in the repository. The first of them becomes the active node (`PageRecognitionService` →
   `CurationService.adoptDetectedNode`). Nothing navigates for the user — the finding surfaces as
   a menu entry, never as a jump.
-- **Metadaten editieren** — loads the metadata into `edu-sharing-mds-editor-wrapper`. Saving
+- **Metadaten editieren** — has the repository generate what the content does not say about itself
+  yet, then loads the metadata into `edu-sharing-mds-editor-wrapper`. The generation is the MDS
+  editor's own „Vorschläge erzeugen", asked for by the panel through the b-API client
+  (`ngx-edu-sharing-b-api`, `EduSharingLlmService.suggestions`) with inputs of its own — the
+  content's title and the text of its page — and its findings are read back as KI-Vorschläge, see
+  [SUGGESTION-API.md](SUGGESTION-API.md). Saving
   creates a `ccm:io` node in the **inbox** the first time (`NodeService.createChild`) and
   updates it in place thereafter (`editNodeMetadata`), then advances to the preview. Available
   for an active node or a fresh result that was never saved. Extracted fields and the raw JSON

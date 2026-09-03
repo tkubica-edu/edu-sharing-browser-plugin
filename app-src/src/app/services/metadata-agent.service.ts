@@ -11,6 +11,7 @@ import { MetadataAgentApiService } from './metadata-agent-api.service';
 import { SOURCE_TEXT_KEY } from '../util/agent-payload';
 import { EXTRACT_FIELD_ANSWER } from '../util/dev-fixtures';
 import { errorMessage } from '../util/errors';
+import { pageFactsOf, pageMetadata } from '../util/page-facts';
 import { CONTENT_TEXT_MAX } from '../util/page-context';
 import { withoutQualityCriteria } from '../util/quality-criteria-values';
 
@@ -40,6 +41,10 @@ const EXTRACT_TIMEOUT_MS = 60000;
 
 const TEXT_EMPTY =
   'Der Text enthält zu wenig Inhalt für eine Erschließung.';
+
+/** What is said for a page nothing can be read off — an extension page, a blank tab, a refused injection. */
+const PAGE_UNREADABLE =
+  'Diese Seite kann nicht gelesen werden. Öffne die Seite des Inhalts und versuche es erneut.';
 
 const EXTRACT_TIMEOUT = 'Der Metadaten-Agent hat nicht rechtzeitig geantwortet.';
 
@@ -116,6 +121,41 @@ export class MetadataAgentService {
             }
           : { ok: false, error: this.describeError(response.error) },
       );
+    } catch (cause: unknown) {
+      return this.remember({ ok: false, error: errorMessage(cause) });
+    } finally {
+      this.running.set(false);
+    }
+  }
+
+  /**
+   * Read the open page and take what it states as the Erschließung's outcome — the way in without the
+   * metadata agent, which is the one outside the WLO context: the page's own title and picture describe
+   * the content, its text travels along as what was read, and no field is marked as generated because
+   * none is. What the page does not answer is proposed later by the repository itself (see
+   * MdsAiSuggestionService).
+   *
+   * Stored as the same last run as {@link run}, since it is the same statement about the same kind of
+   * thing — everything behind this step reads the outcome and not how it came about.
+   */
+  async readPage(): Promise<AnalyzeOutcome> {
+    this.running.set(true);
+    try {
+      const page = await this.browserExtension.readPage();
+      const facts = pageFactsOf(page?.data);
+      if (!page?.source || !facts) {
+        return this.remember({ ok: false, error: PAGE_UNREADABLE });
+      }
+      console.log(`${LOG} the page was read instead of erschlossen — /generate is not called`, {
+        url: page.source.url,
+        title: facts.title,
+        imageUrl: facts.imageUrl
+      });
+      return this.remember({
+        ok: true,
+        source: page.source,
+        parsed: this.parse(pageMetadata(facts))
+      });
     } catch (cause: unknown) {
       return this.remember({ ok: false, error: errorMessage(cause) });
     } finally {

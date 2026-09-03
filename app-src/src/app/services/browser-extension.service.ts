@@ -66,12 +66,42 @@ export interface PageData {
   mainContent?: string;
   formattedText?: string;
   text?: string;
+  images?: PageImages;
+}
+
+/** One picture the page names, with the place it was read from (`og:image`, the largest article image …). */
+export interface PageImage {
+  source: string;
+  url: string;
+  alt?: string;
+}
+
+/**
+ * The pictures a page names, by the role each plays for it: the two the page declares for sharing, the
+ * largest picture inside its content, and the site's icon. Any of them may be missing.
+ */
+export interface PageImages {
+  ogImage?: PageImage;
+  twitterImage?: PageImage;
+  heroImage?: PageImage;
+  favicon?: PageImage;
 }
 
 /** Reply of the background worker's `analyze.run` message. */
 export interface AnalyzeResponse {
   success: boolean;
   result?: Record<string, unknown>;
+  source?: PageSource;
+  error?: string;
+}
+
+/**
+ * Reply of the background worker's `page.read` message: the page as the content script read it, plus the
+ * record of where it was read — the same `source` an analysis reports, screenshot included.
+ */
+export interface PageReadResponse {
+  success: boolean;
+  data?: PageData;
   source?: PageSource;
   error?: string;
 }
@@ -304,6 +334,16 @@ export class BrowserExtensionService {
       action: 'tabs.extractPageData',
     });
     return response?.success ? response.data ?? null : null;
+  }
+
+  /**
+   * Read the open page and the record of where it was read — what an Erschließung that generates nothing
+   * works from (see MetadataAgentService.readPage). `null` for a page that cannot be read at all: an
+   * extension or browser page, one whose injection the browser refuses.
+   */
+  async readPage(): Promise<PageReadResponse | null> {
+    const response = await this.askOrNull<PageReadResponse>({ action: 'page.read' });
+    return response?.success ? response : null;
   }
 
   /**

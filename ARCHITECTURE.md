@@ -40,7 +40,9 @@ Browser tab (any https page)
   events ([content/HOST-EVENTS.md](content/HOST-EVENTS.md)).
 - **Background** (`background/background.js` via `sw.js`) — toggles the panel, extracts the active
   tab's content (`content/content.js`), and **proxies the `/generate` call** so it runs from the
-  service worker (portable across browsers, avoids page-CSP/CORS pitfalls).
+  service worker (portable across browsers, avoids page-CSP/CORS pitfalls). Its `page.read` is the
+  same extraction without that call — the Erschließung with the WLO functions switched off, which
+  generates nothing from the page (see [FEATURES.md](FEATURES.md)).
 - **Auth** runs inside the Angular app (the library owns its HttpClient); it calls
   `GET {repo}/edu-sharing/rest/authentication/v1/validateSession` with Basic auth — or with a bearer
   token, where the session was obtained through the OAuth flow below. See
@@ -77,7 +79,8 @@ precedes every `/generate` rather than as a failed extraction a minute later.
 
 | Leg | Where it runs | Why |
 |-----|---------------|-----|
-| `POST /generate`, `POST /nodes` (Metadata-Agent) | background service worker | background fetch is gated by `host_permissions`, not CORS/page-CSP — portable everywhere (`analyze.run`: extract the tab, generate everything) |
+| `POST /generate`, `POST /nodes` (Metadata-Agent) | background service worker | background fetch is gated by `host_permissions`, not CORS/page-CSP — portable everywhere (`analyze.run`: extract the tab, generate everything). `/generate` only while the WLO functions are on; `page.read` is the same extraction without it |
+| `POST /bapi/api/v1/edu-sharing/suggestions` (b-API) | Angular `HttpClient` (`ngx-edu-sharing-b-api`) | the repository's own metadata generation, on the **configured** repository — same origin and same session as every other repository call, so the library's interceptor carries it (see [SUGGESTION-API.md](SUGGESTION-API.md)) |
 | `POST /extract-field` (Metadata-Agent) | sidebar document (`MetadataAgentService`) | same context the WLO canvas calls `/generate` from, so the request is visible in the panel's own DevTools and there is no worker build that can fall out of sync with the app. Relies on `host_permissions` for the cross-origin call, like the repository login |
 | Page content extraction | `scripting.executeScript` (background) | no cross-origin fetch |
 | Repository login | Angular `HttpClient` (library) | the library owns the call; relies on `host_permissions` bypassing CORS on Chrome/Edge/Firefox |

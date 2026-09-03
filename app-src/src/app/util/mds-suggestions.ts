@@ -114,6 +114,49 @@ export function aiSuggestionRequests(
 }
 
 /**
+ * One proposal as the side that *made* it reports it — the answer of the repository's generation run
+ * (`EduSharingLlmService.suggestions`). Structural on purpose: the b-API and the repository's own API
+ * each declare a DTO of their own, and this is what the two have in common.
+ */
+export interface ProposedSuggestion {
+  id?: string;
+  propertyId?: string;
+  value?: unknown;
+  status?: string;
+  type?: string;
+}
+
+/**
+ * What a generation run reports it proposed, in the shape the widgets read — the offer for a node whose
+ * proposals could not be read back from the store (see {@link storedAiSuggestions}), which is the one
+ * other place the same values are to be had. A person's proposal and a declined one are left out; every
+ * other answer is what the run just made, so it is offered as pending whatever it says of itself.
+ *
+ * Null where the run proposed nothing usable, so the caller can leave the editor's input unset.
+ */
+export function proposedAiSuggestions(
+  nodeId: string,
+  proposals: readonly ProposedSuggestion[] | null | undefined,
+): NodeSuggestions | null {
+  const suggestions: Record<string, MdsSuggestion[]> = {};
+  for (const entry of proposals ?? []) {
+    const propertyId = entry.propertyId;
+    const value = typeof entry.value === 'string' ? entry.value : String(entry.value ?? '');
+    if (!propertyId || !value.trim()) continue;
+    if (entry.type === 'USER_PROPOSAL' || entry.status === 'DECLINED') continue;
+    const proposed = (suggestions[propertyId] ??= []);
+    proposed.push({
+      id: entry.id ?? `es-proposed-${propertyId}-${proposed.length}`,
+      propertyId,
+      value,
+      status: 'PENDING',
+      type: 'AI'
+    });
+  }
+  return Object.keys(suggestions).length ? { nodeId, suggestions } : null;
+}
+
+/**
  * The suggestions the repository stores for a node, in the shape the widgets read: the machine's pending
  * ones only — an accepted or declined suggestion is a decision already taken, and a person's proposal is
  * not what the KI marking is about. Null where the node carries none, so the caller can leave the editor's

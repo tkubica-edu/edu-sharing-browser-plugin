@@ -113,6 +113,14 @@ export function toExtendedFields(
   return fields;
 }
 
+/**
+ * The text a payload's metadata was read from: the agent's own field, else the one a node written from such a
+ * payload keeps it in. `null` where the payload states neither — a content nothing says the wording of.
+ */
+export function sourceTextOf(payload: Record<string, unknown> | null | undefined): string | null {
+  return stringOf(payload?.[SOURCE_TEXT_KEY]) ?? stringOf(payload?.[EXTENDED_TEXT_FIELD]) ?? null;
+}
+
 /** A payload value as the list of strings it stands for, for the fields that hold several. */
 function listOf(value: unknown): readonly string[] {
   const stated = Array.isArray(value) ? value : [value];

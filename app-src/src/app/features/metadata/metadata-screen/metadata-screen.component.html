@@ -4,11 +4,16 @@
   <section class="es-hint-card agent-summary">
     <h2>Metadaten automatisch ergänzt</h2>
 
+    <!-- Only a run that counted its fields has a count to show: an Erschließung that read the page
+         instead of generating from it reports none, and the fields it did not answer are the ones the
+         repository proposes in the form below. -->
     @if (metadataAgent.lastRun()?.parsed; as parsed) {
-      <p class="field-count">
-        <span class="pill">{{ parsed.fieldsExtracted ?? '–' }} von {{ parsed.fieldsTotal ?? '–' }} Felder<i
-              class="pill-glyph" esIcon="smart_toy"></i></span>
-      </p>
+      @if (parsed.fieldsTotal !== null) {
+        <p class="field-count">
+          <span class="pill">{{ parsed.fieldsExtracted ?? '–' }} von {{ parsed.fieldsTotal }} Felder<i
+                class="pill-glyph" esIcon="smart_toy"></i></span>
+        </p>
+      }
     }
 
     <p class="es-muted">

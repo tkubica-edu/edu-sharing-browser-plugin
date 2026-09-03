@@ -146,9 +146,11 @@ The service keeps the two statements apart. `offeredByRepository` is the config'
 was told rather than what came back, and a hint beside it names a repository that offers none of this
 in the first place. Because every WLO branch in the app reads `enabled` and nothing else — the two
 screens above, `metadataSet`, the `wlo-theme` class, `AuthService.authorized` /
-`AuthService.loginRequired`, the WLO-only options in `model/navigation.ts`, the `ccm:oeh_*` write and
-the `GROUP_ORG_WLO-Uploadmanager` workflow in `CurationService`, and the settings groups that
-configure them — the switch reaches all of them at once. Its own card is outside those groups for
+`AuthService.loginRequired`, the WLO-only options in `model/navigation.ts`, the metadata agent's
+`/generate` (`CurationService.analyze` reads the page instead, see
+[FEATURES.md](FEATURES.md#reading-and-curating-a-page)), the `ccm:oeh_*` write and the `GROUP_ORG_WLO-Uploadmanager`
+workflow in `CurationService`, and the settings groups that configure them — the switch reaches all
+of them at once. Its own card is outside those groups for
 that reason: a panel switched off would otherwise have nowhere left to switch itself back on.
 
 `AppComponent` loads the setting before it subscribes to the config, so a panel that has it off never
