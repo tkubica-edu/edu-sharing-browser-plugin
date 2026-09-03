@@ -6,6 +6,7 @@ its guards and the surrounding chrome work is [UI-SHELL.md](UI-SHELL.md); this f
 of what the options *do*.
 
 - [Reading and curating a page](#reading-and-curating-a-page)
+  - [Metadata without a model](#metadata-without-a-model)
 - [Working on a node](#working-on-a-node)
 - [Filing and handing on](#filing-and-handing-on)
 - [OnlyOffice-only options](#onlyoffice-only-options)
@@ -21,13 +22,10 @@ of what the options *do*.
 - **Inhalt erschließen** — reads the active tab and advances to the metadata screen. What it does
   with the page depends on the WLO functions (*Einstellungen → WLO-Funktionen verwenden*, and the
   repository's `browserExtensionCustomWebComponent`): **with them on** it calls
-  `POST {apiUrl}/generate` through the background worker, as before. **With them off no `/generate`
-  is called at all** — the worker's `page.read` reads the page and nothing more
-  (`MetadataAgentService.readPage`), and what the page states about itself becomes the content:
-  its title, the picture it declares (`og:image`, else the largest picture inside the content, else
-  `twitter:image`) and its text, as **values** rather than proposals — nothing generated them, so
-  none of them is marked as KI. The fields the page does not answer are proposed at the next step
-  (see *Metadaten editieren*). It stays listed but is **disabled** on two
+  `POST {apiUrl}/generate` through the background worker. **With them off no `/generate` is called at
+  all** — the worker's `page.read` reads the page and `PageDerivationService` describes the content
+  from what the page says about itself (`MetadataAgentService.readPage`); see
+  [§ Metadata without a model](#metadata-without-a-model). It stays listed but is **disabled** on two
   kinds of page, saying which in its tooltip: **on Edu-Sharing itself**, whose pages show what the
   repository already holds and are never a source to read metadata off — so there for good, not only
   where a node was recognised; and **while a content was detected for the page** (see *Inhalt
@@ -52,6 +50,63 @@ of what the options *do*.
 
 Which editor renders that screen, and which route the save takes, is
 [WEB-COMPONENTS.md](WEB-COMPONENTS.md) and [ARCHITECTURE.md § Saving a content](ARCHITECTURE.md#saving-a-content).
+
+### Metadata without a model
+
+Where the WLO functions are off, no model describes the content: neither `/generate` nor the
+repository's own generation is available, and the form would otherwise open with a title and nothing
+else. `PageDerivationService` fills it from the page's own declarations instead — the meta tags, Open
+Graph, Dublin Core, LRMI, the `ld+json` blocks, the licence link, the page's tags and breadcrumbs,
+all of which `content/content.js` already reads and `PageData` carries.
+
+The split between a statement and a derivation is what the whole path turns on, and it decides how a
+field appears (`util/derived-metadata.ts`). What the page **declares** enters the form as a **value**,
+because it is as much a fact as the page's title: the description out of `meta[description]`/Open
+Graph/Dublin Core/`ld+json`, the keywords out of `meta[keywords]`/`rel=tag`/`DC.subject`, the language
+out of `html lang`, the author, the publisher, the publication date, an identifier, and the licence —
+the last only from a `link[rel=license]` or `meta[DC.rights]` naming a Creative Commons address, which
+`util/page-license.ts` maps back to `ccm:commonlicense_key` plus its version (the mirror of
+`licenseUri` in `util/amb-event.ts`). What is **derived** from the page enters as a **pending
+proposal** the widgets offer for acceptance: keywords counted out of its text
+(`util/text-keywords.ts`, ranked by `KeywordRankingService`), a description taken from its first
+paragraph, the learning time out of an ISO-8601 duration. A licence found only in the running text is
+reported as found and **never written** — a wrongly recorded licence is the most damaging thing this
+path could do.
+
+A property is one or the other, never both: a widget offers a suggestion only while its own value is
+empty, and `MdsEditorComponent` withholds every proposed property from the node to make that so — so
+where the page states something, the derivations for that property are dropped and the report says
+which. The marking rides on `_origins`, whose third value `'page'` distinguishes a page-derived
+proposal from a model's `'ai'` (`fieldOrigins` in `util/curation-node.ts`). Only `'ai'` is written to
+the repository's suggestion store, so this path asks the store for nothing; the form's offer is built
+in memory by `aiSuggestionsFor`, over the wider reading `proposedFieldsOf`.
+
+Two things beyond the page are used. `getWebsiteInformation` is the lookup *Inhalt erkannt* makes
+anyway, and four of its six fields were being discarded: `WebsiteInformationService` holds the answer
+per address so both callers share the one request, and its description and keywords fill what the page
+left empty. Because the repository fetches the address from its own side — no session, no cookies, no
+JavaScript — an answer from behind a login or a cookie wall describes that wall; `describesSamePage`
+(`util/website-information.ts`) requires a shared content word with the page's title, or three with
+its text, before anything from it is used. And the page's own words for the vocabulary-bound fields
+travel along under the envelope key `_page_terms` until a metadata set can resolve them: in the
+metadata step `MdsValuespaceService` matches them against the `values` of the widgets the rendered
+group actually places, by id, by `alternativeIds`, by folded caption or by the last segment of the
+value URI, and **never** by prefix or similarity — „Deutsch" must not resolve to „Deutsch als
+Zweitsprache" (`util/vocabulary-match.ts`). A term that names no value of the widget yields nothing,
+since a value outside a widget's valuespace shows as a blank in the editor and is found by no search.
+
+The form's offer is merged per property rather than per source, so each source fills only what the
+ones before it left empty: what the repository stores for the node, then what a generation run
+reported, then the run's own findings, and last the values matched from the page's words. That
+ordering is also what confines this path to the case it is for — where a model answered, its proposals
+stand.
+
+What lands on the node is bounded by the rendered form, which for the core set's `io` group is
+`ccm:wwwurl`, `cm:name`, `cclom:title`, `cclom:general_description`, `cclom:general_keyword`,
+`ccm:educationallearningresourcetype` and the native `author`/`license` widgets. A derived field no
+widget carries — the language, the date, the identifier, the publisher, the learning time — stays in
+the payload, visible in the metadata screen's collapsibles and carried into `ccm:oeh_extendedData`
+where the WLO functions write it, but no save puts it on the node by itself.
 
 ---
 

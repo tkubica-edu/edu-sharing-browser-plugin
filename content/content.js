@@ -3,6 +3,7 @@
 (() => {
 
 function extractPageData() {
+    const mainContent = extractMainContent();
     const data = {
         url: window.location.href,
         title: document.title || '',
@@ -12,7 +13,8 @@ function extractPageData() {
             keywords: getMetaContent('keywords'),
             author: getMetaContent('author'),
             language: document.documentElement.lang || getMetaContent('language'),
-            copyright: getMetaContent('copyright')
+            copyright: getMetaContent('copyright'),
+            publishedTime: getMetaContent('article:published_time') || getMetaContent('article:modified_time')
         },
 
         openGraph: {
@@ -58,8 +60,10 @@ function extractPageData() {
         tags: extractTags(),
         canonical: extractCanonicalURL(),
         alternateLanguages: extractAlternateLanguages(),
-        mainContent: extractMainContent(),
-        html: extractMainHTML()
+        mainContent,
+        html: extractMainHTML(),
+        headings: extractHeadings(),
+        wordCount: countWords(mainContent)
     };
 
     try {
@@ -115,6 +119,11 @@ function extractImages() {
 function extractSemanticHTML() {
     const semantic = {};
     const article = document.querySelector('article');
+    if (!article) {
+        // A page that marks up no article may still date itself — a lot of them put the date in a header.
+        const time = document.querySelector('time[datetime]');
+        if (time) semantic.publishDate = { source: 'time[datetime]', datetime: time.getAttribute('datetime'), text: time.textContent?.trim() };
+    }
     if (article) {
         const time = article.querySelector('time[datetime]');
         if (time) semantic.publishDate = { source: 'article > time[datetime]', datetime: time.getAttribute('datetime'), text: time.textContent?.trim() };
@@ -159,6 +168,29 @@ function extractAlternateLanguages() {
         if (hreflang && link.href) alternates.push({ language: hreflang, url: link.href });
     });
     return alternates.length > 0 ? { source: 'link[rel=alternate][hreflang]', items: alternates } : null;
+}
+
+/** How many headings are taken along; beyond that many a page is using them for layout. */
+const HEADINGS_MAX = 40;
+
+/**
+ * The page's headings in document order. They name what the sections under them are about, which is the
+ * strongest signal a page's text carries about its own subject — and the one a plain text extraction loses.
+ */
+function extractHeadings() {
+    const headings = [];
+    document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
+        if (headings.length >= HEADINGS_MAX) return;
+        const text = heading.textContent?.replace(/\s+/g, ' ').trim();
+        if (text) headings.push({ level: Number(heading.tagName.slice(1)), text });
+    });
+    return headings.length > 0 ? headings : undefined;
+}
+
+/** How many words the text holds — what a reading time and a "is there content here at all" go by. */
+function countWords(text) {
+    const words = (text || '').trim().match(/[\p{L}\p{N}]+/gu);
+    return words ? words.length : 0;
 }
 
 // How much of the page's readable text is taken along. It is the body of the formatted extraction, which

@@ -1,27 +1,12 @@
 import { Injectable } from '@angular/core';
 
+import { signalTerms, termMatches } from '../util/german-terms';
+
 /**
  * Ranks the keywords the metadata agent generated against the document they came from, so the search starts with the
  * ones that carry its subject: only the first few are searched, and the agent's order is a guess. Scoring follows the
  * WLO reranker's shape — additive points per signal, blended so the text evidence dominates. Local and synchronous.
  */
-
-/** Above this length a term may match anywhere in a word (see {@link termMatches}). */
-const SHORT_TERM_MAX = 3;
-
-/**
- * German stopwords, which must not act as a relevance signal. They are not merely useless but
- * actively harmful, because German stopwords sit inside ordinary words ("Stu-die-n", "Me-die-n") —
- * so a substring test would report a hit for a keyword that is only an article.
- */
-const DE_STOPWORDS = new Set([
-  'der', 'die', 'das', 'den', 'dem', 'des', 'ein', 'eine', 'einer', 'einem', 'einen', 'eines',
-  'und', 'oder', 'aber', 'als', 'auch', 'auf', 'aus', 'bei', 'bis', 'für', 'mit', 'nach',
-  'von', 'vor', 'wie', 'über', 'unter', 'durch', 'gegen', 'ohne', 'zwischen',
-  'ist', 'sind', 'war', 'hat', 'wird', 'kann', 'soll', 'zum', 'zur', 'vom',
-  'nicht', 'noch', 'nur', 'sehr', 'schon', 'dann', 'wenn', 'dass', 'weil',
-  'im', 'am', 'an', 'in', 'zu', 'so', 'es', 'ob',
-]);
 
 // ── Point weights ────────────────────────────────────────────────────────────
 // Where a keyword occurs matters more than how often: a heading names the subject, the body merely
@@ -194,28 +179,4 @@ interface PreparedDocument {
   title: string;
   /** All headings, one per line. */
   headings: string;
-}
-
-/** The words of a keyword that can carry a signal — long enough, and not a stopword. */
-function signalTerms(phrase: string): string[] {
-  return phrase
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter((term) => term.length >= 2 && !DE_STOPWORDS.has(term));
-}
-
-/**
- * Whether `term` occurs in `text` as a signal rather than by accident. A plain substring test is right for German,
- * where a term sits inside compounds and inflections; for a short term it is mostly accident. Position separates
- * them, so a short term must match at a word start — requiring the end too would reject those compounds.
- */
-function termMatches(term: string, text: string): boolean {
-  if (!term || !text) return false;
-  if (term.length > SHORT_TERM_MAX) return text.includes(term);
-  for (let from = 0; ; from += 1) {
-    const at = text.indexOf(term, from);
-    if (at === -1) return false;
-    if (at === 0 || !/[\p{L}\p{N}]/u.test(text[at - 1])) return true;
-    from = at;
-  }
 }

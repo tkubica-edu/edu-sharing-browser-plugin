@@ -1,10 +1,10 @@
 import { Injectable, inject } from '@angular/core';
-import { ConfigService, HOME_REPOSITORY, MdsDefinition, MdsService } from 'ngx-edu-sharing-api';
+import { ConfigService, DEFAULT, HOME_REPOSITORY, MdsDefinition, MdsService } from 'ngx-edu-sharing-api';
 import { EduSharingLlmService, EduSharingLlmWidgetAiConfigRequest } from 'ngx-edu-sharing-b-api';
 import { firstValueFrom } from 'rxjs';
 
 import { AuthService } from './auth.service';
-import { aiConfigWidgets } from '../util/mds-form-widgets';
+import { aiConfigBreakdown, aiConfigFields } from '../util/mds-form-widgets';
 import { NodeSuggestions, proposedAiSuggestions } from '../util/mds-suggestions';
 
 /** Log prefix for the generation run and what it was asked for. */
@@ -56,10 +56,10 @@ export class MdsAiSuggestionService {
    * Have the repository generate what the metadata set can generate for this node, from the values handed
    * in. Answers what the run proposed, in the shape the widgets read; null where there was nothing to ask
    * for, where the repository names no set or no generatable field, or where the run failed or proposed
-   * nothing. The set is the one the repository's client config names for the home repository (see
-   * {@link configuredSetId}), and the fields are the ones the named group's form is built from (see
-   * `aiConfigWidgets`) — a run is asked for what the person in front of the form can see, not for the
-   * whole vocabulary of the set.
+   * nothing. The set is the one the form is built from, which the caller names — else the one the client
+   * config names for the home repository (see {@link configuredSetId}) — and the fields are the ones the
+   * named group's form is built from (see `aiConfigWidgets`): a run is asked for what the person in front
+   * of the form can see, not for the whole vocabulary of the set.
    *
    * The answer is the run's own report of what it wrote. The proposals are read from the node behind this
    * (SuggestionService.load), which is the better source — those carry the ids an acceptance is recorded
@@ -69,22 +69,50 @@ export class MdsAiSuggestionService {
     nodeId: string,
     groupId: string,
     variables: SuggestionVariables,
+    formSetId?: string | null,
   ): Promise<NodeSuggestions | null> {
     if (this.generated.has(nodeId)) return null;
     if (!Object.keys(variables).length) {
       console.log(`${LOG} nothing to generate from for ${nodeId} — no variable carries a value`);
       return null;
     }
-    const setId = await this.configuredSetId();
-    if (!setId) return null;
-    const set = await this.metadataSet(setId);
+    const requested = formSetId || (await this.configuredSetId());
+    if (!requested) return null;
+    const set = await this.metadataSet(requested);
     if (!set) return null;
+    // The set's own id rather than the one it was addressed under: `-default-` reaches a set on the MDS
+    // endpoints but is no id the generation can be configured under, and the definition names the real one.
+    const setId = set.id || (requested === DEFAULT ? null : requested);
+    if (!setId) {
+      console.log(`${LOG} the set behind ${requested} names no id of its own — nothing to generate under`);
+      return null;
+    }
+    // Every field the set describes a generation for, before the form narrows it: this is what the
+    // repository can generate at all, and the group decides how much of it a person gets offered.
+    const declared = aiConfigFields(set);
+    console.log(
+      `${LOG} the ${setId} set describes a generation for ${declared.length} fields`,
+      declared.map((field) => `${field.widgetId} (${field.aiConfigId})`),
+    );
     // The form's own fields, minus the ones the caller already has an answer for: those are what the run
     // works *from*.
-    const widgets = aiConfigWidgets(set, groupId, Object.keys(variables));
+    const fields = aiConfigBreakdown(set, groupId, Object.keys(variables));
+    const widgets = fields.generatable;
+    // What the set says can be generated for this form, and what it says cannot: a field missing from the
+    // form's proposals is answered here rather than in the run's result — either the set names no aiConfig
+    // for it, or a variable already carries its value.
+    console.log(
+      `${LOG} the ${groupId} form of ${setId} offers ${widgets.length} fields to generate for ${nodeId}`,
+      {
+        toGenerate: widgets.map((widget) => `${widget.widgetId} (${widget.aiConfigId})`),
+        answeredByVariables: fields.answered,
+        withoutAiConfig: fields.withoutAiConfig,
+        from: Object.keys(variables)
+      },
+    );
     if (!widgets.length) {
       console.log(
-        `${LOG} the ${groupId} form of ${setId} has no field left to generate — no widget carries an aiConfig`,
+        `${LOG} nothing to generate for ${nodeId} — the ${groupId} form of ${setId} has no field left`,
       );
       return null;
     }
@@ -99,10 +127,7 @@ export class MdsAiSuggestionService {
       contextNodeId: nodeId,
       variables
     };
-    console.log(
-      `${LOG} → generating ${widgets.length} fields of the ${groupId} form for ${nodeId}`,
-      { fields: widgets.map((widget) => widget.widgetId), body },
-    );
+    console.log(`${LOG} → generating ${widgets.length} fields for ${nodeId}`, body);
     try {
       const proposed = await firstValueFrom(this.llm.suggestions({ body }));
       const offer = proposedAiSuggestions(nodeId, proposed);
@@ -139,7 +164,13 @@ export class MdsAiSuggestionService {
         (entry) => !entry.repository || entry.repository === HOME_REPOSITORY,
       );
       const setId = home?.mds?.find((id) => !!id) ?? null;
-      if (!setId) console.log(`${LOG} the client config names no metadata set for ${HOME_REPOSITORY}`);
+      // With what the config did name: `availableMds` is often unset on a repository that leaves the
+      // workspace on its default set, and then the entry the run needs has to come from the caller.
+      if (!setId) {
+        console.log(`${LOG} the client config names no metadata set for ${HOME_REPOSITORY}`, {
+          availableMds: config?.availableMds
+        });
+      }
       return setId;
     } catch (cause: unknown) {
       console.warn(`${LOG} could not read the client config:`, cause);

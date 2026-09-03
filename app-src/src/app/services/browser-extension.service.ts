@@ -56,9 +56,15 @@ export interface PageSource {
 }
 
 /**
- * What the content script reads off the open page, as far as anything here uses it; it carries more, which
- * {@link PageData.formattedText} already contains as text. The three texts are the same page in decreasing
- * preparation: metadata blocks plus main content, that content alone, and a whole-page fallback.
+ * What the content script reads off the open page (`content.js`, `extractPageData`). The three texts are the
+ * same page in decreasing preparation: metadata blocks plus main content, that content alone, and a
+ * whole-page fallback. Everything besides them is what the page *declares* about itself, each block absent
+ * where the page declares nothing of that kind — the extraction leaves a whole group out rather than
+ * sending it empty, and a single key inside a present group is `null`.
+ *
+ * The declarations travel in `formattedText` as prose as well, which is what the metadata agent's prompt
+ * reads; they are declared here because the panel derives metadata from them where no agent runs (see
+ * `util/page-statements.ts`).
  */
 export interface PageData {
   url: string;
@@ -67,6 +73,124 @@ export interface PageData {
   formattedText?: string;
   text?: string;
   images?: PageImages;
+  meta?: PageMeta;
+  openGraph?: PageOpenGraph;
+  twitter?: PageTwitterCard;
+  dublinCore?: PageDublinCore;
+  lrmi?: PageLrmi;
+  /** Every `application/ld+json` block of the page, parsed; a block that would not parse is left out. */
+  structuredData?: unknown[];
+  license?: PageLicense;
+  semantic?: PageSemantic;
+  breadcrumbs?: PageItems<PageBreadcrumb>;
+  tags?: PageItems<string>;
+  canonical?: PageLink;
+  alternateLanguages?: PageItems<PageAlternateLanguage>;
+  /** The page's headings in document order, outermost level first. */
+  headings?: PageHeading[];
+  /** How many words the page's main content holds, as counted where it was read. */
+  wordCount?: number;
+}
+
+/** A list the extraction reports together with the place it was read from. */
+export interface PageItems<T> {
+  source: string;
+  items: T[];
+}
+
+/** A single address the page names for itself, with the place it was read from. */
+export interface PageLink {
+  source: string;
+  url: string;
+}
+
+/** The plain `<meta name="…">` declarations. */
+export interface PageMeta {
+  description?: string | null;
+  keywords?: string | null;
+  author?: string | null;
+  /** `document.documentElement.lang`, else `meta[language]`. */
+  language?: string | null;
+  copyright?: string | null;
+  /** The publication time as the Open Graph article namespace states it. */
+  publishedTime?: string | null;
+}
+
+/** The Open Graph declarations — what the page states about itself for sharing. */
+export interface PageOpenGraph {
+  title?: string | null;
+  description?: string | null;
+  image?: string | null;
+  type?: string | null;
+  locale?: string | null;
+  siteName?: string | null;
+}
+
+/** The Twitter card declarations, the same statements under another vocabulary. */
+export interface PageTwitterCard {
+  card?: string | null;
+  title?: string | null;
+  description?: string | null;
+  image?: string | null;
+}
+
+/** The Dublin Core declarations — the vocabulary libraries and repositories publish under. */
+export interface PageDublinCore {
+  title?: string | null;
+  creator?: string | null;
+  subject?: string | null;
+  description?: string | null;
+  date?: string | null;
+  type?: string | null;
+  format?: string | null;
+  language?: string | null;
+  rights?: string | null;
+}
+
+/**
+ * The LRMI declarations — the educational vocabulary, and the only one that states a resource's level,
+ * use and learning time outright. Rare on a page, worth reading where it is there.
+ */
+export interface PageLrmi {
+  educationalUse?: string | null;
+  educationalLevel?: string | null;
+  learningResourceType?: string | null;
+  timeRequired?: string | null;
+}
+
+/**
+ * What the page says about its licence, and where that was read: a `link[rel=license]` carries the
+ * machine-readable address, the other places carry text only.
+ */
+export interface PageLicense {
+  source: string;
+  url?: string;
+  text?: string;
+}
+
+/** What the page's own markup states about its content — read inside the first `<article>` only. */
+export interface PageSemantic {
+  publishDate?: { source: string; datetime?: string | null; text?: string };
+  author?: { source: string; text?: string };
+  footerLicense?: { source: string; text?: string };
+}
+
+/** One step of the page's own classification of itself. */
+export interface PageBreadcrumb {
+  text: string;
+  href: string;
+}
+
+/** One heading of the page, with the level it stands at. */
+export interface PageHeading {
+  level: number;
+  text: string;
+}
+
+/** The same page in another language, as the page itself links it. */
+export interface PageAlternateLanguage {
+  language: string;
+  url: string;
 }
 
 /** One picture the page names, with the place it was read from (`og:image`, the largest article image …). */

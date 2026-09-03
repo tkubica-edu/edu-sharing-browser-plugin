@@ -32,25 +32,49 @@ export interface NodeSuggestions {
 }
 
 /**
- * The properties a payload's `_origins` attributes to the metadata agent — the fields whose values are a
- * machine's proposal. Only what the map says, and only namespaced keys: a payload without `_origins` yields
- * nothing here rather than declaring everything the agent's.
+ * The properties a payload's `_origins` attributes to the metadata agent — the fields whose values a *model*
+ * proposed. Only what the map says, and only namespaced keys: a payload without `_origins` yields nothing
+ * here rather than declaring everything the agent's.
+ *
+ * Deliberately `'ai'` alone: this is what decides what is written to the repository's suggestion store
+ * ({@link aiSuggestionRequests}), and a value derived from the page's own statements is nothing to ask that
+ * store about — it is re-derived from the page whenever the page is read. For what the *form* offers, which
+ * covers both kinds, see {@link proposedFieldsOf}.
  */
 export function aiFieldsOf(payload: Record<string, unknown> | null | undefined): string[] {
   const origins = (payload?.['_origins'] ?? {}) as Record<string, unknown>;
   return Object.keys(origins).filter((key) => key.includes(':') && origins[key] === 'ai');
 }
 
+/** The origins that stand for a proposal rather than for a decided value — see `FieldOrigin`. */
+const PROPOSED_ORIGINS: readonly string[] = ['ai', 'page'];
+
 /**
- * The agent's fields of a payload as suggestions for one node; null where it has none, so the caller can leave
- * the editor's input unset rather than hand it an empty offer. One suggestion per value, which is the grain
- * the widgets work at.
+ * The properties the form offers for acceptance: everything a machine proposed, whether a model generated it
+ * or it was derived from what the page states about itself. The wider reading of the same map — the widgets
+ * show one marking for both, and the difference is only where the value came from.
+ */
+export function proposedFieldsOf(payload: Record<string, unknown> | null | undefined): string[] {
+  const origins = (payload?.['_origins'] ?? {}) as Record<string, unknown>;
+  return Object.keys(origins).filter(
+    (key) => key.includes(':') && typeof origins[key] === 'string'
+      && PROPOSED_ORIGINS.includes(origins[key] as string),
+  );
+}
+
+/**
+ * The proposed fields of a payload as suggestions for one node — a model's and the page-derived ones alike
+ * (see {@link proposedFieldsOf}); null where it has none, so the caller can leave the editor's input unset
+ * rather than hand it an empty offer. One suggestion per value, which is the grain the widgets work at.
+ *
+ * Built entirely here, without asking the repository for anything: this is the offer a form gets where no
+ * suggestion store and no generation run answered.
  */
 export function aiSuggestionsFor(
   payload: Record<string, unknown> | null | undefined,
   nodeId: string,
 ): NodeSuggestions | null {
-  const fields = aiFieldsOf(payload);
+  const fields = proposedFieldsOf(payload);
   if (!fields.length) return null;
   const values = toMdsEditorValues(payload);
   const suggestions: Record<string, MdsSuggestion[]> = {};

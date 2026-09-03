@@ -42,7 +42,18 @@ Browser tab (any https page)
   tab's content (`content/content.js`), and **proxies the `/generate` call** so it runs from the
   service worker (portable across browsers, avoids page-CSP/CORS pitfalls). Its `page.read` is the
   same extraction without that call — the Erschließung with the WLO functions switched off, which
-  generates nothing from the page (see [FEATURES.md](FEATURES.md)).
+  describes the content from the page's own declarations instead of from a model (see
+  [FEATURES.md § Metadata without a model](FEATURES.md#metadata-without-a-model)).
+
+`extractPageData()` returns one flat object per run, and it is the same object for both routes: the
+three texts in decreasing preparation (`formattedText` — the metadata blocks plus the main content,
+which is what the agent's prompt reads —, `mainContent`, `text`), the pictures the page names, and
+the page's declarations about itself under `meta`, `openGraph`, `twitter`, `dublinCore`, `lrmi`,
+`structuredData` (each `ld+json` block parsed), `license`, `semantic`, `breadcrumbs`, `tags`,
+`canonical`, `alternateLanguages`, `headings` and `wordCount`. `PageData`
+(`services/browser-extension.service.ts`) declares them; a block is absent where the page declares
+nothing of that kind, and a single key inside a present block is `null`.
+
 - **Auth** runs inside the Angular app (the library owns its HttpClient); it calls
   `GET {repo}/edu-sharing/rest/authentication/v1/validateSession` with Basic auth — or with a bearer
   token, where the session was obtained through the OAuth flow below. See

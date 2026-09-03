@@ -1,7 +1,10 @@
 import { NodeSuggestionResponseDto, SuggestionResponseDto } from 'ngx-edu-sharing-api';
 import { describe, expect, it } from 'vitest';
 
-import { aiSuggestionRequests, proposedAiSuggestions, storedAiSuggestions } from './mds-suggestions';
+import {
+  aiFieldsOf, aiSuggestionRequests, aiSuggestionsFor, proposedAiSuggestions, proposedFieldsOf,
+  storedAiSuggestions
+} from './mds-suggestions';
 
 /** An agent payload where the agent filled a description and two keywords, and the user the title. */
 function aPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -190,5 +193,51 @@ describe('proposedAiSuggestions', () => {
   it('offers nothing for a run that reported nothing', () => {
     expect(proposedAiSuggestions('node-1', [])).toBeNull();
     expect(proposedAiSuggestions('node-1', null)).toBeNull();
+  });
+});
+
+describe('the two readings of `_origins`', () => {
+  /** A payload of the KI-free way: the page states the description, and the keywords were derived. */
+  const pageDerived = {
+    'cclom:general_description': 'Ein Überblick über Licht.',
+    'cclom:general_keyword': ['Brechung', 'Brennpunkt'],
+    _origins: { 'cclom:general_keyword': 'page', 'cclom:general_description': 'user' },
+  };
+
+  it('attributes only a model’s fields to the agent', () => {
+    expect(aiFieldsOf(pageDerived)).toEqual([]);
+    expect(aiFieldsOf({ _origins: { 'cclom:general_keyword': 'ai' } })).toEqual(['cclom:general_keyword']);
+  });
+
+  it('offers both kinds in the form — a proposal is a proposal, wherever it came from', () => {
+    expect(proposedFieldsOf(pageDerived)).toEqual(['cclom:general_keyword']);
+    expect(proposedFieldsOf({ _origins: { a: 'page', 'cclom:x': 'ai', 'cclom:y': 'user' } })).toEqual(['cclom:x']);
+    expect(proposedFieldsOf(null)).toEqual([]);
+  });
+
+  it('asks the repository’s suggestion store for nothing about a page-derived field', () => {
+    // The regression guard for the KI-free way: no suggestion API is available there, and none is called.
+    expect(aiSuggestionRequests(pageDerived)).toEqual([]);
+  });
+
+  it('builds the form’s offer for a page-derived field without asking anything', () => {
+    expect(aiSuggestionsFor(pageDerived, 'node-1')?.suggestions).toEqual({
+      'cclom:general_keyword': [
+        {
+          id: 'es-ai-cclom:general_keyword-0',
+          propertyId: 'cclom:general_keyword',
+          value: 'Brechung',
+          status: 'PENDING',
+          type: 'AI',
+        },
+        {
+          id: 'es-ai-cclom:general_keyword-1',
+          propertyId: 'cclom:general_keyword',
+          value: 'Brennpunkt',
+          status: 'PENDING',
+          type: 'AI',
+        },
+      ],
+    });
   });
 });

@@ -53,14 +53,58 @@ export function aiConfigWidgets(
   groupId: string,
   settled: readonly string[] = [],
 ): WidgetAiConfig[] {
-  const generatable: WidgetAiConfig[] = [];
+  return aiConfigBreakdown(set, groupId, settled).generatable;
+}
+
+/** What a form's fields amount to for a generation run: the ones it is asked for, and why the rest are not. */
+export interface AiConfigBreakdown {
+  /** The fields a run is asked for — see {@link aiConfigWidgets}. */
+  generatable: WidgetAiConfig[];
+  /** Fields the set can generate that a value handed to the run already answers. */
+  answered: string[];
+  /** Fields of the form the set names no `aiConfig` for — the ones no run can fill. */
+  withoutAiConfig: string[];
+}
+
+/**
+ * The same reading of a form as {@link aiConfigWidgets}, with what it leaves out named: which of the
+ * form's fields the metadata set can generate, which of those a run is given an answer for, and which
+ * the set describes no generation for at all.
+ */
+export function aiConfigBreakdown(
+  set: MdsDefinition,
+  groupId: string,
+  settled: readonly string[] = [],
+): AiConfigBreakdown {
+  const breakdown: AiConfigBreakdown = { generatable: [], answered: [], withoutAiConfig: [] };
   for (const widget of formWidgets(set, groupId)) {
     const widgetId = widget.id;
-    if (!widgetId || settled.includes(widgetId)) continue;
+    if (!widgetId) continue;
     const aiConfigId = aiConfigOf(widget);
-    if (aiConfigId) generatable.push({ widgetId, aiConfigId });
+    if (!aiConfigId) breakdown.withoutAiConfig.push(widgetId);
+    else if (settled.includes(widgetId)) breakdown.answered.push(widgetId);
+    else breakdown.generatable.push({ widgetId, aiConfigId });
   }
-  return generatable;
+  return breakdown;
+}
+
+/**
+ * Every field the metadata set describes a generation for, whatever form shows it: the whole vocabulary's
+ * widgets carrying an `aiConfig`, each named once. What a run can be asked for at most — a form built from
+ * a group offers the part of it that group renders (see {@link aiConfigBreakdown}).
+ */
+export function aiConfigFields(set: MdsDefinition): WidgetAiConfig[] {
+  const fields: WidgetAiConfig[] = [];
+  const named = new Set<string>();
+  for (const widget of set.widgets ?? []) {
+    const widgetId = widget.id;
+    if (!widgetId || named.has(widgetId)) continue;
+    const aiConfigId = aiConfigOf(widget);
+    if (!aiConfigId) continue;
+    named.add(widgetId);
+    fields.push({ widgetId, aiConfigId });
+  }
+  return fields;
 }
 
 /** See {@link DEFAULT_AI_CONFIG}. */

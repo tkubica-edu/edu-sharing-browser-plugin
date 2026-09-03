@@ -73,21 +73,35 @@ wäre dort also verfügbar.
   `'ai'`; `aiSuggestionRequests()` macht daraus `CreateSuggestionRequestDto[]` (ein Eintrag pro
   Property **und Wert**, `description: 'METHODOLOGY'`, `confidence: 1`), `storedAiSuggestions()`
   formt die Antwort des Repositories in die Form, die die Widgets lesen. `aiSuggestionsFor()` baut
-  dieselbe Form rein im Speicher — der Rückfall, wo das Repository keine Vorschläge hält.
+  dieselbe Form rein im Speicher — der Rückfall, wo das Repository keine Vorschläge hält — und liest
+  dafür `proposedFieldsOf()`, also `'ai'` **und** `'page'`.
 - `app-src/src/app/util/mds-form-widgets.ts` — `formWidgets()` liest die Widgets des gerenderten
   Formulars aus dem Satz: die Gruppe nennt die Views, das `html` einer View platziert die Widgets
   über ihre Id als Element. `aiConfigWidgets()` nimmt davon die mit `aiConfigs` — das sind die
   `widgetAiConfigs` des [b-API-Laufs](#erzeugen-lassen-der-b-api-lauf).
+- `app-src/src/app/features/metadata/mds-editor/mds-editor.component.ts` — führt die Quellen des
+  Angebots **pro Property** zusammen (`mergeSuggestions`), damit jede nur füllt, was die vorherigen
+  offen gelassen haben: was das Repository für den Knoten hält, dann was ein Lauf gemeldet hat, dann
+  die Funde der Erschließung, zuletzt die Werte, die die Vokabulare dieses Formulars für die Wörter
+  der Seite halten (`MdsValuespaceService`, aus dem Umschlagschlüssel `_page_terms`). Ein vorgeschlagenes
+  Feld wird über `withoutAiFields()` aus `element.nodes` zurückgehalten — ein Widget bietet nur an,
+  solange sein eigener Wert leer ist.
 - `app-src/src/app/services/suggestion.service.ts` — `propose()` und `load()`, beide bestenfalls:
   jede Seite meldet, was sie erreicht hat, und wirft nicht. `propose()` löscht vorher die eigene
   `version` (`browser-extension`), damit eine wiederholte Erschließung die Vorschläge ersetzt statt
   sie zu stapeln. Die Lizenz wird nie vorgeschlagen — sie wird gesetzt.
 
   Das betrifft nur den WLO-Weg: nur ein `/generate`-Ergebnis trägt `_origins` mit `'ai'`. Ist
-  *WLO-Funktionen verwenden* aus, liest die Erschließung die Seite (`MetadataAgentService.readPage`),
-  und Titel, Bild und Text stehen als **Werte** ohne `_origins` da — `aiFieldsOf()` findet nichts,
-  `propose()` schreibt nichts, und die Vorschläge kommen allein aus dem
-  [b-API-Lauf](#erzeugen-lassen-der-b-api-lauf).
+  *WLO-Funktionen verwenden* aus, beschreibt die Erschließung den Inhalt aus den Aussagen der Seite
+  (`MetadataAgentService.readPage` → `PageDerivationService`, siehe
+  [FEATURES.md § Metadata without a model](FEATURES.md#metadata-without-a-model)). Deren Ableitungen
+  tragen `_origins` mit `'page'`, und die beiden Lesungen dieser Karte gehen hier auseinander:
+  `aiFieldsOf()` meint weiterhin **nur** `'ai'` und ist die Eingabe von `aiSuggestionRequests()` —
+  `propose()` läuft für einen seitenabgeleiteten Payload in sein `if (!body.length) return true` und
+  schreibt nichts, was auch richtig ist, denn diese Werte werden bei jedem Lesen der Seite neu
+  abgeleitet. `proposedFieldsOf()` meint beide und speist `aiSuggestionsFor()`: das Angebot, das die
+  Widgets zeigen, entsteht dort vollständig im Speicher, ohne den Vorschlagsspeicher überhaupt zu
+  fragen.
 
 Was das Backend annimmt, entscheidet `MongoSuggestionService.createSuggestion` **für die ganze Liste
 auf einmal**, bevor irgendetwas geschrieben wird — ein Eintrag, den es nicht mag, kostet also alle

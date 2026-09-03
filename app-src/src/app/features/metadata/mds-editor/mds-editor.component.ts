@@ -6,7 +6,7 @@ import { HOME_REPOSITORY, Node } from 'ngx-edu-sharing-api';
 
 import { MdsValues, firstString, toMdsEditorValues } from '../../../util/mds-values';
 import { sourceTextOf } from '../../../util/agent-payload';
-import { NodeSuggestions, aiSuggestionsFor } from '../../../util/mds-suggestions';
+import { MdsSuggestion, NodeSuggestions, aiSuggestionsFor } from '../../../util/mds-suggestions';
 import { TEXT_VARIABLE_MAX } from '../../../services/mds-ai-suggestion.service';
 import { EDITOR_MODE_FOR_DRAFT, forMdsEditor, isDraftNode } from '../../../util/mds-node';
 import { LICENSE_FIELDS, mapAgentFields } from '../../../util/agent-fields';
@@ -16,9 +16,28 @@ import {
 } from '../../../services/browser-extension-custom-web-component.service';
 import { MdsAiSuggestionService, SuggestionVariables } from '../../../services/mds-ai-suggestion.service';
 import { SuggestionService } from '../../../services/suggestion.service';
+import { MdsValuespaceService } from '../../../services/mds-valuespace.service';
+import { pageTermsOf } from '../../../util/derived-metadata';
+import type { PageTerms } from '../../../util/page-statements';
 import { loadWebComponentBundle } from '../../../services/web-component-bundle.service';
 
 const EDITOR_TAG = 'edu-sharing-mds-editor-wrapper';
+
+/** Log prefix for what this form is offered and where it came from. */
+const LOG = '[edu-sharing][mds-form]';
+
+/**
+ * Which node property holds the values of which of the page's own word lists. The vocabulary a value comes
+ * out of decides the property, not the wording of the page that named it — a URI in a property whose
+ * valuespace does not contain it shows as a blank (see util/vocabulary-match.ts).
+ */
+const VOCABULARY_PROPERTIES: Record<string, keyof PageTerms> = {
+  'ccm:educationallearningresourcetype': 'learningResourceType',
+  'ccm:oeh_lrt': 'learningResourceType',
+  'ccm:educationalcontext': 'educationalContext',
+  'ccm:educationalintendedenduserrole': 'intendedEndUserRole',
+  'ccm:taxonid': 'discipline'
+};
 
 /** The <edu-sharing-mds-editor-wrapper> element, typed for the inputs we set. */
 interface MdsEditorElement extends HTMLElement {
@@ -82,6 +101,9 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
   // {@link generateSuggestions}.
   private readonly aiSuggestions = inject(MdsAiSuggestionService);
 
+  // Resolves the page's own words to the values this form's widgets offer — see {@link vocabularySuggestions}.
+  private readonly valuespace = inject(MdsValuespaceService);
+
   protected readonly bundle = loadWebComponentBundle('edu', EDITOR_TAG);
 
   /** True once the element is mounted and can be committed. */
@@ -105,6 +127,12 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
    * store that will not hand its proposals back — the run wrote them, so it knows them.
    */
   private readonly generatedSuggestions = signal<NodeSuggestions | null>(null);
+
+  /**
+   * The values this form's vocabularies hold for the words the page stated; null where none of them matched.
+   * The offer of last resort, for a repository that generates nothing — see {@link vocabularySuggestions}.
+   */
+  private readonly vocabularyMatches = signal<NodeSuggestions | null>(null);
 
   /** The repository has been asked — the mount waits for this, whatever the answer was. */
   private readonly suggestionsRead = signal(false);
@@ -172,8 +200,46 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
     if (node && !isDraftNode(node)) {
       this.generatedSuggestions.set(await this.generateSuggestions(node.ref.id));
       this.storedSuggestions.set(await this.suggestions.load(node.ref.id));
+      this.vocabularyMatches.set(await this.vocabularySuggestions(node.ref.id));
     }
     this.suggestionsRead.set(true);
+  }
+
+  /**
+   * The page's own words for the vocabulary-bound fields, as the values this form's widgets offer: the
+   * Erschließung collected them as labels (`_page_terms`), and only a metadata set can say which value one
+   * of them names — which is why this happens here and not where the page was read.
+   *
+   * Nothing is ever constructed: a label that names no value of the widget yields nothing, because a value
+   * outside a widget's valuespace shows as a blank in the form and is found by no search. So the answer is
+   * usually small, and empty for most pages.
+   */
+  private async vocabularySuggestions(nodeId: string): Promise<NodeSuggestions | null> {
+    const terms = pageTermsOf(this.metadata());
+    if (!Object.keys(terms).length) return null;
+    const setId = this.setId() ?? this.webComponent.metadataSet();
+    const groupId = this.groupId();
+    const suggestions: Record<string, MdsSuggestion[]> = {};
+    for (const [property, stated] of Object.entries(VOCABULARY_PROPERTIES)) {
+      const words = terms[stated] ?? [];
+      if (!words.length) continue;
+      const matched = await this.valuespace.resolve(setId, groupId, property, words);
+      if (!matched.length) continue;
+      suggestions[property] = matched.map((match, index) => ({
+        id: `es-page-${property}-${index}`,
+        propertyId: property,
+        value: match.value.id,
+        status: 'PENDING' as const,
+        type: 'AI' as const
+      }));
+    }
+    const offered = Object.keys(suggestions);
+    if (!offered.length) return null;
+    console.log(
+      `${LOG} ${offered.length} vocabulary fields matched from the page's own words for ${nodeId}`,
+      offered,
+    );
+    return { nodeId, suggestions };
   }
 
   /**
@@ -190,7 +256,14 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
     if (!Object.keys(variables).length) return null;
     this.generating.set(true);
     try {
-      return await this.aiSuggestions.generate(nodeId, this.groupId(), variables);
+      // Under the set this form is built from, so the run is asked for the fields it renders — the same
+      // one the element is given below.
+      return await this.aiSuggestions.generate(
+        nodeId,
+        this.groupId(),
+        variables,
+        this.setId() ?? this.webComponent.metadataSet(),
+      );
     } finally {
       this.generating.set(false);
     }
@@ -237,13 +310,19 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
     // form built on a values map never sees them (`nodes` is what decides that, not `editorMode` — a
     // draft's form is built on its stand-in node too). Set before the element connects, like every other
     // input.
-    // What the repository stores for the node leads: those carry the ids an acceptance is recorded under.
-    // Behind it what the run itself reported, for a store that will not hand its proposals back, and last
-    // the findings of the panel's own Erschließung — which only a `/generate` result has.
+    // Merged per property rather than by whole answer, so a source only fills what the ones before it left
+    // empty. What the repository stores for the node leads — those carry the ids an acceptance is recorded
+    // under; behind it what a generation run reported, for a store that will not hand its proposals back;
+    // then the findings of the panel's own Erschließung, and last the values this form's vocabularies hold
+    // for the page's own words. The last two are what a repository without KI and without a suggestion
+    // store leaves the form with.
     const suggestions = node
-      ? this.storedSuggestions() ??
-        this.generatedSuggestions() ??
-        aiSuggestionsFor(metadata, node.ref.id)
+      ? mergeSuggestions(node.ref.id, [
+          this.storedSuggestions(),
+          this.generatedSuggestions(),
+          aiSuggestionsFor(metadata, node.ref.id),
+          this.vocabularyMatches()
+        ])
       : null;
     // The licence is set rather than proposed: dropping it from the offer is what keeps it on the node,
     // so its widget shows a licence chosen instead of one to accept first.
@@ -292,4 +371,26 @@ export class MdsEditorComponent implements MetadataEditor, OnInit, OnDestroy {
     );
     return { ...node, properties };
   }
+}
+
+/**
+ * The offers of several sources as one, the first mention of a property winning. A property is offered by
+ * exactly one source: a widget shows one offer per field, and the sources are ordered by how well each
+ * knows the node — a stored proposal carries the id an acceptance is recorded under, a derived one does not.
+ *
+ * `null` where none of them offered anything, so the caller can leave the editor's input unset rather than
+ * hand it an empty offer.
+ */
+function mergeSuggestions(
+  nodeId: string,
+  offers: readonly (NodeSuggestions | null)[],
+): NodeSuggestions | null {
+  const suggestions: Record<string, MdsSuggestion[]> = {};
+  for (const offer of offers) {
+    for (const [property, proposed] of Object.entries(offer?.suggestions ?? {})) {
+      if (suggestions[property] || !proposed?.length) continue;
+      suggestions[property] = proposed;
+    }
+  }
+  return Object.keys(suggestions).length ? { nodeId, suggestions } : null;
 }

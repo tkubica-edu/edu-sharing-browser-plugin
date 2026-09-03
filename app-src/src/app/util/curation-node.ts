@@ -31,20 +31,39 @@ export function createdAtOf(node: Node | null | undefined): number | null {
 }
 
 /**
+ * Where a metadata field's value comes from. `'ai'` is a machine's proposal, `'page'` one derived from what
+ * the open page states about itself, and `'user'` a value that is simply there — stated by the page, written
+ * by an earlier step, or already on the node. The two proposal kinds are offered for acceptance in the form;
+ * `'user'` is shown as decided.
+ *
+ * The distinction between the two is not cosmetic: only `'ai'` is written to the repository's suggestion
+ * store (see `aiFieldsOf`), which the page-derived route neither needs nor should reach for.
+ */
+export type FieldOrigin = 'ai' | 'page' | 'user';
+
+/** The origins that mean "a machine proposed this, nobody decided it" — see {@link FieldOrigin}. */
+const PROPOSED: readonly string[] = ['ai', 'page'];
+
+/**
  * Provenance per metadata field — the `_origins` map an editor marks the generated fields by. Stated
- * for every field, because an unmentioned one counts as generated. `generated` is the agent run's own
- * map, `recorded` names what the flow set outside it and outranks it. Only namespaced keys are fields.
+ * for every field, because an unmentioned one counts as generated. `generated` is the run's own map, which
+ * may name either proposal kind, and `recorded` names what the flow set outside it and outranks it: a value
+ * a step settled is a decision, whatever proposed it before. Only namespaced keys are fields.
  */
 export function fieldOrigins(
   values: Record<string, unknown>,
   generated: unknown,
   recorded: MdsValues,
-): Record<string, 'ai' | 'user'> {
-  const byAgent = (generated ?? {}) as Record<string, unknown>;
-  const origins: Record<string, 'ai' | 'user'> = {};
+): Record<string, FieldOrigin> {
+  const byRun = (generated ?? {}) as Record<string, unknown>;
+  const origins: Record<string, FieldOrigin> = {};
   for (const key of Object.keys(values)) {
     if (!key.includes(':')) continue;
-    origins[key] = byAgent[key] === 'ai' && !(key in recorded) ? 'ai' : 'user';
+    const stated = byRun[key];
+    origins[key] =
+      typeof stated === 'string' && PROPOSED.includes(stated) && !(key in recorded)
+        ? (stated as FieldOrigin)
+        : 'user';
   }
   return origins;
 }

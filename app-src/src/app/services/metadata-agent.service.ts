@@ -8,7 +8,9 @@ import {
 } from './browser-extension.service';
 import { DevModeService } from './dev-mode.service';
 import { MetadataAgentApiService } from './metadata-agent-api.service';
+import { PageDerivationService } from './page-derivation.service';
 import { SOURCE_TEXT_KEY } from '../util/agent-payload';
+import { PAGE_TERMS_KEY } from '../util/derived-metadata';
 import { EXTRACT_FIELD_ANSWER } from '../util/dev-fixtures';
 import { errorMessage } from '../util/errors';
 import { pageFactsOf, pageMetadata } from '../util/page-facts';
@@ -18,7 +20,8 @@ import { withoutQualityCriteria } from '../util/quality-criteria-values';
 /** Reserved (non-metadata) top-level keys in the metadata-agent response. */
 const ENVELOPE_KEYS = new Set([
   'contextName', 'schemaVersion', 'metadataset', 'metadataset_uri',
-  'language', 'exportedAt', 'processing', 'preview_image_url', '_origins', '_source_text'
+  'language', 'exportedAt', 'processing', 'preview_image_url', '_origins', '_source_text',
+  PAGE_TERMS_KEY
 ]);
 
 /** Log prefix, as everywhere else in the extension (`[edu-sharing][<station>]`). */
@@ -93,6 +96,7 @@ export class MetadataAgentService {
   private readonly browserExtension = inject(BrowserExtensionService);
   private readonly agentApi = inject(MetadataAgentApiService);
   private readonly devMode = inject(DevModeService);
+  private readonly derivation = inject(PageDerivationService);
 
   private readonly lastRunState = signal<AnalyzeOutcome | null>(null);
 
@@ -129,11 +133,10 @@ export class MetadataAgentService {
   }
 
   /**
-   * Read the open page and take what it states as the Erschließung's outcome — the way in without the
-   * metadata agent, which is the one outside the WLO context: the page's own title and picture describe
-   * the content, its text travels along as what was read, and no field is marked as generated because
-   * none is. What the page does not answer is proposed later by the repository itself (see
-   * MdsAiSuggestionService).
+   * Read the open page and describe the content from it — the way in without the metadata agent, which is
+   * the one outside the WLO context. What the page states about itself becomes the content's metadata, and
+   * what is derived from those statements is marked so the form offers it for acceptance rather than showing
+   * it as decided (see PageDerivationService). The page's text travels along as what was read.
    *
    * Stored as the same last run as {@link run}, since it is the same statement about the same kind of
    * thing — everything behind this step reads the outcome and not how it came about.
@@ -146,15 +149,21 @@ export class MetadataAgentService {
       if (!page?.source || !facts) {
         return this.remember({ ok: false, error: PAGE_UNREADABLE });
       }
+      const derived = await this.derivation.derive(page.data);
       console.log(`${LOG} the page was read instead of erschlossen — /generate is not called`, {
         url: page.source.url,
         title: facts.title,
-        imageUrl: facts.imageUrl
+        imageUrl: facts.imageUrl,
+        derived: derived?.report.fields.map(
+          (field) => `${field.property} (${field.standing}, ${field.source})`,
+        )
       });
       return this.remember({
         ok: true,
         source: page.source,
-        parsed: this.parse(pageMetadata(facts))
+        // The derivation builds on the page's plain facts, so its payload replaces them rather than
+        // adding to them; without one — a page it could make nothing of — the three facts stand alone.
+        parsed: this.parse(derived?.payload ?? pageMetadata(facts))
       });
     } catch (cause: unknown) {
       return this.remember({ ok: false, error: errorMessage(cause) });

@@ -170,9 +170,23 @@ instead of the canvas in `mode="detail"`, the repository's default metadata set 
 the login gate back in front of the flow, no *Prüfprozess auswählen* / *Individuelle Qualitätsprüfung
 mit KI* / *Sammlung auswählen* / Boerdi and no *Qualität* tab, no `ccm:oeh_*` write and no
 `200_tocheck` workflow on the save, and the three WLO-only settings groups gone from this screen.
-**And no `/generate`**: the Erschließung then reads the page (`page.read`) and takes its title,
-picture and text as they stand, while everything else is proposed by the repository at the Metadaten
-step ([SUGGESTION-API.md](SUGGESTION-API.md#erzeugen-lassen-der-b-api-lauf)).
+**And no `/generate`**: the Erschließung then reads the page (`page.read`) and describes the content
+from the page's own declarations, while the repository's own generation proposes what is left at the
+Metadaten step ([SUGGESTION-API.md](SUGGESTION-API.md#erzeugen-lassen-der-b-api-lauf)).
+
+This is also the way to walk the path for a repository that has neither. Filter the panel's console on
+`[edu-sharing][derived]` — one line per Erschließung naming every field, whether it entered as a value
+or as a proposal, and which declaration it came from — and on `[edu-sharing][valuespace]`, which says
+which of the page's own words a widget's vocabulary resolved. What to expect of it is
+[FEATURES.md § Metadata without a model](FEATURES.md#metadata-without-a-model). Four pages are worth
+walking: one with a `link[rel=license]`, a `meta[description]` and `article:tag` (description,
+keywords and a chosen CC licence in the form, the derived keywords carrying the pending marking); one
+that declares nothing at all (the title and nothing invented); one behind a login, where
+`describesSamePage` must refuse the repository's reading rather than describe the login page; and one
+whose `ld+json` is only an `Organization` and a `BreadcrumbList`, where the publisher must not become
+the author. Filter the network tab on `/generate` and `/suggestions` — both stay empty for the whole
+flow, which is what `aiSuggestionRequests` returning `[]` for a `'page'` origin is asserted for in
+`util/mds-suggestions.spec.ts`.
 
 The switch is read at every one of those places through the one signal they all hang on, see
 [WEB-COMPONENTS.md § Refusing the variable](WEB-COMPONENTS.md#refusing-the-variable). It survives a

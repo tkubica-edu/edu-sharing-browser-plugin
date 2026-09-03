@@ -1,6 +1,4 @@
 import { Injectable, effect, inject } from '@angular/core';
-import { ClientutilsV1Service } from 'ngx-edu-sharing-api';
-import { firstValueFrom } from 'rxjs';
 
 import { sameAddress } from '../util/page-address';
 import { nodeIdFromRepositoryUrl } from '../util/repository-links';
@@ -9,6 +7,7 @@ import { ConditionsService } from './conditions.service';
 import { CurationService } from './curation.service';
 import { DevModeService } from './dev-mode.service';
 import { HistoryService } from './history.service';
+import { WebsiteInformationService } from './website-information.service';
 
 /** Same tag as the history's own log lines: the lookup below is a read of it. */
 const LOG = '[edu-sharing][history]';
@@ -21,7 +20,7 @@ const LOG = '[edu-sharing][history]';
  */
 @Injectable({ providedIn: 'root' })
 export class PageRecognitionService {
-  private readonly clientUtils = inject(ClientutilsV1Service);
+  private readonly websiteInformation = inject(WebsiteInformationService);
   private readonly auth = inject(AuthService);
   private readonly conditions = inject(ConditionsService);
   private readonly curation = inject(CurationService);
@@ -107,9 +106,9 @@ export class PageRecognitionService {
         remembered ? `held as ${remembered.nodeId}` : 'not held — asking the repository',
       );
       if (remembered && (await this.curation.adoptRememberedNode(remembered))) return true;
-      const information = await firstValueFrom(
-        this.clientUtils.getWebsiteInformation({ url: lookupUrl }),
-      );
+      // Through the shared reading, since the Erschließung reads the rest of the same answer (see
+      // WebsiteInformationService): what the repository says about this address is asked for once.
+      const information = await this.websiteInformation.read(lookupUrl);
       // The first one: the repository answers with every node carrying this URL, and they are
       // versions of the same finding — "this page is already in here".
       const existing = information?.duplicateNodes?.[0];

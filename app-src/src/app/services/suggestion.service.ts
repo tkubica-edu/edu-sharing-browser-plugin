@@ -2,7 +2,9 @@ import { Injectable, inject } from '@angular/core';
 import { CreateSuggestionRequestDto, HOME_REPOSITORY, SuggestionsV1Service } from 'ngx-edu-sharing-api';
 import { firstValueFrom } from 'rxjs';
 
-import { NodeSuggestions, aiSuggestionRequests, storedAiSuggestions } from '../util/mds-suggestions';
+import {
+  NodeSuggestions, aiFieldsOf, aiSuggestionRequests, storedAiSuggestions
+} from '../util/mds-suggestions';
 
 /** Log prefix for what the panel proposes for a node and what it reads back. */
 const LOG = '[edu-sharing][suggestions]';
@@ -37,6 +39,15 @@ export class SuggestionService {
    */
   async propose(nodeId: string, payload: Record<string, unknown> | null): Promise<boolean> {
     const body = aiSuggestionRequests(payload);
+    // The agent's fields against the ones a proposal is made of: a field of the payload that is not
+    // proposed was left out on purpose — the licence, which is set rather than proposed, a name from a
+    // vocabulary the repository cannot resolve to a property, or a field carrying no value at all
+    // (see aiSuggestionRequests).
+    const proposable = new Set(body.map((entry) => entry.propertyId));
+    console.log(`${LOG} ${proposable.size} of the agent's fields are to be proposed for ${nodeId}`, {
+      toPropose: [...proposable],
+      notProposed: aiFieldsOf(payload).filter((propertyId) => !proposable.has(propertyId))
+    });
     if (!body.length) {
       console.log(`${LOG} nothing to propose for ${nodeId} — the run marked no field as the agent's`);
       return true;
