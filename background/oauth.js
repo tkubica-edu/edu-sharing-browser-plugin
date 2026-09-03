@@ -51,10 +51,12 @@ const LOGOUT_TAB_MS = 3000;
  * the access token is traded for a repository session rather than read here — no claim of it is
  * inspected, so a wider request would only add scopes the server can refuse.
  *
- * `offline_access` would yield the refresh token a silent resume is best made from, and is left out
- * all the same: the deployments this runs against do not define it, and an undefined scope fails the
- * whole request. {@link silentSession} therefore falls back to the userinfo endpoint. Has to stay in
- * step with `APP_CONFIG.oauth.scopes` in the panel, which states the scopes on every message.
+ * `offline_access` is left out although it is the scope conventionally asked for a refresh token: the
+ * deployments this runs against do not define it, and an undefined scope fails the whole request.
+ * Asking for it is not what decides whether a refresh token is issued anyway — that follows the
+ * client's registration at the server, and one registered for the `refresh_token` grant issues one
+ * for these scopes too. So {@link silentSession} has to cover both cases and prefers neither. Has to
+ * stay in step with `APP_CONFIG.oauth.scopes` in the panel, which states the scopes on every message.
  */
 const DEFAULT_SCOPES = 'profile';
 
@@ -428,8 +430,10 @@ async function login({ repositoryUrl, clientId, scopes, registrationId, loginHin
  * than the one now in use — so a caller can tell "nobody is signed in" from "the renewal failed".
  * A refresh the IdP rejects clears the store: that token will not start working again.
  *
- * There is a refresh token to renew from only where the server issues one, which it does for
- * `offline_access`; the default scopes do not ask for it, and this then finds nothing to do.
+ * Whether there is a refresh token to renew from is the server's answer, not the request's: one whose
+ * client registration carries the `refresh_token` grant issues one without being asked for
+ * `offline_access`, and one that does not issues none however it is asked. Both are ordinary, which
+ * is why this answers null rather than treating an absent token as a fault.
  */
 async function refresh({ repositoryUrl, clientId } = {}) {
   const stored = await readStoredTokens();
@@ -579,8 +583,9 @@ async function metadata({ repositoryUrl, scopes } = {}) {
 /**
  * The stored session, or null. `storage.local` rather than `storage.session`, which is what makes the
  * refresh token outlive the browser and the sidebar being closed — the point of holding one at all.
- * The access token is stored with it only so a still-valid one can be reused instead of refreshed;
- * it is the refresh token that matters here.
+ * The access token lies beside it for the one case that has no refresh token to renew from: there it
+ * is what {@link stillSignedIn} holds against the provider. Where there is a refresh token, a
+ * refresh is always preferred (see {@link silentSession}) and the stored access token is never read.
  */
 async function readStoredTokens() {
   try {

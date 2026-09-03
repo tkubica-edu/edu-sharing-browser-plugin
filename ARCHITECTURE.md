@@ -181,18 +181,23 @@ for a user who has logged out everywhere they can see, which is a panel that can
 else the token held against the **userinfo endpoint**, which answers for the session rather than for
 the signature and refuses one that has been ended (401/403 → the store is dropped). Where neither can
 be done — no refresh token and no `userinfo_endpoint` in the document — nothing is resumed, because
-there is then no way to tell a live session from a logged-out one. In practice the userinfo endpoint
-is the path: the shipped scopes are `profile` alone, since `offline_access` — which is what would
-yield a refresh token — is not defined by the deployments this runs against, and an undefined scope
-fails the whole authorization request. A server that publishes no userinfo endpoint either leaves the
-panel asking for a login whenever the repository's session cookie is gone.
+there is then no way to tell a live session from a logged-out one.
+
+Which of the two applies is the server's to decide, not the scopes'. The shipped scopes are `profile`
+alone and `offline_access` is deliberately not asked for — an undefined scope fails the whole
+authorization request — but a server issues a refresh token where its client registration carries
+the `refresh_token` grant, whether or not that scope was requested, and edu-sharing's own
+authorization server does exactly that. Neither path is therefore "the" one, and against a given
+repository both can be unavailable at once: see
+[OAUTH-SESSION-LIFETIME.md](OAUTH-SESSION-LIFETIME.md), which records what a deployment actually
+answered and why the panel then asks for a login on every lost cookie.
 
 The worker hands the panel the access token and nothing else. The refresh token stays in
 `browser.storage.local` under `eduSharingOAuthTokens` and is read only there — the panel names the
 key in `APP_CONFIG.storageKeys.oauthTokens` merely so its storage keys are all in one place. A
 provider that rotates refresh tokens is followed; one that rejects a refresh has its stored session
-cleared, since that token will not start working again. (There is a refresh token to follow only
-where the server issues one without being asked for `offline_access`; see the scopes above.)
+cleared, since that token will not start working again — a rejection and an endpoint that never
+served the grant are not told apart, which is a known shortcoming (see the reference above).
 Messages: `oauth.login`, `oauth.silent`,
 `oauth.logout`, `oauth.redirectUri`, `oauth.discover` — the last being the probe above, which also
 reads the document's `scopes_supported` so a scope the server does not define is named in the

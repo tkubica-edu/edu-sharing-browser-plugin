@@ -94,7 +94,10 @@ and only the second is visible from the extension:
    server defines; a server whose metadata lists `scopes_supported` without it is named in
    *Einstellungen → SSO-Anmeldung* as soon as the document is read, so this is visible before anybody
    signs in. (`offline_access` is deliberately not requested for this very reason — Doorkeeper-based
-   servers define none, and an undefined scope fails the whole request. Adding it means changing
+   servers define none, and an undefined scope fails the whole request. Asking for it is also not
+   what decides whether a refresh token is issued: that follows the client's registration at the
+   server, and edu-sharing's own issues one for `profile` alone — see
+   [OAUTH-SESSION-LIFETIME.md](OAUTH-SESSION-LIFETIME.md). Adding the scope anyway means changing
    `APP_CONFIG.oauth.scopes` and `DEFAULT_SCOPES` in `background/oauth.js` together.)
 2. **The client is not granted the scope**, even though the server defines it. On GitLab the
    application's own scope checkboxes have to include every scope requested — `openid`, `profile` and

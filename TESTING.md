@@ -324,9 +324,11 @@ Two ways to get there, both of them local:
    Only `authorization_endpoint` and `token_endpoint` are required — a document without them is
    refused as `OAUTH_DISCOVERY_INCOMPLETE`. `revocation_endpoint` and `end_session_endpoint` are what
    make *Abmelden* do more than forget locally, `userinfo_endpoint` is what lets a stored access token
-   be held against the provider's own session — the panel asks for no `offline_access`, so there is
-   normally no refresh token and this is the only way the silent resume can check one — and
-   `scopes_supported` is what lets the settings name a scope the server does not define. Note that this only exercises the panel's half: the repository
+   be held against the provider's own session — the second of the two ways the silent resume can
+   check one, beside a refresh, and the only one left where the server issues no refresh token — and
+   `scopes_supported` is what lets the settings name a scope the server does not define. Worth
+   including both: a document that names neither leaves the panel unable to resume at all, which is
+   its own thing to test (see [OAUTH-SESSION-LIFETIME.md](OAUTH-SESSION-LIFETIME.md)). Note that this only exercises the panel's half: the repository
    will still refuse the access token unless it trusts that issuer
    (`security.authentication.oauth2.trustedIssuers`).
 
@@ -444,9 +446,12 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    web UI *and* at the provider, leaving the panel alone. Navigate the docked tab so the panel is
    rebuilt: it must show the login card. It asks the provider before resuming from its own store — a
    refresh where the server issues refresh tokens, else the userinfo endpoint — so a panel that comes
-   back signed in means the provider still answers for that session, or its document names neither way
-   of asking (check `userinfo_endpoint` in
-   `<Repository>/.well-known/oauth-authorization-server`).
+   back signed in means the provider still answers for that session. The reverse — a login card where
+   the provider *should* still answer — is worth telling apart from a working refusal: check the
+   worker's console, since a refresh that the token endpoint never served is reported there in the
+   same words as a spent one (see [OAUTH-SESSION-LIFETIME.md](OAUTH-SESSION-LIFETIME.md)), and check
+   whether the document names a `userinfo_endpoint` at all
+   (`<Repository>/.well-known/oauth-authorization-server`).
 9. **Erschließen + speichern**: *Inhalt erschließen* on a content page → the metadata screen shows
    `fields_extracted / fields_total` and loads the MDS editor with the generated metadata. Edit, then
    the footer's **Speichern** → a node is created in your inbox and the preview opens, and the flow's

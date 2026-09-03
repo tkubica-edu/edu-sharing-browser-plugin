@@ -416,7 +416,8 @@ describe('the worker`s OAuth flow', () => {
     it('asks for `profile` alone where the caller names no scopes', async () => {
       // The token is traded for a repository session rather than read, so nothing else is of use —
       // and every extra scope is one the server can refuse on a page the panel never sees, which is
-      // why `offline_access` is left out even though it would yield a refresh token.
+      // why `offline_access` is left out. Whether a refresh token comes back is decided by the
+      // client's registration at the server, not by this scope.
       await loadModule().login(request);
 
       expect(authorizationRequest().searchParams.get('scope')).toBe('profile');
