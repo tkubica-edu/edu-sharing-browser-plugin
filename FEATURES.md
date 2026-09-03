@@ -448,8 +448,8 @@ navigating to it, and closes it again where it stands; the step keeps running be
   view). All of them optional — an entry written before one of them was kept says nothing about it,
   which is not the same as saying no.
 - **Einstellungen** *(dotted while a change waits to be applied)* — the Repository-URL (used for
-  login and every embedded element) at the top, then *SSO-Anmeldung* and **Darstellung**, and below
-  those five folded groups, one open at a time:
+  login and every embedded element) at the top with the edu-sharing version under it, then
+  *SSO-Anmeldung* and **Darstellung**, and below those five folded groups, one open at a time:
   *Entwickler-Optionen* (the switch **WLO-Funktionen verwenden**, plus the dev and the debug mode, see
   [TESTING.md](TESTING.md)), *KI- und
   Chatbot-Optionen* (the corrections to the chat widget's display, the chatbot's master skill as
@@ -473,6 +473,16 @@ navigating to it, and closes it again where it stands; the step keeps running be
   so a folded group says whether anything in it was touched; a group holding nothing but defaults carries
   none. Every default is compared where it is defined — each service answers for its own settings
   (`changedSettings`), the screen only sums them per group.
+
+  Under the URL the panel states which edu-sharing the repository runs, read once on boot from
+  `GET /_about` (`RepositoryVersionService`, `version.repository`) and no setting: it is what decides
+  whether the repository's own UI is embedded at all. Where that version is not one the packaged
+  `edu/` bundle was built for — **11** is currently the only one — a notice says so and names what it
+  costs: *Metadaten editieren*, *Vorschau*, *Inhalt finden*, the Ablageort picker and *Teilen* report
+  the version in place of their element, while every step that does not embed the repository's UI
+  goes on working. A repository that could not be asked, or that names no version, is not treated as
+  an unsupported one; see
+  [WEB-COMPONENTS.md § Which repository the edu bundle fits](WEB-COMPONENTS.md#which-repository-the-edu-bundle-fits).
 
   *SSO-Anmeldung* is folded like the tuning groups but sits above them, next to the repository — and
   unlike them it holds no settings at all, which is why its head carries no `… geändert` pill. What

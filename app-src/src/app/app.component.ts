@@ -24,6 +24,7 @@ import { OnlyOfficeDocumentService } from './services/onlyoffice-document.servic
 import { OptionIconService } from './services/option-icon.service';
 import { PageRecognitionService } from './services/page-recognition.service';
 import { QualityJudgeService } from './services/quality-judge.service';
+import { RepositoryVersionService } from './services/repository-version.service';
 import { SessionResumeService } from './services/session-resume.service';
 import { ThemeService } from './services/theme.service';
 
@@ -114,6 +115,7 @@ export class AppComponent implements OnInit {
   private readonly devMode = inject(DevModeService);
   private readonly recommendations = inject(CollectionRecommendationService);
   private readonly qualityJudge = inject(QualityJudgeService);
+  private readonly repositoryVersion = inject(RepositoryVersionService);
   private readonly chatStyle = inject(ChatStyleService);
   private readonly chatSkill = inject(ChatSkillService);
   private readonly nostr = inject(NostrForwardService);
@@ -210,6 +212,10 @@ export class AppComponent implements OnInit {
     // Before the forwarding step can offer the relay — whether a relay is spoken to at all decides which
     // steps the menu holds, and which one it publishes to is read by the step as it renders.
     await this.nostr.load();
+    // Which edu-sharing this is, on its way before a screen can embed one of its elements: the packaged edu
+    // bundle is only used against a version it was built for (see RepositoryVersionService). Not awaited — the
+    // answer is public and needs no session, and nothing of the boot below it depends on the version.
+    void this.repositoryVersion.load();
     await this.auth.init();
     await this.history.load();
     const tab = await this.browserExtension.getActiveTab().catch(() => null);

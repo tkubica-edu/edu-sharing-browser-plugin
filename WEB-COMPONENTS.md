@@ -10,6 +10,7 @@ document — no iframes**. Three prebuilt bundles ship with the extension:
 | boerdi | `scripts/boerdi/` → `boerdi/` | `boerdi-chat` (the KI assistant) |
 
 - [Loading a bundle](#loading-a-bundle)
+- [Which repository the edu bundle fits](#which-repository-the-edu-bundle-fits)
 - [Handing the theme to a bundle](#handing-the-theme-to-a-bundle)
 - [The optional WLO metadata editor](#the-optional-wlo-metadata-editor)
 - [Refreshing a bundle](#refreshing-a-bundle)
@@ -52,6 +53,32 @@ default), so `WebComponentBundleService` publishes the configured `APP_CONFIG.ap
 the scripts run — mirroring `window.__env.EDU_SHARING_API_URL` for the edu bundle. `wlo/`'s file
 names are content-hashed, so its entry points are read from its own `index.html`; `edu/` and
 `boerdi/` have stable names and are declared in the service.
+
+## Which repository the edu bundle fits
+
+`edu/` is one edu-sharing release's own frontend, so it speaks that release's API and element
+contracts and is only embedded against a repository of the same major version.
+`RepositoryVersionService` asks `GET /_about` once as the panel boots — a public answer, so before
+any login — and reads `version.repository` (`"11.0"` for the release the packaged bundle is built
+from). `SUPPORTED_MAJOR_VERSIONS` in that service names the versions the bundle fits; **11** is
+currently the only one.
+
+Where the repository names a version that is not among them, `WebComponentBundleService.load('edu')`
+rejects before a single script or stylesheet of the bundle is put into the document, with the message
+the screens then show in place of their element (`bundle.error()`, see
+[Loading a bundle](#loading-a-bundle)) — so *Metadaten editieren*, *Vorschau*, *Inhalt finden*, the
+Ablageort picker and *Teilen* report the version rather than the failures its elements would run into
+against an API that is not there. Everything the panel does without the repository's own UI — the
+Erschließung, the KI steps, the checks, the AMB forwarding — is untouched, as are the `wlo/` and
+`boerdi/` bundles: neither is the repository's, so neither is asked about its version.
+
+A version has to have been *named* for the refusal: an unreachable or failing `/_about`, and an
+answer carrying no `version.repository`, leave the bundle to load as it otherwise would
+(`webComponentsRefused` is false in both cases). A failed request is not the statement that this is
+an old edu-sharing, and a panel that blocks its own core screens on a hiccup of a request nothing
+else needs would be worse than one that lets the elements try. The version and, where it is refused,
+what that costs are stated in *Einstellungen* under the Repository-URL — see
+[FEATURES.md § Utilities](FEATURES.md#utilities).
 
 ## Handing the theme to a bundle
 

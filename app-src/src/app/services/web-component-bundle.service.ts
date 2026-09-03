@@ -7,6 +7,7 @@ import { installDraftRequestGuard } from '../util/bundle-requests';
 import { installBundleLanguage } from '../util/bundle-language';
 import { AuthService } from './auth.service';
 import { MetadataAgentApiService } from './metadata-agent-api.service';
+import { RepositoryVersionService, SUPPORTED_VERSIONS_TEXT } from './repository-version.service';
 
 /**
  * The pre-built web-component bundles packaged with the extension: `edu` for the edu-sharing elements, `wlo`
@@ -35,6 +36,11 @@ export interface BundleStatus {
   error: Signal<string | null>;
 }
 
+/** What a component says instead of an edu element where the repository is not one the bundle fits. */
+const UNSUPPORTED_VERSION = (version: string) =>
+  `Die eingebetteten edu-sharing Komponenten unterstützen nur ${SUPPORTED_VERSIONS_TEXT}, ` +
+  `dieses Repository meldet ${version}.`;
+
 /** How long to wait for a bundle to define an awaited element before giving up on it. */
 const ELEMENT_TIMEOUT_MS = 15_000;
 
@@ -47,6 +53,7 @@ const ELEMENT_TIMEOUT_MS = 15_000;
 export class WebComponentBundleService {
   private readonly auth = inject(AuthService);
   private readonly agentApi = inject(MetadataAgentApiService);
+  private readonly repositoryVersion = inject(RepositoryVersionService);
 
   private readonly loads = new Map<WebComponentBundle, Promise<void>>();
 
@@ -77,6 +84,11 @@ export class WebComponentBundleService {
   }
 
   private async loadEntries(bundle: WebComponentBundle): Promise<void> {
+    // The edu bundle is the repository's own UI, built from one edu-sharing release: against a repository of
+    // another major version its elements talk to an API that is not there. Refused before anything of it is put
+    // into the document, so the screens report the version rather than the failures that would follow it. The
+    // wlo and boerdi bundles are not the repository's and are not asked about its version.
+    if (bundle === 'edu') await this.refuseUnsupportedRepository();
     this.publishEnvironment(bundle);
     // The edu bundle opens windows on its own routes and builds them from the DOM's base href — the
     // extension here, so they lead nowhere. Redirecting them to the repository is a correction of
@@ -98,6 +110,18 @@ export class WebComponentBundleService {
     const { styles, scripts } = await this.entriesOf(bundle);
     for (const href of styles) this.addLink(href);
     for (const script of scripts) await this.addScript(script);
+  }
+
+  /**
+   * Throw where the repository named a version the edu bundle was not built for. Waits for `/_about` to have
+   * been answered, since the load would otherwise race the boot's own request and let the elements through on
+   * a repository that is about to be reported as unsupported.
+   */
+  private async refuseUnsupportedRepository(): Promise<void> {
+    await this.repositoryVersion.load();
+    if (this.repositoryVersion.webComponentsRefused()) {
+      throw new Error(UNSUPPORTED_VERSION(this.repositoryVersion.version() ?? '—'));
+    }
   }
 
   /**

@@ -10,6 +10,30 @@
 
   <p class="desc">Basis-URL des edu-sharing Repositoriums. Wird für die Anmeldung verwendet.</p>
 
+  <!-- Was das Repository über sich selbst sagt (`GET /_about`), keine Einstellung: die Version
+       entscheidet, ob die mitgelieferten edu-sharing-Elemente überhaupt eingebettet werden. -->
+  <p class="desc">
+    @if (repositoryVersion.version(); as version) {
+      edu-sharing-Version: <strong>{{ version }}</strong>
+    } @else if (!repositoryVersion.checked()) {
+      edu-sharing-Version wird abgefragt …
+    } @else if (repositoryVersion.error(); as error) {
+      edu-sharing-Version unbekannt: <code>{{ error }}</code>
+    } @else {
+      edu-sharing-Version unbekannt — das Repository nennt unter <code>/_about</code> keine.
+    }
+  </p>
+
+  @if (repositoryVersion.webComponentsRefused()) {
+    <div class="es-notice">
+      <span>
+        Diese Version wird nicht unterstützt — unterstützt wird nur {{ supportedVersions }}. Die
+        eingebetteten edu-sharing-Komponenten (Metadaten-Editor, Vorschau, Suche, Ablageort, Teilen)
+        werden deshalb nicht geladen; die übrigen Schritte des Panels bleiben nutzbar.
+      </span>
+    </div>
+  }
+
   @if (auth.needsReload()) {
     <div class="es-notice">
       <span>Repository geändert. Wird beim Verlassen der Einstellungen übernommen — dazu lädt das Panel neu.</span>

@@ -401,7 +401,11 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
 2. **Einstellungen** (topbar icon, reachable while logged out): the Repository-URL defaults to
    `https://repository.staging.openeduhub.net/edu-sharing` and is required. Changing it shows an
    *Übernehmen* button that reloads the sidebar so the library re-initializes against the new
-   repository (a dot marks the icon until applied).
+   repository (a dot marks the icon until applied). Under the field the edu-sharing version the
+   repository reports must be named (`GET /_about`); against a repository of another major version a
+   notice must say that it is unsupported, and every screen embedding one of the repository's own
+   elements must then report the version instead of loading the `edu/` bundle
+   ([WEB-COMPONENTS.md § Which repository the edu bundle fits](WEB-COMPONENTS.md#which-repository-the-edu-bundle-fits)).
 3. **WLO abschalten**: against a repository that sets `browserExtensionCustomWebComponent`, untick
    *Einstellungen* → *Entwickler-Optionen* → **WLO-Funktionen verwenden** and leave the screen — the
    panel must lose the WLO palette, ask for a login, and offer neither *Prüfprozess auswählen* nor the
