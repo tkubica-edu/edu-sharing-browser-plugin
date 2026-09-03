@@ -101,6 +101,48 @@ wa          <strong>ausschließlich</strong> über „Anmelden mit OAuth“, Ben
       </button>
     </div>
 
+    <!-- Der stille Resume läuft ausschließlich beim Boot ohne Cookie, und dieser Zustand tritt sonst
+         erst nach einem Browser-Neustart ein — ohne diesen Knopf ist er nicht zu erreichen. -->
+    <div class="es-row">
+      <button class="es-btn es-btn--tonal es-btn--small" type="button"
+              (click)="dropSessionCookies()">
+        Session-Cookie entfernen
+      </button>
+      @if (droppedCookies()) {
+        <button class="es-btn es-btn--tonal es-btn--small" type="button" (click)="reloadPanel()">
+          Panel neu laden
+        </button>
+      }
+    </div>
+
+    <p class="desc">
+      Beendet die Anmeldung im Panel und stellt den Zustand her, den ein Browser-Neustart
+      hinterlässt: die Cookies des Repositoriums sind weg, dessen eigene Sitzung und die
+      gespeicherten OAuth-Tokens bleiben stehen — das Sitzungs-Cookie von edu-sharing hat kein
+      <code>Max-Age</code>, geht beim Schließen des Browsers also immer verloren. Damit lässt sich
+      prüfen, ob die Anmeldung ohne Zutun zurückkommt. Das Panel wird absichtlich nicht gleich neu
+      geladen: erst der Boot danach versucht das, und was dabei herauskommt, steht im
+      Service-Worker-Log (<code>chrome://extensions</code> → <em>Service Worker</em>). Gelingt es,
+      steht das Panel wieder angemeldet da; sonst kommt die Login-Karte.
+    </p>
+
+    @if (droppedCookies(); as dropped) {
+      @if (dropped.success) {
+        <div class="es-notice">
+          <span>
+            @if (dropped.removed?.length) {
+              <strong>Entfernt:</strong> <code>{{ dropped.removed?.join(', ') }}</code> — jetzt
+              „Panel neu laden“, um die Anmeldung ohne Zutun zu versuchen.
+            } @else {
+              Es gab keine Cookies für diese Adresse. Ohne Sitzung ist daran nichts zu sehen.
+            }
+          </span>
+        </div>
+      } @else {
+        <p class="desc">Fehlgeschlagen: <code>{{ dropped.error }}</code></p>
+      }
+    }
+
     <!-- Der einzige Wert, der beim Provider hinterlegt sein muss und den niemand nachschlagen kann:
          mit der `identity`-API vergibt ihn der Browser selbst, pro Installation. -->
     @if (redirectUriInUse(); as inUse) {

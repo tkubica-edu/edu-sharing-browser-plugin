@@ -664,6 +664,53 @@ describe('the worker`s OAuth flow', () => {
       expect(stored.has(module.TOKEN_STORAGE_KEY)).toBe(false);
     });
 
+    // A token endpoint behind a portal: the shape edu-sharing's own answers a refresh grant with,
+    // which is a request that never reached the grant at all.
+    it('reports a redirect as one rather than following it', async () => {
+      const module = loadModule();
+      await module.login(request);
+      fakeFetch.mockImplementationOnce(async () => jsonResponse({}, 302));
+
+      await expect(module.refresh(request)).rejects.toThrow(/redirect rather than a JSON body/);
+    });
+
+    it('keeps the stored session where the endpoint redirected instead of judging the grant', async () => {
+      const module = loadModule();
+      await module.login(request);
+      fakeFetch.mockImplementationOnce(async () => jsonResponse({}, 302));
+
+      await expect(module.refresh(request)).rejects.toThrow();
+
+      // Nothing about the token was established, and it is still what a logout has to revoke —
+      // discarding it would also make the next attempt report "nobody is signed in".
+      expect((stored.get(module.TOKEN_STORAGE_KEY) as { refreshToken: string }).refreshToken).toBe('a-refresh-token');
+    });
+
+    // The body a page in front of the endpoint answers a POST with. It carries an `error` field, but
+    // not one of the codes RFC 6749 §5.2 defines, so it is no verdict on the grant.
+    it('keeps the stored session where the failure names no OAuth error code', async () => {
+      const module = loadModule();
+      await module.login(request);
+      fakeFetch.mockImplementationOnce(async () =>
+        jsonResponse({ error: '405', message: 'HTTP method POST is not supported by this URL' }, 405),
+      );
+
+      await expect(module.refresh(request)).rejects.toThrow();
+
+      expect((stored.get(module.TOKEN_STORAGE_KEY) as { refreshToken: string }).refreshToken).toBe('a-refresh-token');
+    });
+
+    it('renews again after an endpoint that never judged the grant starts working', async () => {
+      const module = loadModule();
+      await module.login(request);
+      fakeFetch.mockImplementationOnce(async () => jsonResponse({}, 302));
+      await expect(module.refresh(request)).rejects.toThrow();
+
+      // The point of keeping the token: the failure is repeatable, and a fixed endpoint is answered
+      // without the user having to sign in again.
+      expect((await module.refresh(request))?.accessToken).toBe('a-renewed-token');
+    });
+
     it('renews rather than reusing a stored access token, so the provider gets to refuse', async () => {
       const module = loadModule();
       await module.login(request);

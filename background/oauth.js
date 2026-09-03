@@ -25,6 +25,22 @@ const OAUTH_LOG = '[edu-sharing][oauth]';
 /** Where the tokens of the current OAuth session are kept — see {@link readStoredTokens}. */
 const TOKEN_STORAGE_KEY = 'eduSharingOAuthTokens';
 
+/**
+ * The error codes a token endpoint answers a request it actually judged with (RFC 6749 §5.2). Only
+ * these say something about the grant that was presented; every other failure — a portal in front of
+ * the endpoint, a redirect, a server error, an HTML page — happened before the grant was looked at,
+ * and the two must not be confused: one means the credential is spent, the other that nothing was
+ * asked. See {@link tokenGrantWasJudged}.
+ */
+const OAUTH_ERROR_CODES = new Set([
+  'invalid_request',
+  'invalid_client',
+  'invalid_grant',
+  'unauthorized_client',
+  'unsupported_grant_type',
+  'invalid_scope',
+]);
+
 /** Verifier length in characters; the maximum RFC 7636 allows, since nothing here pays for it. */
 const VERIFIER_LENGTH = 128;
 
@@ -172,6 +188,14 @@ async function fetchJson(url, init, code) {
   } finally {
     clearTimeout(timer);
   }
+  // A redirect where a JSON answer belongs is an address that is not the endpoint it was taken for —
+  // typically a login page in front of it. Reported as itself rather than followed, because
+  // following it ends on whatever that page answers and buries the one fact worth knowing. Only
+  // requests that asked for `redirect: 'manual'` can see this (see {@link postToken}).
+  if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+    throw new Error(`${code}: the address answered with a redirect rather than a JSON body`);
+  }
+
   const text = await response.text().catch(() => '');
   let body = null;
   try {
@@ -181,7 +205,12 @@ async function fetchJson(url, init, code) {
   }
   if (!response.ok) {
     const reason = body?.error_description || body?.error || text.slice(0, 200) || response.statusText;
-    throw new Error(`${code}: ${response.status} ${reason}`);
+    const failure = new Error(`${code}: ${response.status} ${reason}`);
+    // What the caller needs to tell a refused credential from an unusable endpoint. An OAuth error
+    // body names one of a closed set of codes; a body that merely happens to carry an `error` field
+    // (an HTTP error rendered as JSON, say) names none of them and is not a verdict on the grant.
+    failure.oauthErrorCode = OAUTH_ERROR_CODES.has(body?.error) ? String(body.error) : null;
+    throw failure;
   }
   // An empty 2xx body is an answer, not a malformed one: a revocation endpoint (RFC 7009 §2.2)
   // answers 200 with no content, and there is nothing in it a caller wants.
@@ -357,7 +386,13 @@ function toSession(payload, previousRefreshToken = null) {
   };
 }
 
-/** A form-encoded POST to the token endpoint. No client secret: this is a public client. */
+/**
+ * A form-encoded POST to the token endpoint. No client secret: this is a public client.
+ *
+ * `redirect: 'manual'` because a token endpoint answers with JSON, never with a redirect: where one
+ * comes back, the request was intercepted before the endpoint saw it, and following it would replace
+ * that fact with whatever the page at the other end says.
+ */
 function postToken(endpoint, params) {
   return fetchJson(
     endpoint,
@@ -365,9 +400,19 @@ function postToken(endpoint, params) {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
       body: new URLSearchParams(params).toString(),
+      redirect: 'manual',
     },
     'OAUTH_TOKEN_FAILED',
   );
+}
+
+/**
+ * Whether a failed token request was one the endpoint judged, rather than one it never took. Only a
+ * judged request says anything about the credential presented — an endpoint that redirected, timed
+ * out or answered a page did not look at it, and a stored token must survive that untouched.
+ */
+function tokenGrantWasJudged(cause) {
+  return !!cause?.oauthErrorCode;
 }
 
 /**
@@ -428,7 +473,13 @@ async function login({ repositoryUrl, clientId, scopes, registrationId, loginHin
  * Renew the session from the stored refresh token, without showing anything. Answers null where there
  * is nothing to renew from — no stored token, or one belonging to a different repository or client
  * than the one now in use — so a caller can tell "nobody is signed in" from "the renewal failed".
- * A refresh the IdP rejects clears the store: that token will not start working again.
+ *
+ * A refresh the provider *rejects* clears the store: that token will not start working again. A
+ * request the token endpoint never judged — a redirect to a login page, a timeout, an HTML answer —
+ * leaves it standing, because nothing about the token was established and it is still what a logout
+ * has to revoke. Discarding it there would also make the failure unrepeatable: the next attempt
+ * would find nothing to try, and report "nobody is signed in" for an endpoint that is merely
+ * misconfigured (see {@link tokenGrantWasJudged}).
  *
  * Whether there is a refresh token to renew from is the server's answer, not the request's: one whose
  * client registration carries the `refresh_token` grant issues one without being asked for
@@ -462,8 +513,15 @@ async function refresh({ repositoryUrl, clientId } = {}) {
     });
     return session;
   } catch (cause) {
-    console.warn(`${OAUTH_LOG} refresh failed — the stored session is spent:`, cause?.message || cause);
-    await clearTokens();
+    if (tokenGrantWasJudged(cause)) {
+      console.warn(`${OAUTH_LOG} the provider refused the refresh token (${cause.oauthErrorCode}) — dropping the stored session`);
+      await clearTokens();
+    } else {
+      console.warn(
+        `${OAUTH_LOG} the token endpoint did not serve the refresh grant, so nothing about the stored session was established — it is kept:`,
+        cause?.message || cause,
+      );
+    }
     throw cause;
   }
 }

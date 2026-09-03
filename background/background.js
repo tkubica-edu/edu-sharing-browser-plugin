@@ -551,6 +551,44 @@ async function callSaveNode(body, apiUrl) {
   return result;
 }
 
+/**
+ * Remove every cookie the browser would send to a repository address, and answer with the names of
+ * those that were removed. A removal is addressed by the cookie's own domain and path rather than by
+ * the address asked about, because a cookie set for a path the request did not name cannot be
+ * removed through that request's address.
+ *
+ * Named cookies are not searched for: which one carries the session is the repository's business
+ * (edu-sharing's is `JSESSIONID`, a proxy in front of it may add its own), and a simulation that
+ * leaves one of them standing does not simulate anything.
+ */
+async function dropRepositoryCookies(repositoryUrl) {
+  const url = typeof repositoryUrl === 'string' ? repositoryUrl.trim() : '';
+  if (!/^https?:\/\//i.test(url)) return { success: false, error: 'NO_REPOSITORY' };
+  if (!browser.cookies) return { success: false, error: 'NO_COOKIES_PERMISSION' };
+
+  let cookies;
+  try {
+    cookies = await browser.cookies.getAll({ url });
+  } catch (cause) {
+    return { success: false, error: String(cause?.message || cause) };
+  }
+
+  const removed = [];
+  for (const cookie of cookies) {
+    // The address the cookie itself answers to: its domain without the leading dot a domain cookie
+    // carries, its own path, and the scheme its `secure` flag demands.
+    const at = `${cookie.secure ? 'https' : 'http'}://${cookie.domain.replace(/^\./, '')}${cookie.path}`;
+    try {
+      await browser.cookies.remove({ url: at, name: cookie.name, storeId: cookie.storeId });
+      removed.push(cookie.name);
+    } catch (cause) {
+      console.warn('⚠️ could not remove cookie', cookie.name, cause?.message || cause);
+    }
+  }
+  console.log('🍪 dropped repository cookies:', removed.join(', ') || '(none)');
+  return { success: true, removed };
+}
+
 // MESSAGE ROUTER (from the Angular sidebar app)
 
 const ALLOWED_ACTIONS = new Set([
@@ -568,7 +606,8 @@ const ALLOWED_ACTIONS = new Set([
   'oauth.silent',
   'oauth.logout',
   'oauth.redirectUri',
-  'oauth.discover'
+  'oauth.discover',
+  'session.dropCookies'
 ]);
 
 /**
@@ -741,6 +780,16 @@ browser.runtime.onMessage.addListener((message, sender) => {
 
         case 'oauth.logout': {
           return { success: true, ...(await EDU_SHARING_OAUTH.logout(oauthParamsOf(message))) };
+        }
+
+        // Drop the repository's cookies, so the next panel boot has to put the session back the way
+        // it does after the browser was closed: the session cookie edu-sharing sets carries no
+        // `Max-Age`, so a restart always loses it and the boot's OAuth resume is what has to answer.
+        // Reproducing that from a running browser is otherwise a matter of waiting or of clearing
+        // browsing data by hand. Only the cookies are dropped — the repository's own session and the
+        // stored OAuth tokens are left alone, which is exactly the state a restart leaves behind.
+        case 'session.dropCookies': {
+          return await dropRepositoryCookies(message.repositoryUrl);
         }
 
         // What the repository says about its authorization server, asked before any flow is run: it

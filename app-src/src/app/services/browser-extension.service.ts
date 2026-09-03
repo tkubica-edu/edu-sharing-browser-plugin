@@ -289,6 +289,16 @@ export interface OAuthSession {
 }
 
 /**
+ * What dropping the repository's cookies removed. `removed` names them, so a test can tell a session
+ * that was actually thrown away from an address that never had one.
+ */
+export interface DroppedCookies {
+  success: boolean;
+  removed?: readonly string[];
+  error?: string;
+}
+
+/**
  * The redirect address the flow will use, and how it will be watched for. The two read differently
  * to whoever has to register the address: one the browser's own API handed out (a different one per
  * browser and per installation), or the repository path a browser without that API is watched for on
@@ -517,6 +527,18 @@ export class BrowserExtensionService {
    */
   oauthLogout(request: OAuthRequest): Promise<OAuthSession> {
     return this.askOAuth('oauth.logout', request);
+  }
+
+  /**
+   * Have the worker drop the repository's cookies, putting the browser in the state a restart leaves
+   * it in — the session cookie edu-sharing sets carries no `Max-Age`, so closing the browser always
+   * loses it. What follows on the next boot is then the OAuth resume, which is the thing worth
+   * testing. In the worker because only it holds the `cookies` permission.
+   */
+  async dropSessionCookies(repositoryUrl: string): Promise<DroppedCookies> {
+    const response = await this.ask<DroppedCookies>({ action: 'session.dropCookies', repositoryUrl });
+    if (response === UNREACHABLE) return { success: false, error: WORKER_UNREACHABLE };
+    return response ?? { success: false, error: 'NO_RESPONSE' };
   }
 
   /**

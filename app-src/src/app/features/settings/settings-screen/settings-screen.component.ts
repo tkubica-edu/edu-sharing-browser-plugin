@@ -13,7 +13,11 @@ import { CurationService } from '../../../services/curation.service';
 import { DebugService } from '../../../services/debug.service';
 import { DevModeService } from '../../../services/dev-mode.service';
 import { NostrForwardService } from '../../../services/nostr-forward.service';
-import { RedirectUriInUse } from '../../../services/browser-extension.service';
+import {
+  BrowserExtensionService,
+  DroppedCookies,
+  RedirectUriInUse,
+} from '../../../services/browser-extension.service';
 import { OAuthService } from '../../../services/oauth.service';
 import { ContentJudgeService } from '../../../services/content-judge.service';
 import { QualityJudgeService } from '../../../services/quality-judge.service';
@@ -63,6 +67,7 @@ export class SettingsScreenComponent implements OnDestroy {
   protected readonly theme = inject(ThemeService);
   protected readonly nostr = inject(NostrForwardService);
   protected readonly oauth = inject(OAuthService);
+  private readonly browserExtension = inject(BrowserExtensionService);
 
   /** Whether the credential is legible on screen; masked until it is asked for. */
   protected readonly basicAuthVisible = signal(false);
@@ -90,6 +95,13 @@ export class SettingsScreenComponent implements OnDestroy {
    * address the browser makes up that nobody could otherwise look up.
    */
   protected readonly redirectUriInUse = signal<RedirectUriInUse | null>(null);
+
+  /**
+   * What the last cookie drop removed, or null while none was asked for — see
+   * {@link dropSessionCookies}. Kept on screen rather than acted on, because what happens next is
+   * the point and it happens on the next boot.
+   */
+  protected readonly droppedCookies = signal<DroppedCookies | null>(null);
 
   /**
    * The checks the measurement is asked for, as its description lists them. Read from the rules rather than
@@ -265,6 +277,23 @@ export class SettingsScreenComponent implements OnDestroy {
    */
   protected probeOAuth(): void {
     void this.oauth.probe(this.auth.repositoryUrl());
+  }
+
+  /**
+   * Put the browser in the state closing it leaves behind: the repository's cookies gone, the
+   * repository's own session and the stored OAuth tokens untouched. What answers for the session
+   * afterwards is the boot's silent resume, so the panel is deliberately *not* reloaded here — the
+   * outcome is worth reading in the worker's console first, and reloading is the next step the hint
+   * beside the button names.
+   */
+  protected async dropSessionCookies(): Promise<void> {
+    this.droppedCookies.set(null);
+    this.droppedCookies.set(await this.browserExtension.dropSessionCookies(this.auth.repositoryUrl()));
+  }
+
+  /** Boot the panel again, which is what runs the resume the drop above set up. */
+  protected reloadPanel(): void {
+    location.reload();
   }
 
   // ---- Nostr relay --------------------------------------------------------
