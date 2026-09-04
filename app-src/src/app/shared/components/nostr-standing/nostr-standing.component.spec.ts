@@ -195,7 +195,7 @@ describe('NostrStandingComponent', () => {
       render();
 
       expect(fixture.nativeElement.querySelector('.head-at')?.textContent?.trim()).toBe(
-        '06.05.2026, 11:30',
+        '06.05.2026, 09:30',
       );
     });
 

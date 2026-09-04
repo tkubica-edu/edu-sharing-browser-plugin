@@ -13,23 +13,38 @@
  *
  * Every other media query is passed to jsdom's own implementation, so a spec that asks about a width
  * gets what it would have got.
+ *
+ * Installed at load *and* offered as {@link installColorSchemeQuery}, because a worker runs several spec
+ * files against one jsdom and `util/bundle-theme.ts` replaces `matchMedia` for the rest of that jsdom's
+ * life: a spec whose subject reads the query has to put this one back first, or it reads the bundle's
+ * answer instead of the one it set (see `system-theme.spec.ts`).
  */
 
-/** What the query answers with. */
-let systemDark = false;
+/**
+ * What the query answers with, and who is listening — held on `globalThis` rather than in this module.
+ *
+ * A spec that reloads its subject calls `vi.resetModules()`, which re-evaluates this file too: the state
+ * would then split, and the `matchMedia` installed from one instance would answer out of a `systemDark`
+ * the *other* instance's `setSystemDark` never touches. One store per jsdom is what keeps the two halves
+ * of the stub talking about the same preference, however often the module is evaluated.
+ */
+interface ColorSchemeState {
+  dark: boolean;
+  listeners: Set<EventListenerOrEventListenerObject>;
+}
 
-/** The listeners handed out for a colour-scheme query, so a change can reach all of them. */
-const listeners = new Set<EventListenerOrEventListenerObject>();
+const store = globalThis as { __esColorScheme?: ColorSchemeState };
+const state: ColorSchemeState = (store.__esColorScheme ??= { dark: false, listeners: new Set() });
 
 /** Which scheme a query asks about; one naming neither is answered as `light`. */
 const ASKS_FOR_DARK = /dark/i;
 
 /** State what the "system" reports, and tell whoever is listening. */
 export function setSystemDark(dark: boolean): void {
-  if (dark === systemDark) return;
-  systemDark = dark;
-  for (const listener of listeners) {
-    const event = Object.assign(new Event('change'), { matches: systemDark });
+  if (dark === state.dark) return;
+  state.dark = dark;
+  for (const listener of [...state.listeners]) {
+    const event = Object.assign(new Event('change'), { matches: state.dark });
     if (typeof listener === 'function') listener(event);
     else listener.handleEvent(event);
   }
@@ -37,8 +52,8 @@ export function setSystemDark(dark: boolean): void {
 
 /** Back to reporting light, with nothing listening — for a spec's `beforeEach`. */
 export function resetSystemTheme(): void {
-  systemDark = false;
-  listeners.clear();
+  state.dark = false;
+  state.listeners.clear();
 }
 
 /** jsdom's own implementation, where the environment has one — this one defines no `matchMedia`. */
@@ -63,25 +78,32 @@ function unanswered(query: string): MediaQueryList {
   } as MediaQueryList;
 }
 
-window.matchMedia = ((query: string): MediaQueryList => {
+/** Put this file's `matchMedia` in place, over whatever holds it now. */
+export function installColorSchemeQuery(): void {
+  window.matchMedia = colorSchemeQuery;
+}
+
+const colorSchemeQuery = ((query: string): MediaQueryList => {
   if (!/prefers-color-scheme/i.test(query)) {
     return jsdomMatchMedia ? jsdomMatchMedia(query) : unanswered(query);
   }
   const asksForDark = ASKS_FOR_DARK.test(query);
   return {
     get matches() {
-      return asksForDark ? systemDark : !systemDark;
+      return asksForDark ? state.dark : !state.dark;
     },
     media: query,
     onchange: null,
     addEventListener: (_type: string, listener: EventListenerOrEventListenerObject | null) => {
-      if (listener) listeners.add(listener);
+      if (listener) state.listeners.add(listener);
     },
     removeEventListener: (_type: string, listener: EventListenerOrEventListenerObject | null) => {
-      if (listener) listeners.delete(listener);
+      if (listener) state.listeners.delete(listener);
     },
     dispatchEvent: () => true,
     addListener: () => undefined,
     removeListener: () => undefined
   } as MediaQueryList;
 }) as typeof window.matchMedia;
+
+installColorSchemeQuery();

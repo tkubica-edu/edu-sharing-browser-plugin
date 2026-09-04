@@ -98,7 +98,7 @@ describe('NostrReceiptComponent', () => {
 
       expect(text()).not.toContain('Antwort des Relays');
       expect(text()).toContain('Veröffentlicht am');
-      expect(text()).toContain('06.05.2026, 11:30');
+      expect(text()).toContain('06.05.2026, 09:30');
     });
   });
 

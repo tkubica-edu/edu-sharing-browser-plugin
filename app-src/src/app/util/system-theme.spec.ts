@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { resetSystemTheme, setSystemDark } from '../../testing/color-scheme.setup';
+import {
+  installColorSchemeQuery, resetSystemTheme, setSystemDark,
+} from '../../testing/color-scheme.setup';
 
 /**
  * A fresh instance of the module under test.
@@ -9,8 +11,14 @@ import { resetSystemTheme, setSystemDark } from '../../testing/color-scheme.setu
  * runs several spec files against one jsdom — so which `matchMedia` an already-imported instance captured
  * depends on which file imported it first. Loading it here instead makes that reference the one this
  * environment has, and it is also the honest way to exercise the capture at all.
+ *
+ * The colour-scheme query is put back first. `bundle-theme.spec.ts` installs a `matchMedia` of its own
+ * that answers with the *panel's* theme, and it holds for the rest of that jsdom — so without this the
+ * module captures that one whenever the two files land in the same worker, and every preference this
+ * spec states goes unanswered. That is the CI failure this line exists for; it is not hypothetical.
  */
 async function loadSystemTheme(): Promise<typeof import('./system-theme')> {
+  installColorSchemeQuery();
   vi.resetModules();
   return import('./system-theme');
 }

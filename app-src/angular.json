@@ -80,6 +80,7 @@
             "runner": "vitest",
             "providersFile": "src/testing/test-providers.ts",
             "setupFiles": [
+              "src/testing/timezone.setup.ts",
               "src/testing/extension-globals.setup.ts",
               "src/testing/color-scheme.setup.ts",
               "src/testing/quiet-logs.setup.ts",

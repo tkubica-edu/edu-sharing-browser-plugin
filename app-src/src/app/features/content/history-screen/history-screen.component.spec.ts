@@ -122,7 +122,7 @@ describe('HistoryScreenComponent', () => {
       render();
 
       expect(fixture.nativeElement.querySelector('.meta-line')?.textContent?.trim()).toBe(
-        '06.05.2026 11:30',
+        '06.05.2026 09:30',
       );
     });
 

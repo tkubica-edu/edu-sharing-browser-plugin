@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { installColorSchemeQuery } from '../../testing/color-scheme.setup';
 import { installBundleTheme, publishPanelTheme } from './bundle-theme';
 
 /** The key the edu-sharing bundle reads its theme preference from. */
@@ -20,6 +21,12 @@ describe('installBundleTheme', () => {
   afterEach(() => {
     publishPanelTheme(false);
   });
+
+  // The install replaces `window.matchMedia` for the rest of the jsdom, which a worker shares with
+  // every spec file after this one — and the module-level flag means it is never installed twice, so
+  // nothing would put it back. A spec whose subject is the colour-scheme query then reads the panel's
+  // theme instead of the preference it stated (see `system-theme.spec.ts`).
+  afterAll(installColorSchemeQuery);
 
   it('sets the preference to follow the query, since the bundle defaults to light', () => {
     // Written as JSON, exactly as the bundle's own storage wrapper writes it.

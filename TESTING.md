@@ -106,11 +106,29 @@ whose *subject* is a warning takes `warn` over itself and asserts the line inste
 It re-emits in `afterEach` anything the test never looked at, so silencing the expected lines does not make
 that spec a place where a new warning can appear unnoticed.
 
-A fourth setup file is there for one feature rather than to hold something back: `color-scheme.setup.ts`
+`timezone.setup.ts` pins the run to **UTC**, and runs before every other setup file. The panel formats
+dates in the reader's own zone (`DatePipe` without a zone argument), which is right for the product and
+makes an assertion on a rendered date depend on where the suite runs — green in Berlin, red on a CI
+runner in UTC. Pinning it in one place is what lets a spec state the rendering of a fixture instant
+outright. UTC rather than the zone the panel is used in, because it has no daylight saving: under
+`Europe/Berlin` the rendering of a fixture would depend on the time of year it falls in.
+
+A fifth setup file is there for one feature rather than to hold something back: `color-scheme.setup.ts`
 gives the run a `(prefers-color-scheme: dark)` query a spec can answer (`setSystemDark()`), because
 jsdom defines no `matchMedia` at all and the panel's *System folgen* is otherwise untestable. It has to
 be a setup file: `util/system-theme.ts` takes its reference to `matchMedia` at module load, so a stub
 installed from a spec body would arrive after the module it is meant for.
+
+Two things about it are the scars of a CI failure, and both are load-bearing. Its state lives on
+`globalThis`, not in the module: a spec that reloads its subject calls `vi.resetModules()`, which
+re-evaluates this file too, and the state would otherwise split — the `matchMedia` installed from one
+instance answering out of a `dark` flag the other instance's `setSystemDark` never touches. And it
+exports `installColorSchemeQuery()`, because `util/bundle-theme.ts` replaces `matchMedia` for the rest
+of the jsdom's life and a worker shares one jsdom across spec files: `bundle-theme.spec.ts` puts this
+query back in an `afterAll`, and `system-theme.spec.ts` puts it back again before each reload of its
+subject. Without either, whichever spec reads the preference after `bundle-theme.spec.ts` reads the
+*panel's* theme instead of the one it stated — which is what happened, on CI only, once the file count
+changed enough to reshuffle the workers.
 
 Fakes live in `app-src/src/testing/fakes/`, one file per faked service, each a factory returning the
 fake and the knobs a spec drives it with. They are checked against the real surface with
@@ -160,6 +178,13 @@ Console logs are silenced per test so a report stays readable; `warn` and `error
 reads that variable through `process.env`, which is why `@types/node` is a devDependency of `app-src`
 itself: `tsconfig.spec.json` inherits the default type resolution, and the CI `test` job installs the
 sidebar's lockfile alone — nothing there may lean on the root install's transitive copy.
+
+**A leak between spec files shows up only when they share a worker.** Vitest spreads the files over as
+many workers as the machine has cores, so a laptop and a CI runner group them differently and an
+ordering bug can be invisible on one and fatal on the other. To force the worst case — every file in
+one worker, against one jsdom, in order — add `fileParallelism: false` to `app-src/vitest.config.ts`
+and run the suite. It is the check to make after adding a spec that patches a global, and it is how
+the two failures above were reproduced.
 
 `npm run test:coverage` prints a summary and writes the report to `app-src/coverage/sidebar/`:
 `index.html` to open in a browser and drill into a file's uncovered lines, `lcov.info` for an IDE or a
