@@ -15,9 +15,9 @@ exist, this one names the ones that do not yet. It shrinks as it is worked off.
 
 ## Where the coverage stands
 
-Eighty-four specs with 1730 `it()` blocks cover 35 of the panel's 44 services, **all 37** of its util
+Eighty-nine specs with 1947 `it()` blocks cover **43 of the panel's 44 services**, **all 37** of its util
 modules, the navigation registry, the config's URL derivation, the one pipe, and the contracts with the
-extension around it. `npm run test:coverage` reports 87.8 % of statements and 87.1 % of functions over
+extension around it. `npm run test:coverage` reports 96.0 % of statements and 95.5 % of functions over
 its `coverageInclude` (`src/app/services/**`, `src/app/util/**`, `model/navigation.ts`, `pipes/**` and
 `config.ts`). What is outside that scope — the components, the rest of `model/`, the build harness — has
 no automated test of any kind and is not even measured, and the extension's plain-JS parts are pinned
@@ -31,18 +31,17 @@ spoken to. `no-network.setup.ts` is what keeps it that way as specs are added �
 
 | Area | Files | Lines covered | Kind of test it needs |
 | --- | --- | --- | --- |
-| `app-src/src/app/services/` | 44 | 83 % | Service spec (TestBed + fakes) |
-| `app-src/src/app/util/` | 37 | 98 % | Pure-function spec |
+| `app-src/src/app/services/` | 44 | 96 % | Service spec (TestBed + fakes) |
+| `app-src/src/app/util/` | 37 | 99 % | Pure-function spec |
 | `app-src/src/app/model/navigation.ts`, `pipes/`, `config.ts` | 3 | 100 % | Pure-function spec |
 | `app-src/src/app/features/`, `template/`, `shared/` | 47 | none | Component spec |
 | `background/`, `content/` | 3 | the shared literals, 17 assertions | Boundary contract spec |
 | `scripts/*.mjs` | 3 | none | Build-harness spec |
 
-`curation.service.ts` is covered (18 uncovered lines of 458). What is left inside the measured scope is
-six services: `web-component-bundle` (80 — deliberately out of scope, see below), `browser-extension`
-(78), `onlyoffice-document` (66), `content-suggestions` (65), `mds-ai-suggestion` (60) and
-`content-flow` (48), plus about 40 lines of `catch` branches spread over twenty files. Then the
-components.
+What is left inside the measured scope is 122 lines, and 80 of them are `web-component-bundle.service.ts`,
+which is deliberately out of scope (see below). Of the rest, 18 are in `curation.service.ts` and the other
+24 are one- and two-line `catch` branches spread over seventeen files — each reachable only by making a
+library call fail in a way its fake has no knob for. Then the components.
 
 ## The five kinds of test
 
@@ -118,10 +117,17 @@ cost per service follows that, not its size:
     the wrong reason before that was noticed.
   - `fakeContentJudge`, `fakeMetalookup`, `fakeRecommendations` and `fakePageDerivation` are written
     for the services above and are what makes `curation.service.ts` affordable.
-- **Timers and messaging.** `onlyoffice-document.service.ts` runs a request/response exchange with
-  timeouts, and `browser-extension.service.ts` is the `browser.*` and `postMessage` seam itself, with
-  retry back-off. Both need `vi.useFakeTimers()` plus `TestBed.tick()`, which
-  `page-recognition.service.spec.ts` and `session-resume.service.spec.ts` demonstrate.
+- ~~**Timers and messaging.**~~ Done: `browser-extension.service.ts` and `onlyoffice-document.service.ts`.
+  The one that needed a new seam is the first, because its subject *is* the extension API that
+  `extension-globals.setup.ts` exists to refuse: the polyfill reads `globalThis.browser` once, at import,
+  and re-exports it unchanged, so the service holds that proxy for the life of the worker and neither
+  reassigning the global nor `vi.resetModules()` reaches it — the builder's chunks are not the Vite module
+  graph. `useExtensionApi()` swaps what the proxy answers out of instead, which is the only way in a spec
+  still has. What the two settled beyond that: the retry back-off is driven with
+  `await vi.advanceTimersByTimeAsync(ms)`, and a call that rejects has to have its outcome taken hold of
+  **before** the clock is moved, or the rejection lands while nothing is waiting on it and the runner
+  reports an unhandled rejection. `onlyoffice-document.service.spec.ts` correlates its answers by reading
+  the `requestId` off the spy's last call, which is what lets two requests be answered out of order.
 - ~~**`curation.service.ts` — 1686 lines, eleven injected services, some 35 public methods and about 20
   signals.**~~ Done, split by method group into three files, which is the shape to follow for any
   service of this size:
@@ -138,8 +144,13 @@ cost per service follows that, not its size:
     of it is the guest session, whose node the agent wrote and which may therefore not read it: every
     one of those paths has a branch that stands the history entry in for the node, and each is pinned
     both ways round.
-- Left with it: `content-flow`, `content-suggestions` and `mds-ai-suggestion`, which read the
-  curation's state.
+- ~~Left with it: `content-flow`, `content-suggestions` and `mds-ai-suggestion`, which read the
+  curation's state.~~ Done. `content-flow.service.spec.ts` uses the real `ConditionsService`, so the
+  „already open" branch is decided by the page's own address rather than by a flag a fake sets;
+  `content-suggestions.service.spec.ts` fakes `KeywordRankingService.rank` with a reordering of the
+  spec's choosing, which is what proves the cut to eight is made *after* the ranking rather than before
+  it; `mds-ai-suggestion.service.spec.ts` builds a real `MdsDefinition` and lets `aiConfigFields` and
+  `aiConfigBreakdown` read it, since both are covered by their own specs already.
 
 One service is deliberately left out: `web-component-bundle.service.ts` fetches a bundle's
 `index.html`, injects `script` and `link` elements into `document.head` and then polls
@@ -255,7 +266,7 @@ Each round is worth landing on its own; nothing in a later one is a precondition
 | ~~2~~ | ~~The services with no outbound call~~ Done: `action-bar`, `navigation`, `node-write`, `chat-skill`, `chat-style`, `debug`; `metadata-agent-api` is covered through the `node-write` spec | Existing fakes plus two new ones; the largest logic gain per fake written |
 | ~~3~~ | ~~The boundary invariant specs (kind 4, first half)~~ Done: `src/boundary/extension-contract.spec.ts` | No refactor, and one of them already named a broken route — `analyze.url`, fixed with it |
 | ~~4~~ | ~~The judges and the repository adapters~~ Done, plus `suggestion`, `session-resume`, `context-refresh` and `metadata-agent-api` | The `ngx-edu-sharing-api` fakes were its point and now exist; everything after this builds on them |
-| 5 | ~~`curation.service.ts`~~ Done, in three files. Left: `browser-extension`, `onlyoffice-document`, `content-flow`, `content-suggestions`, `mds-ai-suggestion` | `browser-extension.service.ts` first — it is the seam fifteen services depend on, and the one uncovered file where a bug would be invisible everywhere else |
+| ~~5~~ | ~~`curation.service.ts`, then `browser-extension`, `onlyoffice-document`, `content-flow`, `content-suggestions`, `mds-ai-suggestion`~~ Done; every service but `web-component-bundle` now has a spec | `browser-extension.service.ts` was the one worth doing first — the seam fifteen services depend on, and the file where a bug would have been invisible everywhere else |
 | 6 | Component specs for the seven candidates; the build harness; the exported-function half of the boundary | Each needs a decision or a change to shipped code first |
 
 ## Preconditions
@@ -270,8 +281,11 @@ Each round is worth landing on its own; nothing in a later one is a precondition
   `fakeNavigation`, `fakePageRecognition`, `fakePageDerivation`, `fakeContentJudge`, `fakeMetalookup`,
   `fakeRecommendations`, and the library's `fakeNodeApi`, `fakeNodeApiUnwrapped`, `fakeCollections`,
   `fakeConnectors` and `fakeApiConfiguration`. `fakeBrowserExtension` grew `analyzeActiveTab`,
-  `analyzeUrl`, `readPage`, `extractPageData`, `getActiveTab` and `getOwnTabId`; `fakeCuration` grew
-  what the forwarding and the resume read and write. `ConditionsService`, `BusyService`,
+  `analyzeUrl`, `readPage`, `extractPageData`, `getActiveTab`, `getOwnTabId` and the host-page messages
+  (`insertNodes`, `requestDocumentContent`, `requestDocumentInfo`, `signalReady`, `closePanel`, with
+  `standalone()` for a panel no page embeds); `fakeCuration` grew what the forwarding and the resume read
+  and write, plus `previewNode` and its `hydrated()` knob; `fakeMetadataAgent` grew `generatesField()` and
+  `refusesField()` for the single-field runs. `ConditionsService`, `BusyService`,
   `KeywordRankingService`, `OptionIconService` and `MetadataAgentApiService` are used for real, as
   `navigation.service.spec.ts` does with the first two: both are derivations over fakes that exist, and
   faking them would move the registry's own rules into the spec. A spec that uses the real

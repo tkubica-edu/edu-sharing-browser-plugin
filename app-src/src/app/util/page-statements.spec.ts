@@ -217,4 +217,33 @@ describe('pageStatementsOf', () => {
     const page = aPage({ structuredData: ['nonsense', 42, null, { '@type': ['Article', 'LearningResource'] }] });
     expect(() => pageStatementsOf(page)).not.toThrow();
   });
+
+  it('cuts a description at the last sentence that fits', () => {
+    const sentence = 'Licht breitet sich geradlinig aus und wird an einer Linse gebrochen. ';
+    const long = sentence.repeat(40);
+    // Well past the 2000 the description is allowed, so the cut is the point of the test.
+    expect(long.length).toBeGreaterThan(2000);
+
+    const described = pageStatementsOf(aPage({ meta: { description: long } }))?.description?.value ?? '';
+
+    expect(described.length).toBeLessThanOrEqual(2000);
+    expect(described.endsWith('gebrochen.')).toBe(true);
+    expect(described.endsWith('…')).toBe(false);
+  });
+
+  it('cuts one that has no sentence end in it with an ellipsis instead', () => {
+    const long = 'Optik '.repeat(400);
+
+    const described = pageStatementsOf(aPage({ meta: { description: long } }))?.description?.value ?? '';
+
+    expect(described.length).toBeLessThanOrEqual(2001);
+    expect(described.endsWith('…')).toBe(true);
+  });
+
+  it('has no host for a page whose address is none', () => {
+    // The canonical address goes too: it is what the host is read off where the page names one.
+    const nowhere = aPage({ url: 'nicht mal eine Adresse', canonical: undefined });
+
+    expect(pageStatementsOf(nowhere)?.host).toBeNull();
+  });
 });

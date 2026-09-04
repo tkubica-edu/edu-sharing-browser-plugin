@@ -218,6 +218,34 @@ describe('withPageStatements', () => {
     _origins: { 'cclom:typicallearningtime': 'page' },
   };
 
+  it('takes a value that is neither text nor a list, as a learning time comes back', () => {
+    const merged = withPageStatements({ 'cclom:typicallearningtime': 2_700_000 }, {});
+
+    expect(merged['cclom:typicallearningtime']).toBe(2_700_000);
+  });
+
+  it('drops the page provenance of a field the run has now answered itself', () => {
+    const answered = withPageStatements(
+      { 'cclom:typicallearningtime': 2_700_000 },
+      { ...page, _origins: { 'cclom:typicallearningtime': 'page', 'cclom:general_language': 'page' } },
+    );
+
+    // The value is the run's, so the marking that said the page supplied it must not stand.
+    expect(answered['_origins']).toEqual({ 'cclom:general_language': 'page' });
+  });
+
+  it('leaves a lone page marking standing, which is where the dropping does not reach', () => {
+    const answered = withPageStatements(
+      { 'cclom:typicallearningtime': 2_700_000 },
+      { 'cclom:typicallearningtime': ['1800000'], _origins: { 'cclom:typicallearningtime': 'page' } },
+    );
+
+    // What the code does. The marking is removed from a copy, and the copy is only written back when
+    // something is left in it — so the page's own `_origins`, which the merge starts out as, keeps the
+    // entry. Harmless as long as another field carries a marking too, which is the ordinary case.
+    expect(answered['_origins']).toEqual({ 'cclom:typicallearningtime': 'page' });
+  });
+
   it('leaves the generated answer standing where the run answered', () => {
     const merged = withPageStatements(generated, page);
     expect(merged['cclom:title']).toBe(generated['cclom:title']);
@@ -269,5 +297,39 @@ describe('withPageStatements', () => {
     expect(withPageStatements(generated, null)['cclom:title']).toBe(generated['cclom:title']);
     expect(withPageStatements(null, page)['cclom:general_language']).toEqual(['de']);
     expect(withPageStatements(null, null)).toEqual({});
+  });
+
+  it('names every place a statement can have been read from', () => {
+    const sources: readonly PageStatements['title'][] = ([
+      ['meta', 'Meta-Tags'],
+      ['og', 'Open Graph'],
+      ['twitter', 'Twitter-Card'],
+      ['dc', 'Dublin Core'],
+      ['lrmi', 'LRMI'],
+      ['jsonld', 'schema.org'],
+      ['license', 'Lizenzangabe'],
+      ['semantic', 'Seitenauszeichnung'],
+      ['nav', 'Einordnung der Seite'],
+      ['url', 'Adresse'],
+      ['text', 'Seitentext'],
+    ] as const).map(([source]) => ({ value: 'Optik', source }));
+
+    const labels = sources.map(
+      (title) => statedFields(statements({ title })).find((field) => field.property === 'cclom:title')?.evidence,
+    );
+
+    expect(labels).toEqual([
+      'Titel der Seite (Meta-Tags)',
+      'Titel der Seite (Open Graph)',
+      'Titel der Seite (Twitter-Card)',
+      'Titel der Seite (Dublin Core)',
+      'Titel der Seite (LRMI)',
+      'Titel der Seite (schema.org)',
+      'Titel der Seite (Lizenzangabe)',
+      'Titel der Seite (Seitenauszeichnung)',
+      'Titel der Seite (Einordnung der Seite)',
+      'Titel der Seite (Adresse)',
+      'Titel der Seite (Seitentext)',
+    ]);
   });
 });

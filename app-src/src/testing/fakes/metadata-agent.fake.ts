@@ -3,6 +3,7 @@ import { vi } from 'vitest';
 
 import {
   AnalyzeOutcome,
+  FieldOutcome,
   MetadataAgentService,
   ParsedMetadata,
 } from '../../app/services/metadata-agent.service';
@@ -34,6 +35,9 @@ export function fakeMetadataAgent() {
   /** What the next run answers with. */
   let outcome: AnalyzeOutcome = { ok: false, error: 'Unbekannter Fehler bei der Erschließung.' };
 
+  /** What the next single-field generation answers with — see {@link generatesField}. */
+  let field: FieldOutcome = { ok: true, values: [] };
+
   const run = vi.fn(async (): Promise<AnalyzeOutcome> => {
     lastRun.set(outcome);
     return outcome;
@@ -48,7 +52,7 @@ export function fakeMetadataAgent() {
       lastRun.set(outcome);
       return outcome;
     }),
-    extractField: vi.fn(async (_text: string, _fieldId: string) => ({ ok: true, values: [] })),
+    extractField: vi.fn(async (_text: string, _fieldId: string): Promise<FieldOutcome> => field),
     parse: vi.fn((raw: Record<string, unknown> | undefined) => aParsedRun(raw ?? {})),
     reset: vi.fn(() => lastRun.set(null)),
     restore: vi.fn((next: AnalyzeOutcome | null) => lastRun.set(next)),
@@ -70,7 +74,17 @@ export function fakeMetadataAgent() {
     lastRun.set(outcome);
   }
 
-  return { fake, reads, fails, hasRead, lastRun };
+  /** The agent generates one field, and these are the values it answers with. */
+  function generatesField(values: readonly string[]): void {
+    field = { ok: true, values: [...values] };
+  }
+
+  /** It does not: `error` is what the caller shows, and an empty one is its own case. */
+  function refusesField(error?: string): void {
+    field = { ok: false, error };
+  }
+
+  return { fake, reads, fails, hasRead, generatesField, refusesField, lastRun };
 }
 
 export type MetadataAgentFake = ReturnType<typeof fakeMetadataAgent>;

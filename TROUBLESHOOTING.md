@@ -5,6 +5,7 @@ What is known not to work, known to be unverified, or known to look wrong at fir
 - [Browser-specific](#browser-specific)
 - [Permissions](#permissions)
 - [Dependencies and runtime limits](#dependencies-and-runtime-limits)
+- [Behaviour a spec pins although it is wrong](#behaviour-a-spec-pins-although-it-is-wrong)
 - [Bundle size](#bundle-size)
 - [Lint output](#lint-output)
 
@@ -188,6 +189,25 @@ itself; the file's header records the derivation, which is recomputable after ei
 replaced. Dropdowns, menus and date pickers are rendered into the CDK's own overlay container, which
 hangs off `<body>` rather than off the canvas, so those follow the panel's dark theme — intended, and
 the one visible seam.
+
+## Behaviour a spec pins although it is wrong
+
+Two places where a unit test states what the code does rather than what its own docblock says. Both
+are pinned so a fix shows up as a failing assertion to update, rather than as a silent change; neither
+is worth a correction on its own, and each says in the spec why.
+
+- **`ContentSuggestionsService.pickKeywords` keeps the *last* spelling of a keyword the agent named
+  twice, not the first.** Its docblock says the first wins. The de-duplication is
+  `new Map(values.map((word) => [word.toLowerCase(), word]))`, and a later entry overwrites an earlier
+  one under the same key — the *position* is the first mention's, the spelling the last one's. Visible
+  only where the agent answers the same word in two casings, and both spellings are its own.
+- **`withPageStatements` in `util/derived-metadata.ts` leaves a page's provenance standing where it is
+  the only one.** A field the run answered is meant to lose the `_origins` entry that said the page
+  supplied it. The entry is deleted from a copy, and the copy is written back only when something is
+  left in it (`if (Object.keys(origins).length)`) — while the merged payload started as a spread of the
+  page's own object and therefore still carries its `_origins` unchanged. So the deletion takes effect
+  as long as any other field carries a marking, which is the ordinary case, and is lost when the page
+  marked exactly one field and the run answered that one.
 
 ## Bundle size
 

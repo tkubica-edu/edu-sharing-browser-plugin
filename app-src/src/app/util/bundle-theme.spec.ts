@@ -104,4 +104,62 @@ describe('installBundleTheme', () => {
     expect(before.matches).toBe(true);
     expect(after.matches).toBe(true);
   });
+
+  it('carries on without a preference where the profile has no storage', () => {
+    // Stubbed on the prototype and put back by hand: `vi.stubGlobal('localStorage', …)` outlives
+    // `unstubAllGlobals` here and would leave every later spec file without storage.
+    const denied = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage denied');
+    });
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      expect(() => installBundleTheme()).not.toThrow();
+      expect(warned).toHaveBeenCalled();
+    } finally {
+      denied.mockRestore();
+      warned.mockRestore();
+    }
+  });
+
+  it('takes a listener added the old way, which is how an older bundle subscribes', () => {
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const heard: boolean[] = [];
+    query.addListener((event) => heard.push(event.matches));
+
+    publishPanelTheme(true);
+
+    expect(heard).toEqual([true]);
+  });
+
+  it('stops reporting to one removed the old way', () => {
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const listener = vi.fn();
+    query.addListener(listener);
+    query.removeListener(listener);
+
+    publishPanelTheme(true);
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('is unbothered by a listener that was never added, or by none at all', () => {
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+
+    expect(() => query.removeListener(vi.fn())).not.toThrow();
+    expect(() => query.removeListener(null)).not.toThrow();
+    expect(() => query.addListener(null)).not.toThrow();
+
+    publishPanelTheme(true);
+
+    expect(query.matches).toBe(true);
+  });
+
+  it('passes an event dispatched on it through to its own listeners', () => {
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const listener = vi.fn();
+    query.addEventListener('change', listener);
+
+    expect(query.dispatchEvent(new Event('change'))).toBe(true);
+    expect(listener).toHaveBeenCalled();
+  });
 });

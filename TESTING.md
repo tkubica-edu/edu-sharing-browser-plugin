@@ -90,6 +90,13 @@ each says in the file how it holds its ground:
   answering member is `runtime.id`; every other member throws and names
   `fakeBrowserExtension()`. See [TROUBLESHOOTING.md § Dependencies and runtime
   limits](TROUBLESHOOTING.md#dependencies-and-runtime-limits) for why that global has to exist at all.
+  The one spec that may not fake the wrapper away is the one whose subject *is* it,
+  `browser-extension.service.spec.ts`, and `useExtensionApi(api)` / `resetExtensionApi()` are its way
+  in: `webextension-polyfill` reads the global once, at import, and re-exports it unchanged when it
+  carries a `runtime.id`, so the service holds *this proxy* for the life of the worker — neither
+  assigning `globalThis.browser` from a spec body nor `vi.resetModules()` before a dynamic import
+  reaches it, since the builder bundles the specs with esbuild and its chunks are not the Vite module
+  graph. Swapping what the proxy answers out of is what is left, and every test puts the refusal back.
 
 `quiet-logs.setup.ts` silences `console.log` for every test — the services log a line per step by design
 — and deliberately leaves `warn` and `error` alone, so a run still says when something went wrong. A spec

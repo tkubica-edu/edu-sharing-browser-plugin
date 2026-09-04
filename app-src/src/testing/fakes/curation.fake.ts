@@ -43,6 +43,10 @@ export function fakeCuration() {
 
   const fake = {
     activeNode,
+    // The loaded node behind the active one, which the summary above is not: what reads a mimetype,
+    // an access list or a property goes through this. Null while nothing was loaded — a generated
+    // result that is not a node yet.
+    previewNode: signal<Node | null>(null),
     hasDetectedNode: computed(() => activeNode() !== null && nodeDetected()),
     hasUnsavedWork: signal(false),
     hasEditableMetadata: signal(false),
@@ -90,6 +94,11 @@ export function fakeCuration() {
     }),
   } satisfies Partial<CurationService>;
 
+  /** The node behind the content in hand, loaded — see `CurationService.previewNode`. */
+  function hydrated(node: Node): void {
+    fake.previewNode.set(node);
+  }
+
   /** Put a node in place as one that arrived on its own, which is what `hasDetectedNode` reports. */
   function detect(nodeId = 'node-1'): void {
     activeNode.set(anActiveNode(nodeId));
@@ -117,7 +126,17 @@ export function fakeCuration() {
     resumesNode = false;
   }
 
-  return { fake, detect, chose, owesExtraction, refuseQuality, refuseResume, editorialTargets, nodeSource };
+  return {
+    fake,
+    detect,
+    chose,
+    hydrated,
+    owesExtraction,
+    refuseQuality,
+    refuseResume,
+    editorialTargets,
+    nodeSource,
+  };
 }
 
 export type CurationFake = ReturnType<typeof fakeCuration>;

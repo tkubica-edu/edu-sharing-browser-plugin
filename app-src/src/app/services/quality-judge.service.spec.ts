@@ -62,6 +62,24 @@ describe('QualityJudgeService', () => {
     return quality.statuses().find((status) => status.judge === judge)!.detail;
   }
 
+  /**
+   * Run `body` with one of the two criteria maps emptied. They are read off `APP_CONFIG` at the moment a
+   * run starts, so this is what a deployment that configured neither judge looks like — and the only way
+   * to reach the branch, since the maps are the shipped constants.
+   */
+  async function withoutConfig(
+    key: 'qualityMetalookupRules' | 'qualityCriterionSchemes',
+    body: () => Promise<void>,
+  ): Promise<void> {
+    const configured = APP_CONFIG[key];
+    Object.assign(APP_CONFIG, { [key]: key === 'qualityMetalookupRules' ? [] : {} });
+    try {
+      await body();
+    } finally {
+      Object.assign(APP_CONFIG, { [key]: configured });
+    }
+  }
+
   /** A run of both judges, awaited. */
   async function judged(resource: MetalookupResource = { url: URL_UNDER_CHECK }): Promise<void> {
     quality.start(resource);
@@ -205,6 +223,25 @@ describe('QualityJudgeService', () => {
 
       expect(metalookup.fake.evaluate).toHaveBeenCalledWith({ nodeId: NODE }, ['accessibility']);
     });
+
+    it('is skipped where no criterion points at a measurement at all', async () => {
+      await withoutConfig('qualityMetalookupRules', async () => {
+        await judged();
+
+        expect(stateOf('MetalookUp')).toBe('skipped');
+        expect(detailOf('MetalookUp')).toContain('Kein Kriterium verweist auf eine Messung');
+        expect(metalookup.fake.evaluate).not.toHaveBeenCalled();
+      });
+    });
+
+    it('reports a measurement that failed, and says why', async () => {
+      metalookup.fake.evaluate.mockRejectedValue(new Error('MetalookUp nicht erreichbar'));
+
+      await judged();
+
+      expect(stateOf('MetalookUp')).toBe('failed');
+      expect(detailOf('MetalookUp')).toBe('MetalookUp nicht erreichbar');
+    });
   });
 
   describe('what ContentJudge is asked', () => {
@@ -274,6 +311,33 @@ describe('QualityJudgeService', () => {
       await quality.setContentJudgeEnabled(true);
       await judged();
       expect(detailOf('ContentJudge')).toContain('kein Zugang hinterlegt');
+    });
+  });
+
+  describe('when a judge cannot answer', () => {
+    it('skips ContentJudge where no criterion points at a scheme', async () => {
+      await bothOn();
+      extension.extracts(aPage());
+
+      await withoutConfig('qualityCriterionSchemes', async () => {
+        await judged();
+
+        expect(stateOf('ContentJudge')).toBe('skipped');
+        expect(detailOf('ContentJudge')).toContain('Kein Kriterium verweist auf ein Bewertungsschema');
+        expect(contentJudge.fake.evaluate).not.toHaveBeenCalled();
+      });
+    });
+
+    it('reports a judgement that failed, and says why', async () => {
+      await bothOn();
+      extension.extracts(aPage());
+      contentJudge.fake.evaluate.mockRejectedValue(new Error('Das Modell hat abgelehnt.'));
+
+      await judged();
+
+      expect(stateOf('ContentJudge')).toBe('failed');
+      expect(detailOf('ContentJudge')).toBe('Das Modell hat abgelehnt.');
+      expect(quality.evaluation()).toBeNull();
     });
   });
 

@@ -65,6 +65,13 @@ export function fakeBrowserExtension() {
   /** What `tabs.extractPageData` answers with — the open page alone, without the record of where. */
   let extracted: PageData | null = null;
 
+  /**
+   * Whether there is a host page around the panel to post to — the OnlyOffice page it is docked in.
+   * True by default, since the messages only exist for a panel that has one; {@link standalone} is
+   * the panel opened as a tab of its own, where every one of them reaches nobody.
+   */
+  let hosted = true;
+
   const fake = {
     available: true,
     announcedPage: signal<AnnouncedPage | null>(null),
@@ -99,6 +106,11 @@ export function fakeBrowserExtension() {
     oauthDiscover: vi.fn(
       (_request: OAuthRequest): Promise<OAuthDiscovery> => oauthDiscovery(),
     ),
+    insertNodes: vi.fn((_nodes: unknown[]): void => undefined),
+    requestDocumentContent: vi.fn((_requestId: string): boolean => hosted),
+    requestDocumentInfo: vi.fn((_requestId: string): boolean => hosted),
+    signalReady: vi.fn(),
+    closePanel: vi.fn(),
     oauthRedirectUri: vi.fn((_request: OAuthRequest) =>
       Promise.resolve({
         redirectUri: 'https://abc.chromiumapp.org/',
@@ -157,6 +169,11 @@ export function fakeBrowserExtension() {
     activeTab = tab;
   }
 
+  /** No page is embedding the panel, so nothing posted to a host reaches anybody. */
+  function standalone(): void {
+    hosted = false;
+  }
+
   /** The panel sits in this tab, so everything it stores per tab is keyed by it. */
   function inTab(tabId: number | null): void {
     ownTabId = tabId;
@@ -199,6 +216,7 @@ export function fakeBrowserExtension() {
     reads,
     extracts,
     inTab,
+    standalone,
   };
 }
 
