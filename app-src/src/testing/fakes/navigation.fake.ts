@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { vi } from 'vitest';
 
 import { ScreenId, SectionId } from '../../app/model/navigation';
-import { NavigationService, TabView } from '../../app/services/navigation.service';
+import { NavStep, NavigationService, TabView } from '../../app/services/navigation.service';
 
 /** A sub step as the tab bar would render it: open unless the caller says otherwise. */
 export function aTab(id: ScreenId, overrides: Partial<TabView> = {}): TabView {
@@ -22,6 +22,12 @@ export function aTab(id: ScreenId, overrides: Partial<TabView> = {}): TabView {
 export function fakeNavigation() {
   const offered = new Set<SectionId>();
 
+  /** The steps behind the open one, as a resume carries them over. */
+  const trail = signal<readonly NavStep[]>([]);
+
+  /** Whether a resumed state applied on the page it was carried to — see {@link resumesNothing}. */
+  let resumes = true;
+
   const fake = {
     section: signal<SectionId>('menu'),
     screen: signal<ScreenId | null>(null),
@@ -36,6 +42,8 @@ export function fakeNavigation() {
     goTab: vi.fn((_id: ScreenId): void => undefined),
     goNextTab: vi.fn(),
     openMenu: vi.fn(),
+    trailOf: trail,
+    resume: vi.fn((_step: NavStep, _behind: readonly NavStep[]): boolean => resumes),
   } satisfies Partial<NavigationService>;
 
   /** Put the panel on a step: the section, and the sub step showing in it. */
@@ -49,7 +57,17 @@ export function fakeNavigation() {
     ids.forEach((id) => offered.add(id));
   }
 
-  return { fake, at, offer };
+  /** The steps the user came through to get here. */
+  function came(...steps: readonly NavStep[]): void {
+    trail.set(steps);
+  }
+
+  /** Nothing of a resumed state applies on this page, so the caller lands instead. */
+  function resumesNothing(): void {
+    resumes = false;
+  }
+
+  return { fake, at, offer, came, resumesNothing };
 }
 
 export type NavigationFake = ReturnType<typeof fakeNavigation>;

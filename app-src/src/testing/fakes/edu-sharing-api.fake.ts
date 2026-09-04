@@ -3,11 +3,20 @@ import {
   AuthenticationService,
   ClientConfig,
   ClientutilsV1Service,
+  CollectionService,
   ConfigService,
+  Connector,
+  ConnectorList,
+  ConnectorService,
   CurrentUserInfo,
+  EduSharingApiConfiguration,
   LoginInfo,
+  Node,
+  NodeService,
+  NodeServiceUnwrapped,
   UserEntry,
   UserService,
+  Variables,
   WebsiteInformation,
 } from 'ngx-edu-sharing-api';
 import { vi } from 'vitest';
@@ -127,10 +136,24 @@ export function fakeUserApi(entry: UserEntry | null = null) {
     loginInfo: aLoginInfo(),
   } as CurrentUserInfo);
 
+  /** The profile preferences, where the default filing folder lives. Empty for a session without one. */
+  let preferences: Observable<unknown> = of({});
+
   const fake = {
     observeCurrentUser: vi.fn(() => currentUser),
     observeCurrentUserInfo: vi.fn(() => currentUserInfo),
+    getUserPreferences: vi.fn(() => preferences),
   } satisfies Partial<UserService>;
+
+  /** The profile carries these preferences. */
+  function prefers(next: Record<string, unknown>): void {
+    preferences = of(next);
+  }
+
+  /** There is no profile to read them from — a guest session, or a repository that refuses. */
+  function hasNoPreferences(cause: unknown = new Error('no profile')): void {
+    preferences = throwError(() => cause);
+  }
 
   function answers(next: UserEntry | null): void {
     currentUser = of(next);
@@ -148,10 +171,137 @@ export function fakeUserApi(entry: UserEntry | null = null) {
     currentUserInfo = throwError(() => cause);
   }
 
-  return { fake, answers, isAuthenticatedBy, fails };
+  return { fake, answers, isAuthenticatedBy, fails, prefers, hasNoPreferences };
 }
 
 export type UserApiFake = ReturnType<typeof fakeUserApi>;
+
+/** A node as the repository answers with one. */
+export function aNode(overrides: Partial<Node> = {}): Node {
+  return {
+    ref: { id: '2c4d6b1a-8f3e-4c2b-9a10-7d5e6f8b0c31', repo: 'local' },
+    name: 'optik.html',
+    type: 'ccm:io',
+    mimetype: 'text/html',
+    properties: {},
+    aspects: [],
+    access: [],
+    ...overrides,
+  } as unknown as Node;
+}
+
+/**
+ * `NodeService` — the wrapper the panel writes metadata and content through. Every call answers with the
+ * node the spec put in and records what it was asked, so an assertion is about the call rather than about
+ * a URL. {@link refuses} is what makes a write fail, which is the branch the retries are written for.
+ */
+export function fakeNodeApi(node: Node = aNode()) {
+  /** Which calls are to fail, by method name — see {@link refuses}. */
+  const refusing = new Map<string, unknown>();
+
+  /** Properties a single-property write is to refuse, for the field-by-field retry. */
+  const refusedProperties = new Set<string>();
+
+  const answer = (method: string, value: Node = node): Observable<Node> =>
+    refusing.has(method) ? throwError(() => refusing.get(method)) : of(value);
+
+  const fake = {
+    getNode: vi.fn((_nodeId: string) => answer('getNode')),
+    getParents: vi.fn((_nodeId: string) =>
+      refusing.has('getParents')
+        ? throwError(() => refusing.get('getParents'))
+        : of({ nodes: parents, pagination: { total: parents.length, from: 0, count: parents.length } }),
+    ),
+    editNodeMetadata: vi.fn((_nodeId: string, properties: Record<string, string[]>, _options?: unknown) => {
+      const refused = Object.keys(properties).find((name) => refusedProperties.has(name));
+      if (refused) return throwError(() => new Error(`property refused: ${refused}`));
+      return answer('editNodeMetadata');
+    }),
+    createChild: vi.fn((_request: unknown) => answer('createChild')),
+    changeContent: vi.fn(
+      (_repository: string, _node: string, _mimetype: string, _comment: string, _body: unknown) =>
+        answer('changeContent'),
+    ),
+  } satisfies Partial<NodeService>;
+
+  /** What `getParents` answers with — the node's place in the repository, closest first. */
+  let parents: Node[] = [];
+
+  /** The repository answers this call with a failure. */
+  function refuses(method: keyof typeof fake, cause: unknown = new Error('refused')): void {
+    refusing.set(method, cause);
+  }
+
+  /** It refuses a metadata write naming this property, whatever else the write carries. */
+  function refusesProperty(name: string): void {
+    refusedProperties.add(name);
+  }
+
+  /** The node sits in these folders, closest first. */
+  function sitsIn(nodes: Node[]): void {
+    parents = nodes;
+  }
+
+  return { fake, refuses, refusesProperty, sitsIn };
+}
+
+export type NodeApiFake = ReturnType<typeof fakeNodeApi>;
+
+/**
+ * `NodeServiceUnwrapped` — the generated API, for the four calls the wrapper does not cover: creating a
+ * child, replacing a preview, recording a workflow step and moving a node.
+ */
+export function fakeNodeApiUnwrapped(node: Node = aNode()) {
+  const refusing = new Map<string, unknown>();
+
+  const answer = <T>(method: string, value: T): Observable<T> =>
+    refusing.has(method) ? throwError(() => refusing.get(method)) : of(value);
+
+  const fake = {
+    createChild: vi.fn((_request: unknown) => answer('createChild', { node })),
+    changePreview: vi.fn((_request: unknown) => answer('changePreview', { node })),
+    addWorkflowHistory: vi.fn((_request: unknown) => answer('addWorkflowHistory', { node })),
+    createChildByMoving: vi.fn((_request: unknown) => answer('createChildByMoving', { node })),
+  } satisfies Partial<NodeServiceUnwrapped>;
+
+  function refuses(method: keyof typeof fake, cause: unknown = new Error('refused')): void {
+    refusing.set(method, cause);
+  }
+
+  return { fake, refuses };
+}
+
+export type NodeApiUnwrappedFake = ReturnType<typeof fakeNodeApiUnwrapped>;
+
+/** `ConnectorService`, whose list decides whether a node is opened in a connector or merely downloaded. */
+export function fakeConnectors(list: ConnectorList = {} as ConnectorList) {
+  let answer: Observable<ConnectorList> = of(list);
+
+  const fake = {
+    observeConnectorList: vi.fn(() => answer),
+  } satisfies Partial<ConnectorService>;
+
+  /** The repository offers these connectors. */
+  function offers(connectors: Partial<Connector>[], simple: Partial<Connector>[] = []): void {
+    answer = of({ connectors, simpleConnectors: simple } as ConnectorList);
+  }
+
+  /** The list cannot be read — which must not be read as "the node opens nowhere". */
+  function fails(cause: unknown = new Error('no connectors')): void {
+    answer = throwError(() => cause);
+  }
+
+  return { fake, offers, fails };
+}
+
+export type ConnectorsFake = ReturnType<typeof fakeConnectors>;
+
+/** `EduSharingApiConfiguration`, whose `rootUrl` every address the panel composes is derived from. */
+export function fakeApiConfiguration(rootUrl = 'https://repo.example.org/edu-sharing/rest') {
+  return {
+    fake: { rootUrl } satisfies Partial<EduSharingApiConfiguration>,
+  };
+}
 
 /**
  * `ClientutilsV1Service`, whose `getWebsiteInformation` is the repository's answer to „is this page
@@ -186,9 +336,27 @@ export type ClientUtilsFake = ReturnType<typeof fakeClientUtils>;
 export function fakeConfig(config: ClientConfig | null = null) {
   let answer: Observable<ClientConfig | null> = of(config);
 
+  /**
+   * The repository's config variables — where `browserExtensionEditorialGroups` and friends live. The
+   * library types every value as a string; what actually arrives is whatever the repository wrote, so a
+   * spec states it as such and this hands it over the way the caller reads it.
+   */
+  let variables: Observable<Variables | null> = of({} as Variables);
+
   const fake = {
     observeConfig: vi.fn(() => answer),
+    observeVariables: vi.fn(() => variables),
   } satisfies Partial<ConfigService>;
+
+  /** The repository publishes these config variables. */
+  function answersVariables(next: Record<string, unknown>): void {
+    variables = of(next as Variables);
+  }
+
+  /** It does not answer the variables at all — which is not the same as naming none. */
+  function failsVariables(cause: unknown = new Error('config unreachable')): void {
+    variables = throwError(() => cause);
+  }
 
   function answers(next: ClientConfig | null): void {
     answer = of(next);
@@ -203,7 +371,51 @@ export function fakeConfig(config: ClientConfig | null = null) {
     answer = throwError(() => cause);
   }
 
-  return { fake, answers, answersLogout, fails };
+  return { fake, answers, answersLogout, fails, answersVariables, failsVariables };
 }
 
 export type ConfigFake = ReturnType<typeof fakeConfig>;
+
+/**
+ * `CollectionService` — the collections an editorial group is, and the collections inside it. Answers
+ * with nothing by default: a repository whose groups are configured but not readable is the case the
+ * loading is written to survive.
+ */
+export function fakeCollections() {
+  const held = new Map<string, Node>();
+  const children = new Map<string, Node[]>();
+  const refusing = new Set<string>();
+
+  const fake = {
+    getCollection: vi.fn((id: string) =>
+      refusing.has(id) || !held.has(id)
+        ? throwError(() => new Error(`no collection ${id}`))
+        : of(held.get(id) as Node),
+    ),
+    getSubCollections: vi.fn((id: string) =>
+      refusing.has(`${id}/children`)
+        ? throwError(() => new Error(`no children of ${id}`))
+        : of(children.get(id) ?? []),
+    ),
+  } satisfies Partial<CollectionService>;
+
+  /** The repository holds this collection, with these collections inside it. */
+  function holds(node: Node, inside: Node[] = []): void {
+    held.set(node.ref.id, node);
+    children.set(node.ref.id, inside);
+  }
+
+  /** It will not hand this collection back — one that is gone, or one this session may not see. */
+  function refuses(id: string): void {
+    refusing.add(id);
+  }
+
+  /** It hands the collection back but not what is inside it. */
+  function refusesChildren(id: string): void {
+    refusing.add(`${id}/children`);
+  }
+
+  return { fake, holds, refuses, refusesChildren };
+}
+
+export type CollectionsFake = ReturnType<typeof fakeCollections>;

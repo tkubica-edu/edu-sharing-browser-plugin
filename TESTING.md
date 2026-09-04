@@ -36,10 +36,39 @@ with the browser APIs faked.
 `--include` patterns are relative to `src`, and `--list-tests` prints what the builder discovered
 without running it.
 
+Most of the `util/` specs are value-in/value-out and set nothing up. Three groups of them are not, and
+each says in the file how it holds its ground:
+
+- **The specs whose subject is a patched global** — `bundle-windows.spec.ts` (`window.open`),
+  `bundle-requests.spec.ts` and `bundle-language.spec.ts` (`XMLHttpRequest.prototype`). Each replaces
+  the prototype member with a spy **before** installing the patch, so what the patch keeps as "the
+  native one" is that spy: nothing dials out, and what is let through is visible. Every one of those
+  installs is idempotent through a module-level flag it shares with production, so it happens once per
+  spec file and a second call only refreshes what it points at. `bundle-windows.spec.ts` additionally
+  gives the document a `<base href="chrome-extension://…">`, so the URLs the bundle composes resolve
+  the way they do in the extension rather than against jsdom's `http://localhost`.
+  `chat-session.spec.ts` denies `localStorage` by spying `Storage.prototype` and restoring in a
+  `finally`, deliberately not through `vi.stubGlobal` — a storage left denied breaks every test after
+  it rather than that one.
+- **`system-theme.spec.ts`, which decides when its subject is loaded.** `util/system-theme.ts` takes
+  its `matchMedia` reference at module load on purpose, and a worker runs several spec files against
+  one jsdom — so an already-imported instance holds whichever reference the file that imported it
+  first found. The spec calls `vi.resetModules()` and `await import('./system-theme')` per test, and
+  drives the answer with `setSystemDark()` from `color-scheme.setup.ts`.
+- **`quality-check-request.spec.ts`, which pins the outgoing tasks as a golden file.** The five tasks
+  of the KI check are long German texts whose wording is the behaviour, so the spec renders every one
+  of them over every branch that changes it — 39 sections — into
+  `src/app/util/__snapshots__/quality-check-request.txt` through `toMatchFileSnapshot`. A change shows
+  up as a diff; `npm --prefix app-src run test -- -u` records the new wording once it is meant. The
+  couplings those texts carry are pinned as ordinary assertions in `ai-prompts.spec.ts` instead — the
+  chip labels, the footer's own label, and the verdict glyphs, which are checked by running
+  `installChatOverrides` over each glyph the task asks for rather than by restating the list.
+
 **No test reaches a real service.** Three things stand in the way, in `app-src/src/testing/`:
 
-- `no-network.setup.ts` replaces `fetch` **and `WebSocket`** per test with stand-ins that *record* the
-  address and then throw, and fails the test in `afterEach` if anything was recorded. The recording is
+- `no-network.setup.ts` replaces `fetch`, `WebSocket` **and `XMLHttpRequest.prototype`** per test with
+  stand-ins that *record* the address and then throw, and fails the test in `afterEach` if anything was
+  recorded. The recording is
   the load-bearing half: `fetchJson` in `util/json-api.ts` turns any `fetch` rejection into its own
   „&lt;service&gt; nicht erreichbar", and `publishToRelay` in `util/nostr-relay.ts` catches the
   constructor's throw and rejects with a message of its own — either of which a test could otherwise
@@ -49,7 +78,10 @@ without running it.
   `HttpClient` request is named rather than left to time out. A spec that exercises one of these
   (`metalookup.service.spec.ts` for `fetch`, `fakeRelay()` in `nostr-forward.service.spec.ts` for the
   socket) stubs the global again itself, which runs later and wins — and points at `wss://relay.test`,
-  a name reserved by RFC 2606 and therefore unresolvable, rather than at any real relay.
+  a name reserved by RFC 2606 and therefore unresolvable, rather than at any real relay. The XHR guard is
+  on the *prototype*, because that is where `util/bundle-requests.ts` and `util/bundle-language.ts` patch
+  it and jsdom's own implementation dials for real; a spec whose subject is one of those patches keeps the
+  patched members and re-applies them in its own `beforeEach`, which runs after this one.
 - `test-providers.ts` is the builder's `providersFile` and supplies `provideHttpClient()` plus
   `provideHttpClientTesting()` for every `TestBed`, so anything going through `ngx-edu-sharing-api`
   answers from the testing backend. `ApiConfiguration` is deliberately **not** provided: constructing a
@@ -76,7 +108,20 @@ Fakes live in `app-src/src/testing/fakes/`, one file per faked service, each a f
 fake and the knobs a spec drives it with. They are checked against the real surface with
 `satisfies Partial<TheRealService>` and handed to DI through `provideFake()`, which holds the single
 cast in the whole test setup — renaming a member of a real service turns every stale fake into a
-compile error instead of leaving specs that pass against a surface the app no longer has.
+compile error instead of leaving specs that pass against a surface the app no longer has. The knobs are
+named after what the other side *does*, not after what it answers with: `refuses(method)`,
+`refusesProperty(name)`, `holds(node, inside)`, `analyzes(payload, source)`, `federates()`. That is
+what lets a spec reach a retry path — `RepositoryNodeService.writeExtendedData` writing field by field,
+`SuggestionService.propose` entry by entry — by stating the refusal rather than by matching a URL.
+`edu-sharing-api.fake.ts` covers the library's own services the same way (`fakeNodeApi`,
+`fakeCollections`, `fakeConnectors`, …).
+
+Two things about DI that cost time before they were written down. A root-provided service is **one
+instance per `TestBed`**, so a spec that wants a second one carrying different state needs a second
+`it()`, not a second `TestBed.inject()`. And a spec that uses the real `ConditionsService` — which is
+the recommendation, since it is a derivation over fakes that exist — has to provide `fakeAuth()`
+alongside it: the real `AuthService` behind it injects the `BOOT_ROOT_URL` token, which no `TestBed`
+here provides, and the failure reads as a missing provider for a token the spec never mentions.
 
 Two rules a new spec has to obey:
 
@@ -104,9 +149,17 @@ default `npm test` path on purpose — a break in the coverage provider then can
 build and imports `lodash`, a CommonJS package Node cannot take named exports from, so the library is
 inlined to be routed through Vite instead.
 
-Seventeen of the panel's 35 services are covered, of `src/app/util/**` one module is, and the
-contracts with the extension around the panel are pinned. What is still uncovered, which kind of test
-each part of it needs and in which order to work is [TEST-PLAN.md](TEST-PLAN.md).
+Thirty-five of the panel's 44 services are covered, all 37 modules under `src/app/util/**` are, as are
+`model/navigation.ts`, `config.ts` and the pipe, and the contracts with the extension around the panel
+are pinned, `curation.service.ts` included — the panel's state hub, covered in three files split by
+method group (its derived state, its write path, and taking a content back up). What is still
+uncovered — six services around it, and the components — and in which order to work is
+[TEST-PLAN.md](TEST-PLAN.md).
+
+**That no test reaches the network is checked, not assumed.** `unshare -rn npm test` runs the whole
+suite inside a network namespace with no interfaces at all; it passes, which is the proof that nothing
+in it speaks to ContentJudge, MetalookUp, the metadata agent, the topic assistant, a nostr relay or a
+repository. Worth re-running after a round that adds specs with an outbound call in them.
 
 ## Load the extension
 

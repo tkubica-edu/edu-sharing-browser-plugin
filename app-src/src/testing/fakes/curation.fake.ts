@@ -2,12 +2,18 @@ import { computed, signal } from '@angular/core';
 import { Node } from 'ngx-edu-sharing-api';
 import { vi } from 'vitest';
 
-import { ActiveNode, CurationService, SaveSteps } from '../../app/services/curation.service';
+import {
+  ActiveNode,
+  CurationService,
+  EditorialTarget,
+  NodeSource,
+  SaveSteps,
+} from '../../app/services/curation.service';
 import { HistoryEntry } from '../../app/services/history.service';
 
 /** A minimal `ActiveNode`, for the tests that only need one to exist. */
-export function anActiveNode(nodeId = 'node-1'): ActiveNode {
-  return { nodeId, name: null, link: `https://repo.example/components/render/${nodeId}` };
+export function anActiveNode(nodeId = 'node-1', name: string | null = null): ActiveNode {
+  return { nodeId, name, link: `https://repo.example/components/render/${nodeId}` };
 }
 
 /**
@@ -27,7 +33,13 @@ export function fakeCuration() {
   const nodeDetected = signal(false);
   const qualityConfirmed = signal(false);
   const saving = signal(false);
+  /** Where the forwarding step records what it picked; the flow carries it to the save. */
+  const editorialTargets = signal<readonly EditorialTarget[]>([]);
+  /** Where the content came from, and the Erschließung it still owes — what a resume carries over. */
+  const nodeSource = signal<NodeSource | null>(null);
+  const pendingExtraction = signal<string | null>(null);
   let qualityHolds = true;
+  let resumesNode = true;
 
   const fake = {
     activeNode,
@@ -59,6 +71,20 @@ export function fakeCuration() {
     forwardToNostr: vi.fn((): Promise<boolean> => Promise.resolve(true)),
     sendToNostr: vi.fn((): Promise<boolean> => Promise.resolve(true)),
     reportMetadataEnriched: vi.fn(),
+    nodeSourceOf: nodeSource,
+    pendingExtraction: pendingExtraction.asReadonly(),
+    resumeNode: vi.fn(async (nodeId: string, source: NodeSource): Promise<void> => {
+      if (!resumesNode) return;
+      activeNode.set(anActiveNode(nodeId));
+      nodeSource.set(source);
+    }),
+    resumePendingExtraction: vi.fn((_url: string): Promise<void> => Promise.resolve()),
+    contentKeywords: signal<readonly string[]>([]),
+    contentText: signal(''),
+    editorialTargets: editorialTargets.asReadonly(),
+    setEditorialTargets: vi.fn((targets: readonly EditorialTarget[]): void => {
+      editorialTargets.set(targets);
+    }),
     confirmQuality: vi.fn(async (): Promise<void> => {
       if (qualityHolds) qualityConfirmed.set(true);
     }),
@@ -75,7 +101,23 @@ export function fakeCuration() {
     qualityHolds = false;
   }
 
-  return { fake, detect, refuseQuality };
+  /** The content is one the user chose rather than one that was found on the page. */
+  function chose(nodeId = 'node-1'): void {
+    activeNode.set(anActiveNode(nodeId));
+    nodeSource.set('chosen');
+  }
+
+  /** The content still owes an Erschließung of this page — see `CurationService.pendingExtraction`. */
+  function owesExtraction(url: string): void {
+    pendingExtraction.set(url);
+  }
+
+  /** The node cannot be taken back up: it is gone, or this session may not see it. */
+  function refuseResume(): void {
+    resumesNode = false;
+  }
+
+  return { fake, detect, chose, owesExtraction, refuseQuality, refuseResume, editorialTargets, nodeSource };
 }
 
 export type CurationFake = ReturnType<typeof fakeCuration>;

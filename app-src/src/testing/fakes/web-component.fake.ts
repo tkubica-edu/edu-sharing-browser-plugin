@@ -1,4 +1,5 @@
 import { computed, signal } from '@angular/core';
+import { vi } from 'vitest';
 import { DEFAULT } from 'ngx-edu-sharing-api';
 
 import { APP_CONFIG } from '../../app/config';
@@ -26,6 +27,7 @@ export function fakeWebComponent(enabled = false) {
     changedSettings: computed(() => (settingState() ? 0 : 1)),
     metadataSet: computed(() => (enabledState() ? APP_CONFIG.metadataSet : DEFAULT)),
     load: async () => {},
+    refresh: vi.fn(),
     setEnabled: async (value: boolean) => {
       settingState.set(value);
     },

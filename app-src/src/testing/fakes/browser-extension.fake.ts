@@ -2,11 +2,15 @@ import { signal } from '@angular/core';
 import { vi } from 'vitest';
 
 import {
+  AnalyzeResponse,
   AnnouncedPage,
   BrowserExtensionService,
   OAuthDiscovery,
   OAuthRequest,
   OAuthSession,
+  PageData,
+  PageReadResponse,
+  PageSource,
   SaveNodeResponse,
 } from '../../app/services/browser-extension.service';
 
@@ -39,6 +43,28 @@ export function fakeBrowserExtension() {
   /** And the silent one, whose default is the ordinary case of nobody being signed in. */
   let oauthSilent: OAuthSession = { success: true, signedIn: false };
 
+  /** The tab `tabs.getActive` reports; null is a browser showing no page the panel may read. */
+  let activeTab: PageSource | null = null;
+
+  /**
+   * The tab this panel is in. Null is the ordinary case for a spec — the sidebar opened as its own tab
+   * or a plain dev server, where the per-tab storage keys collapse into one.
+   */
+  let ownTabId: number | null = null;
+
+  /**
+   * What the worker answers a run of the metadata agent with — for the open tab and for a named
+   * address alike, since both are the same statement about the same kind of thing. The default is the
+   * failure the worker reports when the panel and the worker come from different builds.
+   */
+  let analyzed: AnalyzeResponse = { success: false, error: 'NO_RESPONSE' };
+
+  /** What `page.read` answers with; null is a page the content script could not be injected into. */
+  let pageRead: PageReadResponse | null = null;
+
+  /** What `tabs.extractPageData` answers with — the open page alone, without the record of where. */
+  let extracted: PageData | null = null;
+
   const fake = {
     available: true,
     announcedPage: signal<AnnouncedPage | null>(null),
@@ -48,6 +74,17 @@ export function fakeBrowserExtension() {
       return Promise.resolve();
     }),
     navigateTab: vi.fn((): Promise<void> => Promise.resolve()),
+    getActiveTab: vi.fn((): Promise<PageSource | null> => Promise.resolve(activeTab)),
+    getOwnTabId: vi.fn((): Promise<number | null> => Promise.resolve(ownTabId)),
+    analyzeActiveTab: vi.fn(
+      (_language: string, _apiUrl?: string): Promise<AnalyzeResponse> => Promise.resolve(analyzed),
+    ),
+    analyzeUrl: vi.fn(
+      (_url: string, _language: string, _title?: string | null, _apiUrl?: string): Promise<AnalyzeResponse> =>
+        Promise.resolve(analyzed),
+    ),
+    readPage: vi.fn((): Promise<PageReadResponse | null> => Promise.resolve(pageRead)),
+    extractPageData: vi.fn((): Promise<PageData | null> => Promise.resolve(extracted)),
     openWindow: vi.fn((_url: string): Promise<void> => Promise.resolve()),
     openTab: vi.fn((_url: string, _options?: { active?: boolean }): Promise<void> => Promise.resolve()),
     saveNode: vi.fn(
@@ -115,7 +152,54 @@ export function fakeBrowserExtension() {
     oauthSilent = { success: true, signedIn: true, accessToken };
   }
 
-  return { fake, storage, storageGet, writes, refuses, federates, oauthYields, oauthRefuses, oauthResumes };
+  /** The browser is showing this page — what `tabs.getActive` reports. */
+  function showing(tab: PageSource | null): void {
+    activeTab = tab;
+  }
+
+  /** The panel sits in this tab, so everything it stores per tab is keyed by it. */
+  function inTab(tabId: number | null): void {
+    ownTabId = tabId;
+  }
+
+  /** The agent answered with this payload, for the page described by `source`. */
+  function analyzes(result: Record<string, unknown>, source: PageSource, data?: unknown): void {
+    analyzed = { success: true, result, source, data: data as AnalyzeResponse['data'] };
+  }
+
+  /** It did not: the worker reports this error instead, which is the branch the messages are written for. */
+  function refusesAnalysis(error: string): void {
+    analyzed = { success: false, error };
+  }
+
+  /** The content script read the page, and this is what it found. */
+  function reads(page: PageReadResponse): void {
+    pageRead = page;
+    extracted = page.data ?? null;
+  }
+
+  /** The open page alone, for the callers that ask only for its content. */
+  function extracts(page: PageData | null): void {
+    extracted = page;
+  }
+
+  return {
+    fake,
+    storage,
+    storageGet,
+    writes,
+    refuses,
+    federates,
+    oauthYields,
+    oauthRefuses,
+    oauthResumes,
+    showing,
+    analyzes,
+    refusesAnalysis,
+    reads,
+    extracts,
+    inTab,
+  };
 }
 
 export type BrowserExtensionFake = ReturnType<typeof fakeBrowserExtension>;

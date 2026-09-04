@@ -37,6 +37,8 @@ export function fakeAuth(repositoryUrl = FAKE_REPOSITORY_URL) {
     login: vi.fn((_username: string, _password: string) => Promise.resolve(true)),
     loginWithOAuth: vi.fn((_provider?: OAuthProvider) => Promise.resolve(true)),
     logout: vi.fn(() => Promise.resolve()),
+    revalidate: vi.fn((): Promise<void> => Promise.resolve()),
+    applyRepositoryChange: vi.fn(),
   } satisfies Partial<AuthService>;
 
   /** A session of the user's own: both the fact and the permission. */

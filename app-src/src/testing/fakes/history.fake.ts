@@ -26,6 +26,7 @@ export function fakeHistory(entries: readonly HistoryEntry[] = []) {
   const fake = {
     entries: signal<HistoryEntry[]>([...entries]),
     noteStep: vi.fn(),
+    add: vi.fn((_entry: Partial<HistoryEntry>): Promise<void> => Promise.resolve()),
   } satisfies Partial<HistoryService>;
 
   return { fake };

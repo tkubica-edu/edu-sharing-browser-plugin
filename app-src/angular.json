@@ -91,7 +91,10 @@
             "runnerConfig": "vitest.config.ts",
             "coverageInclude": [
               "src/app/services/**/*.ts",
-              "src/app/util/**/*.ts"
+              "src/app/util/**/*.ts",
+              "src/app/model/navigation.ts",
+              "src/app/pipes/**/*.ts",
+              "src/app/config.ts"
             ],
             "coverageExclude": [
               "src/testing/**",
