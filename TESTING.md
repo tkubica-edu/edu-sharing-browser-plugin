@@ -21,10 +21,11 @@ npm --prefix app-src run test -- --include app/services/history.service.spec.ts
 ```
 
 `ng test` runs the `@angular/build:unit-test` builder with the Vitest runner in a Node process with
-jsdom — no browser and no extension. The target's `include` is `src/**/*.spec.ts`, and three kinds of
+jsdom — no browser and no extension. The target's `include` is `src/**/*.spec.ts`, and four kinds of
 spec live under it: the service specs, each driving one service through `TestBed` with its
-dependencies replaced, the pure specs next to `src/app/util/`, which need no `TestBed` at all, and
-the two under `src/boundary/`, which are about no service (see [TEST-PLAN.md § Boundary contract
+dependencies replaced, the pure specs next to `src/app/util/`, which need no `TestBed` at all, the
+component specs, which render through `TestBed.createComponent` and assert on the DOM the template
+produced, and the two under `src/boundary/`, which are about no service (see [TEST-PLAN.md § Boundary contract
 specs](TEST-PLAN.md#4-boundary-contract-specs--where-the-sidebar-meets-the-extension)). They are the
 specs that read their subject instead of importing it, because none of the extension's plain-JS files
 exports anything: `extension-contract.spec.ts` reads those files, `sw.js`, the manifests and the root
@@ -129,6 +130,19 @@ instance per `TestBed`**, so a spec that wants a second one carrying different s
 the recommendation, since it is a derivation over fakes that exist — has to provide `fakeAuth()`
 alongside it: the real `AuthService` behind it injects the `BOOT_ROOT_URL` token, which no `TestBed`
 here provides, and the failure reads as a missing provider for a token the spec never mentions.
+
+A component spec renders rather than driving the class: `TestBed.createComponent`, inputs through
+`fixture.componentRef.setInput`, outputs through `subscribe`, and every assertion against the rendered
+DOM — the components worth a spec are the ones whose template is the interesting half. A click is
+`input.checked = …` followed by `input.dispatchEvent(new Event('change'))` and a `detectChanges()`;
+zoneless makes the handler run synchronously, so nothing else is needed. Two traps cost time here and
+are worth knowing before the third spec: a `computed` that *calls* a spy does not re-evaluate when that
+spy's return value changes, because no signal moved — a test wanting the other answer builds the
+fixture with it from the start; and `mockReturnValue` outlives the test that set it, since `mockClear()`
+only forgets the calls, so a spy shared across a file is re-stated with `mockReset()` plus
+`mockImplementation` in `beforeEach`. The components that mount a vendored web component have no spec
+and are excluded from the coverage figure by name — see
+[TEST-PLAN.md § Component specs](TEST-PLAN.md#3-component-specs--testbedcreatecomponent-in-jsdom).
 
 Two rules a new spec has to obey:
 

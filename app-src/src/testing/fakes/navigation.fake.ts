@@ -2,7 +2,26 @@ import { signal } from '@angular/core';
 import { vi } from 'vitest';
 
 import { ScreenId, SectionId } from '../../app/model/navigation';
-import { NavStep, NavigationService, TabView } from '../../app/services/navigation.service';
+import {
+  NavState, NavStep, NavigationService, SectionView, TabView,
+} from '../../app/services/navigation.service';
+
+/**
+ * A section as the menu renders one. The registry's own entry carries the predicates; what a reader
+ * of the menu sees is this — already decided against the conditions, so a spec states the outcome.
+ */
+export function aSectionView(id: SectionId, overrides: Partial<SectionView> = {}): SectionView {
+  return {
+    id,
+    label: id,
+    description: '',
+    disabled: false,
+    loading: false,
+    tabs: [],
+    visible: () => true,
+    ...overrides,
+  } as SectionView;
+}
 
 /** A sub step as the tab bar would render it: open unless the caller says otherwise. */
 export function aTab(id: ScreenId, overrides: Partial<TabView> = {}): TabView {
@@ -22,20 +41,37 @@ export function aTab(id: ScreenId, overrides: Partial<TabView> = {}): TabView {
 export function fakeNavigation() {
   const offered = new Set<SectionId>();
 
+  /** Sub steps the registry does not offer at all, and ones it offers but holds shut. */
+  const hiddenTabs = new Set<string>();
+  const lockedTabs = new Set<string>();
+
   /** The steps behind the open one, as a resume carries them over. */
   const trail = signal<readonly NavStep[]>([]);
 
   /** Whether a resumed state applied on the page it was carried to — see {@link resumesNothing}. */
   let resumes = true;
 
+  /** What a remembered step resolves to, or null where it can no longer be opened. */
+  let resumable: NavState | null = null;
+
   const fake = {
     section: signal<SectionId>('menu'),
+    menuSections: signal<readonly SectionView[]>([]),
     screen: signal<ScreenId | null>(null),
     overlaySection: signal<SectionId | null>(null),
     sessionGate: signal(false),
     tabs: signal<readonly TabView[]>([]),
     nextTab: signal<TabView | null>(null),
-    isVisible: vi.fn((id: SectionId): boolean => offered.has(id)),
+    isVisible: vi.fn((id: SectionId, _conditions?: unknown): boolean => offered.has(id)),
+    // A sub step's own statement, asked of the registry by whatever offers a way into it. Both answer
+    // for the tabs handed to {@link offerTab} and {@link lockTab}; a tab nothing was said about is
+    // there and reachable, which is the ordinary case.
+    isTabVisible: vi.fn(
+      (id: SectionId, tab: ScreenId, _conditions?: unknown): boolean => !hiddenTabs.has(`${id}/${tab}`),
+    ),
+    isTabDisabled: vi.fn(
+      (id: SectionId, tab: ScreenId, _conditions?: unknown): boolean => lockedTabs.has(`${id}/${tab}`),
+    ),
     go: vi.fn((_id: SectionId, _options?: { tab?: ScreenId }): void => undefined),
     back: vi.fn(),
     toggle: vi.fn(),
@@ -43,6 +79,8 @@ export function fakeNavigation() {
     goNextTab: vi.fn(),
     openMenu: vi.fn(),
     trailOf: trail,
+    resumableStep: vi.fn((_step: NavStep | null | undefined): NavState | null => resumable),
+    stepLabel: vi.fn((step: NavStep | null | undefined): string => step?.section ?? ''),
     resume: vi.fn((_step: NavStep, _behind: readonly NavStep[]): boolean => resumes),
   } satisfies Partial<NavigationService>;
 
@@ -57,9 +95,29 @@ export function fakeNavigation() {
     ids.forEach((id) => offered.add(id));
   }
 
+  /** This sub step does not exist for the current conditions — see `NavigationService.isTabVisible`. */
+  function hideTab(section: SectionId, tab: ScreenId): void {
+    hiddenTabs.add(`${section}/${tab}`);
+  }
+
+  /** It exists but cannot be entered yet, which is what an earlier step unlocks. */
+  function lockTab(section: SectionId, tab: ScreenId): void {
+    lockedTabs.add(`${section}/${tab}`);
+  }
+
   /** The steps the user came through to get here. */
   function came(...steps: readonly NavStep[]): void {
     trail.set(steps);
+  }
+
+  /** The menu offers these entries — already decided against the conditions. */
+  function lists(...sections: readonly SectionView[]): void {
+    fake.menuSections.set(sections);
+  }
+
+  /** A remembered step that can still be opened, so an offer to continue leads there. */
+  function resumesAt(section: SectionId, tab: ScreenId | null = null): void {
+    resumable = { section, tab } as NavState;
   }
 
   /** Nothing of a resumed state applies on this page, so the caller lands instead. */
@@ -67,7 +125,7 @@ export function fakeNavigation() {
     resumes = false;
   }
 
-  return { fake, at, offer, came, resumesNothing };
+  return { fake, at, offer, hideTab, lockTab, came, lists, resumesAt, resumesNothing };
 }
 
 export type NavigationFake = ReturnType<typeof fakeNavigation>;

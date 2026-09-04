@@ -91,6 +91,7 @@ tagged release — see [BUILD.md](BUILD.md#prebuilt-downloads).
 | [TESTING.md](TESTING.md) | The service unit tests, loading the extension, the OnlyOffice debug mode, the manual test checklist |
 | [TEST-PLAN.md](TEST-PLAN.md) | What is not covered yet, which kind of test each area needs, in which order |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Known issues, permission quirks, bundle size, lint output |
+| [BUGS.md](BUGS.md) | Defects the tests found and that are still in the code, each pinned by an assertion |
 
 ## Project layout
 

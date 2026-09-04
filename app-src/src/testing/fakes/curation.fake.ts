@@ -10,6 +10,8 @@ import {
   SaveSteps,
 } from '../../app/services/curation.service';
 import { HistoryEntry } from '../../app/services/history.service';
+import { SectionId } from '../../app/model/navigation';
+import { NavStep } from '../../app/services/navigation.service';
 
 /** A minimal `ActiveNode`, for the tests that only need one to exist. */
 export function anActiveNode(nodeId = 'node-1', name: string | null = null): ActiveNode {
@@ -47,6 +49,20 @@ export function fakeCuration() {
     // an access list or a property goes through this. Null while nothing was loaded — a generated
     // result that is not a node yet.
     previewNode: signal<Node | null>(null),
+    // What the content is called, wherever it is named on screen. The real one derives it from the
+    // metadata, the node and the page in that order; a spec of a *reader* states the name outright.
+    contentTitle: signal<string | null>(null),
+    metadataSaved: signal(false),
+    // Whether the Erschließung of the content in hand was left before its end — what the menu's card
+    // turns into an offer to continue.
+    curationUnfinished: signal(false),
+    // Which of the two check processes this content is being taken through — what the junction marks
+    // and every later step reads back.
+    checkProcess: signal<SectionId | null>(null),
+    setCheckProcess: vi.fn((section: SectionId | null): void => {
+      fake.checkProcess.set(section);
+    }),
+    leftAtStep: signal<NavStep | null>(null),
     hasDetectedNode: computed(() => activeNode() !== null && nodeDetected()),
     hasUnsavedWork: signal(false),
     hasEditableMetadata: signal(false),
@@ -83,6 +99,14 @@ export function fakeCuration() {
       nodeSource.set(source);
     }),
     resumePendingExtraction: vi.fn((_url: string): Promise<void> => Promise.resolve()),
+    // The metadata the form and the criteria work over: what a step recorded, over the node's own
+    // properties. Writable here, since a spec of a reader states the record rather than building it.
+    editorMetadata: signal<Record<string, unknown> | null>({}),
+    recordValues: vi.fn((_values: Record<string, string[]>): void => undefined),
+    // What went wrong writing the confirmation, which the criteria view shows where its own errors go.
+    qualityError: signal<string | null>(null),
+    reportQualityCriteria: vi.fn((_satisfied: boolean): void => undefined),
+    judgeQuality: vi.fn(),
     contentKeywords: signal<readonly string[]>([]),
     contentText: signal(''),
     editorialTargets: editorialTargets.asReadonly(),
@@ -97,6 +121,18 @@ export function fakeCuration() {
   /** The node behind the content in hand, loaded — see `CurationService.previewNode`. */
   function hydrated(node: Node): void {
     fake.previewNode.set(node);
+  }
+
+  /** The Erschließung was left unfinished at this step, which is where continuing it leads. */
+  function leftAt(step: NavStep): void {
+    fake.curationUnfinished.set(true);
+    fake.leftAtStep.set(step);
+  }
+
+  /** A content in hand under this name, which is what every place that names one shows. */
+  function named(title: string, nodeId = 'node-1'): void {
+    activeNode.set(anActiveNode(nodeId, title));
+    fake.contentTitle.set(title);
   }
 
   /** Put a node in place as one that arrived on its own, which is what `hasDetectedNode` reports. */
@@ -131,6 +167,8 @@ export function fakeCuration() {
     detect,
     chose,
     hydrated,
+    named,
+    leftAt,
     owesExtraction,
     refuseQuality,
     refuseResume,

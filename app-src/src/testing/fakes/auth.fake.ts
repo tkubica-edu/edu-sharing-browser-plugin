@@ -1,6 +1,8 @@
 import { signal } from '@angular/core';
 import { vi } from 'vitest';
 
+import { User } from 'ngx-edu-sharing-api';
+
 import { AuthService } from '../../app/services/auth.service';
 import { OAuthProvider } from '../../app/services/oauth.service';
 
@@ -25,6 +27,13 @@ export function fakeAuth(repositoryUrl = FAKE_REPOSITORY_URL) {
     loggedIn,
     authorized,
     username: signal<string | null>(null),
+    // The person behind the session, as the repository reports it; null while the profile is still
+    // on its way, which is the state the login name stands in for.
+    currentUser: signal<User | null>(null),
+    // Whether the repository's automatic end is close enough to be pointed out, and how much is
+    // left. Two knobs rather than one derived from a clock: what reads them branches on the fact.
+    sessionEndingSoon: signal(false),
+    sessionRemainingText: signal<string | null>(null),
     error: signal<string | null>(null),
     needsReload: signal(false),
     // What the login card reads to decide what it offers: whether a login applies at all, and which
@@ -40,6 +49,12 @@ export function fakeAuth(repositoryUrl = FAKE_REPOSITORY_URL) {
     revalidate: vi.fn((): Promise<void> => Promise.resolve()),
     applyRepositoryChange: vi.fn(),
   } satisfies Partial<AuthService>;
+
+  /** The session is close to the repository's automatic end, with this much of it left. */
+  function endingSoon(remaining = '4 Minuten'): void {
+    fake.sessionEndingSoon.set(true);
+    fake.sessionRemainingText.set(remaining);
+  }
 
   /** A session of the user's own: both the fact and the permission. */
   function signIn(): void {
@@ -63,7 +78,7 @@ export function fakeAuth(repositoryUrl = FAKE_REPOSITORY_URL) {
     authorized.set(true);
   }
 
-  return { fake, signIn, offerOAuth, authorizeWithoutSession };
+  return { fake, endingSoon, signIn, offerOAuth, authorizeWithoutSession };
 }
 
 export type AuthFake = ReturnType<typeof fakeAuth>;

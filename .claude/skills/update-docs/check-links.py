@@ -22,6 +22,8 @@ DOCS = [
     "BUILD.md",
     "TESTING.md",
     "TROUBLESHOOTING.md",
+    "TEST-PLAN.md",
+    "BUGS.md",
     "content/HOST-EVENTS.md",
     "WIDGET-REFERENZ.md",
     "CHATBOT.md",
