@@ -187,12 +187,13 @@ export class ContentSuggestionsService {
    * after the ranking, or it would throw away keywords before anything looked at them.
    */
   private pickKeywords(values: readonly string[]): string[] {
-    const unique = new Map(
-      values
-        .map((word) => word.trim())
-        .filter(Boolean)
-        .map((word) => [word.toLowerCase(), word]),
-    );
+    const unique = new Map<string, string>();
+    for (const word of values.map((entry) => entry.trim()).filter(Boolean)) {
+      // Set once per spelling-insensitive key: the first mention is the one that stands, both in its
+      // place and in its spelling.
+      const key = word.toLowerCase();
+      if (!unique.has(key)) unique.set(key, word);
+    }
     return [...unique.values()];
   }
 }

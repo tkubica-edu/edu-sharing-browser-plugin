@@ -166,11 +166,11 @@ describe('judgementsForCriteria', () => {
     expect(found[NEUTRALITY][0]).toMatchObject({ value: null, met: null, label: null, reasoning: null });
   });
 
-  it('reads a number a scheme reported as a string as the number it spells', () => {
-    // What `asNumber` does today. Its own comment says the opposite — that a numeric string is no
-    // number here — so one of the two is wrong; the test states which way the code runs.
+  it('says nothing about a number a scheme reported as a string', () => {
+    // A value is only a number when it is one: a `nominal_categorical` category that happens to read
+    // numerically must not be measured against a threshold.
     const found = judgementsForCriteria([NEUTRALITY], aJudgement([aResult({ value: '4' as never })]), null);
-    expect(found[NEUTRALITY][0]).toMatchObject({ value: 4, met: true });
+    expect(found[NEUTRALITY][0]).toMatchObject({ value: null, met: null });
   });
 
   it('reads MetalookUp\'s measurement as the judgement of the criterion the config gives it', () => {

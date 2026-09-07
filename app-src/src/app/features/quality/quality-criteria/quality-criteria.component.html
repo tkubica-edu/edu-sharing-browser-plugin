@@ -18,7 +18,14 @@
       Die Qualitätskriterien werden geladen …
     </div>
   } @else if (!hasCriteria()) {
-    <p class="note">Das Metadatenset hält für diesen Inhalt keine Qualitätskriterien bereit.</p>
+    <!-- Without criteria there are two very different reasons, and they call for opposite responses: a
+         set that defines none leaves the step done, a set that could not be read leaves it to retry.
+         The problem is named first, so the configuration answer is only given when there is none. -->
+    @if (problemShown(); as message) {
+      <p class="note note-error">{{ message }}</p>
+    } @else {
+      <p class="note">Das Metadatenset hält für diesen Inhalt keine Qualitätskriterien bereit.</p>
+    }
   } @else {
     <!-- Two lists side by side while there is room; under each other once there is not. They are
          judged independently — only the left one gates the confirmation. Read-only once the

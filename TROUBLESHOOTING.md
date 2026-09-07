@@ -5,7 +5,6 @@ What is known not to work, known to be unverified, or known to look wrong at fir
 - [Browser-specific](#browser-specific)
 - [Permissions](#permissions)
 - [Dependencies and runtime limits](#dependencies-and-runtime-limits)
-- [Behaviour a spec pins although it is wrong](#behaviour-a-spec-pins-although-it-is-wrong)
 - [Bundle size](#bundle-size)
 - [Lint output](#lint-output)
 
@@ -189,14 +188,6 @@ itself; the file's header records the derivation, which is recomputable after ei
 replaced. Dropdowns, menus and date pickers are rendered into the CDK's own overlay container, which
 hangs off `<body>` rather than off the canvas, so those follow the panel's dark theme — intended, and
 the one visible seam.
-
-## Behaviour a spec pins although it is wrong
-
-Five places where a unit test states what the code does rather than what it is meant to do. They are
-listed with their reasoning in [BUGS.md](BUGS.md); the one that reaches the user is that **a metadata
-set the repository will not hand over is shown as a set that defines no quality criteria** — the
-message the load records never reaches the template, so a failure to reach the repository reads as a
-configuration answer.
 
 ## Bundle size
 

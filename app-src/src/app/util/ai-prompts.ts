@@ -29,6 +29,9 @@ import type { CheckSubject, QualityCriterion } from './quality-check-request';
 /** The vocabularies to look up, quoted and enumerated for the task's sentence. */
 function askedVocabularies(names: readonly string[]): string {
   const quoted = names.map((vocabulary) => `"${vocabulary}"`);
+  // A single name is the whole enumeration, and an empty list has none: joining either with „und"
+  // would put the conjunction in front of nothing.
+  if (quoted.length < 2) return quoted[0] ?? '';
   return [quoted.slice(0, -1).join(', '), quoted[quoted.length - 1]].join(' und ');
 }
 

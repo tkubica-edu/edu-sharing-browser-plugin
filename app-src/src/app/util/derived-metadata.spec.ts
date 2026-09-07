@@ -234,16 +234,15 @@ describe('withPageStatements', () => {
     expect(answered['_origins']).toEqual({ 'cclom:general_language': 'page' });
   });
 
-  it('leaves a lone page marking standing, which is where the dropping does not reach', () => {
+  it('drops a lone page marking too, leaving no markings at all', () => {
     const answered = withPageStatements(
       { 'cclom:typicallearningtime': 2_700_000 },
       { 'cclom:typicallearningtime': ['1800000'], _origins: { 'cclom:typicallearningtime': 'page' } },
     );
 
-    // What the code does. The marking is removed from a copy, and the copy is only written back when
-    // something is left in it — so the page's own `_origins`, which the merge starts out as, keeps the
-    // entry. Harmless as long as another field carries a marking too, which is the ordinary case.
-    expect(answered['_origins']).toEqual({ 'cclom:typicallearningtime': 'page' });
+    // The run answered the one field the page had marked, so nothing is left to mark — and the field
+    // must not go on reading as the page's own just because it was the only marking.
+    expect(answered['_origins']).toBeUndefined();
   });
 
   it('leaves the generated answer standing where the run answered', () => {

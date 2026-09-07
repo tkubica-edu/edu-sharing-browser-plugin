@@ -181,13 +181,15 @@ describe('AI_PROMPTS.enrichment', () => {
     );
   });
 
-  it('DEFECT: a list of one vocabulary comes out with a dangling „und"', () => {
-    // `askedVocabularies` joins "all but the last" with "the last", and for one name the first half
-    // is empty — the sentence then reads `vocabulary= und "discipline"`. Latent: the only caller
-    // passes VOCABULARY_FIELD_NAMES, which is four. Delete this test with the fix.
+  it('names a single vocabulary on its own, without a conjunction in front of it', () => {
+    // One name is the whole enumeration; the sentence used to read `vocabulary= und "discipline"`.
     expect(textOf(AI_PROMPTS.enrichment(aSubject(), ['discipline']))).toContain(
-      'vocabulary= und "discipline"',
+      'vocabulary="discipline". ',
     );
+  });
+
+  it('names no vocabulary at all where it was handed none', () => {
+    expect(textOf(AI_PROMPTS.enrichment(aSubject(), []))).toContain('vocabulary=. ');
   });
 
   it('asks for the URI the lookup returned and forbids forming one', () => {

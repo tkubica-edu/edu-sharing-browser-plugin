@@ -195,8 +195,7 @@ function meets(value: number, mapped: { met: SchemeDirection; threshold: number 
  * number here — including the numeric *strings* a scheme may report.
  */
 function asNumber(value: unknown): number | null {
-  const number = typeof value === 'string' ? Number(value) : value;
-  return typeof number === 'number' && Number.isFinite(number) ? number : null;
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 /** A scheme's label; the ones that collect several categories at once answer with a list. */

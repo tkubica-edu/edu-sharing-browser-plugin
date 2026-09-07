@@ -273,8 +273,11 @@ export function withPageStatements(
 ): Record<string, unknown> {
   const fromRun = generated ?? {};
   const fromPage = page ?? {};
-  const merged: Record<string, unknown> = { ...fromPage };
-  const origins: Record<string, unknown> = { ...((fromPage['_origins'] ?? {}) as object) };
+  // The markings are held apart from the values and put back at the end, so dropping the last of them
+  // is not overruled by a copy that still carries it.
+  const { _origins: pageOrigins, ...pageValues } = fromPage;
+  const merged: Record<string, unknown> = { ...pageValues };
+  const origins: Record<string, unknown> = { ...((pageOrigins ?? {}) as object) };
   const runOrigins = (fromRun['_origins'] ?? {}) as Record<string, unknown>;
 
   for (const [key, value] of Object.entries(fromRun)) {

@@ -163,16 +163,13 @@ describe('ContentSuggestionsService', () => {
     it('keeps a keyword the agent named twice once, in the place it first named it', async () => {
       await derive(['Optik', 'Prisma', 'optik']);
 
-      expect(suggestions.keywords()).toEqual(['optik', 'Prisma']);
+      expect(suggestions.keywords()).toEqual(['Optik', 'Prisma']);
     });
 
-    it('keeps the last spelling of the ones that differ only in case', async () => {
-      // What the code does — `new Map(entries)` lets a later entry overwrite an earlier one under the
-      // same key. `pickKeywords` says the first spelling wins, which is not what happens; pinned as it
-      // stands, since the spelling only shows on the screen and both are the agent's own.
+    it('keeps the first spelling of the ones that differ only in case', async () => {
       await derive(['Optik', 'optik', 'OPTIK']);
 
-      expect(suggestions.keywords()).toEqual(['OPTIK']);
+      expect(suggestions.keywords()).toEqual(['Optik']);
     });
 
     it('trims what it was given and drops what is left empty', async () => {

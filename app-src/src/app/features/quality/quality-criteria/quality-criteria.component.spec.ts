@@ -182,16 +182,15 @@ describe('QualityCriteriaComponent', () => {
       expect(text()).toContain('keine Qualitätskriterien bereit');
     });
 
-    it('shows a set that could not be read as one that holds no criteria', async () => {
+    it('says a set could not be read, rather than that it holds no criteria', async () => {
       published = throwError(() => new Error('mds unreachable'));
 
       await render();
 
-      // What the code does. The load records „Die Qualitätskriterien konnten nicht geladen werden.",
-      // but the only place the template renders a problem sits inside the branch that needs criteria
-      // to have loaded — so what the person is told is that the set defines none.
-      expect(text()).toContain('keine Qualitätskriterien bereit');
-      expect(text()).not.toContain('konnten nicht geladen werden');
+      // The two are opposite answers: a set that defines none leaves the step done, one that could not
+      // be read leaves it to retry. Only the failure is reported here.
+      expect(text()).toContain('konnten nicht geladen werden');
+      expect(text()).not.toContain('keine Qualitätskriterien bereit');
     });
 
     it('re-reads the criteria when the set it is pointed at changes', async () => {
