@@ -87,10 +87,13 @@ tagged release — see [BUILD.md](BUILD.md#prebuilt-downloads).
 | [CHATBOT.md](CHATBOT.md) | The KI assistant: where the `boerdi` widget comes from, how it is embedded, the contract surface |
 | [CHATBOT-IO.md](CHATBOT-IO.md) | What the assistant is given, asked and answers: contexts, tasks, result schemas, recorded properties |
 | [WIDGET-REFERENZ.md](WIDGET-REFERENZ.md) | `<metadata-agent-canvas>`: layouts, attributes, events — a snapshot of the metadata-agent project's own widget, in German |
+| [SUGGESTION-API.md](SUGGESTION-API.md) | edu-sharing's suggestion API: how the curation files the agent's fields as AI suggestions and reads them back, in German |
+| [OAUTH-SESSION-LIFETIME.md](OAUTH-SESSION-LIFETIME.md) | Which credential actually carries a session, what the refresh token is for, and the session a token login lands in |
 | [BUILD.md](BUILD.md) | Building, what goes into the package, CI artifacts, cutting a release |
 | [TESTING.md](TESTING.md) | The service unit tests, loading the extension, the OnlyOffice debug mode, the manual test checklist |
 | [TEST-PLAN.md](TEST-PLAN.md) | What is not covered yet, which kind of test each area needs, in which order |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Known issues, permission quirks, bundle size, lint output |
+| [STORE-RELEASE.md](STORE-RELEASE.md) | What publishing to the Chrome, Firefox and Safari stores would take, and where the blockers are, in German |
 
 ## Project layout
 

@@ -553,6 +553,33 @@ describe('AuthService', () => {
       expect(extension.fake.oauthLogin).not.toHaveBeenCalled();
     });
 
+    it('presents the token to a session of its own rather than to the guest one', async () => {
+      configureOAuth();
+      authentication.answers(noSession());
+      authentication.answersToken(aLoginInfo({ authorityName: 'ada' }));
+      extension.oauthResumes('a-renewed-token');
+
+      await auth.init();
+
+      // The repository resolves a session's tool permissions once and keeps them, so a token login
+      // that takes over the boot's guest session inherits the guest's rights under the user's name.
+      expect(extension.fake.dropSessionCookies).toHaveBeenCalledWith(auth.repositoryUrl());
+    });
+
+    it('leaves the browser its cookies where the repository never said what the session is', async () => {
+      configureOAuth();
+      // Unreachable rather than guest: the session may well be intact, and the cookies dropped here
+      // are the browser's own — a repository that answered nothing must not log the user out of it.
+      authentication.fails(new Error('offline'));
+      authentication.answersToken(aLoginInfo({ authorityName: 'ada' }));
+      extension.oauthResumes('a-renewed-token');
+
+      await auth.init();
+
+      expect(extension.fake.dropSessionCookies).not.toHaveBeenCalled();
+      expect(auth.loggedIn()).toBe(true);
+    });
+
     it('does not ask where the cookie already carried a session', async () => {
       configureOAuth();
       authentication.answers(aLoginInfo({ authorityName: 'ada' }));

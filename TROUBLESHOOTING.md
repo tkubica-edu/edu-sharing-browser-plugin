@@ -113,6 +113,42 @@ minute timeout). The authorization request as actually sent is logged by the bac
 `scope`, `client_id` and `redirect_uri` really were. See
 [TESTING.md § Where errors show up](TESTING.md#where-errors-show-up) for which console that is.
 
+## A save fails with 403 and a missing tool permission
+
+```
+403  X-Edu-Authenticated: true
+{"error":"org.edu_sharing.restservices.DAOToolPermissionException",
+ "message":"TOOLPERMISSION_CREATE_ELEMENTS_FILES is missing for current user"}
+```
+
+The session was accepted and the *operation* refused, so no re-login and no interceptor changes it:
+the repository resolved this session's tool permissions as a set that does not include creating
+files. It is worth telling apart from the two states it resembles. A guest is refused the same
+request earlier, with `DAOSecurityException` and `X-Edu-Authenticated: false`; a user who genuinely
+lacks the permission is refused it in edu-sharing's own web UI as well. What is left is a session
+that is authenticated as the user and carries somebody else's rights, which
+`validateSession` shows directly — in the panel's frame or the worker's console:
+
+```js
+const d = await (await fetch('<Repository>/rest/authentication/v1/validateSession',
+  { credentials: 'include' })).json();
+({ user: d.authorityName, guest: d.isGuest, tp: d.toolPermissions?.length,
+   canUpload: d.toolPermissions?.includes('TOOLPERMISSION_CREATE_ELEMENTS_FILES') });
+```
+
+A name with a guest-sized `tp` count beside it is that state (compare against the anonymous session:
+the same call with `credentials: 'omit'`, which sends no cookie and stores none). It arose from a
+bearer-token login taking over the guest session the boot's own requests had been given, which the
+panel no longer does — `AuthService.resumeOAuthSession` drops the repository's cookies before the
+token is exchanged, so the token login authors the session it authenticates. The measurements and the
+reasoning are in
+[OAUTH-SESSION-LIFETIME.md § The session a token login lands in](OAUTH-SESSION-LIFETIME.md#the-session-a-token-login-lands-in).
+
+Note what that fix costs, since it is a state worth recognising too: the cookies are dropped for the
+whole browser, not for the panel, so a resume signs the user out of any edu-sharing tab they had open
+against that repository. It happens only on a boot that found no session of its own and holds a token
+to put one back with.
+
 ## Dependencies and runtime limits
 
 - **`ngx-edu-sharing-api`** (11.0.2) is Angular-only and declares a peer dep of Angular >= 18, while

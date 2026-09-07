@@ -550,11 +550,31 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    rebuilt: it must show the login card. It asks the provider before resuming from its own store — a
    refresh where the server issues refresh tokens, else the userinfo endpoint — so a panel that comes
    back signed in means the provider still answers for that session. The reverse — a login card where
-   the provider *should* still answer — is worth telling apart from a working refusal: check the
-   worker's console, since a refresh that the token endpoint never served is reported there in the
-   same words as a spent one (see [OAUTH-SESSION-LIFETIME.md](OAUTH-SESSION-LIFETIME.md)), and check
-   whether the document names a `userinfo_endpoint` at all
+   the provider *should* still answer — is read off the worker's console, which names a refusal the
+   token endpoint judged and one it never served in different words; where the server issues no
+   refresh token, check whether the document names a `userinfo_endpoint` at all
    (`<Repository>/.well-known/oauth-authorization-server`).
+
+   The state itself is reachable without waiting for anything: *Einstellungen* → **Session-Cookie
+   entfernen** → **Panel neu laden** leaves exactly what a browser restart does, a repository whose
+   own session and stored tokens are untouched and no cookie to reach them with. A panel that comes
+   back signed in from that must also be able to **save** — a resumed session that can be looked at
+   but not written to is the failure this reproduces, and the tell is its tool permission count:
+
+   ```js
+   const d = await (await fetch('<Repository>/rest/authentication/v1/validateSession',
+     { credentials: 'include' })).json();
+   ({ user: d.authorityName, tp: d.toolPermissions?.length,
+      canUpload: d.toolPermissions?.includes('TOOLPERMISSION_CREATE_ELEMENTS_FILES') });
+   ```
+
+   Run it in the panel's own frame (right-click the panel → *Untersuchen*, then pick the extension
+   frame in the console's context selector) or in the worker's console; the host page has no host
+   permission for the repository and answers `Failed to fetch`. `canUpload: false` under the user's
+   own name is
+   [TROUBLESHOOTING.md § A save fails with 403 and a missing tool permission](TROUBLESHOOTING.md#a-save-fails-with-403-and-a-missing-tool-permission).
+   Note that the resume drops the repository's cookies for the whole browser, so an edu-sharing tab
+   open beside the panel is signed out by it — that is expected here, not a second failure.
 9. **Erschließen + speichern**: *Inhalt erschließen* on a content page → the metadata screen shows
    `fields_extracted / fields_total` and loads the MDS editor with the generated metadata. Edit, then
    the footer's **Speichern** → a node is created in your inbox and the preview opens, and the flow's

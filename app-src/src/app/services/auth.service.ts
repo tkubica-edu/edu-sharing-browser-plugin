@@ -140,25 +140,31 @@ export class AuthService {
     // Asked before anything else about a login: the answer decides which way in the card offers, and
     // it is a fact about this repository rather than a setting (see OAuthService.probe).
     await this.oauth.probe(this.repositoryUrl());
-    await this.restoreSession();
+    const answered = await this.restoreSession();
     // The repository session outlives a sidebar reload as a cookie, so this only runs where that
     // cookie is gone — the repository's own session timeout, or a browser that dropped it. The OAuth
     // refresh token then puts the session back without asking, which is what holding one is for.
-    if (!this.loggedIn()) await this.resumeOAuthSession();
+    if (!this.loggedIn()) await this.resumeOAuthSession(answered);
   }
 
   // Restore an existing repository session on startup: the library authenticates by session cookie, which survives
   // a sidebar reload — so the backend is asked for the current login info and a valid non-guest session is taken
   // up. No credentials are stored; without the cookie this resolves to guest.
-  private async restoreSession(): Promise<void> {
+  //
+  // Answers whether the repository stated what this session is, which is not the same as it being a
+  // session worth keeping: a guest is an answer, an unreachable repository is none. Told apart because
+  // the resume acts on the session standing here, and only an answer establishes that there is one.
+  private async restoreSession(): Promise<boolean> {
     try {
       const info = await firstValueFrom(
         this.authentication.observeLoginInfo().pipe(timeout(RESTORE_TIMEOUT_MS)),
       );
       this.applyOAuthEntries(info);
       if (this.isValidUser(info)) this.applyLogin(info.authorityName ?? this.username());
+      return true;
     } catch {
       /* no active session (or unreachable) — stay logged out */
+      return false;
     }
   }
 
@@ -251,10 +257,22 @@ export class AuthService {
    * Put a session back from the refresh token the worker kept, without showing anything — see
    * {@link init}. Silent throughout: a stored token that no longer works is not something to report
    * on a panel nobody has asked for a login on, and the login screen it leaves standing says the rest.
+   *
+   * `guestSessionStands` says that the repository answered the restore above and named the session a
+   * guest one — the cookie that has to go before the token is presented.
    */
-  private async resumeOAuthSession(): Promise<boolean> {
+  private async resumeOAuthSession(guestSessionStands: boolean): Promise<boolean> {
     const accessToken = await this.oauth.silentAccessToken(this.repositoryUrl());
     if (!accessToken) return false;
+    // The guest session the boot's own requests were given a cookie for. The token login would take
+    // that session over instead of authoring one, and the repository then resolves its tool
+    // permissions as the guest's: a session named after the user that may not upload anything.
+    //
+    // Dropped only once there is a token to present, and only for a session the repository has
+    // actually described. Both narrow it to the case it is for: the cookies go for the whole browser,
+    // so a boot with nothing to resume from, or one that merely could not reach the repository, must
+    // leave the session it has alone rather than sign the user out of their own repository tabs.
+    if (guestSessionStands) await this.browserExtension.dropSessionCookies(this.repositoryUrl());
     const restored = await this.exchangeForSession(accessToken, null);
     // The refusal belongs to a login nobody asked for; the screen stays as the failed restore left it.
     if (!restored) this.error.set(null);

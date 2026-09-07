@@ -6,7 +6,7 @@ Weg — Aufwände in Personentagen (PT) sind Schätzungen.
 
 Was die Extension inhaltlich kann, ist [FEATURES.md](FEATURES.md); wie sie gebaut wird,
 [BUILD.md](BUILD.md); die bekannten Einschränkungen [TROUBLESHOOTING.md](TROUBLESHOOTING.md); der
-Reifegrad der Funktionen [MATURITY.md](MATURITY.md).
+Reifegrad der Funktionen [MATURITY.md](präsentation/MATURITY.md).
 
 - [Ausgangslage](#1-ausgangslage--was-schon-store-fähig-ist)
 - [Blocker für jeden Weg](#2-blocker-die-für-jeden-store-und-jede-sichtbarkeit-gelten)
@@ -71,7 +71,7 @@ Optionen, kombinierbar:
 | | Was | Aufwand |
 |---|---|---|
 | B1-a | Produktions-Hosts als Defaults eintragen; setzt voraus, dass die Deployments existieren, inklusive echter Domain für den Chatbot. Zusätzlich prüfen, dass Prod CORS/Auth für die Extension-Origin erlaubt | ≈1 PT |
-| B1-b | Onboarding statt Default: die Extension startet ohne Repository und fragt es beim ersten Öffnen ab. Löst gleichzeitig den ersten der „nächsten drei Schritte" aus [MATURITY.md](MATURITY.md) — die gepinnte Agent-Adresse — und ist die sauberste Antwort auf „warum brauchst du Zugriff auf alle Seiten" | ≈3–5 PT |
+| B1-b | Onboarding statt Default: die Extension startet ohne Repository und fragt es beim ersten Öffnen ab. Löst gleichzeitig den ersten der „nächsten drei Schritte" aus [MATURITY.md](präsentation/MATURITY.md) — die gepinnte Agent-Adresse — und ist die sauberste Antwort auf „warum brauchst du Zugriff auf alle Seiten" | ≈3–5 PT |
 | B1-c | Chatbot-, MetalookUp- und ContentJudge-URL konfigurierbar machen, wie Repository-URL und Relay es schon sind | ≈1–2 PT |
 
 ### B2 — Keine Datenschutzerklärung, keine LICENSE *(hart)*
@@ -179,7 +179,7 @@ ein `PREVIEW_NODE` (landet in `storage.local` als `eduSharingPendingPreview`) od
 ### B7 — Stille Datenübertragungen *(hart für die Store-Disclosure)*
 
 - **MetalookUp läuft per Default an** (`DEFAULT_METALOOKUP_ENABLED = true`) nach jeder erfolgreichen
-  Erschließung — und ist im Core-Kontext laut [MATURITY.md](MATURITY.md) *weder sichtbar noch
+  Erschließung — und ist im Core-Kontext laut [MATURITY.md](präsentation/MATURITY.md) *weder sichtbar noch
   abschaltbar*, weil die Settings-Gruppe hinter `browserExtensionCustomWebComponent` hängt.
   Identisch mit dem zweiten der „nächsten drei Schritte" dort. **≈1–2 PT.**
 - **Google Fonts zur Laufzeit** von `fonts.gstatic.com` (`app-src/src/index.html:15,19`) bei jedem
@@ -276,7 +276,7 @@ Drei Abstufungen:
 
 Kontext zur Einordnung: die Extension ist heute ein Werkzeug für Redaktionen an
 edu-sharing-Repositories, mit Defaults auf Staging und einer Kernfunktion, die laut
-[MATURITY.md](MATURITY.md) außerhalb des Default-Repositories nicht nutzbar ist — „die
+[MATURITY.md](präsentation/MATURITY.md) außerhalb des Default-Repositories nicht nutzbar ist — „die
 Agent-Adresse ist auf `APP_CONFIG.defaultRepositoryUrl` gepinnt … in einem fremden Core-Repo
 antwortet der Proxy also nicht".
 

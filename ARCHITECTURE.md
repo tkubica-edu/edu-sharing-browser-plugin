@@ -190,14 +190,25 @@ the `refresh_token` grant, whether or not that scope was requested, and edu-shar
 authorization server does exactly that. Neither path is therefore "the" one, and against a given
 repository both can be unavailable at once: see
 [OAUTH-SESSION-LIFETIME.md](OAUTH-SESSION-LIFETIME.md), which records what a deployment actually
-answered and why the panel then asks for a login on every lost cookie.
+answered.
+
+The token is presented to a session of the resume's own making. Every request the boot has already
+made was answered with a session cookie, and a bearer login that takes such a session over keeps the
+tool permissions edu-sharing resolved for it — an authenticated session carrying a guest's rights. So
+`AuthService.resumeOAuthSession` drops the repository's cookies (`session.dropCookies` →
+`dropRepositoryCookies`) before `exchangeForSession`, and only there: with a token in hand, and for a
+session the repository described rather than one it failed to answer about, since the cookies are the
+browser's and not the panel's. See
+[OAUTH-SESSION-LIFETIME.md § The session a token login lands in](OAUTH-SESSION-LIFETIME.md#the-session-a-token-login-lands-in).
 
 The worker hands the panel the access token and nothing else. The refresh token stays in
 `browser.storage.local` under `eduSharingOAuthTokens` and is read only there — the panel names the
 key in `APP_CONFIG.storageKeys.oauthTokens` merely so its storage keys are all in one place. A
 provider that rotates refresh tokens is followed; one that rejects a refresh has its stored session
-cleared, since that token will not start working again — a rejection and an endpoint that never
-served the grant are not told apart, which is a known shortcoming (see the reference above).
+cleared, since that token will not start working again. A rejection is told from a request the
+endpoint never judged by the error code it answers with (`tokenGrantWasJudged`, RFC 6749 §5.2): a
+redirect to a login page, an HTML body or a server error establishes nothing about the token, so it
+is kept — it is still what a logout has to revoke.
 Messages: `oauth.login`, `oauth.silent`,
 `oauth.logout`, `oauth.redirectUri`, `oauth.discover` — the last being the probe above, which also
 reads the document's `scopes_supported` so a scope the server does not define is named in the

@@ -175,7 +175,15 @@ nothing outside the extension can clear that store, and a token trusted for its 
 would put back a session the user has already logged out of elsewhere (see
 [ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow)). It is silent in both directions: a stored token that no
 longer works is not reported, because nobody asked for a login, and the login card it leaves standing
-says the rest. (The panel asks for `profile` alone; `offline_access` is not defined by the
+says the rest. The repository's cookies are dropped before the token is presented
+(`BrowserExtensionService.dropSessionCookies`), so the token login authors the session it
+authenticates instead of taking over the guest session the boot's own requests were given — a session
+taken over keeps the tool permissions it was resolved with, and is then a session named after the user
+that may not write anything (see
+[OAUTH-SESSION-LIFETIME.md § The session a token login lands in](OAUTH-SESSION-LIFETIME.md#the-session-a-token-login-lands-in)).
+Only ever on a boot that holds a token *and* was told by the repository what the session it has is:
+the cookies go for the whole browser, so a repository that answered nothing keeps the session it may
+still have. (The panel asks for `profile` alone; `offline_access` is not defined by the
 deployments this runs against, and asking for it is not what decides whether a refresh token comes
 back — that follows the client's registration at the server. Which of the two checks applies is
 therefore the server's answer, and where it offers neither, nothing is resumed at all — see

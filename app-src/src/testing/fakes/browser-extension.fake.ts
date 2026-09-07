@@ -5,6 +5,7 @@ import {
   AnalyzeResponse,
   AnnouncedPage,
   BrowserExtensionService,
+  DroppedCookies,
   OAuthDiscovery,
   OAuthRequest,
   OAuthSession,
@@ -105,6 +106,9 @@ export function fakeBrowserExtension() {
     // server, so the panel offers the credential form. `federates` is what turns it round.
     oauthDiscover: vi.fn(
       (_request: OAuthRequest): Promise<OAuthDiscovery> => oauthDiscovery(),
+    ),
+    dropSessionCookies: vi.fn(
+      (_repositoryUrl: string): Promise<DroppedCookies> => Promise.resolve({ success: true, removed: ['JSESSIONID'] }),
     ),
     insertNodes: vi.fn((_nodes: unknown[]): void => undefined),
     requestDocumentContent: vi.fn((_requestId: string): boolean => hosted),
