@@ -66,6 +66,9 @@ export function fakeBrowserExtension() {
   /** What `tabs.extractPageData` answers with — the open page alone, without the record of where. */
   let extracted: PageData | null = null;
 
+  /** What a cookie drop removed — the ordinary case being the repository's session cookie. */
+  let dropped: DroppedCookies = { success: true, removed: ['JSESSIONID'] };
+
   /**
    * Whether there is a host page around the panel to post to — the OnlyOffice page it is docked in.
    * True by default, since the messages only exist for a panel that has one; {@link standalone} is
@@ -108,7 +111,7 @@ export function fakeBrowserExtension() {
       (_request: OAuthRequest): Promise<OAuthDiscovery> => oauthDiscovery(),
     ),
     dropSessionCookies: vi.fn(
-      (_repositoryUrl: string): Promise<DroppedCookies> => Promise.resolve({ success: true, removed: ['JSESSIONID'] }),
+      (_repositoryUrl: string): Promise<DroppedCookies> => Promise.resolve(dropped),
     ),
     insertNodes: vi.fn((_nodes: unknown[]): void => undefined),
     requestDocumentContent: vi.fn((_requestId: string): boolean => hosted),
@@ -151,6 +154,16 @@ export function fakeBrowserExtension() {
         unsupportedScopes: [],
         ...server,
       });
+  }
+
+  /** There were no cookies for the address at all — a browser with no session to drop. */
+  function dropsNothing(): void {
+    dropped = { success: true, removed: [] };
+  }
+
+  /** The drop itself did not happen: no `cookies` permission, or no worker to ask. */
+  function refusesDrop(error: string): void {
+    dropped = { success: false, error };
   }
 
   /** The worker's OAuth flow ends in this token — the completed-flow case. */
@@ -221,6 +234,8 @@ export function fakeBrowserExtension() {
     extracts,
     inTab,
     standalone,
+    dropsNothing,
+    refusesDrop,
   };
 }
 

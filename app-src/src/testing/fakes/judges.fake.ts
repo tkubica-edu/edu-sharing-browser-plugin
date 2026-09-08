@@ -9,6 +9,8 @@ import {
 } from '../../app/services/content-judge.service';
 import {
   CollectionRecommendationService,
+  DEFAULT_MAX_KEYWORDS,
+  DEFAULT_MIN_SCORE,
   RecommendedCollection,
 } from '../../app/services/collection-recommendation.service';
 import {
@@ -46,6 +48,16 @@ export function fakeContentJudge() {
 
   const fake = {
     credentialSet: signal(true),
+    // The credential as the settings hold it, `user:password` — set, since the interesting cases are the
+    // ones where it is taken back out.
+    basicAuth: signal('judge:secret'),
+    // Typed as the real one answers: what counts is that a credential was typed at all, not what it says.
+    changedSettings: signal<0 | 1>(0),
+    setBasicAuth: vi.fn((credential: string): Promise<void> => {
+      fake.basicAuth.set(credential);
+      fake.credentialSet.set(credential.includes(':'));
+      return Promise.resolve();
+    }),
     requestBody: vi.fn((input: ContentJudgeInput, schemes: readonly string[]) => ({
       schemes,
       source: input.source,
@@ -103,6 +115,23 @@ export function fakeRecommendations() {
 
   const fake = {
     recommend: vi.fn((_keywords: readonly string[], _text?: string) => recommendation()),
+    // The two numbers the proposal is derived with, as the settings show and take them over.
+    maxKeywords: signal(DEFAULT_MAX_KEYWORDS),
+    minScore: signal(DEFAULT_MIN_SCORE),
+    changedSettings: signal(0),
+    setMaxKeywords: vi.fn((count: number): Promise<void> => {
+      fake.maxKeywords.set(count);
+      return Promise.resolve();
+    }),
+    setMinScore: vi.fn((score: number): Promise<void> => {
+      fake.minScore.set(score);
+      return Promise.resolve();
+    }),
+    resetToDefaults: vi.fn((): Promise<void> => {
+      fake.maxKeywords.set(DEFAULT_MAX_KEYWORDS);
+      fake.minScore.set(DEFAULT_MIN_SCORE);
+      return Promise.resolve();
+    }),
   } satisfies Partial<CollectionRecommendationService>;
 
   /** The assistant proposes this collection, sitting inside these collections (closest first). */

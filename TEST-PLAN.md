@@ -15,15 +15,17 @@ exist, this one names the ones that do not yet. It shrinks as it is worked off.
 
 ## Where the coverage stands
 
-A hundred and six specs with 2212 `it()` blocks cover **43 of the panel's 44 services**, **all 37** of
-its util modules, **17 of its components**, the navigation registry, the config's URL derivation, the
-one pipe, and the contracts with the extension around it. `npm run test:coverage` reports 95.2 % of
-statements and 93.7 % of functions over its `coverageInclude`, which is now `src/app/services/**`,
-`src/app/util/**`, `src/app/features/**`, `src/app/template/**`, `src/app/shared/**`,
-`model/navigation.ts`, `pipes/**` and `config.ts`.
+A hundred and ten specs with 2349 `it()` blocks cover **43 of the panel's 44 services**, **all 37** of
+its util modules, **22 of the 25 measured components**, the navigation registry, the config's URL
+derivation, the one pipe, and the contracts with the extension around it. `npm run test:coverage`
+reports 97.6 % of statements and 97.1 % of functions over its `coverageInclude`, which is now
+`src/app/services/**`, `src/app/util/**`, `src/app/features/**`, `src/app/template/**`,
+`src/app/shared/**`, `model/navigation.ts`, `pipes/**` and `config.ts`. The three measured components
+with no spec of their own — `curation-progress`, `details-link` and `spinner` — are covered through the
+screens that render them, and have no uncovered line left.
 
-**The components that mount a vendored web component are deliberately outside that scope**, named one
-by one in `coverageExclude` beside `web-component-bundle.service.ts` itself. Each of them creates a
+**The 22 component files that mount a vendored web component are deliberately outside that scope**, named
+one by one in `coverageExclude` beside `web-component-bundle.service.ts` itself. Each of them creates a
 custom element the bundle defines and then waits for it; what a jsdom spec could assert is that the
 element was created, which is not the thing that breaks. The exclusion follows the dependency: a
 screen that embeds `es-nodes-selector` or `es-mds-editor` is as much a bundle host as the wrapper it
@@ -47,16 +49,17 @@ spoken to. `no-network.setup.ts` is what keeps it that way as specs are added �
 | `app-src/src/app/services/` | 44 | 96 % | Service spec (TestBed + fakes) |
 | `app-src/src/app/util/` | 37 | 99 % | Pure-function spec |
 | `app-src/src/app/model/navigation.ts`, `pipes/`, `config.ts` | 3 | 100 % | Pure-function spec |
-| `app-src/src/app/features/`, `template/`, `shared/` | 33 measured, 14 excluded | 86 % | Component spec |
+| `app-src/src/app/features/`, `template/`, `shared/` | 25 measured, 22 excluded | 99 % | Component spec |
 | `background/`, `content/` | 3 | the shared literals, 17 assertions | Boundary contract spec |
 | `scripts/*.mjs` | 3 | none | Build-harness spec |
 
-What is left inside the measured scope is 179 lines. 86 of them are `settings-screen.component.ts`, the
-one component with logic of its own and no spec; 43 more are spread over five components that are half
-covered (`editorial-forward-screen`, `interactions-screen`, `nostr-forward-screen`, and the branches
-`login` and `content-options-screen` do not reach). Of the 42 in `services/` and `util/`, 18 are in
-`curation.service.ts` and the rest are one- and two-line `catch` branches over seventeen files — each
-reachable only by making a library call fail in a way its fake has no knob for.
+What is left inside the measured scope is 62 lines. 20 of them are in components: the branches `login`
+(9) and `content-options-screen` (6) do not reach, two lines in `quality-criteria`, one in
+`history-screen`, and the two in `settings-screen` are `location.reload()` — which jsdom does not
+implement, as in `auth.service.spec.ts` — and `resetNostrRelayUrl()`, which no template calls at all.
+Of the 42 in `services/` and `util/`, 18 are in `curation.service.ts` and the rest are one- and
+two-line `catch` branches over seventeen files — each reachable only by making a library call fail in a
+way its fake has no knob for.
 
 ## The five kinds of test
 
@@ -175,7 +178,7 @@ the manual checklist.
 
 ### 3. Component specs — `TestBed.createComponent` in jsdom
 
-Seventeen of the 33 measured components have a spec. They render: `TestBed.createComponent`, inputs
+Twenty-two of the 25 measured components have a spec. They render: `TestBed.createComponent`, inputs
 through `fixture.componentRef.setInput`, outputs through `subscribe`, and every assertion made
 against the DOM the template produced. That was the open question before the first one and it is
 settled — the components worth a spec at all are the ones whose template is the interesting half, and
@@ -200,25 +203,42 @@ What the round settled beyond that:
   `quality-check-screen.component.spec.ts` ticks a box in the embedded criteria view and asserts what
   reached the flow, which is what proves the binding; reaching for the child's `EventEmitter` had the
   gate test passing against a value the child would have emitted anyway.
+- **A `[ngModel]` field is written by the event its accessor listens for**, which is `input` for a text
+  or number field and `change` for a `select`. A number field emits `null` for an empty one, which is
+  what makes the „a field halfway typed in is not a value" guard of `settings-screen` reachable at all.
+  A one-way `[ngModel]` with an `(ngModelChange)` beside it re-renders from the signal the handler
+  wrote, so the field's own value is worth asserting as well as the call.
+- **A label that stands in more than one card has to be looked up within one.** „Auf Standard
+  zurücksetzen" is offered by three cards of the settings, and a `querySelectorAll('button')` sweep
+  answers with the first — `settings-screen.component.spec.ts` scopes it through the card the folded
+  section is shown in.
+- **A count a fake answers with is stated, not recomputed.** Which value a setting has without anybody
+  setting it is the knowledge of whoever holds the setting, so every `changedSettings` in the fakes is
+  a writable signal a spec sets: what the screen is asserted on is the summing and the grouping, which
+  is its own work. Typed as the real one answers where that is a union (`signal<0 | 1>(0)`), since
+  `WritableSignal<number>` does not satisfy a `Signal<0 | 1>`.
 
-Covered: `quality-criteria` (44 tests), `nostr-standing` (23), `menu` (24), `user-bar` (22),
-`nostr-receipt` (22), `quality-check-alert` (21), `content-options-screen` (16),
-`flow-choice-screen` (15), `content-card` (15), `history-screen` (14), `login` (11),
+Covered: `settings-screen` (69 tests), `quality-criteria` (44), `editorial-forward-screen` (34),
+`menu` (24), `nostr-standing` (23), `user-bar` (22), `nostr-receipt` (22), `quality-check-alert` (21),
+`interactions-screen` (18), `content-options-screen` (16), `flow-choice-screen` (15),
+`content-card` (15), `history-screen` (14), `nostr-forward-screen` (13), `login` (11),
 `ai-assistant-bar` (11), `action-bar` (9), `tab-bar` (8), `curation-screen` (8),
 `quality-check-screen` (7), `add-content-screen` (6), `login-gate` (3).
 
-Left:
+`settings-screen` was the one that had to be taken in two: fifteen injected services, five folded
+sections and some fifteen setters, so its spec is grouped by the card a setting stands in rather than
+by the method that writes it — which is also how the screen groups them for the reader. Eight of its
+services had no fake and now do (`fakeChatStyle`, `fakeChatSkill`, `fakeTheme`,
+`fakeRepositoryVersion`, `fakeOAuth`, `fakeContextRefresh`, plus the settings' surface on
+`fakeDevMode`, `fakeDebug`, `fakeNostrForward`, `fakeContentJudge` and `fakeRecommendations`), and
+`fakeEditorialGroups` carried the three forwarding screens. Its 41 branches are all reached; the three
+mutations the spec was checked against — the KI card counting the proposal's setting, the relay switch
+not marking a change, the fixture guard removed — each failed exactly the test that names it.
 
-- `features/settings/settings-screen/settings-screen.component.ts` (86 uncovered lines) — the one
-  component with real logic and no spec: `changedPerSection` over five sections and some fifteen
-  setters, each writing a persisted option. It injects fifteen services, which is the whole cost —
-  eight of them have no fake yet (`ChatSkillService`, `ChatStyleService`, `ThemeService`,
-  `RepositoryVersionService`, `OAuthService`, `CollectionRecommendationService`, …).
-- `editorial-forward-screen` (13), `interactions-screen` (12) and `nostr-forward-screen` (8) — each
-  needs `EditorialGroupsService` faked and a few more members on `fakeCuration`
-  (`contentForwardings`, `lookUpOnNostr`).
-- The branches `login` (9) and `content-options-screen` (6) do not reach, plus two lines in
-  `quality-criteria` and one in `history-screen`.
+Left: the branches `login` (9) and `content-options-screen` (6) do not reach, plus two lines in
+`quality-criteria`, one in `history-screen`, and the two in `settings-screen` that nothing can reach
+from a spec — `location.reload()`, and `resetNostrRelayUrl()`, which **no template calls**: it is dead
+code, and deleting it is a change to the component rather than to a test.
 
 ### 4. Boundary contract specs — where the sidebar meets the extension
 
@@ -299,8 +319,9 @@ Each round is worth landing on its own; nothing in a later one is a precondition
 | ~~3~~ | ~~The boundary invariant specs (kind 4, first half)~~ Done: `src/boundary/extension-contract.spec.ts` | No refactor, and one of them already named a broken route — `analyze.url`, fixed with it |
 | ~~4~~ | ~~The judges and the repository adapters~~ Done, plus `suggestion`, `session-resume`, `context-refresh` and `metadata-agent-api` | The `ngx-edu-sharing-api` fakes were its point and now exist; everything after this builds on them |
 | ~~5~~ | ~~`curation.service.ts`, then `browser-extension`, `onlyoffice-document`, `content-flow`, `content-suggestions`, `mds-ai-suggestion`~~ Done; every service but `web-component-bundle` now has a spec | `browser-extension.service.ts` was the one worth doing first — the seam fifteen services depend on, and the file where a bug would have been invisible everywhere else |
-| 6 | ~~Component specs~~ Done for 17 of the 33 measured components; the render-or-not decision is settled and the web-component hosts are out of scope | The fakes the service rounds left behind carried it — three new ones were needed in all |
-| 7 | `settings-screen`, the three forwarding screens; the build harness; the exported-function half of the boundary | The first two are fakes to write; the last two need a change to shipped code and a second CI runner |
+| ~~6~~ | ~~Component specs~~ Done for 22 of the 25 measured components; the render-or-not decision is settled and the web-component hosts are out of scope | The fakes the service rounds left behind carried it — three new ones were needed in all |
+| ~~7a~~ | ~~`settings-screen` and the three forwarding screens~~ Done; every measured component with logic of its own now has a spec | Fakes to write and nothing else — six new ones, and the settings' surface on five that existed |
+| 7b | The build harness, and the exported-function half of the boundary | Both need a change to shipped code (exports plus a main guard) and the second one needs a second CI runner — which is why they are last |
 
 ## Preconditions
 
@@ -331,8 +352,20 @@ Each round is worth landing on its own; nothing in a later one is a precondition
   faking them would move the registry's own rules into the spec. A spec that uses the real
   `ConditionsService` has to provide `fakeAuth()` with it — the real `AuthService` behind it wants the
   `BOOT_ROOT_URL` token, which no `TestBed` here provides.
+
+  Round 7a added `fakeChatStyle`, `fakeChatSkill`, `fakeTheme`, `fakeRepositoryVersion`, `fakeOAuth`
+  (with `aDiscovery()`), `fakeContextRefresh` and `fakeEditorialGroups` (with `aCollection()` and
+  `anEditorialGroup()`), and grew what the settings write through: the whole setter surface of
+  `fakeDevMode` and `fakeDebug`, `configuredRelayUrl`/`select`/`setEnabled`/`setRelayUrl` on
+  `fakeNostrForward`, `basicAuth`/`setBasicAuth` on `fakeContentJudge`, the two numbers on
+  `fakeRecommendations`, `setRepositoryUrl` on `fakeAuth`, `dropsNothing()`/`refusesDrop()` on
+  `fakeBrowserExtension`, and `startNew`, `contentForwardings`, `assignError`, `saveError`,
+  `ambSource`, `lookUpOnNostr`, `describes()` and `forwarded()` on `fakeCuration`. Every
+  `changedSettings` among them is a stated signal rather than a derivation, and `BusyService` is used
+  for real in the forwarding spec — it is `saving() || assigning()` over `fakeCuration`, and faking it
+  would move the rule that a running write closes the picking out of the service that holds it.
 - **Exports and a main guard** in `scripts/build.mjs`, `scripts/version.mjs`,
-  `background/background.js`, `content/content.js` and `content/panel-host.js` — round 6's
+  `background/background.js`, `content/content.js` and `content/panel-host.js` — round 7b's
   precondition, and the one item on this list that changes code that ships.
 - **A second runner** for the root-level `scripts/**` specs, plus the CI job that runs it. The
   sidebar's `test` job in `.github/workflows/build.yml` installs `app-src`'s lockfile alone and

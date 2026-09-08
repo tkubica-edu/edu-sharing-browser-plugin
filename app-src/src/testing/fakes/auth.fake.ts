@@ -48,6 +48,9 @@ export function fakeAuth(repositoryUrl = FAKE_REPOSITORY_URL) {
     logout: vi.fn(() => Promise.resolve()),
     revalidate: vi.fn((): Promise<void> => Promise.resolve()),
     applyRepositoryChange: vi.fn(),
+    setRepositoryUrl: vi.fn((url: string): void => {
+      fake.repositoryUrl.set(url);
+    }),
   } satisfies Partial<AuthService>;
 
   /** The session is close to the repository's automatic end, with this much of it left. */

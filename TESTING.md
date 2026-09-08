@@ -153,7 +153,13 @@ A component spec renders rather than driving the class: `TestBed.createComponent
 `fixture.componentRef.setInput`, outputs through `subscribe`, and every assertion against the rendered
 DOM — the components worth a spec are the ones whose template is the interesting half. A click is
 `input.checked = …` followed by `input.dispatchEvent(new Event('change'))` and a `detectChanges()`;
-zoneless makes the handler run synchronously, so nothing else is needed. Two traps cost time here and
+zoneless makes the handler run synchronously, so nothing else is needed. A `[ngModel]` field is written
+the same way through the event *its* accessor listens for — `input` for a text or number field,
+`change` for a `select` — and a number field emits `null` for an emptied one, which is how
+`settings-screen.component.spec.ts` reaches the guard that treats a half-typed field as no value at
+all. `location.reload()` is not driven from any spec: jsdom does not implement it, so the screens that
+offer it (`settings-screen`, `AuthService.applyRepositoryChange`) leave that one line to the manual
+checklist. Two traps cost time here and
 are worth knowing before the third spec: a `computed` that *calls* a spy does not re-evaluate when that
 spy's return value changes, because no signal moved — a test wanting the other answer builds the
 fixture with it from the start; and `mockReturnValue` outlives the test that set it, since `mockClear()`

@@ -29,6 +29,7 @@ export function fakeQualityJudge() {
     contentJudgeEnabled: signal(false),
     start: vi.fn(),
     reset: vi.fn(),
+    changedSettings: signal(0),
     setMetalookupEnabled: vi.fn((_enabled: boolean): Promise<void> => Promise.resolve()),
     setContentJudgeEnabled: vi.fn((_enabled: boolean): Promise<void> => Promise.resolve()),
   } satisfies Partial<QualityJudgeService>;

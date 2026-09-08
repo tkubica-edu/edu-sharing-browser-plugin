@@ -10,6 +10,7 @@ import {
   SaveSteps,
 } from '../../app/services/curation.service';
 import { HistoryEntry } from '../../app/services/history.service';
+import { AmbSource } from '../../app/util/amb-event';
 import { SectionId } from '../../app/model/navigation';
 import { NavStep } from '../../app/services/navigation.service';
 
@@ -40,6 +41,15 @@ export function fakeCuration() {
   /** Where the content came from, and the Erschließung it still owes — what a resume carries over. */
   const nodeSource = signal<NodeSource | null>(null);
   const pendingExtraction = signal<string | null>(null);
+  /** What an AMB record would be built from — nothing AMB can identify a resource by, until a spec says. */
+  const ambSource = signal<AmbSource>({
+    metadata: null,
+    url: null,
+    title: null,
+    imageUrl: null,
+    nodeLink: null,
+    repositoryUrl: null,
+  });
   let qualityHolds = true;
   let resumesNode = true;
 
@@ -79,6 +89,12 @@ export function fakeCuration() {
     assigning: signal(false),
     // The real one is `computed(() => this.saving())`: what a save is under way is not written twice.
     metadataLocked: computed(() => saving()),
+    // Letting go of the content the panel holds, whatever it came from — what the settings do when a
+    // switch that faked it is moved.
+    startNew: vi.fn((): void => {
+      activeNode.set(null);
+      fake.hasUnsavedWork.set(false);
+    }),
     releaseDetectedContent: vi.fn(),
     releaseChosenContent: vi.fn(),
     adoptDetectedNode: vi.fn((_node: Node): void => undefined),
@@ -110,6 +126,18 @@ export function fakeCuration() {
     contentKeywords: signal<readonly string[]>([]),
     contentText: signal(''),
     editorialTargets: editorialTargets.asReadonly(),
+    // The forwardings a save already carried out, as against the picked ones above: what the
+    // Interaktionen read the teams' cards off, and what a content taken up from the Verlauf carries.
+    contentForwardings: signal<readonly EditorialTarget[]>([]),
+    // What went wrong handing the content on, and what went wrong writing it — the two the forwarding
+    // step reports back, since that is where either can be answered by picking differently.
+    assignError: signal<string | null>(null),
+    saveError: signal<string | null>(null),
+    // The content as an AMB record is read off, and the question the relay is asked about it. The
+    // record itself is `toAmbResource`'s business and has its own spec, so a spec here states the
+    // source and lets the real derivation run over it.
+    ambSource: vi.fn((): AmbSource => ambSource()),
+    lookUpOnNostr: vi.fn((): Promise<void> => Promise.resolve()),
     setEditorialTargets: vi.fn((targets: readonly EditorialTarget[]): void => {
       editorialTargets.set(targets);
     }),
@@ -162,6 +190,22 @@ export function fakeCuration() {
     resumesNode = false;
   }
 
+  /**
+   * What the content says where an AMB record is built from it: an address the resource is reachable
+   * under and a title, plus whatever else a spec states. Without both there is no record at all.
+   */
+  function describes(
+    metadata: Record<string, unknown>,
+    url: string | null = 'https://example.org/optik',
+  ): void {
+    ambSource.set({ ...ambSource(), metadata, url });
+  }
+
+  /** The teams a save already handed this content to. */
+  function forwarded(...targets: readonly EditorialTarget[]): void {
+    fake.contentForwardings.set(targets);
+  }
+
   return {
     fake,
     detect,
@@ -172,6 +216,8 @@ export function fakeCuration() {
     owesExtraction,
     refuseQuality,
     refuseResume,
+    describes,
+    forwarded,
     editorialTargets,
     nodeSource,
   };

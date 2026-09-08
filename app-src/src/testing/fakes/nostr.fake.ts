@@ -56,9 +56,26 @@ export function fakeNostrForward() {
     sending: signal(false),
     looking: signal(false),
     relayUsable: signal(true),
+    // What the settings field shows, as against `relayUrl` behind it: empty while the panel's own relay
+    // stands, and the address that was entered once one was.
+    configuredRelayUrl: signal(''),
+    changedSettings: signal(0),
+    setEnabled: vi.fn((enabled: boolean): Promise<void> => {
+      fake.enabled.set(enabled);
+      return Promise.resolve();
+    }),
+    setRelayUrl: vi.fn((url: string): Promise<void> => {
+      fake.configuredRelayUrl.set(url.trim());
+      return Promise.resolve();
+    }),
     error: signal<string | null>(null),
     lookupError: signal<string | null>(null),
     receipt: signal<NostrReceipt | null>(null),
+    // Whether the content is to go to the relay — what the forwarding step's row writes through.
+    select: vi.fn((selected: boolean): void => {
+      fake.selected.set(selected);
+      if (!selected) fake.error.set(null);
+    }),
     reset: vi.fn(),
   } satisfies Partial<NostrForwardService>;
 
