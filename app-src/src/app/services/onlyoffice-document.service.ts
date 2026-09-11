@@ -1,6 +1,7 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { Node, RestConstants } from 'ngx-edu-sharing-api';
 
+import { isFeatureEnabled } from '../config';
 import {
   DocumentContent,
   DocumentIdentity,
@@ -28,6 +29,10 @@ const READ_FAILED = 'Das Dokument konnte nicht ausgelesen werden.';
  * Request/response bridge to the document the host page has open. Requests are correlated by `requestId`, since
  * several may be in flight and the answer is a plain window message, and each is bounded by a timeout, because a
  * switched-off plugin never replies. The plugin reports only the node id, so this loads that node once.
+ *
+ * The whole exchange is off where `APP_CONFIG.featureBlacklist` names `onlyOfficeEvents` — see
+ * {@link accept} and {@link send} — so a blacklisted deployment behaves as if the host never ran the
+ * plugin at all.
  */
 @Injectable({ providedIn: 'root' })
 export class OnlyOfficeDocumentService {
@@ -115,6 +120,10 @@ export class OnlyOfficeDocumentService {
    * the caller can keep routing.
    */
   accept(envelope: PluginEnvelope): boolean {
+    // Left to the next reader, exactly like an envelope this service does not handle — a
+    // blacklisted deployment sees no DOCUMENT_INFO/DOCUMENT_CONTENT at all, unsolicited ones (the
+    // plugin's own startup announce, its toolbar button) included.
+    if (!isFeatureEnabled('onlyOfficeEvents')) return false;
     if (envelope.event !== 'DOCUMENT_INFO' && envelope.event !== 'DOCUMENT_CONTENT') return false;
     const answer: DocumentContent = envelope.data ?? {};
     // The identity sits on the envelope for every event and additionally in `data` for
@@ -188,9 +197,12 @@ export class OnlyOfficeDocumentService {
 
   /**
    * Ask for the document — from the host page, or from the simulator while debug mode is on, whose answer takes the
-   * same route back. False means there is nobody to ask.
+   * same route back. False means there is nobody to ask, which is also what a blacklisted deployment answers: it
+   * behaves exactly as if there were never a host to talk to, rather than sending a request nothing will ever
+   * resolve.
    */
   private send(kind: DocumentRequestKind, requestId: string): boolean {
+    if (!isFeatureEnabled('onlyOfficeEvents')) return false;
     if (this.debug.enabled()) return this.debug.answerDocumentRequest(kind, requestId);
     return kind === 'info'
       ? this.browserExtension.requestDocumentInfo(requestId)

@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Node } from 'ngx-edu-sharing-api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { APP_CONFIG, FeatureKey } from '../config';
 import { DocumentContent, DocumentRequestKind, PluginEnvelope } from '../model/onlyoffice-events';
 import {
   AuthFake,
@@ -210,6 +211,54 @@ describe('OnlyOfficeDocumentService', () => {
       await vi.advanceTimersByTimeAsync(CONTENT_TIMEOUT_MS * 2);
 
       await expect(asked).resolves.toMatchObject({ markdown: '# Optik' });
+    });
+  });
+
+  describe('with the feature blacklisted', () => {
+    /** Puts `feature` on the deployment's blacklist for one test, restored again after it. */
+    function blacklist(...features: FeatureKey[]): void {
+      (APP_CONFIG as unknown as { featureBlacklist: FeatureKey[] }).featureBlacklist = features;
+    }
+
+    afterEach(() => blacklist());
+
+    it('says so at once rather than waiting out the timeout, exactly like no host page', async () => {
+      blacklist('onlyOfficeEvents');
+
+      await expect(documents.requestContent()).rejects.toThrow(NO_HOST);
+      await expect(documents.requestInfo()).rejects.toThrow(NO_HOST);
+      expect(extension.fake.requestDocumentContent).not.toHaveBeenCalled();
+      expect(extension.fake.requestDocumentInfo).not.toHaveBeenCalled();
+    });
+
+    it('ignores an unsolicited announce from the host', () => {
+      blacklist('onlyOfficeEvents');
+
+      expect(answers('DOCUMENT_INFO', {}, { document: { nodeId: 'abc' } })).toBe(false);
+      expect(documents.currentDocument()).toBeNull();
+    });
+
+    it('lets a request already in flight time out rather than resolve it', async () => {
+      const asked = documents.requestContent();
+      const failed = asked.catch((cause: unknown) => cause);
+      const requestId = lastRequestId();
+      blacklist('onlyOfficeEvents');
+
+      expect(answers('DOCUMENT_CONTENT', { requestId, markdown: '# Optik' })).toBe(false);
+      expect(documents.currentDocument()).toBeNull();
+
+      await vi.advanceTimersByTimeAsync(CONTENT_TIMEOUT_MS);
+      expect(await failed).toEqual(new Error(TIMEOUT));
+    });
+
+    it('does not even ask the debug simulator', async () => {
+      const simulate = vi.fn();
+      Object.assign(debug.fake, { answerDocumentRequest: simulate });
+      debug.fake.enabled.set(true);
+      blacklist('onlyOfficeEvents');
+
+      await expect(documents.requestContent()).rejects.toThrow(NO_HOST);
+      expect(simulate).not.toHaveBeenCalled();
     });
   });
 

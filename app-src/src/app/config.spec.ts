@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
-import { APP_CONFIG, METADATA_AGENT_API_URL, toAgentProxyUrl, toApiRootUrl, toTopicAssistantUrl } from './config';
+import {
+  APP_CONFIG, FeatureKey, METADATA_AGENT_API_URL, isFeatureEnabled, toAgentProxyUrl, toApiRootUrl,
+  toTopicAssistantUrl
+} from './config';
 
 const REPO = 'https://repo.example.org/edu-sharing';
 
@@ -60,5 +63,28 @@ describe('toTopicAssistantUrl', () => {
 describe('METADATA_AGENT_API_URL', () => {
   it('is where the configured repository proxies the agent, not a deployment of its own', () => {
     expect(METADATA_AGENT_API_URL).toBe(toAgentProxyUrl(APP_CONFIG.defaultRepositoryUrl));
+  });
+});
+
+describe('isFeatureEnabled', () => {
+  /** Puts `features` on the deployment's blacklist for one test, restored again after it. */
+  function blacklist(...features: FeatureKey[]): void {
+    (APP_CONFIG as unknown as { featureBlacklist: FeatureKey[] }).featureBlacklist = features;
+  }
+
+  afterEach(() => blacklist());
+
+  it('ships with nothing blacklisted', () => {
+    expect(APP_CONFIG.featureBlacklist).toEqual([]);
+  });
+
+  it('runs a feature the blacklist does not name', () => {
+    expect(isFeatureEnabled('onlyOfficeEvents')).toBe(true);
+  });
+
+  it('turns off a feature the blacklist names', () => {
+    blacklist('onlyOfficeEvents');
+
+    expect(isFeatureEnabled('onlyOfficeEvents')).toBe(false);
   });
 });

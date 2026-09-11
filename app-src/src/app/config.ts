@@ -1,4 +1,18 @@
 /**
+ * A feature the extension can be deployed with turned off outright — see `APP_CONFIG.featureBlacklist`
+ * and `isFeatureEnabled`.
+ *
+ * - `onlyOfficeEvents`: the host plugin's own event protocol (`content/HOST-EVENTS.md`, directions 2
+ *   and 3) — `OnlyOfficeDocumentService`'s request/response exchange (`REQUEST_DOCUMENT_CONTENT`,
+ *   `REQUEST_DOCUMENT_INFO`) and what it accepts from the host (`DOCUMENT_CONTENT`, `DOCUMENT_INFO`,
+ *   `PREVIEW_NODE`), and with it "Inhalt erkannt" (the open document adopted as the active node on
+ *   boot) and "Passende Inhalte" (content suggested from the open document's text). `INSERT_NODE`
+ *   ("Gewählten Inhalt kopieren", direction 1) is a separate, application-agnostic contract and is
+ *   not covered — a page the plugin no longer announces itself on can still receive content.
+ */
+export type FeatureKey = 'onlyOfficeEvents';
+
+/**
  * Which way a scheme's number has to go for the criterion it judges to count as met: `atLeast` where the higher
  * value is the better one (the 0–5 rubrics and the legal gates), `atMost` where the lower one is — the minors gate
  * answers an age rating, so its scale runs the other way.
@@ -38,6 +52,14 @@ export interface MetalookupRule {
 // Sidebar defaults. The repository URL is a user-editable default; where the metadata agent is
 // follows from it (see MetadataAgentApiService), so it is not configured as a URL of its own.
 export const APP_CONFIG = {
+  /**
+   * Features this deployment turns off outright — a blacklist, not a whitelist: everything not named
+   * here runs as normal. Checked once, via `isFeatureEnabled`, at the point each feature's own code
+   * would otherwise run; never surfaced as a user setting (unlike the WLO/Nostr switches in
+   * *Einstellungen*, this is not something a person using the extension chooses). A deployment that
+   * needs one off edits this array and rebuilds — see `FeatureKey` for what each one covers.
+   */
+  featureBlacklist: [] as readonly FeatureKey[],
   /**
    * MetalookUp, which evaluates a resource and answers with the metadata it could extract from it
    * (`POST /api/evaluation`, see MetalookupService). The host root — the base its own OpenAPI
@@ -280,6 +302,11 @@ export const APP_CONFIG = {
   },
   maxHistory: 200
 };
+
+/** Whether `feature` is one this deployment runs — false only where `APP_CONFIG.featureBlacklist` names it. */
+export function isFeatureEnabled(feature: FeatureKey): boolean {
+  return !APP_CONFIG.featureBlacklist.includes(feature);
+}
 
 // Normalize a repository base to the library's rootUrl (`<host>/edu-sharing/rest`).
 export function toApiRootUrl(repositoryBase: string): string {
