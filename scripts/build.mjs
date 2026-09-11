@@ -25,13 +25,20 @@ const SIDEBAR = path.join(ROOT, 'sidebar');
 //   scripts/boerdi → boerdi/ — chat widget of the KI assistant (boerdi-chat), loaded by its screen
 const BUNDLE_DIRS = ['edu', 'wlo', 'boerdi'];
 
-// Parts of those bundles that stay out of the package, keyed by bundle name and given as
-// POSIX paths relative to the bundle root. Excluding a directory drops its whole subtree.
-//   edu/assets/monaco — the Monaco editor is reachable only from the bundle's admin-page and
-//                       embed-page lazy routes; the extension mounts custom elements and never
+// Parts of those bundles that stay out of the package, keyed by bundle name and given as POSIX
+// paths relative to the bundle root; a `*` path segment matches any single directory name.
+// Excluding a directory drops its whole subtree.
+//   edu/<version>/assets/monaco — the Monaco editor is reachable only from the bundle's admin-page
+//                       and embed-page lazy routes; the extension mounts custom elements and never
 //                       starts that router. Its ts.worker is ~6.7 MB, above the 5 MB
 //                       addons-linter can parse, which fails `web-ext lint` with FILE_TOO_LARGE.
-const BUNDLE_EXCLUDES = { edu: ['assets/monaco'] };
+const BUNDLE_EXCLUDES = { edu: ['*/assets/monaco'] };
+
+// The edu bundle ships one folder per edu-sharing release it was built for, named `<major>.<minor>`
+// (a patch version is not distinguished — see RepositoryVersionService). Its entry points, loaded by
+// WebComponentBundleService against the folder the repository's own version selects.
+const EDU_VERSION_DIR_RE = /^\d+\.\d+$/;
+const EDU_BUNDLE_ENTRIES = ['styles.css', 'scripts.js', 'polyfills.js', 'main.js'];
 
 const TARGETS = ['chrome', 'firefox', 'safari'];
 
@@ -137,11 +144,61 @@ function buildAngular() {
   })();
 }
 
+// Whether every segment of `pattern` (POSIX, `*` matching any single segment) matches the
+// same-length prefix of `segments`.
+function matchesPattern(segments, pattern) {
+  const patternSegments = pattern.split('/');
+  if (segments.length < patternSegments.length) return false;
+  return patternSegments.every((seg, i) => seg === '*' || seg === segments[i]);
+}
+
 // True when `relPath` (relative to a bundle root, platform separators) is one of the POSIX
 // `excludes` or sits below one. The bundle root itself comes through as '' and is never excluded.
+// A `*` segment in an exclude matches any single directory name, e.g. `*/assets/monaco` reaches
+// into every one of the edu bundle's version folders.
 function isExcluded(relPath, excludes) {
-  const p = relPath.split(path.sep).join('/');
-  return excludes.some((e) => p === e || p.startsWith(e + '/'));
+  if (!relPath) return false;
+  const segments = relPath.split(path.sep);
+  return excludes.some((e) => matchesPattern(segments, e));
+}
+
+// The edu bundle's version folders directly under `src` (`scripts/edu`), named `<major>.<minor>`,
+// ascending. Aborts the build where none is found — a package with no version folder is one whose
+// panel silently never loads the edu-sharing elements — and warns per folder about a missing entry
+// point, which would surface only as a load failure deep inside the running extension otherwise.
+async function readEduVersions(src) {
+  const entries = await fs.readdir(src, { withFileTypes: true });
+  const versions = entries
+    .filter((e) => e.isDirectory() && EDU_VERSION_DIR_RE.test(e.name))
+    .map((e) => e.name)
+    .sort((a, b) => {
+      const [aMajor, aMinor] = a.split('.').map(Number);
+      const [bMajor, bMinor] = b.split('.').map(Number);
+      return aMajor - bMajor || aMinor - bMinor;
+    });
+  if (versions.length === 0) {
+    console.error(
+      `✗ ${rel(src)} has no version folder. Expected one or more <major>.<minor> folders ` +
+        `(e.g. scripts/edu/11.0/) holding the bundle's ${EDU_BUNDLE_ENTRIES.join(', ')}.`
+    );
+    process.exit(1);
+  }
+  for (const version of versions) {
+    for (const entry of EDU_BUNDLE_ENTRIES) {
+      if (!existsSync(path.join(src, version, entry))) {
+        log(`⚠ ${rel(path.join(src, version, entry))} not found — this version's bundle is incomplete.`);
+      }
+    }
+  }
+  return versions;
+}
+
+// Record which of the edu bundle's version folders were packaged, so RepositoryVersionService can
+// pick one at runtime without the app knowing the list at build time.
+async function writeEduVersions(src, outDir) {
+  const versions = await readEduVersions(src);
+  await fs.writeFile(path.join(outDir, 'versions.json'), JSON.stringify(versions) + '\n');
+  log(`  ↳ edu: packaged version(s) ${versions.join(', ')}`);
 }
 
 async function assembleTarget(target) {
@@ -171,6 +228,7 @@ async function assembleTarget(target) {
       filter: (from) => !isExcluded(path.relative(src, from), excludes)
     });
     if (excludes.length) log(`  ↳ ${name}: left out ${excludes.join(', ')}`);
+    if (name === 'edu') await writeEduVersions(src, path.join(outDir, name));
   }
 
   const manifest = await writeManifest(target, outDir);

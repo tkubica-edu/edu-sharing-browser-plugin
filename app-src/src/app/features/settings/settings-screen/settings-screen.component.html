@@ -27,9 +27,16 @@
   @if (repositoryVersion.webComponentsRefused()) {
     <div class="es-notice">
       <span>
-        Diese Version wird nicht unterstützt — unterstützt wird nur {{ supportedVersions }}. Die
+        Diese Version wird nicht unterstützt — mitgeliefert {{ repositoryVersion.packagedVersionsText() }}. Die
         eingebetteten edu-sharing-Komponenten (Metadaten-Editor, Vorschau, Suche, Ablageort, Teilen)
         werden deshalb nicht geladen; die übrigen Schritte des Panels bleiben nutzbar.
+      </span>
+    </div>
+  } @else if (repositoryVersion.version() && !repositoryVersion.bundleVersionExact()) {
+    <div class="es-notice">
+      <span>
+        Für diese Version ist kein passendes Bundle dabei — geladen werden die edu-sharing-Komponenten aus
+        Version {{ repositoryVersion.bundleVersion() }}. Einzelne Felder oder Dialoge können deshalb abweichen.
       </span>
     </div>
   }

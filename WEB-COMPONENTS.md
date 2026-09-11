@@ -5,7 +5,7 @@ document — no iframes**. Three prebuilt bundles ship with the extension:
 
 | Bundle | Source folder → packaged as | Elements it registers |
 |---|---|---|
-| edu | `scripts/edu/` → `edu/` | `edu-sharing-mds-editor-wrapper`, `edu-sharing-preview-sidebar`, `edu-sharing-nodes-selector`, `edu-sharing-add-with-connector`, `edu-sharing-search`, `edu-sharing-usages`, `edu-sharing-share-qr`, `edu-sharing-location-picker` |
+| edu | `scripts/edu/<version>/` → `edu/<version>/` | `edu-sharing-mds-editor-wrapper`, `edu-sharing-preview-sidebar`, `edu-sharing-nodes-selector`, `edu-sharing-add-with-connector`, `edu-sharing-search`, `edu-sharing-usages`, `edu-sharing-share-qr`, `edu-sharing-location-picker` |
 | wlo | `scripts/wlo/` → `wlo/` | `metadata-agent-canvas` (the optional WLO editor) |
 | boerdi | `scripts/boerdi/` → `boerdi/` | `boerdi-chat` (the KI assistant) |
 
@@ -52,20 +52,31 @@ The `wlo/` bundle reads `window.__ENV.agentUrl` at bootstrap (falling back to it
 default), so `WebComponentBundleService` publishes the configured `APP_CONFIG.apiUrl` there before
 the scripts run — mirroring `window.__env.EDU_SHARING_API_URL` for the edu bundle. `wlo/`'s file
 names are content-hashed, so its entry points are read from its own `index.html`; `edu/` and
-`boerdi/` have stable names and are declared in the service.
+`boerdi/` have stable names and are declared in the service — `edu/`'s under the version folder
+`RepositoryVersionService.bundleVersion()` names, see
+[Which repository the edu bundle fits](#which-repository-the-edu-bundle-fits).
 
 ## Which repository the edu bundle fits
 
-`edu/` is one edu-sharing release's own frontend, so it speaks that release's API and element
-contracts and is only embedded against a repository of the same major version.
-`RepositoryVersionService` asks `GET /_about` once as the panel boots — a public answer, so before
-any login — and reads `version.repository` (`"11.0"` for the release the packaged bundle is built
-from). `SUPPORTED_MAJOR_VERSIONS` in that service names the versions the bundle fits; **11** is
-currently the only one.
+`edu/` is packaged as one folder per edu-sharing release it was built for, named `<major>.<minor>`
+(a patch version is not distinguished — `11.0.2` and `11.0.7` are the same folder). Each speaks that
+release's API and element contracts, so only a folder of the repository's own major version is ever
+embedded. `scripts/build.mjs` writes `edu/versions.json` alongside the bundle — the sorted list of
+version folders it packaged (e.g. `["11.0"]`) — and `RepositoryVersionService` reads it next to
+`GET /_about`, both once as the panel boots and the latter before any login.
 
-Where the repository names a version that is not among them, `WebComponentBundleService.load('edu')`
-rejects before a single script or stylesheet of the bundle is put into the document, with the message
-the screens then show in place of their element (`bundle.error()`, see
+Which folder to load is `RepositoryVersionService.bundleVersion`, computed by
+`selectBundleVersion()` (`app-src/src/app/util/edu-bundle-versions.ts`) from the repository's
+reported `version.repository` (patch stripped by `normalizeVersion()`) and the packaged list: an
+exact `major.minor` match if the package carries one (`bundleVersionExact` true); otherwise the
+closest packaged minor of the same major — the nearest one below the reported minor, or, failing
+that, the lowest one above it (`bundleVersionExact` false); `null` where the package carries no
+folder of that major at all, which is the refusal case. A repository that named no version at all
+picks the newest packaged folder, since that is not the statement that none fits — see below.
+
+Where `bundleVersion` is `null` for a named version, `WebComponentBundleService.load('edu')` rejects
+before a single script or stylesheet of the bundle is put into the document, with the message the
+screens then show in place of their element (`bundle.error()`, see
 [Loading a bundle](#loading-a-bundle)) — so *Metadaten editieren*, *Vorschau*, *Inhalt finden*, the
 Ablageort picker and *Teilen* report the version rather than the failures its elements would run into
 against an API that is not there. Everything the panel does without the repository's own UI — the
@@ -76,8 +87,8 @@ A version has to have been *named* for the refusal: an unreachable or failing `/
 answer carrying no `version.repository`, leave the bundle to load as it otherwise would
 (`webComponentsRefused` is false in both cases). A failed request is not the statement that this is
 an old edu-sharing, and a panel that blocks its own core screens on a hiccup of a request nothing
-else needs would be worse than one that lets the elements try. The version and, where it is refused,
-what that costs are stated in *Einstellungen* under the Repository-URL — see
+else needs would be worse than one that lets the elements try. The version is stated in
+*Einstellungen* under the Repository-URL, along with what a refusal or an inexact match costs — see
 [FEATURES.md § Utilities](FEATURES.md#utilities).
 
 ## Handing the theme to a bundle
@@ -188,7 +199,10 @@ the metadata screen mounts next.
 ## Refreshing a bundle
 
 A bundle is replaced by overwriting `scripts/<name>/` with the new build — nothing else is generated
-from it. For the boerdi widget `scripts/fetch-widget.mjs` does that, pulling
+from it. For `edu/` that means overwriting one version folder, `scripts/edu/<major>.<minor>/`, or
+adding a new one; `scripts/build.mjs` derives `edu/versions.json` from whatever folders are there at
+build time, so nothing else needs updating to make a newly added version reachable. For the boerdi
+widget `scripts/fetch-widget.mjs` does that, pulling
 `<base>/widget/boerdi-widget.js` into `scripts/boerdi/boerdi-widget.js`:
 
 ```bash

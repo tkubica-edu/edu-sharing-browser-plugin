@@ -288,7 +288,16 @@ describe('SettingsScreenComponent', () => {
       await render();
 
       expect(text()).toContain('Diese Version wird nicht unterstützt');
-      expect(text()).toContain('Version 11');
+      expect(text()).toContain('mitgeliefert 11.0');
+    });
+
+    it('says a neighboring bundle is loaded where none matches the version exactly', async () => {
+      repositoryVersion.inexact('11.3', '11.0');
+      await render();
+
+      expect(text()).not.toContain('Diese Version wird nicht unterstützt');
+      expect(text()).toContain('kein passendes Bundle dabei');
+      expect(text()).toContain('Version 11.0');
     });
 
     it('offers to take a changed address over at once, and does', async () => {

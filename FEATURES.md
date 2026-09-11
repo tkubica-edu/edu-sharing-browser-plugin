@@ -476,12 +476,16 @@ navigating to it, and closes it again where it stands; the step keeps running be
 
   Under the URL the panel states which edu-sharing the repository runs, read once on boot from
   `GET /_about` (`RepositoryVersionService`, `version.repository`) and no setting: it is what decides
-  whether the repository's own UI is embedded at all. Where that version is not one the packaged
-  `edu/` bundle was built for — **11** is currently the only one — a notice says so and names what it
-  costs: *Metadaten editieren*, *Vorschau*, *Inhalt finden*, the Ablageort picker and *Teilen* report
+  whether the repository's own UI is embedded at all, and from which of the packaged `edu/` bundle's
+  version folders. Where the reported version's major is not one the package carries a folder for at
+  all, a notice says so and names the version(s) that are packaged (`packagedVersionsText`);
+  *Metadaten editieren*, *Vorschau*, *Inhalt finden*, the Ablageort picker and *Teilen* then report
   the version in place of their element, while every step that does not embed the repository's UI
-  goes on working. A repository that could not be asked, or that names no version, is not treated as
-  an unsupported one; see
+  goes on working. Where the major matches but no packaged folder is built for the exact
+  `major.minor` reported, a second notice names the closest folder that is loaded instead, since
+  individual fields or dialogs may then differ from what the repository itself would render. A
+  repository that could not be asked, or that names no version, is not treated as an unsupported
+  one; see
   [WEB-COMPONENTS.md § Which repository the edu bundle fits](WEB-COMPONENTS.md#which-repository-the-edu-bundle-fits).
 
   *SSO-Anmeldung* is folded like the tuning groups but sits above them, next to the repository — and

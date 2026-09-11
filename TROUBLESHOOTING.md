@@ -227,17 +227,19 @@ the one visible seam.
 
 ## Bundle size
 
-`scripts/edu/` is 66 MB, of which 54 MB reach `dist/<target>/` (see
-[BUILD.md § What goes into the package](BUILD.md#what-goes-into-the-package)). The two remaining
-heavyweights are reachable and stay:
+`scripts/edu/` holds one version folder per packaged release (currently one, `11.0/`, see
+[WEB-COMPONENTS.md § Which repository the edu bundle fits](WEB-COMPONENTS.md#which-repository-the-edu-bundle-fits));
+paths below are relative to a version folder. Each is 66 MB, of which 54 MB reach `dist/<target>/`
+(see [BUILD.md § What goes into the package](BUILD.md#what-goes-into-the-package)). The two
+remaining heavyweights are reachable and stay:
 
 - **pdf.js** (`assets/pdf.*`, `assets/viewer*`, `assets/locale`, `assets/cmaps`,
   `assets/standard_fonts`, `assets/wasm`, ~21 MB). `chunk-OZPZMSZI.js` is the node renderer that
-  picks `rs-module-pdf` by mime type; `edu/main.js` imports it eagerly and it sits behind
+  picks `rs-module-pdf` by mime type; `main.js` imports it eagerly and it sits behind
   `<edu-sharing-preview-sidebar>`, which the sidebar mounts in
   `preview-node/preview-node.component.html`. Previewing a PDF node fetches these. (`assets/locale`
   is 113 languages of pdf.js' `viewer.ftl`, not edu-sharing i18n.)
-- **TinyMCE** (`assets/tinymce`, 13 MB). The core is bundled into `edu/scripts.js`; skins, themes and
+- **TinyMCE** (`assets/tinymce`, 13 MB). The core is bundled into `scripts.js`; skins, themes and
   plugins are fetched from the folder as soon as an `<editor>` renders. Whether an MDS form has a
   rich-text widget is decided by the repository's metadata set, so this is a config question, not one
   the import graph can answer.
@@ -248,9 +250,10 @@ heavyweights are reachable and stay:
 ## Lint output
 
 **`web-ext lint` is error-free but noisy**: 0 errors, ~204 warnings, 1 notice. Every warning comes
-from third-party libs inside the vendored bundles, not from this extension's own code —
-`edu/assets/tinymce` (67), `edu/scripts.js` (17), `edu/assets/viewer*` (37), `edu/assets/pdf.worker*`
-(19), `edu/assets/cordova` (7), `boerdi/boerdi-widget.js` (6), `edu/index.html` (5, the bundle's own
-start page, which the extension never opens). The notice is `MISSING_DATA_COLLECTION_PERMISSIONS`:
-AMO will require `browser_specific_settings.gecko.data_collection_permissions` in future. CI runs the
-lint with `continue-on-error: true`, so warnings never block a build.
+from third-party libs inside the vendored bundles, not from this extension's own code — inside each
+`edu/<version>/` folder: `assets/tinymce` (67), `scripts.js` (17), `assets/viewer*` (37),
+`assets/pdf.worker*` (19), `assets/cordova` (7), `index.html` (5, the bundle's own start page, which
+the extension never opens) — plus `boerdi/boerdi-widget.js` (6). The notice is
+`MISSING_DATA_COLLECTION_PERMISSIONS`: AMO will require
+`browser_specific_settings.gecko.data_collection_permissions` in future. CI runs the lint with
+`continue-on-error: true`, so warnings never block a build.

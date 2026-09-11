@@ -49,20 +49,29 @@ Changes to the Angular app only reach the loaded extension through a build — `
 
 `scripts/edu/`, `scripts/wlo/` and `scripts/boerdi/` are prebuilt web-component bundles, copied
 verbatim to `dist/<target>/{edu,wlo,boerdi}/`. Their contents are not ours to shape — `scripts/edu/`
-is the output of an edu-sharing Frontend build and is taken over as a whole, third-party libraries
-and all. See [WEB-COMPONENTS.md](WEB-COMPONENTS.md).
+is the output of one or more edu-sharing Frontend builds and is taken over as a whole, third-party
+libraries and all. See [WEB-COMPONENTS.md](WEB-COMPONENTS.md).
 
-The one exception is `BUNDLE_EXCLUDES` in `scripts/build.mjs`, a per-bundle list of paths that are
-skipped while copying:
+`scripts/edu/` holds one folder per packaged release, named `<major>.<minor>` (e.g. `11.0/`) — a
+patch version is not distinguished, see
+[WEB-COMPONENTS.md § Which repository the edu bundle fits](WEB-COMPONENTS.md#which-repository-the-edu-bundle-fits).
+After copying the bundle, the build reads those folders and writes their names, sorted, to
+`dist/<target>/edu/versions.json` — the list `RepositoryVersionService` picks a folder from at
+runtime — and fails the build if `scripts/edu/` holds none, or if a folder is missing one of the
+four entry points (`styles.css`, `scripts.js`, `polyfills.js`, `main.js`).
+
+The one exception to the verbatim copy is `BUNDLE_EXCLUDES` in `scripts/build.mjs`, a per-bundle list
+of paths that are skipped while copying; a `*` path segment matches any single directory name, so an
+exclude reaches into every one of `edu/`'s version folders:
 
 | Path | Size | Why it is left out |
 | --- | --- | --- |
-| `edu/assets/monaco` | 16 MB | The Monaco editor is pulled in by `chunk-BQCCT6S5.js` (`ngx-monaco-editor-v2`), which only the bundle's `admin-page` and `embed-page` lazy routes import. The extension loads the fixed entry points `styles.css`, `scripts.js`, `polyfills.js`, `main.js` and then mounts custom elements (`app-src/src/app/services/web-component-bundle.service.ts`) — it never starts the bundle's router, so neither route is reachable. Monaco's `ts.worker-*.js` is 6.7 MB, above the 5 MB addons-linter can parse, and made `web-ext lint` fail with `FILE_TOO_LARGE`. |
+| `edu/*/assets/monaco` | 16 MB per version | The Monaco editor is pulled in by `chunk-BQCCT6S5.js` (`ngx-monaco-editor-v2`), which only the bundle's `admin-page` and `embed-page` lazy routes import. The extension loads the fixed entry points `styles.css`, `scripts.js`, `polyfills.js`, `main.js` and then mounts custom elements (`app-src/src/app/services/web-component-bundle.service.ts`) — it never starts the bundle's router, so neither route is reachable. Monaco's `ts.worker-*.js` is 6.7 MB, above the 5 MB addons-linter can parse, and made `web-ext lint` fail with `FILE_TOO_LARGE`. |
 
-That leaves `scripts/edu/` at 66 MB in the repo and each `dist/<target>/` at 54 MB (16 MB zipped).
-Refreshing a bundle is still a plain overwrite of `scripts/<name>/` — the exclusion names a
-directory, so a new build's renamed chunks and workers are covered too. The boerdi widget has a
-script for that overwrite, see
+That leaves `scripts/edu/` at 66 MB per packaged version in the repo and each `dist/<target>/` at
+54 MB per version (16 MB zipped). Refreshing a bundle is still a plain overwrite of one version
+folder under `scripts/<name>/` — the exclusion names a directory, so a new build's renamed chunks
+and workers are covered too. The boerdi widget has a script for that overwrite, see
 [WEB-COMPONENTS.md § Refreshing a bundle](WEB-COMPONENTS.md#refreshing-a-bundle). What stays and why
 is [TROUBLESHOOTING.md § Bundle size](TROUBLESHOOTING.md#bundle-size).
 

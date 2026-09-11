@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -238,6 +238,35 @@ describe('the storage keys the two sides meet in', () => {
         APP_CONFIG.storageKeys.theme,
       ]),
     );
+  });
+});
+
+describe('the edu bundle`s version folders', () => {
+  // Kept in step by hand with scripts/build.mjs (EDU_BUNDLE_ENTRIES, which writes edu/versions.json
+  // from the same folders) and WebComponentBundleService.entriesOf('edu'), which loads exactly these
+  // four files from the folder RepositoryVersionService.bundleVersion() names.
+  const ENTRIES = ['styles.css', 'scripts.js', 'polyfills.js', 'main.js'];
+  const EDU_DIR = join(ROOT, 'scripts', 'edu');
+  const versionDirs = readdirSync(EDU_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+
+  it('ships at least one version folder', () => {
+    expect(versionDirs.length).toBeGreaterThan(0);
+  });
+
+  it('names every folder major.minor, with the patch version left out', () => {
+    // A stray top-level file (the pre-versioning layout) or a folder carrying a patch component
+    // would leave RepositoryVersionService matching against a name it never produces itself.
+    versionDirs.forEach((name) => expect(name, name).toMatch(/^\d+\.\d+$/));
+  });
+
+  it('carries every entry point the bundle service loads, in each version folder', () => {
+    versionDirs.forEach((version) => {
+      ENTRIES.forEach((entry) =>
+        expect(existsSync(join(EDU_DIR, version, entry)), `${version}/${entry}`).toBe(true),
+      );
+    });
   });
 });
 

@@ -1,13 +1,13 @@
 import { Injectable, Signal, inject, signal } from '@angular/core';
-import browser from 'webextension-polyfill';
 
 import { errorMessage } from '../util/errors';
 import { installBundleWindowRedirect } from '../util/bundle-windows';
 import { installDraftRequestGuard } from '../util/bundle-requests';
 import { installBundleLanguage } from '../util/bundle-language';
+import { packageUrl } from '../util/edu-bundle-versions';
 import { AuthService } from './auth.service';
 import { MetadataAgentApiService } from './metadata-agent-api.service';
-import { RepositoryVersionService, SUPPORTED_VERSIONS_TEXT } from './repository-version.service';
+import { RepositoryVersionService } from './repository-version.service';
 
 /**
  * The pre-built web-component bundles packaged with the extension: `edu` for the edu-sharing elements, `wlo`
@@ -37,9 +37,13 @@ export interface BundleStatus {
 }
 
 /** What a component says instead of an edu element where the repository is not one the bundle fits. */
-const UNSUPPORTED_VERSION = (version: string) =>
-  `Die eingebetteten edu-sharing Komponenten unterstützen nur ${SUPPORTED_VERSIONS_TEXT}, ` +
+const UNSUPPORTED_VERSION = (version: string, packaged: string) =>
+  `Die eingebetteten edu-sharing Komponenten unterstützen nur Version ${packaged}, ` +
   `dieses Repository meldet ${version}.`;
+
+/** What is thrown where the package itself carries no usable edu bundle version at all. */
+const NO_PACKAGED_VERSION =
+  'edu/versions.json nennt keine Bundle-Version — das Paket ist unvollständig oder beschädigt.';
 
 /** How long to wait for a bundle to define an awaited element before giving up on it. */
 const ELEMENT_TIMEOUT_MS = 15_000;
@@ -113,15 +117,25 @@ export class WebComponentBundleService {
   }
 
   /**
-   * Throw where the repository named a version the edu bundle was not built for. Waits for `/_about` to have
-   * been answered, since the load would otherwise race the boot's own request and let the elements through on
-   * a repository that is about to be reported as unsupported.
+   * Throw where the repository named a version the edu bundle carries no folder for, or where the package
+   * carries none at all. Waits for `/_about` and `edu/versions.json` to have been answered, since the load
+   * would otherwise race the boot's own request and let the elements through on a repository that is about
+   * to be reported as unsupported.
    */
   private async refuseUnsupportedRepository(): Promise<void> {
     await this.repositoryVersion.load();
     if (this.repositoryVersion.webComponentsRefused()) {
-      throw new Error(UNSUPPORTED_VERSION(this.repositoryVersion.version() ?? '—'));
+      throw new Error(
+        UNSUPPORTED_VERSION(
+          this.repositoryVersion.version() ?? '—',
+          this.repositoryVersion.packagedVersionsText(),
+        ),
+      );
     }
+    // Not a refusal by version — the repository named none, or one the package covers — but there is still
+    // no folder to load from: `edu/versions.json` was empty or unreadable, a packaging problem rather than
+    // anything the repository said.
+    if (this.repositoryVersion.bundleVersion() === null) throw new Error(NO_PACKAGED_VERSION);
   }
 
   /**
@@ -131,12 +145,14 @@ export class WebComponentBundleService {
    */
   private async entriesOf(bundle: WebComponentBundle): Promise<BundleEntries> {
     if (bundle === 'edu') {
+      // Non-null: refuseUnsupportedRepository() has already thrown otherwise, and it always runs first.
+      const version = this.repositoryVersion.bundleVersion()!;
       return {
-        styles: [this.assetUrl(bundle, 'styles.css')],
+        styles: [this.assetUrl(bundle, `${version}/styles.css`)],
         scripts: [
-          { src: this.assetUrl(bundle, 'scripts.js'), module: false },
-          { src: this.assetUrl(bundle, 'polyfills.js'), module: true },
-          { src: this.assetUrl(bundle, 'main.js'), module: true },
+          { src: this.assetUrl(bundle, `${version}/scripts.js`), module: false },
+          { src: this.assetUrl(bundle, `${version}/polyfills.js`), module: true },
+          { src: this.assetUrl(bundle, `${version}/main.js`), module: true },
         ],
       };
     }
@@ -193,8 +209,7 @@ export class WebComponentBundleService {
   }
 
   private assetUrl(bundle: WebComponentBundle, file: string): string {
-    const path = `${bundle}/${file.replace(/^\.?\//, '')}`;
-    return browser?.runtime?.getURL ? browser.runtime.getURL(path) : path;
+    return packageUrl(`${bundle}/${file.replace(/^\.?\//, '')}`);
   }
 
   private addLink(href: string): void {

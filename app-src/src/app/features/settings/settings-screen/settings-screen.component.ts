@@ -21,9 +21,7 @@ import {
 import { OAuthService } from '../../../services/oauth.service';
 import { ContentJudgeService } from '../../../services/content-judge.service';
 import { QualityJudgeService } from '../../../services/quality-judge.service';
-import {
-  RepositoryVersionService, SUPPORTED_VERSIONS_TEXT
-} from '../../../services/repository-version.service';
+import { RepositoryVersionService } from '../../../services/repository-version.service';
 import { ThemeService, ThemeSetting } from '../../../services/theme.service';
 import { configuredSchemes } from '../../../util/quality-schemes';
 
@@ -86,9 +84,6 @@ export class SettingsScreenComponent implements OnDestroy {
    * request itself uses, so the listing cannot state something the judge is not doing.
    */
   protected readonly contentJudgeSchemes = configuredSchemes().schemes;
-
-  /** The versions the packaged elements were built for, as the notice about a refused repository names them. */
-  protected readonly supportedVersions = SUPPORTED_VERSIONS_TEXT;
 
   /** The relay the panel ships with, named where the field says what an empty one falls back to. */
   protected readonly defaultNostrRelayUrl = APP_CONFIG.nostrRelayUrl;

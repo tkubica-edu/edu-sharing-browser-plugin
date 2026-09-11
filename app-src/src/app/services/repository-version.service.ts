@@ -3,26 +3,19 @@ import { firstValueFrom, timeout } from 'rxjs';
 import { AboutService } from 'ngx-edu-sharing-api';
 
 import { errorMessage } from '../util/errors';
-
-/**
- * The repository major versions this panel's packaged web components fit. The `edu/` bundle is built from one
- * edu-sharing frontend and speaks that release's API and element contracts, so it is only used against a
- * repository of the same major version — see {@link RepositoryVersionService.webComponentsRefused}.
- */
-export const SUPPORTED_MAJOR_VERSIONS: readonly number[] = [11];
-
-/** The supported versions as the settings name them. */
-export const SUPPORTED_VERSIONS_TEXT = 'Version 11';
+import { normalizeVersion, packageUrl, selectBundleVersion } from '../util/edu-bundle-versions';
 
 /** How long to wait for `/_about` before giving up on it; the answer is public and small. */
 const ABOUT_TIMEOUT_MS = 8000;
 
 /**
- * Which edu-sharing the configured repository runs, read once from `GET /_about`. Two things hang on it: the
- * settings name the version, and the packaged `edu/` bundle is only loaded where the version is one its elements
- * were built for.
+ * Which edu-sharing the configured repository runs, read once from `GET /_about`, and which of the
+ * packaged `edu/` bundle's version folders — read from `edu/versions.json` — fits it. Two things
+ * hang on the answer: the settings name the version, and `WebComponentBundleService` loads the
+ * `edu/` bundle only where {@link bundleVersion} names a folder — see {@link webComponentsRefused}.
  *
- * The answer is public — `/_about` needs no session — so it is asked as the panel boots, before any login.
+ * The `/_about` answer is public — it needs no session — so it is asked as the panel boots, before
+ * any login. `edu/versions.json` is a file of the extension's own package, read alongside it.
  */
 @Injectable({ providedIn: 'root' })
 export class RepositoryVersionService {
@@ -32,6 +25,8 @@ export class RepositoryVersionService {
   private readonly versionState = signal<string | null>(null);
   private readonly errorState = signal<string | null>(null);
   private readonly checkedState = signal(false);
+  /** The edu bundle's version folders this package ships, as `edu/versions.json` lists them. */
+  private readonly packagedVersionsState = signal<string[]>([]);
 
   /** The one request, kept so every caller waits on the same answer. */
   private request?: Promise<void>;
@@ -41,6 +36,10 @@ export class RepositoryVersionService {
   readonly error = this.errorState.asReadonly();
   /** True once the repository has answered, whether with a version or with a failure. */
   readonly checked = this.checkedState.asReadonly();
+  readonly packagedVersions = this.packagedVersionsState.asReadonly();
+
+  /** The packaged versions, for the notices in the settings (`"11.0"`, or `"11.0, 12.0"`). */
+  readonly packagedVersionsText = computed(() => this.packagedVersionsState().join(', '));
 
   /** The leading number of the reported version, or null where the repository named none. */
   readonly major = computed(() => {
@@ -50,11 +49,26 @@ export class RepositoryVersionService {
     return Number.isFinite(major) ? major : null;
   });
 
-  /** True where the repository named a version the packaged web components were built for. */
-  readonly supported = computed(() => {
-    const major = this.major();
-    return major !== null && SUPPORTED_MAJOR_VERSIONS.includes(major);
+  /**
+   * Which of the packaged bundle's version folders to load, given what `/_about` reported and what
+   * the package ships. Null only where the report named a major the package carries no folder for
+   * at all — see {@link selectBundleVersion}.
+   */
+  readonly bundleVersion = computed(() => {
+    const version = this.versionState();
+    const reported = version === null ? null : normalizeVersion(version);
+    return selectBundleVersion(reported, this.packagedVersionsState()).version;
   });
+
+  /** True where {@link bundleVersion} was built for the repository's exact `major.minor`. */
+  readonly bundleVersionExact = computed(() => {
+    const version = this.versionState();
+    const reported = version === null ? null : normalizeVersion(version);
+    return selectBundleVersion(reported, this.packagedVersionsState()).exact;
+  });
+
+  /** True where the repository named a version the packaged bundle carries a folder for. */
+  readonly supported = computed(() => this.major() !== null && this.bundleVersion() !== null);
 
   /**
    * Whether the `edu/` bundle is refused for this repository. A version has to have been *named* for that: a
@@ -63,20 +77,35 @@ export class RepositoryVersionService {
    */
   readonly webComponentsRefused = computed(() => this.major() !== null && !this.supported());
 
-  /** Ask the repository for its version, at most once. Resolves once the answer settled, either way. */
+  /** Ask the repository for its version and read the packaged bundle's versions, at most once. */
   load(): Promise<void> {
     this.request ??= this.fetch();
     return this.request;
   }
 
   private async fetch(): Promise<void> {
+    const [about, packaged] = await Promise.allSettled([
+      firstValueFrom(this.about.getAbout().pipe(timeout(ABOUT_TIMEOUT_MS))),
+      this.fetchPackagedVersions(),
+    ]);
+    if (about.status === 'fulfilled') {
+      this.versionState.set(about.value?.version?.repository?.trim() || null);
+    } else {
+      this.errorState.set(errorMessage(about.reason));
+    }
+    if (packaged.status === 'fulfilled') this.packagedVersionsState.set(packaged.value);
+    this.checkedState.set(true);
+  }
+
+  /** The edu bundle's packaged version folders, from `edu/versions.json`. Empty where it cannot be read. */
+  private async fetchPackagedVersions(): Promise<string[]> {
     try {
-      const about = await firstValueFrom(this.about.getAbout().pipe(timeout(ABOUT_TIMEOUT_MS)));
-      this.versionState.set(about?.version?.repository?.trim() || null);
-    } catch (cause) {
-      this.errorState.set(errorMessage(cause));
-    } finally {
-      this.checkedState.set(true);
+      const response = await fetch(packageUrl('edu/versions.json'));
+      if (!response.ok) return [];
+      const versions = await response.json();
+      return Array.isArray(versions) ? versions.filter((v) => typeof v === 'string') : [];
+    } catch {
+      return [];
     }
   }
 }
