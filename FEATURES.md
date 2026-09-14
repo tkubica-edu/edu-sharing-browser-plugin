@@ -255,6 +255,12 @@ editorial teams or the relay — and the *Interaktionen* view only while one of 
 to report. Switching it off also drops what the content in hand had with the relay (the tick and the
 receipt), so switching it back on carries nothing into a step as though it had just happened.
 
+A deployment can also turn nostr off outright — `APP_CONFIG.featureBlacklist` naming `nostr`
+(`app-src/src/app/config.ts`, see `FeatureKey` for the full list) — a static, developer-edited array
+rather than a setting: `NostrForwardService.blacklisted` folds into `enabled` the same way the switch
+does, so a blacklisted deployment behaves exactly as described above, and *Einstellungen* hides the
+whole Nostr-Relay card instead of showing a switch nobody could turn back on.
+
 The mapping lives in `util/amb-event.ts` and follows the reference converter
 (`edufeed-org/amb-nostr-converter`): the record's `id` — and with it the event's `d` tag — is the
 address the resource lives at (`ccm:wwwurl`, else the page the Erschließung ran on), which is what

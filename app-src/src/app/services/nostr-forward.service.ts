@@ -3,7 +3,7 @@ import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure
 import * as nip19 from 'nostr-tools/nip19';
 import { bytesToHex, hexToBytes } from 'nostr-tools/utils';
 
-import { APP_CONFIG } from '../config';
+import { APP_CONFIG, isFeatureEnabled } from '../config';
 import { AmbResource, AmbSource, AMB_KIND, toAmbEvent, toAmbResource } from '../util/amb-event';
 import { errorMessage } from '../util/errors';
 import {
@@ -73,6 +73,11 @@ export interface NostrReceipt {
  * Nostr identifies a publisher by a key pair and by nothing else. The panel holds one of its own, generated
  * on the first publication and then kept in this browser's storage: it is what makes every record this
  * installation publishes findable as one publisher's, and what a relay's operator would allow-list.
+ *
+ * A deployment can also turn the whole thing off outright — `APP_CONFIG.featureBlacklist` naming `nostr` —
+ * a static, developer-edited switch rather than a setting; see {@link blacklisted} and {@link enabled}.
+ * `SettingsScreenComponent` hides the Nostr-Relay card entirely for such a deployment, instead of showing a
+ * switch that would have no effect.
  */
 @Injectable({ providedIn: 'root' })
 export class NostrForwardService {
@@ -80,13 +85,17 @@ export class NostrForwardService {
 
   private readonly enabledState = signal(DEFAULT_ENABLED);
 
+  /** True where `APP_CONFIG.featureBlacklist` names `nostr` — see `FeatureKey`. */
+  readonly blacklisted = computed(() => !isFeatureEnabled('nostr'));
+
   /**
-   * Whether this panel speaks to a relay at all. A setting rather than a condition of the content: off, the
-   * two steps that publish are not offered, the forwarding shows no relay row and the Interaktionen no
-   * standing, and neither {@link publish} nor {@link lookup} reaches a relay — so an installation that has
-   * switched it off sends nothing into the open network and asks nothing of it either.
+   * Whether this panel speaks to a relay at all — the setting and `nostr` not being blacklisted, both. Off
+   * either way, the two steps that publish are not offered, the forwarding shows no relay row and the
+   * Interaktionen no standing, and neither {@link publish} nor {@link lookup} reaches a relay — so an
+   * installation that has switched it off, or that blacklists it, sends nothing into the open network and
+   * asks nothing of it either.
    */
-  readonly enabled = this.enabledState.asReadonly();
+  readonly enabled = computed(() => !this.blacklisted() && this.enabledState());
 
   /**
    * Whether the step is to publish to the relay. Ticked in the forwarding step and read by its way on;
@@ -237,7 +246,7 @@ export class NostrForwardService {
    * relay's own `OK` and is the more exact answer of the two.
    */
   async lookup(source: AmbSource): Promise<void> {
-    if (!this.enabledState()) return;
+    if (!this.enabled()) return;
     const resource = toAmbResource(source);
     if (!resource) return;
     if (this.lookedUp === resource.id) return;
@@ -300,9 +309,9 @@ export class NostrForwardService {
    * on the relay — `true` also where the step was not ticked at all, which is nothing failing.
    */
   forward(source: AmbSource): Promise<boolean> {
-    // A relay that is switched off is not a publication that failed: the way on out of the step leads on
-    // as it does for a step that was never ticked.
-    if (!this.enabledState()) return Promise.resolve(true);
+    // A relay that is switched off, or blacklisted, is not a publication that failed: the way on out of
+    // the step leads on as it does for a step that was never ticked.
+    if (!this.enabled()) return Promise.resolve(true);
     if (!this.selectedState()) return Promise.resolve(true);
     if (this.receiptState()) return Promise.resolve(true);
     return this.publish(source);
@@ -318,10 +327,10 @@ export class NostrForwardService {
    * resource replaces the record on the relay rather than adding a second one beside it.
    */
   async publish(source: AmbSource): Promise<boolean> {
-    // Nothing leaves the panel where the relay is switched off. The screens that would ask for a
-    // publication are not offered then, so this is the guard behind them rather than a case they run
+    // Nothing leaves the panel where the relay is switched off or blacklisted. The screens that would ask
+    // for a publication are not offered then, so this is the guard behind them rather than a case they run
     // into — and it is the one that has to hold, since a publication cannot be taken back.
-    if (!this.enabledState()) return false;
+    if (!this.enabled()) return false;
     this.errorState.set(null);
     const relayUrl = this.relayUrl();
     if (!isRelayUrl(relayUrl)) {

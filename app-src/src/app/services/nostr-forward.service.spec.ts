@@ -4,7 +4,7 @@ import { verifyEvent } from 'nostr-tools/pure';
 
 import { NostrForwardService } from './nostr-forward.service';
 import { BrowserExtensionService } from './browser-extension.service';
-import { APP_CONFIG } from '../config';
+import { APP_CONFIG, FeatureKey } from '../config';
 import { AmbSource } from '../util/amb-event';
 import { BrowserExtensionFake, fakeBrowserExtension } from '../../testing/fakes';
 import { provideFake } from '../../testing/provide-fake';
@@ -524,6 +524,54 @@ describe('NostrForwardService', () => {
 
       expect(await nostr.publish(aSource())).toBe(true);
       expect(relay.sent).toHaveLength(1);
+    });
+  });
+
+  describe('with nostr blacklisted', () => {
+    /** Puts `features` on the deployment's blacklist for one test, restored again after it. */
+    function blacklist(...features: FeatureKey[]): void {
+      (APP_CONFIG as unknown as { featureBlacklist: FeatureKey[] }).featureBlacklist = features;
+    }
+
+    afterEach(() => blacklist());
+
+    it('reports itself blacklisted and behaves as though the setting were off', () => {
+      blacklist('nostr');
+      expect(nostr.blacklisted()).toBe(true);
+      expect(nostr.enabled()).toBe(false);
+    });
+
+    it('sends nothing while it is blacklisted, whatever the step ticked', async () => {
+      const relay = fakeRelay();
+      nostr.select(true);
+      blacklist('nostr');
+
+      expect(await nostr.forward(aSource())).toBe(true);
+      expect(await nostr.publish(aSource())).toBe(false);
+      expect(relay.sent).toEqual([]);
+      expect(nostr.receipt()).toBeNull();
+    });
+
+    it('asks no relay what it holds while it is blacklisted', async () => {
+      const relay = fakeRelay({ holds: [aStoredRecord()] });
+      blacklist('nostr');
+
+      await nostr.lookup(aSource());
+
+      expect(relay.asked).toEqual([]);
+      expect(nostr.receipt()).toBeNull();
+    });
+
+    it('leaves the persisted setting itself alone', async () => {
+      await nostr.setEnabled(true);
+      blacklist('nostr');
+
+      expect(extension.storage.get(APP_CONFIG.storageKeys.nostrEnabled)).toBe(true);
+    });
+
+    it('runs as normal where the blacklist does not name it', () => {
+      expect(nostr.blacklisted()).toBe(false);
+      expect(nostr.enabled()).toBe(true);
     });
   });
 

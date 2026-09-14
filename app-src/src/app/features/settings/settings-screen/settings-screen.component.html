@@ -242,30 +242,33 @@ wa          <strong>ausschließlich</strong> über „Anmelden mit OAuth“, Ben
   @if (openSection() === 'developer') {
     <!-- Ob die WLO-Erweiterungen des Repositoriums gelten. Steht hier statt bei den WLO-Karten weiter
          unten: die sind selbst hinter dem Schalter, ein abgeschaltetes Panel könnte ihn dort nicht mehr
-         zeigen. -->
-    <div class="group-item">
-      <label class="check">
-        <input type="checkbox" [ngModel]="wlo.settingEnabled()" (ngModelChange)="setWloEnabled($event)" />
-        <span>WLO-Funktionen verwenden</span>
-      </label>
+         zeigen. Ganz ausgeblendet, statt nur wirkungslos, wo eine Installation `wlo` per
+         `APP_CONFIG.featureBlacklist` abschaltet — ein Schalter ohne Wirkung wäre irreführend. -->
+    @if (!wlo.blacklisted()) {
+      <div class="group-item">
+        <label class="check">
+          <input type="checkbox" [ngModel]="wlo.settingEnabled()" (ngModelChange)="setWloEnabled($event)" />
+          <span>WLO-Funktionen verwenden</span>
+        </label>
 
-      <p class="desc">
-        Ob das Panel die Erweiterungen anbietet, die ein Repositorium über die Config-Variable
-        <code>browserExtensionCustomWebComponent</code> einschaltet. Standardmäßig an. Abgeschaltet gilt die
-        Variable als nicht gesetzt: Metadaten und Vorschau laufen über den MDS-Editor mit dem Standard-Set
-        des Repositoriums statt über den WLO-Canvas, die Schritte „Prüfprozess auswählen“, „Qualität“,
-        „Sammlung auswählen“ und der KI-Assistent entfallen, beim Speichern werden keine
-        <code>ccm:oeh_*</code>-Felder geschrieben und kein Redaktions-Workflow gesetzt, und es wird eine
-        Anmeldung verlangt. So lässt sich der normale Core-Workflow auch gegen ein WLO-Repositorium
-        durchspielen.
-      </p>
+        <p class="desc">
+          Ob das Panel die Erweiterungen anbietet, die ein Repositorium über die Config-Variable
+          <code>browserExtensionCustomWebComponent</code> einschaltet. Standardmäßig an. Abgeschaltet gilt die
+          Variable als nicht gesetzt: Metadaten und Vorschau laufen über den MDS-Editor mit dem Standard-Set
+          des Repositoriums statt über den WLO-Canvas, die Schritte „Prüfprozess auswählen“, „Qualität“,
+          „Sammlung auswählen“ und der KI-Assistent entfallen, beim Speichern werden keine
+          <code>ccm:oeh_*</code>-Felder geschrieben und kein Redaktions-Workflow gesetzt, und es wird eine
+          Anmeldung verlangt. So lässt sich der normale Core-Workflow auch gegen ein WLO-Repositorium
+          durchspielen.
+        </p>
 
-      <!-- Der Schalter sagt, was dem Panel aufgetragen wurde, nicht was das Repositorium antwortet — an
-           einem Repositorium ohne die Variable steht er auf „an“ und bewirkt nichts. -->
-      @if (wlo.settingEnabled() && !wlo.offeredByRepository()) {
-        <p class="es-hint">Dieses Repositorium bietet keine WLO-Funktionen an.</p>
-      }
-    </div>
+        <!-- Der Schalter sagt, was dem Panel aufgetragen wurde, nicht was das Repositorium antwortet — an
+             einem Repositorium ohne die Variable steht er auf „an“ und bewirkt nichts. -->
+        @if (wlo.settingEnabled() && !wlo.offeredByRepository()) {
+          <p class="es-hint">Dieses Repositorium bietet keine WLO-Funktionen an.</p>
+        }
+      </div>
+    }
 
     <!-- Entwicklung: ersetzt die Antworten der KI-Dienste durch Fixtures. -->
     <div class="group-item">
@@ -568,7 +571,11 @@ wa          <strong>ausschließlich</strong> über „Anmelden mit OAuth“, Ben
 <!-- Where the forwarding step publishes to when the relay is ticked there, and where the step
      "An Nostr Relay senden" publishes to. Outside the WLO block above: an AMB record is published
      from any repository and the relay belongs to none, so both steps are offered everywhere (see
-     model/navigation.ts) and the setting they read has to be reachable everywhere too. -->
+     model/navigation.ts) and the setting they read has to be reachable everywhere too.
+
+     Hidden entirely, rather than shown but inert, where a deployment blacklists `nostr` via
+     `APP_CONFIG.featureBlacklist` — a switch nobody can turn back on would be misleading. -->
+@if (!nostr.blacklisted()) {
 <section class="es-card">
   <button type="button" class="section-head" (click)="toggleSection('nostr')"
           [attr.aria-expanded]="openSection() === 'nostr'">
@@ -638,3 +645,4 @@ wa          <strong>ausschließlich</strong> über „Anmelden mit OAuth“, Ben
     }
   }
 </section>
+}

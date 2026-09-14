@@ -2,7 +2,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { take } from 'rxjs';
 import { ConfigService, DEFAULT } from 'ngx-edu-sharing-api';
 
-import { APP_CONFIG } from '../config';
+import { APP_CONFIG, isFeatureEnabled } from '../config';
 import { BrowserExtensionService } from './browser-extension.service';
 
 /** Boolean repository-config variable that switches the browser extension custom web component on. */
@@ -22,9 +22,12 @@ const DEFAULT_SETTING = true;
  * metadata screen embeds the WLO canvas instead of the MDS editor and the footer buttons take the bundle's pill
  * shape ({@link THEME_CLASS}); without the variable the wlo bundle is never loaded.
  *
- * Two statements make that one: what the repository says, and whether the settings let it count. Everything
- * WLO-specific in the panel hangs on {@link enabled} alone, so refusing the variable here is what lets the
- * ordinary core flow be walked through against a repository that has the variable set.
+ * Three statements make that one: what the repository says, whether the settings let it count, and whether
+ * `APP_CONFIG.featureBlacklist` names `wlo` ({@link blacklisted}) — a static, developer-edited switch rather
+ * than a setting, which is why a blacklisted deployment hides the *Einstellungen* switch instead of merely
+ * ignoring it (`SettingsScreenComponent`). Everything WLO-specific in the panel hangs on {@link enabled}
+ * alone, so refusing the variable here is what lets the ordinary core flow be walked through against a
+ * repository that has the variable set.
  */
 @Injectable({ providedIn: 'root' })
 export class BrowserExtensionCustomWebComponentService {
@@ -34,11 +37,14 @@ export class BrowserExtensionCustomWebComponentService {
   private readonly configState = signal(false);
   private readonly settingState = signal(DEFAULT_SETTING);
 
+  /** True where `APP_CONFIG.featureBlacklist` names `wlo` — see `FeatureKey`. */
+  readonly blacklisted = computed(() => !isFeatureEnabled('wlo'));
+
   /**
    * True once the repository config enabled the browser extension custom web component and the settings let
-   * that answer count. The one statement every WLO branch in the panel reads.
+   * that answer count, and `wlo` is not blacklisted. The one statement every WLO branch in the panel reads.
    */
-  readonly enabled = computed(() => this.settingState() && this.configState());
+  readonly enabled = computed(() => !this.blacklisted() && this.settingState() && this.configState());
 
   /**
    * Whether the settings let the repository's variable count. The switch itself rather than its outcome: a

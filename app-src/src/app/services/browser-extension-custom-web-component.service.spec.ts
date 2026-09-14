@@ -3,7 +3,7 @@ import { BehaviorSubject } from 'rxjs';
 import { ConfigService, DEFAULT, Variables } from 'ngx-edu-sharing-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { APP_CONFIG } from '../config';
+import { APP_CONFIG, FeatureKey } from '../config';
 import { BrowserExtensionCustomWebComponentService } from './browser-extension-custom-web-component.service';
 import { BrowserExtensionService } from './browser-extension.service';
 import { BrowserExtensionFake, fakeBrowserExtension } from '../../testing/fakes';
@@ -120,5 +120,36 @@ describe('BrowserExtensionCustomWebComponentService', () => {
     expect(service.changedSettings()).toBe(0);
     await service.setEnabled(false);
     expect(service.changedSettings()).toBe(1);
+  });
+
+  describe('with wlo blacklisted', () => {
+    /** Puts `features` on the deployment's blacklist for one test, restored again after it. */
+    function blacklist(...features: FeatureKey[]): void {
+      (APP_CONFIG as unknown as { featureBlacklist: FeatureKey[] }).featureBlacklist = features;
+    }
+
+    afterEach(() => blacklist());
+
+    it('reports itself blacklisted', () => {
+      blacklist('wlo');
+      const service = TestBed.inject(BrowserExtensionCustomWebComponentService);
+      expect(service.blacklisted()).toBe(true);
+    });
+
+    it('stays off whatever the repository config and the setting say', () => {
+      blacklist('wlo');
+      const service = bootedWith(true);
+      expect(service.enabled()).toBe(false);
+      // Not a derived statement: the repository still offered it and the setting still stands on,
+      // which is what the settings screen reads to decide whether to show the switch at all.
+      expect(service.offeredByRepository()).toBe(true);
+      expect(service.settingEnabled()).toBe(true);
+    });
+
+    it('runs as normal where the blacklist does not name it', () => {
+      const service = bootedWith(true);
+      expect(service.blacklisted()).toBe(false);
+      expect(service.enabled()).toBe(true);
+    });
   });
 });

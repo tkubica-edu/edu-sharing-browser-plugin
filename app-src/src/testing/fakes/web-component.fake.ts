@@ -8,22 +8,25 @@ import { BrowserExtensionCustomWebComponentService } from '../../app/services/br
 /**
  * `BrowserExtensionCustomWebComponentService` without the repository config behind it. The real one
  * subscribes to `ConfigService`, reads a setting out of the extension storage and toggles a class on
- * `document.documentElement`; a spec sets the two statements directly, which is the only thing its
+ * `document.documentElement`; a spec sets the statements directly, which is the only thing its
  * dependents read.
  *
- * `enabled` is the two of them together, as in the real service: `repository` is what the config answered
- * and `setting` whether the settings let it count. A spec that only cares about the outcome passes the one
- * argument and never touches the setting.
+ * `enabled` is all of them together, as in the real service: `repository` is what the config answered,
+ * `setting` whether the settings let it count, and `blacklisted` whether `APP_CONFIG.featureBlacklist`
+ * names `wlo` (a knob, not a derivation — see {@link blacklist}). A spec that only cares about the outcome
+ * passes the one argument and never touches the setting or the blacklist.
  */
 export function fakeWebComponent(enabled = false) {
   const repositoryState = signal(enabled);
   const settingState = signal(true);
-  const enabledState = computed(() => settingState() && repositoryState());
+  const blacklistedState = signal(false);
+  const enabledState = computed(() => !blacklistedState() && settingState() && repositoryState());
 
   const fake = {
     enabled: enabledState,
     settingEnabled: settingState,
     offeredByRepository: repositoryState,
+    blacklisted: blacklistedState,
     changedSettings: computed(() => (settingState() ? 0 : 1)),
     metadataSet: computed(() => (enabledState() ? APP_CONFIG.metadataSet : DEFAULT)),
     load: async () => {},
@@ -33,7 +36,12 @@ export function fakeWebComponent(enabled = false) {
     },
   } satisfies Partial<BrowserExtensionCustomWebComponentService>;
 
-  return { fake };
+  /** The deployment turned `wlo` off outright — see `FeatureKey`. */
+  function blacklist(): void {
+    blacklistedState.set(true);
+  }
+
+  return { fake, blacklist };
 }
 
 export type WebComponentFake = ReturnType<typeof fakeWebComponent>;

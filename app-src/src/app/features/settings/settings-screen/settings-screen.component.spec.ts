@@ -602,6 +602,16 @@ describe('SettingsScreenComponent', () => {
       expect(text()).toContain('Dieses Repositorium bietet keine WLO-Funktionen an');
     });
 
+    it('hides the WLO switch entirely where the deployment blacklists it', async () => {
+      wlo.blacklist();
+      await render();
+      await open(DEVELOPER);
+
+      expect(text()).not.toContain('WLO-Funktionen verwenden');
+      // The rest of the section — a switch a deployment did not blacklist — is unaffected.
+      expect(text()).toContain('Dev-Modus: KI-Antworten faken');
+    });
+
     it('shows the faked run’s fields only while the mode is on', async () => {
       await render();
       await open(DEVELOPER);
@@ -961,6 +971,13 @@ describe('SettingsScreenComponent', () => {
       await open(NOSTR);
 
       expect(text()).toContain('Noch kein Schlüssel vorhanden');
+    });
+
+    it('hides the whole card where the deployment blacklists nostr', async () => {
+      nostr.blacklist();
+      await render();
+
+      expect(text()).not.toContain(NOSTR);
     });
   });
 });

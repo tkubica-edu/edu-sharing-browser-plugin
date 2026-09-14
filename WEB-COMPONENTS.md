@@ -13,6 +13,7 @@ document — no iframes**. Three prebuilt bundles ship with the extension:
 - [Which repository the edu bundle fits](#which-repository-the-edu-bundle-fits)
 - [Handing the theme to a bundle](#handing-the-theme-to-a-bundle)
 - [The optional WLO metadata editor](#the-optional-wlo-metadata-editor)
+- [Blacklisting WLO outright](#blacklisting-wlo-outright)
 - [Refreshing a bundle](#refreshing-a-bundle)
 
 Attributes and events of `metadata-agent-canvas` are documented in
@@ -179,11 +180,12 @@ repository. The checkbox **WLO-Funktionen verwenden** in *Einstellungen → Entw
 (`eduSharingWloEnabled`, default on) is what makes it reachable: with it off the variable is read as
 unset whatever the repository answers.
 
-The service keeps the two statements apart. `offeredByRepository` is the config's answer,
-`settingEnabled` the switch, and `enabled` is the conjunction — so the checkbox shows what the panel
-was told rather than what came back, and a hint beside it names a repository that offers none of this
-in the first place. Because every WLO branch in the app reads `enabled` and nothing else — the two
-screens above, `metadataSet`, the `wlo-theme` class, `AuthService.authorized` /
+The service keeps the three statements apart. `offeredByRepository` is the config's answer,
+`settingEnabled` the switch, `blacklisted` whether the deployment turned WLO off outright (see below),
+and `enabled` is the conjunction of all three — so the checkbox shows what the panel was told rather
+than what came back, and a hint beside it names a repository that offers none of this in the first
+place. Because every WLO branch in the app reads `enabled` and nothing else — the two screens above,
+`metadataSet`, the `wlo-theme` class, `AuthService.authorized` /
 `AuthService.loginRequired`, the WLO-only options in `model/navigation.ts`, the metadata agent's
 `/generate` (`CurationService.analyze` reads the page instead, see
 [FEATURES.md](FEATURES.md#reading-and-curating-a-page)), the `ccm:oeh_*` write and the `GROUP_ORG_WLO-Uploadmanager`
@@ -195,6 +197,17 @@ that reason: a panel switched off would otherwise have nowhere left to switch it
 comes up in the WLO palette. Nothing of a content in hand is let go of: the switch decides which
 screens and which fields a save has, and an Erschließung in progress carries on into whichever editor
 the metadata screen mounts next.
+
+## Blacklisting WLO outright
+
+The repository-side refusal above and the *Einstellungen* switch beside it are both something the
+panel can still turn back on; `APP_CONFIG.featureBlacklist` naming `wlo` (`app-src/src/app/config.ts`,
+see `FeatureKey` for the full list this deployment can turn off) is not — a static, developer-edited
+array, checked once by `blacklisted`, with no setting and no storage key behind it. `enabled` folds it
+in alongside the other two statements, so a blacklisted deployment runs the ordinary core flow exactly
+as if the repository never set the variable at all, and `SettingsScreenComponent` hides the
+**WLO-Funktionen verwenden** checkbox from *Entwickler-Optionen* rather than showing a switch nobody
+could turn back on.
 
 ## Refreshing a bundle
 

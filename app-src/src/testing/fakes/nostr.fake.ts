@@ -49,6 +49,10 @@ export function aReceipt(overrides: Partial<NostrReceipt> = {}): NostrReceipt {
 export function fakeNostrForward() {
   const fake = {
     enabled: signal(true),
+    // Independent of `enabled` here, unlike the real service (whose `enabled` is the two of them
+    // together): most specs only care about the outcome and use `disable()`/`blacklist()`, which each
+    // set `enabled` to match what the real service would derive.
+    blacklisted: signal(false),
     relayUrl: signal(FAKE_RELAY_URL),
     // Typed as the library types it — a key is `npub1…` or nothing at all.
     npub: signal<`npub1${string}` | null>('npub1beispiel'),
@@ -109,7 +113,13 @@ export function fakeNostrForward() {
     fake.enabled.set(false);
   }
 
-  return { fake, select, published, publishedByAnother, holds, disable };
+  /** The deployment turned `nostr` off outright — see `FeatureKey`. Also turns `enabled` off with it. */
+  function blacklist(): void {
+    fake.blacklisted.set(true);
+    fake.enabled.set(false);
+  }
+
+  return { fake, select, published, publishedByAnother, holds, disable, blacklist };
 }
 
 export type NostrForwardFake = ReturnType<typeof fakeNostrForward>;

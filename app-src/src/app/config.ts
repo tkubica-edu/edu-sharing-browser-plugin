@@ -1,6 +1,7 @@
 /**
  * A feature the extension can be deployed with turned off outright — see `APP_CONFIG.featureBlacklist`
- * and `isFeatureEnabled`.
+ * and `isFeatureEnabled`. Each is read at the one place its own service already funnels every check
+ * through, so blacklisting it there turns off everything downstream for free:
  *
  * - `onlyOfficeEvents`: the host plugin's own event protocol (`content/HOST-EVENTS.md`, directions 2
  *   and 3) — `OnlyOfficeDocumentService`'s request/response exchange (`REQUEST_DOCUMENT_CONTENT`,
@@ -9,8 +10,18 @@
  *   boot) and "Passende Inhalte" (content suggested from the open document's text). `INSERT_NODE`
  *   ("Gewählten Inhalt kopieren", direction 1) is a separate, application-agnostic contract and is
  *   not covered — a page the plugin no longer announces itself on can still receive content.
+ * - `wlo`: the optional WLO metadata editor — `BrowserExtensionCustomWebComponentService.enabled`,
+ *   which every WLO branch in the panel reads (see that service). Blacklisted, the wlo bundle is never
+ *   loaded and the panel runs the ordinary core flow whatever the repository config or the *Einstellungen*
+ *   switch say — the switch itself, and everything behind it, is hidden from *Einstellungen* rather than
+ *   merely inert (`SettingsScreenComponent`).
+ * - `nostr`: the panel speaking to a nostr relay at all — `NostrForwardService.enabled` (see that
+ *   service). Blacklisted, the two forwarding steps and the Interaktionen's nostr standing are not
+ *   offered and neither `publish` nor `lookup` ever reaches a relay, exactly as the *Einstellungen*
+ *   switch's own off already behaves — the Nostr-Relay card is hidden from *Einstellungen* rather than
+ *   merely inert.
  */
-export type FeatureKey = 'onlyOfficeEvents';
+export type FeatureKey = 'onlyOfficeEvents' | 'wlo' | 'nostr';
 
 /**
  * Which way a scheme's number has to go for the criterion it judges to count as met: `atLeast` where the higher
@@ -59,7 +70,7 @@ export const APP_CONFIG = {
    * *Einstellungen*, this is not something a person using the extension chooses). A deployment that
    * needs one off edits this array and rebuilds — see `FeatureKey` for what each one covers.
    */
-  featureBlacklist: [] as readonly FeatureKey[],
+  featureBlacklist: ["onlyOfficeEvents", "nostr", "wlo"] as readonly FeatureKey[],
   /**
    * MetalookUp, which evaluates a resource and answers with the metadata it could extract from it
    * (`POST /api/evaluation`, see MetalookupService). The host root — the base its own OpenAPI
