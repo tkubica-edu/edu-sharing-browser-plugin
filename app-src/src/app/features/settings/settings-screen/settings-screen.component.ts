@@ -137,13 +137,6 @@ export class SettingsScreenComponent implements OnDestroy {
   protected readonly openSection = signal<SettingsSection | null>(null);
 
   /**
-   * How many settings of each section stand away from what the panel ships with, so a folded section says
-   * whether anything in it was touched. Summed from the services rather than compared here: which value a
-   * setting has without anybody setting it is the knowledge of whoever holds the setting (see
-   * ChatStyleService.changedSettings). Stated per section of this screen, since the sections are how they
-   * are grouped for the reader and not how the services are split.
-   */
-  /**
    * Whether the *Entwickler-Optionen* card has anything to show at all: the WLO switch, the dev mode or
    * the debug mode each fold in only while its own `blacklisted()` is false, so the card itself is hidden
    * rather than left standing empty once a deployment blacklists all three.
@@ -152,6 +145,21 @@ export class SettingsScreenComponent implements OnDestroy {
     () => !this.wlo.blacklisted() || !this.devMode.blacklisted() || !this.debug.blacklisted(),
   );
 
+  /**
+   * Whether the *SSO-Anmeldung* card is shown at all — grouped with the other developer-facing detail
+   * behind the same `developerOptions` blacklist key `devMode.blacklisted` already reads, hidden
+   * entirely rather than shown but pointless once a deployment turns it off. The login flow itself is
+   * unaffected either way.
+   */
+  protected readonly ssoInfoShown = computed(() => !this.devMode.blacklisted());
+
+  /**
+   * How many settings of each section stand away from what the panel ships with, so a folded section says
+   * whether anything in it was touched. Summed from the services rather than compared here: which value a
+   * setting has without anybody setting it is the knowledge of whoever holds the setting (see
+   * ChatStyleService.changedSettings). Stated per section of this screen, since the sections are how they
+   * are grouped for the reader and not how the services are split.
+   */
   protected readonly changedPerSection = computed<Record<TunableSection, number>>(() => ({
     developer: this.wlo.changedSettings() + this.devMode.changedSettings() + this.debug.changedSettings(),
     ai: this.chatStyle.changedSettings() + this.chatSkill.changedSettings(),
@@ -185,10 +193,6 @@ export class SettingsScreenComponent implements OnDestroy {
     this.touched.set(true);
     this.changed = true;
     this.auth.setRepositoryUrl(url);
-  }
-
-  protected resetToDefault(): void {
-    this.apply(APP_CONFIG.defaultRepositoryUrl);
   }
 
   /** Take the changed repository over right away, instead of leaving it to the screen being left. */

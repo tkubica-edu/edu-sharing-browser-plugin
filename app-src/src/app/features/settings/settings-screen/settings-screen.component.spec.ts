@@ -252,14 +252,13 @@ describe('SettingsScreenComponent', () => {
       expect(query('#repo-url')!.classList.contains('invalid')).toBe(true);
     });
 
-    it('puts the shipped address back', async () => {
+    it('offers no way to reset the address — a typed value is the only way to change it', async () => {
       await render();
 
-      button('Auf Standard zurücksetzen').click();
-      await settle();
-
-      expect(auth.fake.setRepositoryUrl).toHaveBeenCalledWith(APP_CONFIG.defaultRepositoryUrl);
-      expect(query<HTMLInputElement>('#repo-url')!.value).toBe(APP_CONFIG.defaultRepositoryUrl);
+      const buttons: HTMLButtonElement[] = Array.from(
+        query('#repo-url')!.closest('section')!.querySelectorAll('button'),
+      );
+      expect(buttons.find((entry) => (entry.textContent ?? '').includes('Auf Standard zurücksetzen'))).toBeUndefined();
     });
 
     it('names the version the repository answered', async () => {
@@ -428,6 +427,13 @@ describe('SettingsScreenComponent', () => {
   });
 
   describe('the SSO section', () => {
+    it('is hidden entirely where the deployment blacklists developerOptions', async () => {
+      devMode.blacklist();
+      await render();
+
+      expect(() => head(SSO)).toThrow();
+    });
+
     it('names the address the repository is asked under', async () => {
       await render();
       await open(SSO);
@@ -639,6 +645,15 @@ describe('SettingsScreenComponent', () => {
       await render();
 
       expect(() => head(DEVELOPER)).toThrow();
+    });
+
+    it('drops a changed WLO setting from the pill once the deployment blacklists it', async () => {
+      await wlo.fake.setEnabled(false);
+      wlo.blacklist();
+      await render();
+
+      // The checkbox this would report on is itself hidden — nothing is left to show it on.
+      expect(pill(DEVELOPER)).toBeNull();
     });
 
     it('shows the faked run’s fields only while the mode is on', async () => {

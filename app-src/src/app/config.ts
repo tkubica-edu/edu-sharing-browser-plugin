@@ -76,7 +76,7 @@ export const APP_CONFIG = {
    * *Einstellungen*, this is not something a person using the extension chooses). A deployment that
    * needs one off edits this array and rebuilds — see `FeatureKey` for what each one covers.
    */
-  featureBlacklist: ["onlyOfficeEvents", "nostr", "wlo"] as readonly FeatureKey[],
+  featureBlacklist: ["onlyOfficeEvents", "nostr", "wlo", "developerOptions"] as readonly FeatureKey[],
   /**
    * MetalookUp, which evaluates a resource and answers with the metadata it could extract from it
    * (`POST /api/evaluation`, see MetalookupService). The host root — the base its own OpenAPI

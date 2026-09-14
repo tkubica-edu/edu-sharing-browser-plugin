@@ -47,16 +47,15 @@
       <button class="es-btn es-btn--tonal es-btn--small" (click)="reload()">Jetzt übernehmen</button>
     </div>
   }
-
-  <div class="es-row">
-    <button class="es-btn es-btn--text" (click)="resetToDefault()">Auf Standard zurücksetzen</button>
-  </div>
 </section>
 
 <!-- What the repository says about its own authorization server. Next to the repository rather than
      among the tuning below, because that is what it is about: whether this repository federates
      decides which way the login card leads, and nothing in here is a setting. Folded, because a
-     repository that federates against nothing never needs it. -->
+     repository that federates against nothing never needs it. Hidden entirely, rather than shown but
+     of no interest, once a deployment blacklists `developerOptions` — the login flow itself keeps
+     running unchanged either way, only this card's own diagnostic detail disappears. -->
+@if (ssoInfoShown()) {
 <section class="es-card">
   <button type="button" class="section-head" (click)="toggleSection('sso')"
           [attr.aria-expanded]="openSection() === 'sso'">
@@ -201,6 +200,7 @@ wa          <strong>ausschließlich</strong> über „Anmelden mit OAuth“, Ben
     </p>
   }
 </section>
+}
 
 <!-- Not folded away like the tuning below it: this one is about the panel itself rather than about a
      step in it, and the settings are reachable from every screen through the topbar. -->

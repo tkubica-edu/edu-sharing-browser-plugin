@@ -173,11 +173,13 @@ export class NostrForwardService {
   /**
    * How many of the settings stand away from what the panel ships with — see
    * ChatStyleService.changedSettings. The relay counts as changed while one is named, the default being
-   * the address the panel carries itself.
+   * the address the panel carries itself. Blacklisted counts as never changed: the whole Nostr-Relay
+   * card these settings belong to is itself hidden from *Einstellungen*, so nothing is left to report on.
    */
-  readonly changedSettings = computed(
-    () => (this.enabledState() === DEFAULT_ENABLED ? 0 : 1) + (this.relayState().trim() ? 1 : 0)
-  );
+  readonly changedSettings = computed(() => {
+    if (this.blacklisted()) return 0;
+    return (this.enabledState() === DEFAULT_ENABLED ? 0 : 1) + (this.relayState().trim() ? 1 : 0);
+  });
 
   /** Load the persisted settings. Before the forwarding step can offer the relay. */
   async load(): Promise<void> {

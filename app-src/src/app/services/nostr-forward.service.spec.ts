@@ -565,6 +565,15 @@ describe('NostrForwardService', () => {
       expect(extension.storage.get(APP_CONFIG.storageKeys.nostrEnabled)).toBe(true);
     });
 
+    it('reports no changed settings, even ones left over from before the blacklist took effect', () => {
+      // `beforeEach` already put a non-default relay in through `setRelayUrl(TEST_RELAY)`, so this is a
+      // setting left standing from before the deployment blacklisted nostr, not one changed here.
+      blacklist('nostr');
+
+      // The whole Nostr-Relay card these settings belong to is itself hidden — nothing is left to show them on.
+      expect(nostr.changedSettings()).toBe(0);
+    });
+
     it('runs as normal where the blacklist does not name it', () => {
       expect(nostr.blacklisted()).toBe(false);
       expect(nostr.enabled()).toBe(true);

@@ -147,5 +147,16 @@ describe('BrowserExtensionCustomWebComponentService', () => {
       expect(service.blacklisted()).toBe(false);
       expect(service.enabled()).toBe(true);
     });
+
+    it('reports no changed settings, even one left over from before the blacklist took effect', async () => {
+      browserExtension.storage.set(APP_CONFIG.storageKeys.wloEnabled, false);
+      blacklist('wlo');
+
+      const service = TestBed.inject(BrowserExtensionCustomWebComponentService);
+      await service.load();
+
+      // The checkbox this would report on is itself hidden — nothing is left to show it on.
+      expect(service.changedSettings()).toBe(0);
+    });
   });
 });

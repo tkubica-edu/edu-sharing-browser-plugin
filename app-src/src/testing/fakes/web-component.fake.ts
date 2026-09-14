@@ -27,7 +27,7 @@ export function fakeWebComponent(enabled = false) {
     settingEnabled: settingState,
     offeredByRepository: repositoryState,
     blacklisted: blacklistedState,
-    changedSettings: computed(() => (settingState() ? 0 : 1)),
+    changedSettings: computed(() => (blacklistedState() || settingState() ? 0 : 1)),
     metadataSet: computed(() => (enabledState() ? APP_CONFIG.metadataSet : DEFAULT)),
     load: async () => {},
     refresh: vi.fn(),

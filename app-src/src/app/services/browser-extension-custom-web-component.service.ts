@@ -56,8 +56,15 @@ export class BrowserExtensionCustomWebComponentService {
   /** Whether the repository offers the WLO extensions at all, whatever the settings make of it. */
   readonly offeredByRepository = this.configState.asReadonly();
 
-  /** Whether the setting stands away from what the panel ships with — see ChatStyleService.changedSettings. */
-  readonly changedSettings = computed(() => (this.settingState() === DEFAULT_SETTING ? 0 : 1));
+  /**
+   * Whether the setting stands away from what the panel ships with — see ChatStyleService.changedSettings.
+   * Blacklisted counts as never changed: the checkbox it would report on is itself hidden from
+   * *Entwickler-Optionen*, so a value left over from before the blacklist took effect must not go on
+   * showing as a pending change nobody can see, let alone undo.
+   */
+  readonly changedSettings = computed(() =>
+    this.blacklisted() || this.settingState() === DEFAULT_SETTING ? 0 : 1,
+  );
 
   /**
    * The metadata set the panel's forms are built from: the WLO set where this is a WLO panel, the repository's own

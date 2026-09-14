@@ -523,7 +523,10 @@ navigating to it, and closes it again where it stands; the step keeps running be
   asking for username and password; where it does not — the ordinary case — the card is the
   credential form alone. See
   [UI-SHELL.md § Login, session restore and the guest gate](UI-SHELL.md#login-session-restore-and-the-guest-gate)
-  and [ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow).
+  and [ARCHITECTURE.md § The OAuth flow](ARCHITECTURE.md#the-oauth-flow). The card is hidden from
+  *Einstellungen* altogether where a deployment blacklists `developerOptions` — grouped with the
+  other developer-facing detail behind that key rather than a key of its own; the login flow itself
+  keeps running exactly as described above, only this diagnostic view of it disappears.
 
   *Darstellung* is not folded away, because it is about the panel rather than about a step in it:
   *System folgen* / *Hell* / *Dunkel*, persisted under `eduSharingTheme` and resolved by
