@@ -27,6 +27,10 @@ export function fakeDevMode() {
 
   const fake = {
     enabled: signal(false),
+    // Independent of `enabled` here, unlike the real service (whose `enabled` is the two of them
+    // together): most specs only care about the outcome and use `faking()`/`blacklist()`, which each
+    // set `enabled` to match what the real service would derive.
+    blacklisted: signal(false),
     fakedCollectionId: signal(''),
     fakedNodeId: signal(''),
     writesSkipped: signal(false),
@@ -74,7 +78,13 @@ export function fakeDevMode() {
     fake.changedSettings.set(changed);
   }
 
-  return { fake, faked, answer, standsInForNode, faking };
+  /** The deployment turned `developerOptions` off outright — see `FeatureKey`. Also turns `enabled` off with it. */
+  function blacklist(): void {
+    fake.blacklisted.set(true);
+    fake.enabled.set(false);
+  }
+
+  return { fake, faked, answer, standsInForNode, faking, blacklist };
 }
 
 export type DevModeFake = ReturnType<typeof fakeDevMode>;

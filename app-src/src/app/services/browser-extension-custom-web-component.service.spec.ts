@@ -3,11 +3,12 @@ import { BehaviorSubject } from 'rxjs';
 import { ConfigService, DEFAULT, Variables } from 'ngx-edu-sharing-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { APP_CONFIG, FeatureKey } from '../config';
+import { APP_CONFIG } from '../config';
 import { BrowserExtensionCustomWebComponentService } from './browser-extension-custom-web-component.service';
 import { BrowserExtensionService } from './browser-extension.service';
 import { BrowserExtensionFake, fakeBrowserExtension } from '../../testing/fakes';
 import { provideFake } from '../../testing/provide-fake';
+import { useFeatureBlacklist } from '../../testing/feature-blacklist';
 
 /** Class the service stamps on the document while the panel is a WLO one. */
 const THEME_CLASS = 'wlo-theme';
@@ -28,6 +29,8 @@ function fakeConfig() {
 }
 
 describe('BrowserExtensionCustomWebComponentService', () => {
+  const blacklist = useFeatureBlacklist();
+
   let browserExtension: BrowserExtensionFake;
   let config: ReturnType<typeof fakeConfig>;
 
@@ -123,13 +126,6 @@ describe('BrowserExtensionCustomWebComponentService', () => {
   });
 
   describe('with wlo blacklisted', () => {
-    /** Puts `features` on the deployment's blacklist for one test, restored again after it. */
-    function blacklist(...features: FeatureKey[]): void {
-      (APP_CONFIG as unknown as { featureBlacklist: FeatureKey[] }).featureBlacklist = features;
-    }
-
-    afterEach(() => blacklist());
-
     it('reports itself blacklisted', () => {
       blacklist('wlo');
       const service = TestBed.inject(BrowserExtensionCustomWebComponentService);

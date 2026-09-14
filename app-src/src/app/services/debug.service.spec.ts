@@ -7,6 +7,7 @@ import { BrowserExtensionService } from './browser-extension.service';
 import { DebugService } from './debug.service';
 import { provideFake } from '../../testing/provide-fake';
 import { BrowserExtensionFake, fakeBrowserExtension } from '../../testing/fakes';
+import { useFeatureBlacklist } from '../../testing/feature-blacklist';
 
 /** The node id the simulated document reports while nobody configured one. */
 const DEFAULT_NODE_ID = 'debug-document-node';
@@ -18,6 +19,8 @@ const LATENCY_MS = 250;
 type PostedMessage = PluginEnvelope & { source: string };
 
 describe('DebugService', () => {
+  const blacklist = useFeatureBlacklist();
+
   let debug: DebugService;
   let extension: BrowserExtensionFake;
   /**
@@ -251,6 +254,32 @@ describe('DebugService', () => {
 
       await debug.setEnabled(false);
       expect(extension.storage.get(keys.debugMode)).toBe(false);
+    });
+  });
+
+  describe('with the feature blacklisted', () => {
+    it('reports itself blacklisted and behaves as though the setting were off', async () => {
+      await debug.setEnabled(true);
+      blacklist('developerOptions');
+
+      expect(debug.blacklisted()).toBe(true);
+      expect(debug.enabled()).toBe(false);
+      expect(debug.changedSettings()).toBe(0);
+    });
+
+    it('is blacklisted along with `onlyOfficeEvents`, since simulating it then answers nobody', async () => {
+      await debug.setEnabled(true);
+      blacklist('onlyOfficeEvents');
+
+      expect(debug.blacklisted()).toBe(true);
+      expect(debug.enabled()).toBe(false);
+    });
+
+    it('runs as normal where the blacklist does not name either key', async () => {
+      await debug.setEnabled(true);
+
+      expect(debug.blacklisted()).toBe(false);
+      expect(debug.enabled()).toBe(true);
     });
   });
 });

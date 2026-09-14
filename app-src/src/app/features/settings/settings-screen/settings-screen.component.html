@@ -215,18 +215,12 @@ wa          <strong>ausschließlich</strong> über „Anmelden mit OAuth“, Ben
               (click)="setTheme(option.value)">{{ option.label }}</button>
     }
   </div>
-
-  <p class="desc">
-    Die Farben des Panels. „System folgen“ übernimmt, was im Browser bzw. Betriebssystem eingestellt ist —
-    standardmäßig das; die Schaltfläche in der Kopfzeile wechselt zwischen Hell und Dunkel und ist damit
-    zugleich die Abwahl von „System folgen“. Die eingebetteten edu-sharing-Komponenten (Metadatenformular, Vorschau, Suche,
-    „Eigene Inhalte“) und der KI-Chat schalten mit um; der WLO-Editor bleibt hell, weil sein Bundle kein
-    dunkles Thema mitbringt.
-  </p>
 </section>
 
 <!-- The two switches that stand in for a service, folded together: both are for developing on the
-     panel, and neither belongs in front of someone using it. -->
+     panel, and neither belongs in front of someone using it. Hidden entirely, rather than shown but
+     empty, once a deployment blacklists everything the card would otherwise hold. -->
+@if (developerOptionsShown()) {
 <section class="es-card">
   <button type="button" class="section-head" (click)="toggleSection('developer')"
           [attr.aria-expanded]="openSection() === 'developer'">
@@ -270,7 +264,10 @@ wa          <strong>ausschließlich</strong> über „Anmelden mit OAuth“, Ben
       </div>
     }
 
-    <!-- Entwicklung: ersetzt die Antworten der KI-Dienste durch Fixtures. -->
+    <!-- Entwicklung: ersetzt die Antworten der KI-Dienste durch Fixtures. Ganz ausgeblendet, statt nur
+         wirkungslos, wo eine Installation `developerOptions` per `APP_CONFIG.featureBlacklist`
+         abschaltet — ein Schalter ohne Wirkung wäre irreführend. -->
+    @if (!devMode.blacklisted()) {
     <div class="group-item">
       <label class="check">
         <input type="checkbox" [ngModel]="devMode.enabled()" (ngModelChange)="setDevMode($event)" />
@@ -339,8 +336,12 @@ wa          <strong>ausschließlich</strong> über „Anmelden mit OAuth“, Ben
         }
       }
     </div>
+    }
 
-    <!-- Entwicklung: ersetzt das OnlyOffice-Plugin durch simulierte Events. -->
+    <!-- Entwicklung: ersetzt das OnlyOffice-Plugin durch simulierte Events. Ganz ausgeblendet, statt nur
+         wirkungslos, wo eine Installation `developerOptions` oder `onlyOfficeEvents` per
+         `APP_CONFIG.featureBlacklist` abschaltet — ein Schalter ohne Wirkung wäre irreführend. -->
+    @if (!debug.blacklisted()) {
     <div class="group-item">
       <label class="check">
         <input type="checkbox" [ngModel]="debug.enabled()" (ngModelChange)="setDebug($event)" />
@@ -370,8 +371,10 @@ wa          <strong>ausschließlich</strong> über „Anmelden mit OAuth“, Ben
         </div>
       }
     </div>
+    }
   }
 </section>
+}
 
 <!-- Die Einstellungen zum KI-Chat und zur KI-Prüfung: beides gibt es nur im WLO-Panel, also
      werden sie nur dort gezeigt. -->

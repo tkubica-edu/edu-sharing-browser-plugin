@@ -2,7 +2,6 @@ import { TestBed } from '@angular/core/testing';
 import { Node } from 'ngx-edu-sharing-api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { APP_CONFIG, FeatureKey } from '../config';
 import { DocumentContent, DocumentRequestKind, PluginEnvelope } from '../model/onlyoffice-events';
 import {
   AuthFake,
@@ -15,6 +14,7 @@ import {
   fakeDebug,
 } from '../../testing/fakes';
 import { provideFake } from '../../testing/provide-fake';
+import { useFeatureBlacklist } from '../../testing/feature-blacklist';
 import { AuthService } from './auth.service';
 import { BrowserExtensionService } from './browser-extension.service';
 import { DebugService } from './debug.service';
@@ -33,6 +33,8 @@ const CONTENT_TIMEOUT_MS = 15000;
 const INFO_TIMEOUT_MS = 10000;
 
 describe('OnlyOfficeDocumentService', () => {
+  const blacklist = useFeatureBlacklist();
+
   let documents: OnlyOfficeDocumentService;
   let extension: BrowserExtensionFake;
   let auth: AuthFake;
@@ -215,13 +217,6 @@ describe('OnlyOfficeDocumentService', () => {
   });
 
   describe('with the feature blacklisted', () => {
-    /** Puts `feature` on the deployment's blacklist for one test, restored again after it. */
-    function blacklist(...features: FeatureKey[]): void {
-      (APP_CONFIG as unknown as { featureBlacklist: FeatureKey[] }).featureBlacklist = features;
-    }
-
-    afterEach(() => blacklist());
-
     it('says so at once rather than waiting out the timeout, exactly like no host page', async () => {
       blacklist('onlyOfficeEvents');
 

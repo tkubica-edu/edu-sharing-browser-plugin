@@ -143,6 +143,15 @@ export class SettingsScreenComponent implements OnDestroy {
    * ChatStyleService.changedSettings). Stated per section of this screen, since the sections are how they
    * are grouped for the reader and not how the services are split.
    */
+  /**
+   * Whether the *Entwickler-Optionen* card has anything to show at all: the WLO switch, the dev mode or
+   * the debug mode each fold in only while its own `blacklisted()` is false, so the card itself is hidden
+   * rather than left standing empty once a deployment blacklists all three.
+   */
+  protected readonly developerOptionsShown = computed(
+    () => !this.wlo.blacklisted() || !this.devMode.blacklisted() || !this.debug.blacklisted(),
+  );
+
   protected readonly changedPerSection = computed<Record<TunableSection, number>>(() => ({
     developer: this.wlo.changedSettings() + this.devMode.changedSettings() + this.debug.changedSettings(),
     ai: this.chatStyle.changedSettings() + this.chatSkill.changedSettings(),

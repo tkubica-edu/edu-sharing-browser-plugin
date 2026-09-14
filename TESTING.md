@@ -353,6 +353,16 @@ a WLO panel, see there); ticking the last one adds a fourth:
   ideally one whose content matches the **Gefakter Inhalt** above: the assistant reads its metadata and
   full text from it. It never becomes the target of a save — while it applies, nothing is written.
 
+A deployment can turn the whole *Entwickler-Optionen* card off outright — `APP_CONFIG.featureBlacklist`
+naming `developerOptions` (`app-src/src/app/config.ts`, see `FeatureKey` for the full list) — a static,
+developer-edited array rather than a setting, shared with the debug mode below. `DevModeService.blacklisted`
+folds into `enabled` the same way the switch does, so a blacklisted deployment answers from the real
+services whatever the setting says, and `SettingsScreenComponent` hides the **Dev-Modus** checkbox
+instead of showing a switch nobody could turn back on. Unlike the WLO and Nostr switches, `load()` also
+writes a persisted "on" back to storage where it finds the mode blacklisted: `background/background.js`
+reads `eduSharingDevMode` on its own, with no blacklist of its own to stop it, and would otherwise keep
+answering `/generate` from fixtures unseen.
+
 ### Reaching „Individuelle Qualitätsprüfung mit KI" quickly
 
 1. Switch the dev mode on, put a real collection id into **Test-Sammlungs-ID**, tick **Nichts ins
@@ -393,6 +403,13 @@ exercise the whole flow including *Speichern*. The flag is persisted in `storage
 (`eduSharingDebugMode`) and read in `AppComponent.ngOnInit` **before** anything evaluates
 `onlyOfficePresent()`, so it survives reloads inside the extension — in a plain `ng serve` there is no
 extension storage and it resets per session.
+
+The same `developerOptions` blacklist entry that turns off the dev mode above turns this switch off
+too (`DebugService.blacklisted`), hiding the **Debug-Modus** checkbox from *Entwickler-Optionen*.
+Blacklisting `onlyOfficeEvents` blacklists it as well: with the exchange itself off, simulating it
+would offer *Metadaten anreichern* and *Passende Inhalte finden* against a request nobody answers any
+more, see
+[content/HOST-EVENTS.md § Turning directions 2 and 3 off](content/HOST-EVENTS.md#turning-directions-2-and-3-off).
 
 ## An identity provider to test the SSO login against
 

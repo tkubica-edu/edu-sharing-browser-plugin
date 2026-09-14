@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 
-import { APP_CONFIG } from '../config';
+import { APP_CONFIG, isFeatureEnabled } from '../config';
 import { BrowserExtensionService } from './browser-extension.service';
 
 /**
@@ -36,6 +36,13 @@ const DEFAULT_FIXTURE = GENERATE_FIXTURES[0].id;
  * Development mode that answers the LLM-backed services from fixtures instead of asking them, saving the minute or
  * more of LLM work each run costs; off by default. Distinct from {@link DebugService}, which fakes what the browser
  * cannot deliver here rather than what a service takes too long to.
+ *
+ * A deployment can also turn it off outright — `APP_CONFIG.featureBlacklist` naming `developerOptions` — a
+ * static, developer-edited switch rather than a setting; see {@link blacklisted} and {@link enabled}.
+ * `SettingsScreenComponent` hides the switch entirely for such a deployment, instead of showing one that would
+ * have no effect. Unlike the WLO and Nostr switches, {@link load} also writes a persisted "on" back to
+ * storage where it finds itself blacklisted: `background/background.js` reads the same key on its own, with
+ * no blacklist of its own to stop it, and would otherwise go on answering from fixtures unseen.
  */
 @Injectable({ providedIn: 'root' })
 export class DevModeService {
@@ -43,8 +50,11 @@ export class DevModeService {
 
   private readonly enabledState = signal(DEFAULT_ENABLED);
 
-  /** True while the services' answers are faked. Persisted, so it survives a reload. */
-  readonly enabled = this.enabledState.asReadonly();
+  /** True where `APP_CONFIG.featureBlacklist` names `developerOptions` — see `FeatureKey`. */
+  readonly blacklisted = computed(() => !isFeatureEnabled('developerOptions'));
+
+  /** Whether the services' answers are faked — the setting and `developerOptions` not being blacklisted, both. Persisted, so it survives a reload. */
+  readonly enabled = computed(() => !this.blacklisted() && this.enabledState());
 
   private readonly collectionIdState = signal('');
 
@@ -85,9 +95,9 @@ export class DevModeService {
 
   /** Both of the above are answers about a faked run, so they only hold while the mode is on. */
   readonly fakedCollectionId = computed(() =>
-    this.enabledState() ? this.collectionIdState().trim() : '',
+    this.enabled() ? this.collectionIdState().trim() : '',
   );
-  readonly writesSkipped = computed(() => this.enabledState() && this.skipWritesState());
+  readonly writesSkipped = computed(() => this.enabled() && this.skipWritesState());
 
   /**
    * The node a run stands in for, or empty where it stands in for none.
@@ -106,7 +116,7 @@ export class DevModeService {
    * {@link fakedCollectionId}, {@link writesSkipped}) and the only one the settings show them in.
    */
   readonly changedSettings = computed(() => {
-    if (!this.enabledState()) return 0;
+    if (!this.enabled()) return 0;
     return (
       1 +
       (this.generateState() === DEFAULT_FIXTURE ? 0 : 1) +
@@ -129,7 +139,16 @@ export class DevModeService {
     this.generateState.set(
       toFixtureId(await this.browserExtension.storageGet(keys.devModeGenerate, DEFAULT_FIXTURE)),
     );
-    if (this.enabledState()) {
+
+    // A switch left on from before this deployment blacklisted the mode: turned off here rather than
+    // merely read as off, since the background worker reads `devMode` on its own storage lookup, with
+    // no blacklist of its own, and would otherwise keep answering `/generate` from fixtures unseen.
+    if (this.blacklisted() && this.enabledState()) {
+      this.enabledState.set(false);
+      await this.browserExtension.storageSet(keys.devMode, false);
+    }
+
+    if (this.enabled()) {
       console.log(`${LOG} aktiv — KI-Antworten werden gefakt`, {
         generate: this.generateState(),
         collectionId: this.fakedCollectionId() || null,

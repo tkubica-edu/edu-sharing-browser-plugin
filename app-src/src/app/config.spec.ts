@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
-  APP_CONFIG, FeatureKey, METADATA_AGENT_API_URL, isFeatureEnabled, toAgentProxyUrl, toApiRootUrl,
+  APP_CONFIG, METADATA_AGENT_API_URL, isFeatureEnabled, toAgentProxyUrl, toApiRootUrl,
   toTopicAssistantUrl
 } from './config';
+import { useFeatureBlacklist } from '../testing/feature-blacklist';
 
 const REPO = 'https://repo.example.org/edu-sharing';
 
@@ -67,16 +68,7 @@ describe('METADATA_AGENT_API_URL', () => {
 });
 
 describe('isFeatureEnabled', () => {
-  /** Puts `features` on the deployment's blacklist for one test, restored again after it. */
-  function blacklist(...features: FeatureKey[]): void {
-    (APP_CONFIG as unknown as { featureBlacklist: FeatureKey[] }).featureBlacklist = features;
-  }
-
-  afterEach(() => blacklist());
-
-  it('ships with nothing blacklisted', () => {
-    expect(APP_CONFIG.featureBlacklist).toEqual([]);
-  });
+  const blacklist = useFeatureBlacklist();
 
   it('runs a feature the blacklist does not name', () => {
     expect(isFeatureEnabled('onlyOfficeEvents')).toBe(true);
@@ -86,5 +78,13 @@ describe('isFeatureEnabled', () => {
     blacklist('onlyOfficeEvents');
 
     expect(isFeatureEnabled('onlyOfficeEvents')).toBe(false);
+  });
+
+  it('covers `developerOptions`, the Entwickler-Optionen card`s own key', () => {
+    expect(isFeatureEnabled('developerOptions')).toBe(true);
+
+    blacklist('developerOptions');
+
+    expect(isFeatureEnabled('developerOptions')).toBe(false);
   });
 });

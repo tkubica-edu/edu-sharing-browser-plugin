@@ -612,6 +612,35 @@ describe('SettingsScreenComponent', () => {
       expect(text()).toContain('Dev-Modus: KI-Antworten faken');
     });
 
+    it('hides the dev mode switch entirely where the deployment blacklists it', async () => {
+      devMode.blacklist();
+      await render();
+      await open(DEVELOPER);
+
+      expect(text()).not.toContain('Dev-Modus: KI-Antworten faken');
+      // The rest of the section — a switch a deployment did not blacklist — is unaffected.
+      expect(text()).toContain('Debug-Modus: OnlyOffice-Events simulieren');
+    });
+
+    it('hides the debug mode switch entirely where the deployment blacklists it', async () => {
+      debug.blacklist();
+      await render();
+      await open(DEVELOPER);
+
+      expect(text()).not.toContain('Debug-Modus: OnlyOffice-Events simulieren');
+      // The rest of the section — a switch a deployment did not blacklist — is unaffected.
+      expect(text()).toContain('Dev-Modus: KI-Antworten faken');
+    });
+
+    it('hides the whole card where the deployment blacklists everything it holds', async () => {
+      wlo.blacklist();
+      devMode.blacklist();
+      debug.blacklist();
+      await render();
+
+      expect(() => head(DEVELOPER)).toThrow();
+    });
+
     it('shows the faked run’s fields only while the mode is on', async () => {
       await render();
       await open(DEVELOPER);

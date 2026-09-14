@@ -4,10 +4,11 @@ import { verifyEvent } from 'nostr-tools/pure';
 
 import { NostrForwardService } from './nostr-forward.service';
 import { BrowserExtensionService } from './browser-extension.service';
-import { APP_CONFIG, FeatureKey } from '../config';
+import { APP_CONFIG } from '../config';
 import { AmbSource } from '../util/amb-event';
 import { BrowserExtensionFake, fakeBrowserExtension } from '../../testing/fakes';
 import { provideFake } from '../../testing/provide-fake';
+import { useFeatureBlacklist } from '../../testing/feature-blacklist';
 
 /**
  * A relay in place of the network: it takes the frames the service sends, and answers the `EVENT` with
@@ -127,6 +128,8 @@ function aSource(overrides: Partial<AmbSource> = {}): AmbSource {
 }
 
 describe('NostrForwardService', () => {
+  const blacklist = useFeatureBlacklist();
+
   let nostr: NostrForwardService;
   let extension: BrowserExtensionFake;
   /**
@@ -528,13 +531,6 @@ describe('NostrForwardService', () => {
   });
 
   describe('with nostr blacklisted', () => {
-    /** Puts `features` on the deployment's blacklist for one test, restored again after it. */
-    function blacklist(...features: FeatureKey[]): void {
-      (APP_CONFIG as unknown as { featureBlacklist: FeatureKey[] }).featureBlacklist = features;
-    }
-
-    afterEach(() => blacklist());
-
     it('reports itself blacklisted and behaves as though the setting were off', () => {
       blacklist('nostr');
       expect(nostr.blacklisted()).toBe(true);

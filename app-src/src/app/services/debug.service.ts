@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 
-import { APP_CONFIG } from '../config';
+import { APP_CONFIG, isFeatureEnabled } from '../config';
 import {
   DocumentContent,
   DocumentRequestKind,
@@ -62,6 +62,12 @@ const LOG = '[edu-sharing][debug]';
  * Development mode standing in for the host-side OnlyOffice plugin: every page counts as an insert host and each
  * `REQUEST_DOCUMENT_*` is answered from the fixtures above. The answers are fed in through the real inbound path,
  * so the requestId correlation, the identity handling and the node hydration run exactly as in production.
+ *
+ * A deployment can also turn it off outright — `APP_CONFIG.featureBlacklist` naming `developerOptions` — a
+ * static, developer-edited switch rather than a setting; see {@link blacklisted} and {@link enabled}.
+ * `SettingsScreenComponent` hides the switch entirely for such a deployment, instead of showing one that would
+ * have no effect. `onlyOfficeEvents` blacklists it too: simulating events nobody accepts any more would offer
+ * options — "Metadaten anreichern", "Passende Inhalte finden" — that then find nothing behind them.
  */
 @Injectable({ providedIn: 'root' })
 export class DebugService {
@@ -70,8 +76,13 @@ export class DebugService {
   private readonly enabledState = signal(false);
   private readonly documentNodeIdState = signal(DEFAULT_DOCUMENT_NODE_ID);
 
-  /** True while the OnlyOffice events are simulated. Persisted, so it survives a reload. */
-  readonly enabled = this.enabledState.asReadonly();
+  /** True where `APP_CONFIG.featureBlacklist` names `developerOptions` or `onlyOfficeEvents` — see `FeatureKey`. */
+  readonly blacklisted = computed(
+    () => !isFeatureEnabled('developerOptions') || !isFeatureEnabled('onlyOfficeEvents'),
+  );
+
+  /** Whether the OnlyOffice events are simulated — the setting and neither blacklist naming it, both. Persisted, so it survives a reload. */
+  readonly enabled = computed(() => !this.blacklisted() && this.enabledState());
 
   /** Node id the simulated document reports (editable in the settings). */
   readonly documentNodeId = this.documentNodeIdState.asReadonly();
@@ -82,7 +93,7 @@ export class DebugService {
    * mode is on: with it off nothing reports that node, and the settings do not even show the field.
    */
   readonly changedSettings = computed(() => {
-    if (!this.enabledState()) return 0;
+    if (!this.enabled()) return 0;
     return 1 + (this.documentNodeIdState() === DEFAULT_DOCUMENT_NODE_ID ? 0 : 1);
   });
 

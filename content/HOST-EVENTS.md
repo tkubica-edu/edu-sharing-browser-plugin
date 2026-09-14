@@ -298,15 +298,20 @@ answers, and with them the *Inhalt erkannt* auto-detection and *Passende Inhalte
 (`INSERT_NODE`) is untouched — it is the application-agnostic contract this file opens with, not
 something OnlyOffice-specific.
 
-`OnlyOfficeDocumentService` is the one place the flag is read (`isFeatureEnabled('onlyOfficeEvents')`
-from `config.ts`), in the two methods that are this contract's whole surface: `accept()` drops every
-`DOCUMENT_INFO`/`DOCUMENT_CONTENT` envelope exactly as it drops one it does not recognize at all —
-solicited or not, the plugin's startup announce and toolbar button included — so `currentDocument`
-and the node behind it never get set; `send()` (behind `requestContent()`/`requestInfo()`) answers
-`false` on the same path already used for "no host page to ask", so a blacklisted deployment fails
-at once with the existing message rather than waiting out a request nobody will ever answer.
-`panel-host.js` is untouched and keeps relaying every envelope regardless — the gate is entirely on
-the sidebar-app side, in the one service the contract runs through.
+`OnlyOfficeDocumentService` is where the flag gates the contract itself
+(`isFeatureEnabled('onlyOfficeEvents')` from `config.ts`), in the two methods that are this contract's
+whole surface: `accept()` drops every `DOCUMENT_INFO`/`DOCUMENT_CONTENT` envelope exactly as it drops
+one it does not recognize at all — solicited or not, the plugin's startup announce and toolbar button
+included — so `currentDocument` and the node behind it never get set; `send()` (behind
+`requestContent()`/`requestInfo()`) answers `false` on the same path already used for "no host page to
+ask", so a blacklisted deployment fails at once with the existing message rather than waiting out a
+request nobody will ever answer. `panel-host.js` is untouched and keeps relaying every envelope
+regardless — the gate is entirely on the sidebar-app side, in the one service the contract runs
+through.
+
+The same key also folds into `DebugService.blacklisted` (see below): simulating an exchange nobody
+answers any more would offer options — *Metadaten anreichern*, *Passende Inhalte finden* — that then
+find nothing behind them, so the debug mode goes off with the exchange it simulates.
 
 ---
 
@@ -391,8 +396,8 @@ only string fields and the extension re-hydrates from `id`.
 | `app-src/src/app/app.component.ts` | single `window:message` listener: `DOCUMENT_*` → the document bridge, `PREVIEW_NODE` → the flow |
 | `app-src/src/app/model/onlyoffice-events.ts` | the inbound contract: `PLUGIN_SOURCE` marker + `PluginEnvelope` / `DocumentContent` / `DocumentIdentity` payloads |
 | `app-src/src/app/services/onlyoffice-document.service.ts` | the request/response bridge: `requestContent`/`requestInfo` (`requestId` + timeout), `accept(envelope)`, `currentDocument` — also where `APP_CONFIG.featureBlacklist` turns directions 2 and 3 off, see above |
-| `app-src/src/app/config.ts` | `FeatureKey`, `APP_CONFIG.featureBlacklist`, `isFeatureEnabled` — the static switch for the whole exchange |
-| `app-src/src/app/services/debug.service.ts` | debug mode: answers the `REQUEST_DOCUMENT_*` events with hard-coded fixtures instead of asking the host page |
+| `app-src/src/app/config.ts` | `FeatureKey`, `APP_CONFIG.featureBlacklist`, `isFeatureEnabled` — the static switch for the whole exchange and for `developerOptions`, the Entwickler-Optionen card |
+| `app-src/src/app/services/debug.service.ts` | debug mode: answers the `REQUEST_DOCUMENT_*` events with hard-coded fixtures instead of asking the host page — blacklisted along with `onlyOfficeEvents`, see above |
 | `app-src/src/app/services/metadata-agent.service.ts` | `extractField(text, fieldId)` — document `markdown` → `POST /extract-field` (own `fetch`, like the WLO canvas' `/generate`) → the one field's values |
 | `app-src/src/app/services/curation.service.ts` | `openNode(id)` (hydrate the node into the flow), `adoptDetectedNode(node)` (the open document as active node, no history entry) |
 | `background/background.js` | `analyze.run` — `POST /generate` for the extracted tab (the erschließen path; the keyword call does not go through here) |

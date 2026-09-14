@@ -13,6 +13,10 @@ import { DebugService } from '../../app/services/debug.service';
 export function fakeDebug() {
   const fake = {
     enabled: signal(false),
+    // Independent of `enabled` here, unlike the real service (whose `enabled` is the two of them
+    // together): most specs only care about the outcome and use `simulating()`/`blacklist()`, which
+    // each set `enabled` to match what the real service would derive.
+    blacklisted: signal(false),
     documentNodeId: signal('debug-document-node'),
     changedSettings: signal(0),
     setEnabled: vi.fn((enabled: boolean): Promise<void> => {
@@ -32,7 +36,13 @@ export function fakeDebug() {
     fake.changedSettings.set(changed);
   }
 
-  return { fake, simulating };
+  /** The deployment blacklists `developerOptions` or `onlyOfficeEvents` — see `FeatureKey`. Also turns `enabled` off with it. */
+  function blacklist(): void {
+    fake.blacklisted.set(true);
+    fake.enabled.set(false);
+  }
+
+  return { fake, simulating, blacklist };
 }
 
 export type DebugFake = ReturnType<typeof fakeDebug>;

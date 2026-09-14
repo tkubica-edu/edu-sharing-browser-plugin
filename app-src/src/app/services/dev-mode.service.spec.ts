@@ -6,6 +6,7 @@ import { BrowserExtensionService } from './browser-extension.service';
 import { DevModeService, GENERATE_FIXTURES } from './dev-mode.service';
 import { BrowserExtensionFake, fakeBrowserExtension } from '../../testing/fakes';
 import { provideFake } from '../../testing/provide-fake';
+import { useFeatureBlacklist } from '../../testing/feature-blacklist';
 
 /** The fixture a run answers with while nobody chose one. */
 const DEFAULT_FIXTURE = GENERATE_FIXTURES[0].id;
@@ -13,6 +14,8 @@ const DEFAULT_FIXTURE = GENERATE_FIXTURES[0].id;
 const OTHER_FIXTURE = GENERATE_FIXTURES[1].id;
 
 describe('DevModeService', () => {
+  const blacklist = useFeatureBlacklist();
+
   let devMode: DevModeService;
   let extension: BrowserExtensionFake;
 
@@ -206,6 +209,42 @@ describe('DevModeService', () => {
 
       await vi.advanceTimersByTimeAsync(300);
       await settled;
+    });
+  });
+
+  describe('with the feature blacklisted', () => {
+    it('reports itself blacklisted and behaves as though the setting were off', async () => {
+      await devMode.setEnabled(true);
+      blacklist('developerOptions');
+
+      expect(devMode.blacklisted()).toBe(true);
+      expect(devMode.enabled()).toBe(false);
+      expect(devMode.changedSettings()).toBe(0);
+    });
+
+    it('turns a switch left on back off in storage on load, so the background worker stops faking too', async () => {
+      extension.storage.set(keys.devMode, true);
+      blacklist('developerOptions');
+
+      await devMode.load();
+
+      expect(devMode.enabled()).toBe(false);
+      expect(extension.storage.get(keys.devMode)).toBe(false);
+    });
+
+    it('leaves a switch that was already off alone on load', async () => {
+      blacklist('developerOptions');
+
+      await devMode.load();
+
+      expect(extension.storage.get(keys.devMode)).toBeUndefined();
+    });
+
+    it('runs as normal where the blacklist does not name it', async () => {
+      await devMode.setEnabled(true);
+
+      expect(devMode.blacklisted()).toBe(false);
+      expect(devMode.enabled()).toBe(true);
     });
   });
 });

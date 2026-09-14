@@ -20,8 +20,14 @@
  *   offered and neither `publish` nor `lookup` ever reaches a relay, exactly as the *Einstellungen*
  *   switch's own off already behaves — the Nostr-Relay card is hidden from *Einstellungen* rather than
  *   merely inert.
+ * - `developerOptions`: the *Entwickler-Optionen* card in *Einstellungen* — `DevModeService.enabled`
+ *   and `DebugService.enabled` (see those services). Blacklisted, both switches are hidden rather than
+ *   merely inert, and a switch left on from before the blacklist took effect is turned off with it:
+ *   `DevModeService` writes its persisted setting back to off on load, since the background worker
+ *   reads that same storage key on its own and would otherwise keep answering from fixtures; `DebugService`
+ *   only computes `enabled` off the flag, since nothing outside the panel reads its storage key.
  */
-export type FeatureKey = 'onlyOfficeEvents' | 'wlo' | 'nostr';
+export type FeatureKey = 'onlyOfficeEvents' | 'wlo' | 'nostr' | 'developerOptions';
 
 /**
  * Which way a scheme's number has to go for the criterion it judges to count as met: `atLeast` where the higher

@@ -480,6 +480,15 @@ navigating to it, and closes it again where it stands; the step keeps running be
   none. Every default is compared where it is defined — each service answers for its own settings
   (`changedSettings`), the screen only sums them per group.
 
+  A deployment can hide the dev mode and the debug mode from *Entwickler-Optionen* independently —
+  `APP_CONFIG.featureBlacklist` naming `developerOptions` — and the debug mode along with them by
+  naming `onlyOfficeEvents` instead, since simulating an exchange that is itself off would offer
+  options nothing answers any more; see
+  [TESTING.md § Dev mode](TESTING.md#dev-mode-faked-ki-answers) and
+  [TESTING.md § Debug mode](TESTING.md#debug-mode-onlyoffice-without-onlyoffice). Blacklisting
+  everything the card can hold — those two plus **WLO-Funktionen verwenden** — hides the whole card
+  instead of leaving it open on nothing.
+
   Under the URL the panel states which edu-sharing the repository runs, read once on boot from
   `GET /_about` (`RepositoryVersionService`, `version.repository`) and no setting: it is what decides
   whether the repository's own UI is embedded at all, and from which of the packaged `edu/` bundle's
