@@ -1,7 +1,14 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 
 import { APP_CONFIG } from '../config';
-import { BrowserExtensionService, OAuthDiscovery, OAuthRequest, RedirectUriInUse } from './browser-extension.service';
+import {
+  BrowserExtensionService,
+  OAuthDiscovery,
+  OAuthRequest,
+  RedirectUriInUse,
+  WORKER_UNREACHABLE,
+  WORKER_UNREACHABLE_TEXT,
+} from './browser-extension.service';
 import { errorMessage } from '../util/errors';
 
 /**
@@ -46,6 +53,7 @@ const CANCELLED = /OAUTH_CANCELLED|OAUTH_TIMEOUT/;
  * throws, so a refusal says which step refused rather than showing its internals.
  */
 const ERROR_TEXTS: readonly (readonly [RegExp, string])[] = [
+  [new RegExp(WORKER_UNREACHABLE), WORKER_UNREACHABLE_TEXT],
   [/OAUTH_NO_REPOSITORY|OAUTH_NO_CLIENT_ID/, 'Die SSO-Anmeldung steht für dieses Repository nicht zur Verfügung.'],
   [/OAUTH_DISCOVERY_INCOMPLETE/, 'Das Repository beschreibt keine nutzbaren OAuth-Endpunkte.'],
   [/OAUTH_DISCOVERY_FAILED/, 'Das Repository veröffentlicht keine OAuth-Konfiguration.'],
