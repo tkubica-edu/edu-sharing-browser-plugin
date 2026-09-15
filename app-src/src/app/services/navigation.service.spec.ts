@@ -285,7 +285,7 @@ describe('NavigationService', () => {
     it('makes the step it left the one back returns to', () => {
       navigation.go('history');
       contentInHand();
-      navigation.go('overview');
+      navigation.go('editing');
       navigation.back();
 
       expect(navigation.section()).toBe('history');
@@ -294,12 +294,12 @@ describe('NavigationService', () => {
     it('counts re-entering the open section as a tab change rather than as a step', () => {
       contentInHand();
       navigation.go('history');
-      navigation.go('overview');
-      navigation.go('overview', { tab: 'usages' });
+      navigation.go('editing');
+      navigation.go('editing', { tab: 'find-content' });
 
-      expect(navigation.screen()).toBe('usages');
+      expect(navigation.screen()).toBe('find-content');
       navigation.back();
-      // One step behind the Übersicht, not two.
+      // One step behind the section, not two.
       expect(navigation.section()).toBe('history');
     });
   });
@@ -449,6 +449,16 @@ describe('NavigationService', () => {
 
       expect(navigation.section()).toBe('overview');
       expect(curation.fake.releaseChosenContent).not.toHaveBeenCalled();
+    });
+
+    it('leaves the Inhaltsübersicht on the main menu, wherever it was reached from', () => {
+      navigation.go('history');
+      contentInHand();
+      navigation.go('overview');
+
+      navigation.back();
+
+      expect(navigation.section()).toBe('menu');
     });
   });
 
@@ -648,13 +658,21 @@ describe('NavigationService', () => {
     it('names where the way back leads', () => {
       navigation.go('history');
       contentInHand();
-      navigation.go('overview');
+      navigation.go('content-options');
 
       expect(navigation.backLabel()).toBe('Zurück zu „Verlauf“');
     });
 
     it('names the main menu where the trail is used up', () => {
       navigation.go('history');
+
+      expect(navigation.backLabel()).toBe('Zurück zum Hauptmenü');
+    });
+
+    it('names the main menu from the Inhaltsübersicht, wherever it was reached from', () => {
+      navigation.go('history');
+      contentInHand();
+      navigation.go('overview');
 
       expect(navigation.backLabel()).toBe('Zurück zum Hauptmenü');
     });
@@ -859,13 +877,13 @@ describe('NavigationService', () => {
       contentInHand();
 
       expect(
-        navigation.resume({ section: 'overview', tab: 'usages' }, [
+        navigation.resume({ section: 'editing', tab: 'search' }, [
           { section: 'menu', tab: null },
           { section: 'history', tab: 'history' },
         ]),
       ).toBe(true);
-      expect(navigation.section()).toBe('overview');
-      expect(navigation.screen()).toBe('usages');
+      expect(navigation.section()).toBe('editing');
+      expect(navigation.screen()).toBe('search');
 
       navigation.back();
       expect(navigation.section()).toBe('history');

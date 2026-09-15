@@ -106,6 +106,8 @@ export class NavigationService {
       const beneath = this.currentSection();
       return beneath ? `Zurück zu „${this.titleOf(beneath)}“` : 'Zurück zum Hauptmenü';
     }
+    // Reachable from several different screens, so the trail's step behind it is not named here either.
+    if (this.currentSection()?.backToMenu) return 'Zurück zum Hauptmenü';
     const previous = this.previousStep();
     const section = previous && this.sectionOf(previous.section);
     return section && previous.section !== 'menu'
@@ -340,6 +342,8 @@ export class NavigationService {
     // The one place both back buttons meet — the topbar's and every footer's — so a step that has something to
     // lose is asked about once, wherever the walk back was started from.
     if (this.leaveGuard()?.() === false) return;
+    // A step reached from several different screens has no single one to walk back to — see AppSection.backToMenu.
+    if (this.currentSection()?.backToMenu) return this.openMenu();
     let trail = this.trail();
     while (trail.length) {
       const target = trail[trail.length - 1];

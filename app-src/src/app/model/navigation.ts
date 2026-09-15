@@ -181,6 +181,13 @@ export interface AppSection {
    * something. Back and resume walk past it to the step behind; it is still entered normally.
    */
   oneWay?: boolean;
+  /**
+   * The section ends a flow rather than continuing one it was reached from — it can be reached from
+   * several different screens (Inhaltsoptionen, Verlauf, die eigenen Inhalte, …), so walking back to
+   * whichever one led here would be arbitrary. Back skips the trail entirely and lands on the main
+   * menu instead — see NavigationService.back.
+   */
+  backToMenu?: boolean;
 }
 
 /** Everything except login and settings requires a valid login. */
@@ -476,6 +483,7 @@ export const SECTIONS: readonly AppSection[] = [
     label: 'Inhaltsübersicht',
     description: 'Vorschau, Nutzung, Teilen und Interaktionen des Inhalts',
     visible: requiresLogin((c) => c.hasActiveNode),
+    backToMenu: true,
     tabs: [
       { id: 'preview', label: 'Vorschau' },
       { id: 'usages', label: 'Nutzung' },
