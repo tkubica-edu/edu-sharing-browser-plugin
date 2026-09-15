@@ -489,6 +489,19 @@ navigating to it, and closes it again where it stands; the step keeps running be
   everything the card can hold — those two plus **WLO-Funktionen verwenden** — hides the whole card
   instead of leaving it open on nothing.
 
+  *Qualitätsprüfung*'s two switches — **MetalookUp: Inhalt messen** and **ContentJudge: Inhalt per
+  LLM bewerten**, the latter with the credential field above it — can each be turned off outright by a
+  deployment, independently of **WLO-Funktionen verwenden** and of each other: `metalookup` and
+  `contentJudge` are two more `APP_CONFIG.featureBlacklist` entries, alongside `wlo`/`nostr`/
+  `developerOptions` (see `FeatureKey`). Unlike the *Einstellungen* switches, which only decide
+  whether an allowed judge gets asked, this decides whether `QualityJudgeService.judge` may call it at
+  all — the one place both judges run from after every Erschließung, whatever
+  `browserExtensionCustomWebComponent` says. Blacklisted, the switch (and, for ContentJudge, the
+  credential field) is hidden rather than merely inert, and a setting left over from before the
+  blacklist took effect no longer counts as changed on the group's pill. Blacklisting both hides the
+  whole card, same as blacklisting everything *Entwickler-Optionen* can hold does above — see
+  [STORE-RELEASE.md](STORE-RELEASE.md) § B7.
+
   Under the URL the panel states which edu-sharing the repository runs, read once on boot from
   `GET /_about` (`RepositoryVersionService`, `version.repository`) and no setting: it is what decides
   whether the repository's own UI is embedded at all, and from which of the packaged `edu/` bundle's

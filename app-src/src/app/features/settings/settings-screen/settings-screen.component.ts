@@ -164,7 +164,12 @@ export class SettingsScreenComponent implements OnDestroy {
     developer: this.wlo.changedSettings() + this.devMode.changedSettings() + this.debug.changedSettings(),
     ai: this.chatStyle.changedSettings() + this.chatSkill.changedSettings(),
     recommendation: this.recommendations.changedSettings(),
-    quality: this.qualityJudge.changedSettings() + this.contentJudge.changedSettings(),
+    // The credential's own changedSettings knows nothing of QualityJudgeService.contentJudgeBlacklisted
+    // — a credential left over from before ContentJudge was blacklisted must not go on showing as a
+    // pending change, since the field that would let it be cleared is itself hidden (see the template).
+    quality:
+      this.qualityJudge.changedSettings() +
+      (this.qualityJudge.contentJudgeBlacklisted() ? 0 : this.contentJudge.changedSettings()),
     nostr: this.nostr.changedSettings()
   }));
 

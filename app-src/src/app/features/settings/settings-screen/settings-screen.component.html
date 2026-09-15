@@ -492,81 +492,89 @@ wa          <strong>ausschließlich</strong> über „Anmelden mit OAuth“, Ben
     }
   </section>
 
-  <!-- Welche Dienste die Qualitätsprüfung befragt; eingeklappt wie die Empfehlung darüber. -->
-  <section class="es-card">
-    <button type="button" class="section-head" (click)="toggleSection('quality')"
-            [attr.aria-expanded]="openSection() === 'quality'">
-      <h2>Qualitätsprüfung</h2>
-      <!-- What was changed in this section, so a folded one says whether it holds anything but the
-           defaults; absent where it holds only those. -->
-      @if (changedPerSection().quality; as changed) {
-        <span class="section-count">{{ changed }} geändert</span>
+  <!-- Welche Dienste die Qualitätsprüfung befragt; eingeklappt wie die Empfehlung darüber. Die ganze
+       Karte bleibt aus, wenn dieses Deployment beide Dienste per featureBlacklist abgeschaltet hat —
+       dann gibt es hier nichts mehr einzustellen. -->
+  @if (!qualityJudge.metalookupBlacklisted() || !qualityJudge.contentJudgeBlacklisted()) {
+    <section class="es-card">
+      <button type="button" class="section-head" (click)="toggleSection('quality')"
+              [attr.aria-expanded]="openSection() === 'quality'">
+        <h2>Qualitätsprüfung</h2>
+        <!-- What was changed in this section, so a folded one says whether it holds anything but the
+             defaults; absent where it holds only those. -->
+        @if (changedPerSection().quality; as changed) {
+          <span class="section-count">{{ changed }} geändert</span>
+        }
+        <i class="section-chevron" [class.is-open]="openSection() === 'quality'"
+           esIcon="expand_more"></i>
+      </button>
+
+      @if (openSection() === 'quality') {
+        @if (!qualityJudge.metalookupBlacklisted()) {
+          <label class="check">
+            <input type="checkbox" [ngModel]="qualityJudge.metalookupEnabled()"
+                   (ngModelChange)="setMetalookup($event)" />
+            <span>MetalookUp: Inhalt messen</span>
+          </label>
+
+          <p class="desc">
+            Ruft den Inhalt selbst ab und misst ihn. Abgeschaltet bleiben die Kriterien unbeantwortet, die
+            davon leben. Angefragt werden nur diese Prüfungen — was der Dienst sonst noch messen könnte,
+            läuft gar nicht erst:
+          </p>
+
+          <ul class="desc-list">
+            @for (check of metalookupChecks; track check.propertyId) {
+              <li>{{ check.label }} — Feature „{{ check.feature }}“</li>
+            }
+          </ul>
+        }
+
+        @if (!qualityJudge.contentJudgeBlacklisted()) {
+          <!-- Der Zugang steht über dem Schalter, den er freigibt: ohne ihn ließe der sich nie setzen. -->
+          <label class="es-field-label" for="cj-auth">ContentJudge: Zugang</label>
+          <div class="reveal-field">
+            <input id="cj-auth" class="es-input" [type]="basicAuthVisible() ? 'text' : 'password'"
+                   placeholder="Benutzer:Passwort" autocomplete="off"
+                   [ngModel]="contentJudge.basicAuth()" (ngModelChange)="setContentJudgeAuth($event)" />
+            <button class="reveal" type="button" (click)="toggleBasicAuthVisible()"
+                    [attr.aria-pressed]="basicAuthVisible()"
+                    [title]="basicAuthVisible() ? 'Zugang verbergen' : 'Zugang anzeigen'"
+                    [attr.aria-label]="basicAuthVisible() ? 'Zugang verbergen' : 'Zugang anzeigen'">
+              <i [esIcon]="basicAuthVisible() ? 'visibility_off' : 'visibility'"></i>
+            </button>
+          </div>
+
+          <p class="desc">
+            Zugangsdaten der Basic-Authentifizierung, die den Dienst absichert, als
+            <code>Benutzer:Passwort</code>. Sie werden nur lokal im Browser gespeichert; ohne sie lässt sich
+            die Bewertung nicht einschalten.
+          </p>
+
+          <label class="check">
+            <input type="checkbox" [ngModel]="qualityJudge.contentJudgeEnabled()"
+                   (ngModelChange)="setContentJudge($event)"
+                   [disabled]="!contentJudge.credentialSet()" />
+            <span>ContentJudge: Inhalt per LLM bewerten</span>
+          </label>
+
+          <p class="desc">
+            Beurteilt den Text des Inhalts gegen die Bewertungsschemata der Qualitätskriterien. Standardmäßig
+            aus: jedes Schema ist ein eigener LLM-Durchgang und dauert entsprechend. Angefragt werden nur
+            diese Schemata:
+          </p>
+
+          <ul class="desc-list">
+            @for (scheme of contentJudgeSchemes; track scheme) {
+              <li><code>{{ scheme }}</code></li>
+            } @empty {
+              <li>keines — kein Kriterium verweist derzeit auf ein Schema</li>
+            }
+          </ul>
+        }
       }
-      <i class="section-chevron" [class.is-open]="openSection() === 'quality'"
-         esIcon="expand_more"></i>
-    </button>
-
-    @if (openSection() === 'quality') {
-      <label class="check">
-        <input type="checkbox" [ngModel]="qualityJudge.metalookupEnabled()"
-               (ngModelChange)="setMetalookup($event)" />
-        <span>MetalookUp: Inhalt messen</span>
-      </label>
-
-      <p class="desc">
-        Ruft den Inhalt selbst ab und misst ihn. Abgeschaltet bleiben die Kriterien unbeantwortet, die
-        davon leben. Angefragt werden nur diese Prüfungen — was der Dienst sonst noch messen könnte,
-        läuft gar nicht erst:
-      </p>
-
-      <ul class="desc-list">
-        @for (check of metalookupChecks; track check.propertyId) {
-          <li>{{ check.label }} — Feature „{{ check.feature }}“</li>
-        }
-      </ul>
-
-      <!-- Der Zugang steht über dem Schalter, den er freigibt: ohne ihn ließe der sich nie setzen. -->
-      <label class="es-field-label" for="cj-auth">ContentJudge: Zugang</label>
-      <div class="reveal-field">
-        <input id="cj-auth" class="es-input" [type]="basicAuthVisible() ? 'text' : 'password'"
-               placeholder="Benutzer:Passwort" autocomplete="off"
-               [ngModel]="contentJudge.basicAuth()" (ngModelChange)="setContentJudgeAuth($event)" />
-        <button class="reveal" type="button" (click)="toggleBasicAuthVisible()"
-                [attr.aria-pressed]="basicAuthVisible()"
-                [title]="basicAuthVisible() ? 'Zugang verbergen' : 'Zugang anzeigen'"
-                [attr.aria-label]="basicAuthVisible() ? 'Zugang verbergen' : 'Zugang anzeigen'">
-          <i [esIcon]="basicAuthVisible() ? 'visibility_off' : 'visibility'"></i>
-        </button>
-      </div>
-
-      <p class="desc">
-        Zugangsdaten der Basic-Authentifizierung, die den Dienst absichert, als
-        <code>Benutzer:Passwort</code>. Sie werden nur lokal im Browser gespeichert; ohne sie lässt sich
-        die Bewertung nicht einschalten.
-      </p>
-
-      <label class="check">
-        <input type="checkbox" [ngModel]="qualityJudge.contentJudgeEnabled()"
-               (ngModelChange)="setContentJudge($event)"
-               [disabled]="!contentJudge.credentialSet()" />
-        <span>ContentJudge: Inhalt per LLM bewerten</span>
-      </label>
-
-      <p class="desc">
-        Beurteilt den Text des Inhalts gegen die Bewertungsschemata der Qualitätskriterien. Standardmäßig
-        aus: jedes Schema ist ein eigener LLM-Durchgang und dauert entsprechend. Angefragt werden nur
-        diese Schemata:
-      </p>
-
-      <ul class="desc-list">
-        @for (scheme of contentJudgeSchemes; track scheme) {
-          <li><code>{{ scheme }}</code></li>
-        } @empty {
-          <li>keines — kein Kriterium verweist derzeit auf ein Schema</li>
-        }
-      </ul>
-    }
-  </section>
+    </section>
+  }
 }
 
 <!-- Where the forwarding step publishes to when the relay is ticked there, and where the step

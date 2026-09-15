@@ -18,8 +18,7 @@
     "scripting",
     "storage",
     "cookies",
-    "identity",
-    "clipboardRead"
+    "identity"
   ],
 
   "host_permissions": [
@@ -39,7 +38,7 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["sidebar/*", "edu/*", "wlo/*", "boerdi/*"],
+      "resources": ["sidebar/*", "edu/*"],
       "matches": ["https://*/*", "http://*/*"]
     }
   ],

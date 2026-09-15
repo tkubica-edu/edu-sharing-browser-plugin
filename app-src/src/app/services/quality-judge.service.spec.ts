@@ -12,6 +12,7 @@ import {
   fakeContentJudge,
   fakeMetalookup,
 } from '../../testing/fakes';
+import { useFeatureBlacklist } from '../../testing/feature-blacklist';
 import { provideFake } from '../../testing/provide-fake';
 import { BrowserExtensionService, PageData } from './browser-extension.service';
 import { ContentJudgeService } from './content-judge.service';
@@ -27,6 +28,8 @@ function aPage(url = URL_UNDER_CHECK): PageData {
 }
 
 describe('QualityJudgeService', () => {
+  const blacklist = useFeatureBlacklist();
+
   let quality: QualityJudgeService;
   let extension: BrowserExtensionFake;
   let contentJudge: ContentJudgeFake;
@@ -355,6 +358,74 @@ describe('QualityJudgeService', () => {
 
       await judged();
       expect(contentJudge.fake.evaluate).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('with metalookup blacklisted', () => {
+    it('reports itself blacklisted and behaves as though the setting were off', () => {
+      blacklist('metalookup');
+
+      expect(quality.metalookupBlacklisted()).toBe(true);
+      expect(quality.metalookupEnabled()).toBe(false);
+    });
+
+    it('is skipped whatever the setting, and says it is the deployment rather than the settings', async () => {
+      await quality.setMetalookupEnabled(true);
+      blacklist('metalookup');
+
+      await judged();
+
+      expect(stateOf('MetalookUp')).toBe('skipped');
+      expect(detailOf('MetalookUp')).toContain('Deployment');
+      expect(metalookup.fake.evaluate).not.toHaveBeenCalled();
+    });
+
+    it('reports no changed settings, even ones left over from before the blacklist took effect', async () => {
+      await quality.setMetalookupEnabled(false);
+      blacklist('metalookup');
+
+      expect(quality.changedSettings()).toBe(0);
+    });
+
+    it('runs as normal where the blacklist does not name it', () => {
+      blacklist('contentJudge');
+
+      expect(quality.metalookupBlacklisted()).toBe(false);
+      expect(quality.metalookupEnabled()).toBe(true);
+    });
+  });
+
+  describe('with contentJudge blacklisted', () => {
+    it('reports itself blacklisted and behaves as though the setting were off', async () => {
+      await quality.setContentJudgeEnabled(true);
+      blacklist('contentJudge');
+
+      expect(quality.contentJudgeBlacklisted()).toBe(true);
+      expect(quality.contentJudgeEnabled()).toBe(false);
+    });
+
+    it('is skipped whatever the setting or credential, and says it is the deployment', async () => {
+      await quality.setContentJudgeEnabled(true);
+      blacklist('contentJudge');
+
+      await judged();
+
+      expect(stateOf('ContentJudge')).toBe('skipped');
+      expect(detailOf('ContentJudge')).toContain('Deployment');
+      expect(contentJudge.fake.evaluate).not.toHaveBeenCalled();
+    });
+
+    it('reports no changed settings, even ones left over from before the blacklist took effect', async () => {
+      await quality.setContentJudgeEnabled(true);
+      blacklist('contentJudge');
+
+      expect(quality.changedSettings()).toBe(0);
+    });
+
+    it('runs as normal where the blacklist does not name it', () => {
+      blacklist('metalookup');
+
+      expect(quality.contentJudgeBlacklisted()).toBe(false);
     });
   });
 });

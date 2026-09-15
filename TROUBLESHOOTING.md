@@ -61,14 +61,21 @@ What is known not to work, known to be unverified, or known to look wrong at fir
   is a permission a store reviewer will ask about, and Safari does not implement it at all (see
   above). The flow is off unless an issuer and a client id are configured, so an installation that
   does not federate never uses it.
-- **Reading the clipboard** takes two grants, both for one option of the preview widget: it offers
-  *Aus der Zwischenablage einfügen* only while it can see an image on the clipboard, which it answers
-  with `navigator.permissions.query({name: 'clipboard-read'})` plus a `clipboard.read()`. The
-  extension declares `clipboardRead` (Chrome answers that query with `denied` without it), and the
-  panel's iframe is opened with `allow="clipboard-read; clipboard-write"` (the permissions policy
-  defaults to the top-level document, so the frame is refused otherwise — see
-  `content/panel-host.js`). Pasting itself needs neither: the widget listens for the `paste` event as
-  well, which is why Cmd+V worked all along.
+- **Reading the clipboard has no grant, deliberately.** The preview widget's *Aus der Zwischenablage
+  einfügen* option answers `navigator.permissions.query({name: 'clipboard-read'})` with `denied`
+  without the `clipboardRead` permission and hides itself — the extension does not declare it (dropped
+  2026-09-15, see `STORE-RELEASE.md` § B3). Pasting itself needs neither: the widget listens for the
+  `paste` event as well, which is why Cmd+V works regardless. The panel's iframe still requests
+  `allow="clipboard-write"` (`content/panel-host.js`) for the nostr receipt's copy buttons
+  (`navigator.clipboard.writeText`) — the permissions policy for that direction defaults to the
+  top-level document, so the frame is refused it otherwise.
+- **`web_accessible_resources`** lists `sidebar/*` and `edu/*` — `wlo/*` and `boerdi/*` were dropped
+  (2026-09-15): both bundles are only ever loaded into the sidebar's own document
+  (`WebComponentBundleService`, `AiAssistantScreenComponent`), a same-origin `chrome-extension://`
+  load that needs no web-accessible grant, and with `wlo`/`nostr` blacklisted (see `config.ts`
+  `FeatureKey`) neither is loaded at all. **If a deployment un-blacklists `wlo` or `nostr`, add
+  `"wlo/*"`/`"boerdi/*"` back to `manifest.base.json` in the same change** — otherwise the bundle
+  fails to load in whichever scenario does turn out to need the grant, silently.
 
 ## No SSO button on the login card
 
@@ -249,11 +256,14 @@ remaining heavyweights are reachable and stay:
 
 ## Lint output
 
-**`web-ext lint` is error-free but noisy**: 0 errors, ~204 warnings, 1 notice. Every warning comes
-from third-party libs inside the vendored bundles, not from this extension's own code — inside each
-`edu/<version>/` folder: `assets/tinymce` (67), `scripts.js` (17), `assets/viewer*` (37),
-`assets/pdf.worker*` (19), `assets/cordova` (7), `index.html` (5, the bundle's own start page, which
-the extension never opens) — plus `boerdi/boerdi-widget.js` (6). The notice is
-`MISSING_DATA_COLLECTION_PERMISSIONS`: AMO will require
-`browser_specific_settings.gecko.data_collection_permissions` in future. CI runs the lint with
+**`web-ext lint` is error-free and quiet**: 0 errors, ~195 warnings, 0 notices (2026-09-15; was 204
+warnings and 1 notice). Every remaining warning comes from third-party libs inside the vendored
+bundles, not from this extension's own code — inside each `edu/<version>/` folder: `assets/tinymce`
+(67), `scripts.js` (17), `assets/viewer*` (37), `assets/pdf.worker*` (19), `assets/cordova` (7) — plus
+`boerdi/boerdi-widget.js` (6) and one from `wlo/index.html` (its own entry point, load-bearing — see
+`WEB-COMPONENTS.md § Loading a bundle`). `edu/<version>/index.html` (the bundle's own start page,
+never opened) and `wlo/examples/*.html` are excluded from the package (`scripts/build.mjs`
+`BUNDLE_EXCLUDES`), which is where the other 9 warnings went. The `MISSING_DATA_COLLECTION_PERMISSIONS`
+notice is gone since `manifest.firefox.json` declares
+`browser_specific_settings.gecko.data_collection_permissions`. CI runs the lint with
 `continue-on-error: true`, so warnings never block a build.

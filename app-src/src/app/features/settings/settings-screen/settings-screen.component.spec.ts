@@ -953,6 +953,44 @@ describe('SettingsScreenComponent', () => {
       ).map((entry) => (entry as HTMLElement).textContent ?? '');
       expect(listed).toEqual([...configuredSchemes().schemes]);
     });
+
+    it('hides the MetalookUp switch entirely where the deployment blacklists it', async () => {
+      qualityJudge.blacklistMetalookup();
+      await render();
+      await open(QUALITY);
+
+      expect(text()).not.toContain('MetalookUp: Inhalt messen');
+      // The rest of the section — a judge a deployment did not blacklist — is unaffected.
+      expect(text()).toContain('ContentJudge: Inhalt per LLM bewerten');
+    });
+
+    it('hides the ContentJudge credential and switch entirely where the deployment blacklists it', async () => {
+      qualityJudge.blacklistContentJudge();
+      await render();
+      await open(QUALITY);
+
+      expect(query('#cj-auth')).toBeNull();
+      expect(text()).not.toContain('ContentJudge: Inhalt per LLM bewerten');
+      // The rest of the section — a judge a deployment did not blacklist — is unaffected.
+      expect(text()).toContain('MetalookUp: Inhalt messen');
+    });
+
+    it('hides the whole card where the deployment blacklists both judges', async () => {
+      qualityJudge.blacklistMetalookup();
+      qualityJudge.blacklistContentJudge();
+      await render();
+
+      expect(() => head(QUALITY)).toThrow();
+    });
+
+    it('drops a changed ContentJudge credential from the pill once the deployment blacklists it', async () => {
+      contentJudge.fake.changedSettings.set(1);
+      qualityJudge.blacklistContentJudge();
+      await render();
+
+      // The field this would report on is itself hidden — nothing is left to show it on.
+      expect(pill(QUALITY)).toBeNull();
+    });
   });
 
   describe('the nostr relay', () => {

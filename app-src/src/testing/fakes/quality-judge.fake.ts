@@ -19,20 +19,46 @@ export function fakeQualityJudge() {
     { judge: 'ContentJudge', state: 'idle', detail: null },
   ]);
 
+  // Independent of the enabled signals below, as `changedSettings` is in every settings fake — which
+  // value counts as untouched is the real service's business, not this fake's. See
+  // `blacklistMetalookup`/`blacklistContentJudge` and `APP_CONFIG.featureBlacklist`.
+  const metalookupBlacklistedState = signal(false);
+  const contentJudgeBlacklistedState = signal(false);
+  const metalookupEnabledState = signal(true);
+  const contentJudgeEnabledState = signal(false);
+
   const fake = {
     evaluation: signal<ContentJudgeEvaluation | null>(null),
     measured: signal<MetalookupEvaluation | null>(null),
     statuses,
     running: computed(() => statuses().some((status) => status.state === 'running')),
     asked: computed(() => statuses().some((status) => status.state !== 'idle')),
-    metalookupEnabled: signal(true),
-    contentJudgeEnabled: signal(false),
+    metalookupBlacklisted: metalookupBlacklistedState,
+    metalookupEnabled: computed(() => !metalookupBlacklistedState() && metalookupEnabledState()),
+    contentJudgeBlacklisted: contentJudgeBlacklistedState,
+    contentJudgeEnabled: computed(() => !contentJudgeBlacklistedState() && contentJudgeEnabledState()),
     start: vi.fn(),
     reset: vi.fn(),
     changedSettings: signal(0),
-    setMetalookupEnabled: vi.fn((_enabled: boolean): Promise<void> => Promise.resolve()),
-    setContentJudgeEnabled: vi.fn((_enabled: boolean): Promise<void> => Promise.resolve()),
+    setMetalookupEnabled: vi.fn((enabled: boolean): Promise<void> => {
+      metalookupEnabledState.set(enabled);
+      return Promise.resolve();
+    }),
+    setContentJudgeEnabled: vi.fn((enabled: boolean): Promise<void> => {
+      contentJudgeEnabledState.set(enabled);
+      return Promise.resolve();
+    }),
   } satisfies Partial<QualityJudgeService>;
+
+  /** The deployment turned `metalookup` off outright — see `FeatureKey`. */
+  function blacklistMetalookup(): void {
+    metalookupBlacklistedState.set(true);
+  }
+
+  /** The deployment turned `contentJudge` off outright — see `FeatureKey`. */
+  function blacklistContentJudge(): void {
+    contentJudgeBlacklistedState.set(true);
+  }
 
   /** Both judges are out — the wait a view shows a spinner for. */
   function judging(): void {
@@ -66,7 +92,7 @@ export function fakeQualityJudge() {
     ]);
   }
 
-  return { fake, statuses, judging, answered, unavailable };
+  return { fake, statuses, judging, answered, unavailable, blacklistMetalookup, blacklistContentJudge };
 }
 
 export type QualityJudgeFake = ReturnType<typeof fakeQualityJudge>;

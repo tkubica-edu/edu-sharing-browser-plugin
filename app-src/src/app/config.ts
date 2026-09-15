@@ -26,8 +26,24 @@
  *   `DevModeService` writes its persisted setting back to off on load, since the background worker
  *   reads that same storage key on its own and would otherwise keep answering from fixtures; `DebugService`
  *   only computes `enabled` off the flag, since nothing outside the panel reads its storage key.
+ * - `metalookup`: `MetalookupService`, called by `QualityJudgeService.runMetalookup`. Blacklisted, the
+ *   call never runs regardless of the stored *MetalookUp: Inhalt messen* switch (default: on) — this is
+ *   checked ahead of it, not instead of it — and that checkbox is hidden from *Einstellungen →
+ *   Qualitätsprüfung* rather than merely inert. Unlike the other entries this one gates a call
+ *   `QualityJudgeService.judge` makes automatically after every Erschließung, not a screen or flow step
+ *   a person opens; whatever `wlo` says, `judge` still runs and still checks this first.
+ * - `contentJudge`: `ContentJudgeService`, called by `QualityJudgeService.runContentJudge`. Blacklisted,
+ *   the call never runs regardless of the stored switch or a configured credential, and the
+ *   *ContentJudge: Inhalt per LLM bewerten* checkbox plus the credential field above it are hidden the
+ *   same way. Independent of `metalookup` and of `wlo`, same reasoning.
  */
-export type FeatureKey = 'onlyOfficeEvents' | 'wlo' | 'nostr' | 'developerOptions';
+export type FeatureKey =
+  | 'onlyOfficeEvents'
+  | 'wlo'
+  | 'nostr'
+  | 'developerOptions'
+  | 'metalookup'
+  | 'contentJudge';
 
 /**
  * Which way a scheme's number has to go for the criterion it judges to count as met: `atLeast` where the higher
@@ -76,7 +92,14 @@ export const APP_CONFIG = {
    * *Einstellungen*, this is not something a person using the extension chooses). A deployment that
    * needs one off edits this array and rebuilds — see `FeatureKey` for what each one covers.
    */
-  featureBlacklist: ["onlyOfficeEvents", "nostr", "wlo", "developerOptions"] as readonly FeatureKey[],
+  featureBlacklist: [
+    "onlyOfficeEvents",
+    "nostr",
+    "wlo",
+    "developerOptions",
+    "metalookup",
+    "contentJudge"
+  ] as readonly FeatureKey[],
   /**
    * MetalookUp, which evaluates a resource and answers with the metadata it could extract from it
    * (`POST /api/evaluation`, see MetalookupService). The host root — the base its own OpenAPI

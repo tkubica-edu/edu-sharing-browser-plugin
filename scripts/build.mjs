@@ -32,7 +32,12 @@ const BUNDLE_DIRS = ['edu', 'wlo', 'boerdi'];
 //                       and embed-page lazy routes; the extension mounts custom elements and never
 //                       starts that router. Its ts.worker is ~6.7 MB, above the 5 MB
 //                       addons-linter can parse, which fails `web-ext lint` with FILE_TOO_LARGE.
-const BUNDLE_EXCLUDES = { edu: ['*/assets/monaco'] };
+//   edu/<version>/index.html — the bundle's own start page; the extension never opens it, only its
+//                       entry scripts (see EDU_BUNDLE_ENTRIES). Source of 5 `web-ext lint` warnings.
+//   wlo/examples — demo pages fetch-widget.mjs does not touch and the extension never loads; source
+//                       of 4 `INLINE_SCRIPT` warnings. wlo's own entry point, `wlo/index.html`, is
+//                       load-bearing (its content-hashed script names are read from it) and stays.
+const BUNDLE_EXCLUDES = { edu: ['*/assets/monaco', '*/index.html'], wlo: ['examples'] };
 
 // The edu bundle ships one folder per edu-sharing release it was built for, named `<major>.<minor>`
 // (a patch version is not distinguished — see RepositoryVersionService). Its entry points, loaded by
@@ -45,6 +50,11 @@ const TARGETS = ['chrome', 'firefox', 'safari'];
 // Shared source copied verbatim into every target build.
 const SHARED_DIRS = ['icons', 'background', 'content', 'sidebar', 'vendor'];
 const SHARED_FILES = ['config.js', 'sw.js'];
+
+// Parts of the shared dirs that stay out of the package, same keying and matching as BUNDLE_EXCLUDES.
+//   content/HOST-EVENTS.md — reference doc for the host-page event protocol, useful to a repository
+//                       or OnlyOffice-plugin integrator reading the source, not to the running extension.
+const SHARED_EXCLUDES = { content: ['HOST-EVENTS.md'] };
 
 const log = (...a) => console.log(...a);
 const rel = (p) => path.relative(ROOT, p) || '.';
@@ -208,7 +218,13 @@ async function assembleTarget(target) {
 
   for (const d of SHARED_DIRS) {
     const src = path.join(ROOT, d);
-    if (existsSync(src)) await fs.cp(src, path.join(outDir, d), { recursive: true });
+    if (!existsSync(src)) continue;
+    const excludes = SHARED_EXCLUDES[d] ?? [];
+    await fs.cp(src, path.join(outDir, d), {
+      recursive: true,
+      filter: (from) => !isExcluded(path.relative(src, from), excludes)
+    });
+    if (excludes.length) log(`  ↳ ${d}: left out ${excludes.join(', ')}`);
   }
   for (const f of SHARED_FILES) {
     const src = path.join(ROOT, f);

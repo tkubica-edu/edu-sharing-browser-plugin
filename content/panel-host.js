@@ -138,10 +138,12 @@
     const iframe = document.createElement('iframe');
     iframe.src = api.runtime.getURL('sidebar/index.html');
     iframe.setAttribute('title', 'edu-sharing');
-    // Clipboard access is delegated to the panel: the permissions policy for both directions
-    // defaults to the top-level document alone, so a cross-origin frame is refused without this —
-    // including the read the preview widget answers its "aus der Zwischenablage einfügen" with.
-    iframe.setAttribute('allow', 'clipboard-read; clipboard-write');
+    // Clipboard writes (the nostr receipt's copy buttons) are delegated to the panel: the permissions
+    // policy defaults to the top-level document alone, so a cross-origin frame is refused without this.
+    // Reads are not: without the `clipboardRead` permission the preview widget's "aus der
+    // Zwischenablage einfügen" answers denied and stays hidden, and pasting still works via the
+    // `paste` event, which needs no permission at all.
+    iframe.setAttribute('allow', 'clipboard-write');
     Object.assign(iframe.style, {
       width: '100%',
       height: '100%',

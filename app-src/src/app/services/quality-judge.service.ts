@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 
-import { APP_CONFIG } from '../config';
+import { APP_CONFIG, isFeatureEnabled } from '../config';
 import { BrowserExtensionService } from './browser-extension.service';
 import {
   ContentJudgeEvaluation, ContentJudgeInput, ContentJudgeService, judgeableText
@@ -54,6 +54,12 @@ export interface JudgeStatus {
  * Has the content's quality judged and holds what came back. A service rather than the view's business because of
  * when it runs: started as soon as the content is erschlossen and read several steps later, so the minute it takes
  * passes while the user walks the flow. Two independent judges, one measuring the resource, one assessing its text.
+ *
+ * Either can be turned off outright by `APP_CONFIG.featureBlacklist` naming `metalookup`/`contentJudge`
+ * — see {@link metalookupBlacklisted}, {@link contentJudgeBlacklisted} and `FeatureKey`. That check runs
+ * ahead of the *Einstellungen* switches below: this is the one place both judges are called from, whatever
+ * `browserExtensionCustomWebComponent` says, so it is also the one place a deployment can refuse them
+ * without touching the settings UI at all.
  */
 @Injectable({ providedIn: 'root' })
 export class QualityJudgeService {
@@ -87,32 +93,53 @@ export class QualityJudgeService {
   /** Whether the content in hand has been judged, so it is not judged twice. */
   private started = false;
 
+  /** True where `APP_CONFIG.featureBlacklist` names `metalookup` — see `FeatureKey`. */
+  readonly metalookupBlacklisted = computed(() => !isFeatureEnabled('metalookup'));
+
   private readonly metalookupEnabledState = signal(DEFAULT_METALOOKUP_ENABLED);
 
-  /** Whether MetalookUp measures the content at all. Persisted, so it survives a reload. */
-  readonly metalookupEnabled = this.metalookupEnabledState.asReadonly();
+  /**
+   * Whether MetalookUp measures the content at all: the setting, persisted so it survives a reload,
+   * and whether this deployment allows the judge to run in the first place.
+   */
+  readonly metalookupEnabled = computed(
+    () => !this.metalookupBlacklisted() && this.metalookupEnabledState(),
+  );
+
+  /** True where `APP_CONFIG.featureBlacklist` names `contentJudge` — see `FeatureKey`. */
+  readonly contentJudgeBlacklisted = computed(() => !isFeatureEnabled('contentJudge'));
 
   private readonly contentJudgeEnabledState = signal(DEFAULT_CONTENT_JUDGE_ENABLED);
 
   /**
-   * Whether ContentJudge judges the content: what the setting says, and whether there is a credential to
-   * reach the guarded deployment with. A credential taken back out therefore switches the judge off,
-   * without the setting having to be touched as well.
+   * Whether ContentJudge judges the content: whether this deployment allows it to run at all, what the
+   * setting says, and whether there is a credential to reach the guarded deployment with. A credential
+   * taken back out therefore switches the judge off, without the setting having to be touched as well.
    */
   readonly contentJudgeEnabled = computed(
-    () => this.contentJudgeEnabledState() && this.contentJudge.credentialSet(),
+    () =>
+      !this.contentJudgeBlacklisted() &&
+      this.contentJudgeEnabledState() &&
+      this.contentJudge.credentialSet(),
   );
 
   /**
    * How many of the two judges stand away from what the panel ships with — see
    * ChatStyleService.changedSettings for what the settings do with it. ContentJudge is counted as the
    * settings show it, which is with the credential taken into account: a switch that is on without one
-   * judges nothing, and the checkbox is unticked and disabled while it is missing.
+   * judges nothing, and the checkbox is unticked and disabled while it is missing. A blacklisted judge
+   * counts as never changed: the checkbox it would report on is itself hidden from *Einstellungen →
+   * Qualitätsprüfung*, so a value left over from before the blacklist took effect must not go on
+   * showing as a pending change nobody can see, let alone undo.
    */
   readonly changedSettings = computed(
     () =>
-      (this.metalookupEnabledState() === DEFAULT_METALOOKUP_ENABLED ? 0 : 1) +
-      (this.contentJudgeEnabled() === DEFAULT_CONTENT_JUDGE_ENABLED ? 0 : 1),
+      (this.metalookupBlacklisted() || this.metalookupEnabledState() === DEFAULT_METALOOKUP_ENABLED
+        ? 0
+        : 1) +
+      (this.contentJudgeBlacklisted() || this.contentJudgeEnabled() === DEFAULT_CONTENT_JUDGE_ENABLED
+        ? 0
+        : 1),
   );
 
   /**
@@ -186,7 +213,9 @@ export class QualityJudgeService {
     features: readonly string[]
   ): Promise<void> {
     if (!this.metalookupEnabled()) {
-      const detail = 'Die Messung ist in den Einstellungen abgeschaltet.';
+      const detail = this.metalookupBlacklisted()
+        ? 'Die Messung ist für dieses Deployment abgeschaltet.'
+        : 'Die Messung ist in den Einstellungen abgeschaltet.';
       this.metalookupStatus.set({ judge: 'MetalookUp', state: 'skipped', detail });
       console.log(`${LOG_METALOOKUP} skipped — ${detail}`);
       return;
@@ -224,9 +253,11 @@ export class QualityJudgeService {
     schemes: readonly string[]
   ): Promise<void> {
     if (!this.contentJudgeEnabled()) {
-      const detail = this.contentJudge.credentialSet()
-        ? 'Die LLM-Bewertung ist in den Einstellungen abgeschaltet.'
-        : 'Für die LLM-Bewertung ist in den Einstellungen kein Zugang hinterlegt.';
+      const detail = this.contentJudgeBlacklisted()
+        ? 'Die LLM-Bewertung ist für dieses Deployment abgeschaltet.'
+        : this.contentJudge.credentialSet()
+          ? 'Die LLM-Bewertung ist in den Einstellungen abgeschaltet.'
+          : 'Für die LLM-Bewertung ist in den Einstellungen kein Zugang hinterlegt.';
       this.contentJudgeStatus.set({ judge: 'ContentJudge', state: 'skipped', detail });
       console.log(`${LOG_CONTENT_JUDGE} skipped — ${detail}`);
       return;
