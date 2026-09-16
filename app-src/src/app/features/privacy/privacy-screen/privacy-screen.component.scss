@@ -1,0 +1,25 @@
+:host { display: block; padding: var(--es-space-4); }
+
+.pv-text {
+  color: var(--es-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+
+.pv-heading {
+  margin: var(--es-space-3) 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--es-text);
+}
+
+.pv-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--es-muted);
+  font-size: 12px;
+  line-height: 1.5;
+
+  li + li { margin-top: 6px; }
+}

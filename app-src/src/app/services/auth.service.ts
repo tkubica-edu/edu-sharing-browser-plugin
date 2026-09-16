@@ -128,13 +128,14 @@ export class AuthService {
     this.watchSession();
   }
 
-  /** Load the persisted repository URL (or default), then revalidate any session. */
+  /**
+   * Load the persisted repository URL, then revalidate any session. Only reached once one has been
+   * saved (see the `onboarded` condition and AppComponent.ngOnInit) — there is no default to fall
+   * back to here, since nothing is asked of a repository before the onboarding screen persists one.
+   */
   async init(): Promise<void> {
     this.repositoryUrl.set(
-      await this.browserExtension.storageGet(
-        APP_CONFIG.storageKeys.repositoryUrl,
-        APP_CONFIG.defaultRepositoryUrl,
-      ),
+      await this.browserExtension.storageGet(APP_CONFIG.storageKeys.repositoryUrl, ''),
     );
     this.needsReload.set(false);
     // Asked before anything else about a login: the answer decides which way in the card offers, and
@@ -189,14 +190,19 @@ export class AuthService {
     }
   }
 
-  /** Persist the repository base; flag needsReload if it differs from the booted URL. */
-  setRepositoryUrl(repositoryBase: string): void {
+  /**
+   * Persist the repository base; flag needsReload if it differs from the booted URL. Returns the
+   * storage write, so a caller that needs the value actually saved before acting on it — the
+   * onboarding screen, before it reloads the sidebar — can await it; every other caller keeps
+   * calling this fire-and-forget.
+   */
+  setRepositoryUrl(repositoryBase: string): Promise<void> {
     const base = repositoryBase.trim();
     this.repositoryUrl.set(base);
     this.needsReload.set(!!base && toApiRootUrl(base) !== this.bootRootUrl);
-    if (base) {
-      void this.browserExtension.storageSet(APP_CONFIG.storageKeys.repositoryUrl, base);
-    }
+    return base
+      ? this.browserExtension.storageSet(APP_CONFIG.storageKeys.repositoryUrl, base)
+      : Promise.resolve();
   }
 
   /** Reload the sidebar so the library re-initializes against the new repository. */

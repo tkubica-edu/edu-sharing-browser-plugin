@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   AuthFake,
@@ -11,6 +11,7 @@ import {
   CurationFake,
   DebugFake,
   DevModeFake,
+  NavigationFake,
   NostrForwardFake,
   OAuthFake,
   QualityJudgeFake,
@@ -29,6 +30,7 @@ import {
   fakeCuration,
   fakeDebug,
   fakeDevMode,
+  fakeNavigation,
   fakeNostrForward,
   fakeOAuth,
   fakeQualityJudge,
@@ -51,6 +53,7 @@ import { ContextRefreshService } from '../../../services/context-refresh.service
 import { CurationService } from '../../../services/curation.service';
 import { DebugService } from '../../../services/debug.service';
 import { DevModeService } from '../../../services/dev-mode.service';
+import { NavigationService } from '../../../services/navigation.service';
 import { NostrForwardService } from '../../../services/nostr-forward.service';
 import { OAuthService } from '../../../services/oauth.service';
 import { QualityJudgeService } from '../../../services/quality-judge.service';
@@ -72,7 +75,7 @@ const NOSTR = 'Nostr-Relay';
  * around that: which of the folded sections says it holds something changed, and whether leaving the
  * screen re-answers the checks a change may have invalidated.
  *
- * The screen injects fifteen services and shows different cards depending on one of them, so the fakes are
+ * The screen injects seventeen services and shows different cards depending on one of them, so the fakes are
  * built per test and the WLO switch is stated at render time.
  */
 describe('SettingsScreenComponent', () => {
@@ -93,6 +96,7 @@ describe('SettingsScreenComponent', () => {
   let oauth: OAuthFake;
   let contextRefresh: ContextRefreshFake;
   let curation: CurationFake;
+  let navigation: NavigationFake;
 
   beforeEach(() => {
     auth = fakeAuth();
@@ -111,6 +115,7 @@ describe('SettingsScreenComponent', () => {
     oauth = fakeOAuth();
     contextRefresh = fakeContextRefresh();
     curation = fakeCuration();
+    navigation = fakeNavigation();
     TestBed.configureTestingModule({
       imports: [SettingsScreenComponent],
       providers: [
@@ -130,6 +135,7 @@ describe('SettingsScreenComponent', () => {
         provideFake(OAuthService, oauth.fake),
         provideFake(ContextRefreshService, contextRefresh.fake),
         provideFake(CurationService, curation.fake),
+        provideFake(NavigationService, navigation.fake),
       ],
     });
   });
@@ -314,6 +320,48 @@ describe('SettingsScreenComponent', () => {
 
       expect(text()).not.toContain('Jetzt übernehmen');
     });
+  });
+
+  describe('resetting the plugin', () => {
+    /** What the user answered the confirmation with. */
+    let confirms = true;
+
+    beforeEach(() => {
+      confirms = true;
+      vi.stubGlobal('confirm', vi.fn(() => confirms));
+    });
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('stands in its own card, not folded away among the tuning', async () => {
+      await render();
+
+      expect(query('h2.reset-heading')?.textContent).toContain('Browserplugin zurücksetzen');
+    });
+
+    it('asks before doing anything, and does nothing on a refusal', async () => {
+      confirms = false;
+      await render();
+
+      button('Browserplugin zurücksetzen').click();
+      await settle();
+
+      expect(extension.fake.storageClear).not.toHaveBeenCalled();
+    });
+
+    it('wipes everything stored once confirmed', async () => {
+      await render();
+
+      button('Browserplugin zurücksetzen').click();
+      await settle();
+
+      expect(extension.fake.storageClear).toHaveBeenCalled();
+    });
+
+    // The reload that follows a confirmed reset is deliberately not asserted on: it calls
+    // `location.reload()`, which jsdom does not implement — see the same note beside AuthService's
+    // `applyRepositoryChange` in auth.service.spec.ts. That it happens right after storageClear(),
+    // rather than behind a second button, is what the manual checklist covers.
   });
 
   describe('leaving the screen', () => {

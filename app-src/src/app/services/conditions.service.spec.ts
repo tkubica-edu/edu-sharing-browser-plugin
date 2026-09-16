@@ -112,6 +112,24 @@ describe('ConditionsService', () => {
     });
   });
 
+  describe('onboarded', () => {
+    it('is true once a repository URL has been saved', () => {
+      expect(conditions.onboarded()).toBe(true);
+    });
+
+    it('is false on a fresh install, with nothing saved yet', () => {
+      auth.fake.repositoryUrl.set('');
+
+      expect(conditions.onboarded()).toBe(false);
+    });
+
+    it('does not count a URL of only whitespace as onboarded', () => {
+      auth.fake.repositoryUrl.set('   ');
+
+      expect(conditions.onboarded()).toBe(false);
+    });
+  });
+
   it('leaves it open what the page shows until something answers', () => {
     expect(conditions.recognizingContent()).toBe(true);
   });
@@ -158,6 +176,7 @@ describe('ConditionsService', () => {
     nostr.fake.enabled.set(false);
 
     expect(conditions.snapshot()).toEqual({
+      onboarded: true,
       onlyOfficePresent: false,
       onEduSharing: false,
       loggedIn: false,
@@ -184,6 +203,7 @@ describe('ConditionsService', () => {
     conditions.recognizingContent.set(false);
 
     expect(conditions.snapshot()).toEqual({
+      onboarded: true,
       onlyOfficePresent: false,
       onEduSharing: false,
       loggedIn: true,

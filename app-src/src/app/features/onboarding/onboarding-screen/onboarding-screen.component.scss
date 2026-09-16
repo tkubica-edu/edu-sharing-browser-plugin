@@ -1,0 +1,67 @@
+@use 'mixins' as m;
+
+:host { display: block; padding: var(--es-space-4); }
+
+// One card, centred like the login form it precedes — what is asked for is one thing.
+.ob-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--es-space-3);
+  padding: var(--es-space-4);
+  text-align: center;
+
+  .es-input, .ob-suggestion, .ob-submit { width: 100%; }
+  .es-input { margin-bottom: 0; }
+  > * { flex: 0 0 auto; }
+}
+
+.ob-avatar {
+  color: var(--es-blue);
+  font-size: 52px;
+  line-height: 1;
+}
+
+.ob-heading {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--es-blue);
+}
+
+.ob-lead {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--es-text);
+}
+
+// A button rather than a preset value: the suggestion is only ever filled into the field on
+// request, never chosen on the person's behalf.
+.ob-suggestion {
+  white-space: normal;
+  word-break: break-all;
+}
+
+.ob-submit {
+  @include m.fbtn;
+  @include m.fbtn-primary;
+
+  cursor: pointer;
+  padding: 12px;
+  font-size: 14px;
+}
+
+// Same treatment as the login form's link out of the panel (LoginComponent) — kept local since
+// component styles are view-encapsulated and cannot be shared across templates.
+.ob-link {
+  padding: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--es-blue);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}

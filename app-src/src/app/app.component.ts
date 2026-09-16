@@ -53,10 +53,12 @@ import { NostrForwardScreenComponent } from './features/filing/nostr-forward-scr
 import { PersonalStorageScreenComponent } from './features/filing/personal-storage-screen/personal-storage-screen.component';
 import { SelectCollectionScreenComponent } from './features/filing/select-collection-screen/select-collection-screen.component';
 import { MetadataScreenComponent } from './features/metadata/metadata-screen/metadata-screen.component';
+import { OnboardingScreenComponent } from './features/onboarding/onboarding-screen/onboarding-screen.component';
 import { InteractionsScreenComponent } from './features/overview/interactions-screen/interactions-screen.component';
 import { PreviewScreenComponent } from './features/overview/preview-screen/preview-screen.component';
 import { ShareScreenComponent } from './features/overview/share-screen/share-screen.component';
 import { UsagesScreenComponent } from './features/overview/usages-screen/usages-screen.component';
+import { PrivacyScreenComponent } from './features/privacy/privacy-screen/privacy-screen.component';
 import { AiQualityScreenComponent } from './features/quality/ai-quality-screen/ai-quality-screen.component';
 import { FlowChoiceScreenComponent } from './features/quality/flow-choice-screen/flow-choice-screen.component';
 import { QualityCheckScreenComponent } from './features/quality/quality-check-screen/quality-check-screen.component';
@@ -74,6 +76,7 @@ const DISCARD_PROMPT =
     IconDirective,
     // AiAssistantBarComponent belongs here — commented out with its tag, see the template.
     ActionBarComponent, TabBarComponent, UserBarComponent, MenuComponent,
+    OnboardingScreenComponent, PrivacyScreenComponent,
     LoginComponent, LoginGateComponent, AiAssistantScreenComponent, HistoryScreenComponent,
     SettingsScreenComponent, SearchScreenComponent, AddContentScreenComponent,
     ContentOptionsScreenComponent, CurationScreenComponent, CurationPreviewScreenComponent,
@@ -188,12 +191,22 @@ export class AppComponent implements OnInit {
     // panel that reads the config first would come up in the WLO palette and fall back out of it a moment
     // later.
     await this.browserExtensionCustomWebComponent.load();
-    // Only activates when the repository config enables `browserExtensionCustomWebComponent`.
-    this.browserExtensionCustomWebComponent.initialize();
     // Before anything renders: a screen that comes up light and turns dark a moment later is the one
     // thing this setting cannot afford. Until it resolves the panel stands on the theme the pre-boot
     // snippet in index.html stamped, which is the one this panel last ran in.
     await this.theme.load();
+
+    // No repository has been configured yet: nothing is asked of one, here or below, until the
+    // onboarding screen persists a choice and reloads the sidebar (AuthService.applyRepositoryChange
+    // via NavigationService.land, reached through the `onboarded` condition).
+    if (!this.auth.repositoryUrl().trim()) {
+      this.browserExtension.signalReady();
+      this.navigation.land();
+      return;
+    }
+
+    // Only activates when the repository config enables `browserExtensionCustomWebComponent`.
+    this.browserExtensionCustomWebComponent.initialize();
     // Then: the debug flag decides `onlyOfficePresent`, which the section visibilities
     // and the document request below are gated on.
     await this.debug.load();

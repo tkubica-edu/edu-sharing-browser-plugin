@@ -659,3 +659,24 @@ wa          <strong>ausschließlich</strong> über „Anmelden mit OAuth“, Ben
   }
 </section>
 }
+
+<!-- Its own, unfolded card rather than one more entry among the tuning above — this is the one
+     action on the screen with no way back, and it deserves to be seen for what it is rather than
+     found inside a fold. -->
+<section class="es-card">
+  <h2 class="reset-heading">Browserplugin zurücksetzen</h2>
+  <p class="desc">
+    Entfernt alle in diesem Browser gespeicherten Daten dieser Erweiterung — Repository-URL,
+    Anmeldedaten, Verlauf und alle übrigen Einstellungen. Das Panel lädt danach neu und startet wieder
+    beim Willkommensbildschirm.
+  </p>
+  <div class="es-row">
+    <button class="es-btn es-btn--tonal es-btn--small" type="button" (click)="resetPlugin()">
+      Browserplugin zurücksetzen
+    </button>
+  </div>
+</section>
+
+<!-- The same screen the onboarding offers before a repository is even configured — kept reachable
+     here too, since it stops applying to a fresh install once a repository is saved. -->
+<button type="button" class="privacy-link" (click)="openPrivacy()">Datenschutzerklärung</button>

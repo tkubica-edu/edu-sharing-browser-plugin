@@ -82,8 +82,10 @@ export interface MetalookupRule {
   readonly threshold: number;
 }
 
-// Sidebar defaults. The repository URL is a user-editable default; where the metadata agent is
-// follows from it (see MetadataAgentApiService), so it is not configured as a URL of its own.
+// Sidebar defaults. The repository is not one of them — nothing is asked of a repository until the
+// onboarding screen persists one the user entered (see NavigationService.land); where the metadata
+// agent is follows from `defaultRepositoryUrl` regardless (see MetadataAgentApiService), so it is
+// not configured as a URL of its own.
 export const APP_CONFIG = {
   /**
    * Features this deployment turns off outright — a blacklist, not a whitelist: everything not named
@@ -211,6 +213,12 @@ export const APP_CONFIG = {
       threshold: 0.9
     }
   ] as readonly MetalookupRule[],
+  /**
+   * Not a default the panel starts against — nothing is asked of a repository before one is
+   * configured (see the `onboarded` condition and NavigationService.land). This is the suggestion
+   * the onboarding screen offers as a clickable chip, filled into the field on request and never on
+   * its own; a person still has to confirm it. Also where `METADATA_AGENT_API_URL` below points.
+   */
   defaultRepositoryUrl: 'https://repository.staging.openeduhub.net/edu-sharing',
  //defaultRepositoryUrl: 'http://repository.127.0.0.1.nip.io:8100/edu-sharing',
   /**

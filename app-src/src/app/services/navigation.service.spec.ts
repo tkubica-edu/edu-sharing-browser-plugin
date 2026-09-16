@@ -718,6 +718,15 @@ describe('NavigationService', () => {
   });
 
   describe('landing', () => {
+    it('sends a fresh install to onboarding before it ever reaches the login', () => {
+      auth.fake.repositoryUrl.set('');
+      auth.fake.authorized.set(false);
+
+      navigation.land();
+
+      expect(navigation.section()).toBe('onboarding');
+    });
+
     it('sends a panel with no login to the login', () => {
       auth.fake.authorized.set(false);
 

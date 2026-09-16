@@ -5,6 +5,25 @@
 // Component-specific: descriptive helper text under the field.
 .desc { color: var(--es-muted); font-size: 12px; margin: 8px 0 0; }
 
+// The reset card's own heading — an unfolded card, unlike the tuning sections below, so it needs a
+// heading of its own rather than a fold button's.
+.reset-heading { margin: 0 0 var(--es-space-2); font-size: 15px; font-weight: 600; color: var(--es-text); }
+
+// Sits below every card rather than in one of them — it is not a repository setting.
+.privacy-link {
+  display: block;
+  margin: var(--es-space-3) auto 0;
+  padding: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--es-blue);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
 // The app's checkboxes (the switches on this screen) — label and box on one clickable line.
 .check {
   display: flex;

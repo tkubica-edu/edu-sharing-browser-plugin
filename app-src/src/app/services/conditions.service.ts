@@ -44,6 +44,11 @@ export class ConditionsService {
   private readonly webComponent = inject(BrowserExtensionCustomWebComponentService);
   private readonly nostr = inject(NostrForwardService);
 
+  // A repository URL has been saved — see AuthService.repositoryUrl. Read directly off the signal
+  // rather than derived from anything async, since it has to answer before the rest of the boot
+  // (which it gates) has run at all.
+  readonly onboarded = computed(() => !!this.auth.repositoryUrl().trim());
+
   /** The active browser tab's URL (set by the shell on boot). */
   readonly activeUrl = signal<string | null>(null);
 
@@ -116,6 +121,7 @@ export class ConditionsService {
 
   /** The snapshot handed to every option's visible() predicate. */
   readonly snapshot = computed<Conditions>(() => ({
+    onboarded: this.onboarded(),
     onlyOfficePresent: this.onlyOfficePresent(),
     onEduSharing: this.onEduSharing(),
     loggedIn: this.loggedIn(),

@@ -515,31 +515,50 @@ What the unit tests above cannot answer, and what this list is therefore for: an
 real browser, a real repository or a real host page — the panel's own docking and resizing, the
 embedded web components, the repository's answers, and the OnlyOffice event exchange.
 
-1. **Panel.** Toolbar click → the sidebar docks on the right; drag its left edge to resize; the ✕
+1. **Onboarding** (fresh profile, no repository ever saved — clear `eduSharingRepoUrl` from extension
+   storage to get back here): toolbar click → the onboarding screen, not the menu. The repository
+   field starts empty; check the network tab that nothing was requested of any repository yet. The
+   suggestion button fills the field with the shipped staging address but must not submit it —
+   *Verbinden* stays a separate step. Typing an address that does not end in `/edu-sharing` must block
+   *Verbinden* with the same hint the *Einstellungen* field shows. *Verbinden* on a valid address
+   persists it and reloads the sidebar; the panel must come up on the login card (or the menu, against
+   a repository that brings its own session) afterwards, never back on onboarding. The
+   *Datenschutzerklärung* link must open the summary screen from here too.
+2. **Panel.** Toolbar click → the sidebar docks on the right; drag its left edge to resize; the ✕
    button closes it — and the page must take the freed width back immediately (no empty strip), also
-   after a later window resize and after closing straight out of a drag. The start view is the menu,
-   which lists the options visible for the current page (on an OnlyOffice page *Inhalt suchen* first,
-   and nothing opens on its own), and the topbar carries the *Verlauf* / *Einstellungen* icons.
-2. **Einstellungen** (topbar icon, reachable while logged out): the Repository-URL defaults to
-   `https://repository.staging.openeduhub.net/edu-sharing` and is required. Changing it shows an
-   *Übernehmen* button that reloads the sidebar so the library re-initializes against the new
-   repository (a dot marks the icon until applied). Under the field the edu-sharing version the
-   repository reports must be named (`GET /_about`); against a repository whose major version no
-   packaged `edu/` folder fits, a notice must say that it is unsupported and name the packaged
-   version(s), and every screen embedding one of the repository's own elements must then report the
-   version instead of loading the bundle. Against one whose major matches but whose exact
+   after a later window resize and after closing straight out of a drag. Once a repository is
+   configured the start view is the menu, which lists the options visible for the current page (on an
+   OnlyOffice page *Inhalt suchen* first, and nothing opens on its own), and the topbar carries the
+   *Verlauf* / *Einstellungen* icons.
+3. **Einstellungen** (topbar icon, reachable while logged out): the Repository-URL field is empty only
+   on the fresh profile onboarding covers above; here it already carries what onboarding persisted.
+   Changing it shows an *Übernehmen* button that reloads the sidebar so the library re-initializes
+   against the new repository (a dot marks the icon until applied). Under the field the edu-sharing
+   version the repository reports must be named (`GET /_about`); against a repository whose major
+   version no packaged `edu/` folder fits, a notice must say that it is unsupported and name the
+   packaged version(s), and every screen embedding one of the repository's own elements must then
+   report the version instead of loading the bundle. Against one whose major matches but whose exact
    `major.minor` is not packaged, a second notice must name the closest packaged version that is
    loaded instead
    ([WEB-COMPONENTS.md § Which repository the edu bundle fits](WEB-COMPONENTS.md#which-repository-the-edu-bundle-fits)).
-3. **WLO abschalten**: against a repository that sets `browserExtensionCustomWebComponent`, untick
+   The *Datenschutzerklärung* link at the bottom must open the same summary screen onboarding offers.
+4. **Browserplugin zurücksetzen** (its own, unfolded card at the bottom of *Einstellungen*, below the
+   *Nostr-Relay* group): must ask for confirmation first — *Abbrechen* leaves the field, the session
+   and every setting untouched, and nothing must be visible in the storage inspector
+   (`chrome://extensions` → *Details* → *Erweiterungsspeicher untersuchen*, or
+   `about:debugging` → *Storage*) as having changed. Confirmed, every key this extension has ever
+   written must be gone from that inspector, the panel reloads on its own — no second button, unlike
+   the cookie drop below — and comes up on the onboarding screen from item 1, not the login card, not
+   the menu.
+5. **WLO abschalten**: against a repository that sets `browserExtensionCustomWebComponent`, untick
    *Einstellungen* → *Entwickler-Optionen* → **WLO-Funktionen verwenden** and leave the screen — the
    panel must lose the WLO palette, ask for a login, and offer neither *Prüfprozess auswählen* nor the
    *Qualität* tab nor Boerdi; the metadata screen must show the MDS editor. Tick it again and all of
    it must come back without reloading the extension. Everything below is walked with it ticked.
-4. **Login**: required for everything except *Einstellungen*. Enter staging credentials → the session
+6. **Login**: required for everything except *Einstellungen*. Enter staging credentials → the session
    bar flips to "Angemeldet: …" and the login option disappears while the rest appear. If the
    repository URL was changed, login is blocked until it is applied in *Einstellungen*.
-5. **SSO-Anmeldung** (needs a repository that publishes an authorization server — see
+7. **SSO-Anmeldung** (needs a repository that publishes an authorization server — see
    [§ An identity provider to test the SSO login against](#an-identity-provider-to-test-the-sso-login-against)):
    register the address *Einstellungen* → *SSO-Anmeldung* reports with the client at the provider,
    then open the login card. It must now show **only** the SSO button — no username, no password, no
@@ -553,7 +572,7 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    silently does nothing when the endpoint is missing. Closing the provider's window instead must
    leave the login card exactly as it was, with no error on it. **Untested on Safari**, see
    [TROUBLESHOOTING.md § Browser-specific](TROUBLESHOOTING.md#browser-specific).
-6. **Abmelden gegen eine Repository-Logout-Policy** (needs a repository whose client config carries a
+8. **Abmelden gegen eine Repository-Logout-Policy** (needs a repository whose client config carries a
    `logout` block — see
    [ARCHITECTURE.md § Logging out of the repository](ARCHITECTURE.md#logging-out-of-the-repository)):
    *Abmelden* must leave the page the panel is docked in exactly where it was, and open the logout
@@ -565,13 +584,13 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    what it always did. In every case the check that matters is what happens **next**: navigate the
    docked tab to another page, so the panel is rebuilt, and it must still show the login card. A panel
    that comes back signed in means the session cookie survived, or the worker's token store did.
-7. **Sitzungsende**: with a session open, leave the panel untouched past the repository's
+9. **Sitzungsende**: with a session open, leave the panel untouched past the repository's
    `sessionTimeout` (shorten it on a test instance to make this bearable). The session bar must count
    the last five minutes down (*Angemeldet · 04:31*), and when the time is up the panel must fall back
    to the login card naming inactivity as the reason. Then navigate the docked tab, so the panel is
    rebuilt: it must still show the login card. The stored tokens are dropped with a timed-out session
    precisely so the boot cannot put it back.
-8. **Abmelden außerhalb des Panels**: sign in through the provider, then log out in edu-sharing's own
+10. **Abmelden außerhalb des Panels**: sign in through the provider, then log out in edu-sharing's own
    web UI *and* at the provider, leaving the panel alone. Navigate the docked tab so the panel is
    rebuilt: it must show the login card. It asks the provider before resuming from its own store — a
    refresh where the server issues refresh tokens, else the userinfo endpoint — so a panel that comes
@@ -601,20 +620,20 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    [TROUBLESHOOTING.md § A save fails with 403 and a missing tool permission](TROUBLESHOOTING.md#a-save-fails-with-403-and-a-missing-tool-permission).
    Note that the resume drops the repository's cookies for the whole browser, so an edu-sharing tab
    open beside the panel is signed out by it — that is expected here, not a second failure.
-9. **Erschließen + speichern**: *Inhalt erschließen* on a content page → the metadata screen shows
+11. **Erschließen + speichern**: *Inhalt erschließen* on a content page → the metadata screen shows
    `fields_extracted / fields_total` and loads the MDS editor with the generated metadata. Edit, then
    the footer's **Speichern** → a node is created in your inbox and the preview opens, and the flow's
    steps become reachable for that content.
-10. **Metadaten anreichern** (OnlyOffice): open a document in the OnlyOffice editor with the
+12. **Metadaten anreichern** (OnlyOffice): open a document in the OnlyOffice editor with the
    edu-sharing plugin active, open the panel → the option appears and names the detected document.
    The footer's **Metadaten anreichern** reads the document and lands on the metadata screen with the
    generated metadata, the menu naming the document under *Inhalt erkannt*. **Speichern** must update
    **that** node — check in the repository that the document's metadata changed, that its
    name/extension is unchanged, and that no new node appeared in the inbox. With the page-side plugin
    switched off (*Plugins im Hintergrund*) the screen must report the timeout instead of hanging.
-11. **Vorschau → Sammlungen**: from the preview, *Sammlung zuordnen* → pick a collection and confirm
+13. **Vorschau → Sammlungen**: from the preview, *Sammlung zuordnen* → pick a collection and confirm
    with *In Sammlung einfügen*; the screen lists what was added.
-12. **An Nostr Relay weiterleiten**: the step is reached in the base version too — against a repository
+14. **An Nostr Relay weiterleiten**: the step is reached in the base version too — against a repository
    *without* `browserExtensionCustomWebComponent` it must show the relay row alone, with no Redaktionen
    list, no „keine Redaktionen konfiguriert" line and no collection request in the network tab. The
    *Nostr-Relay* group in *Einstellungen* must be there in that version too — the step is, so its relay
@@ -634,7 +653,7 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    flow as well, since it has no target left. Ticking it again brings all of it back, with the relay
    row unticked and no receipt carried over.
 
-13. **An Nostr Relay senden** (Inhaltsoptionen, between *Inhalt teilen* and *Interaktionen anzeigen*):
+15. **An Nostr Relay senden** (Inhaltsoptionen, between *Inhalt teilen* and *Interaktionen anzeigen*):
    open a node from the *Verlauf* → the row appears and opens a step of its own — the Inhaltsübersicht
    must **not** grow a tab for it. The screen names the `d` tag and the field count
    it would publish, with the standing card above it. *An Relay senden* publishes it; the button then
@@ -647,7 +666,7 @@ embedded web components, the repository's answers, and the OnlyOffice event exch
    relay, not out of the *Verlauf* — labelled „Beim Nostr-Relay hinterlegt". Clearing the *Verlauf* must
    change nothing about that. With the relay pointed at an unreachable address the state must read
    **Unbekannt**, never „Nicht gesendet".
-14. **Verlauf**: every *saved* node is listed (nothing is recorded until you save); entries expand to
+16. **Verlauf**: every *saved* node is listed (nothing is recorded until you save); entries expand to
    show their fields and offer *In Vorschau öffnen*, which reloads the node from the repository;
    *Leeren* clears the list.
 

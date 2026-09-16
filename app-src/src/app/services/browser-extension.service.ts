@@ -577,6 +577,20 @@ export class BrowserExtensionService {
     await browser.storage.local.set({ [key]: value });
   }
 
+  /**
+   * Wipe every key this extension has ever written — every entry in `APP_CONFIG.storageKeys`, the
+   * worker's own OAuth token store, and its per-tab panel/resume bookkeeping alike. For *Browserplugin
+   * zurücksetzen*, which means exactly that: not one key at a time, unlike every other write here.
+   * `storage.session` is cleared too, where the browser has one — the worker falls back to
+   * `storage.local` for the same bookkeeping where it does not (`openPanelsArea` in
+   * `background/background.js`), so this reaches it there as well.
+   */
+  async storageClear(): Promise<void> {
+    if (!this.available) return;
+    await browser.storage.local.clear();
+    await browser.storage.session?.clear();
+  }
+
   /** Forward selected edu-sharing node(s) to the host page (e.g. OnlyOffice). */
   insertNodes(nodes: unknown[]): void {
     this.postToHost({ type: 'edusharing-insert-node', nodes });

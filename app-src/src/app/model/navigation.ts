@@ -5,6 +5,8 @@
 
 /** A leaf screen: exactly one component is rendered for it. */
 export type ScreenId =
+  | 'onboarding'
+  | 'privacy'
   | 'login'
   | 'ai-assistant'
   | 'settings'
@@ -34,6 +36,8 @@ export type ScreenId =
 /** A navigable section: the main menu itself, a menu entry, or a step of the content flow. */
 export type SectionId =
   | 'menu'
+  | 'onboarding'
+  | 'privacy'
   | 'login'
   | 'ai-assistant'
   | 'settings'
@@ -58,6 +62,9 @@ export type SectionId =
 
 /** A snapshot of the world a section's (or tab's) visibility is decided against. */
 export interface Conditions {
+  /** A repository URL has been saved — see AuthService.repositoryUrl. False on a fresh install,
+   *  where nothing is asked of any repository until the onboarding screen persists a choice. */
+  onboarded: boolean;
   /** OnlyOffice (or another insert host) detected on the active page. */
   onlyOfficePresent: boolean;
   /** The active page is Edu-Sharing itself (host match or `/edu-sharing` path). */
@@ -198,6 +205,17 @@ const requiresLogin =
 
 /** Every section, in main-menu order (the flow steps and the utilities last). */
 export const SECTIONS: readonly AppSection[] = [
+  {
+    id: 'onboarding',
+    label: 'Willkommen',
+    description: 'Repository verbinden',
+    title: 'Willkommen',
+    // The very first thing a fresh install can show: nothing else applies before a repository is
+    // configured, since nothing is asked of one until this screen persists a choice (see
+    // NavigationService.land).
+    visible: (c) => !c.onboarded,
+    tabs: [{ id: 'onboarding', label: 'Willkommen' }]
+  },
   {
     id: 'login',
     label: 'Login',
@@ -501,6 +519,16 @@ export const SECTIONS: readonly AppSection[] = [
   },
 
   // ---- Utilities ----------------------------------------------------------
+  {
+    id: 'privacy',
+    label: 'Datenschutz',
+    description: 'Was diese Erweiterung an Daten verarbeitet',
+    title: 'Datenschutzerklärung',
+    // Reachable from the onboarding screen and from the settings, in every state — a person deciding
+    // whether to configure a repository at all needs this before there is anything else to gate it on.
+    visible: () => true,
+    tabs: [{ id: 'privacy', label: 'Datenschutz' }]
+  },
   {
     id: 'settings',
     label: 'Einstellungen',

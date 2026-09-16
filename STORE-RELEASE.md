@@ -38,7 +38,8 @@ Der Aufwand liegt **nicht** im Bauen.
 | Paketgröße | 16,4 MB zip / 54 MB entpackt — unter allen harten Store-Limits | `dist/*.zip` |
 | CI | baut alle drei Targets, zippt, GitHub-Release auf `v*`-Tags | `.github/workflows/build.yml` |
 
-Nicht vorhanden: `LICENSE`, Datenschutzerklärung, Screenshots, Promo-Assets, Store-Accounts,
+Nicht vorhanden: `LICENSE`, eine geprüfte Datenschutzerklärung unter öffentlicher URL (ein Entwurf
+liegt seit B2 als [PRIVACY.md](PRIVACY.md) im Repo), Screenshots, Promo-Assets, Store-Accounts,
 Upload-Jobs in der CI, Secrets (`.gitignore` listet nicht einmal `.env`).
 
 ### Lint-Warnings nach Quelle (195 gesamt, 0 Errors, 0 Notices)
@@ -63,15 +64,19 @@ dem Firefox-Manifest-Update (§3) keine Notice mehr.
 
 ## 2. Blocker, die für jeden Store und jede Sichtbarkeit gelten
 
-### B1 — Default-Endpunkte zeigen auf Staging *(nur noch die Repository-URL läuft wirklich)*
+### B1 — Default-Endpunkte zeigen auf Staging *(Repository-Default erledigt, Agent-Adresse bleibt gepinnt)*
 
 `config.js:7` und `app-src/src/app/config.ts` nennen fünf Staging-Adressen, aber sie stehen nicht
 alle gleich: `APP_CONFIG.featureBlacklist` (`config.ts:95`, **erledigt 15.09.2026**) schaltet `wlo`,
 `nostr`, `metalookup` und `contentJudge` aus:
 
-- `https://repository.staging.openeduhub.net/edu-sharing` — Repository **und** der daran gepinnte
-  Metadata-Agent. Der einzige der fünf, der wirklich als Default läuft: das Repository ist zwar in
-  den Einstellungen änderbar, aber ungeändert genau diese Staging-Instanz.
+- `https://repository.staging.openeduhub.net/edu-sharing` — **kein Default mehr, seit B1-a
+  (erledigt).** Die Extension startet ohne Repository und fragt es beim ersten Öffnen ab
+  (Onboarding-Bildschirm); die Adresse steht dort nur noch als anklickbarer Vorschlag. Der daran
+  gepinnte Metadata-Agent (`METADATA_AGENT_API_URL`) ist davon unberührt — ein neu verbundenes
+  Repository kann die Kernfunktion „Inhalt erschließen" also weiterhin nicht nutzen, siehe die
+  gepinnte Agent-Adresse in [MATURITY.md](präsentation/MATURITY.md) und
+  [ARCHITECTURE.md § The metadata agent's address](ARCHITECTURE.md#the-metadata-agents-address).
 - `https://metalookup-2.staging.openeduhub.net` — **jetzt blacklisted.** `QualityJudgeService.judge`
   ist der eine Ort, von dem aus beide Judges laufen — unabhängig vom `wlo`-Stand — und prüft dort
   zuerst `isFeatureEnabled('metalookup')` (`quality-judge.service.ts`), vor der Einstellung und
@@ -90,30 +95,33 @@ alle gleich: `APP_CONFIG.featureBlacklist` (`config.ts:95`, **erledigt 15.09.202
 - `wss://amb-relay.edufeed.org` — Nostr-Relay, mit `nostr` blacklisted ebenso nie kontaktiert
   (`NostrForwardService.blacklisted`, `nostr-forward.service.ts:89`).
 
-Damit bleibt ein einziger offener Punkt: die Repository-URL — ein normaler, konfigurierbarer Default,
-kein Store-Blocker für sich. Alle vier anderen laufen mit dieser Deployment-Konfiguration nie an.
+Alle vier Staging-Adressen außer dem Repository laufen mit dieser Deployment-Konfiguration nie an.
+Offen bleibt die gepinnte Metadaten-Agent-Adresse — der erste der „nächsten drei Schritte" aus
+[MATURITY.md](präsentation/MATURITY.md) — sowie B1-b unten.
 
 | | Was | Aufwand |
 |---|---|---|
-| B1-a | Onboarding statt Default: die Extension startet ohne Repository und fragt es beim ersten Öffnen ab. Löst gleichzeitig den ersten der „nächsten drei Schritte" aus [MATURITY.md](präsentation/MATURITY.md) — die gepinnte Agent-Adresse — und ist die sauberste Antwort auf „warum brauchst du Zugriff auf alle Seiten" | ≈3–5 PT |
+| B1-a | **Erledigt.** Onboarding statt Default: die Extension startet ohne Repository und fragt es beim ersten Öffnen ab (`model/navigation.ts` Sektion `onboarding`, `NavigationService.land`) — die sauberste Antwort auf „warum brauchst du Zugriff auf alle Seiten". Löst **nicht** die gepinnte Agent-Adresse mit; die bleibt offen | ≈3–5 PT |
 | B1-b | Chatbot-, ContentJudge- und MetalookUp-URL trotzdem konfigurierbar machen, für ein Deployment, das eine der beiden Blacklists später lockert | ≈1–2 PT |
 
-### B2 — Keine Datenschutzerklärung, keine LICENSE *(hart)*
+### B2 — Keine geprüfte Datenschutzerklärung, keine LICENSE *(hart)*
 
-Weder `LICENSE`/`COPYING` noch ein Datenschutzdokument im Repo; das Manifest nennt keine
-Policy-URL. Alle drei Stores verlangen eine Datenschutzerklärung, sobald Nutzerdaten verarbeitet
-werden — und hier verlässt Folgendes das Gerät:
+Weder `LICENSE`/`COPYING` noch ein rechtlich geprüftes Datenschutzdokument im Repo; das Manifest
+nennt keine Policy-URL. Alle drei Stores verlangen eine Datenschutzerklärung, sobald Nutzerdaten
+verarbeitet werden — und hier verlässt Folgendes das Gerät:
 
-- bis **20 000 Zeichen `innerText`** plus **10 000 Zeichen HTML** der Seite (`content/content.js:5-72,167-183`), zusammen mit URL, Titel, allen Meta-/OG-/Twitter-/DC-/LRMI-Tags und JSON-LD
-- ein **JPEG-Screenshot des sichtbaren Tabs** (`background/background.js:338`), wenn die Seite kein eigenes Vorschaubild nennt
-- Repository-Zugangsdaten (Basic, nur im Login-Request), danach ein Session-Cookie mit `credentials: 'include'` (`background/background.js:98`)
-- bis **50 000 Zeichen** Inhaltstext an ContentJudge, bis 20 000 an den Chatbot
-- ein lokal erzeugter, dauerhafter Nostr-Schlüssel — der Pubkey geht an ein öffentliches Relay; die
-  Anbindung ist in den Einstellungen ganz abschaltbar (*Nostr-Relay verwenden*), dann wird kein
-  Schlüssel erzeugt und nichts gesendet
+- bis **20 000 Zeichen** lesbarer Text plus **10 000 Zeichen HTML** der Seite (`content/content.js:5-76,199-215`), zusammen mit URL, Titel, allen Meta-/OG-/Twitter-/DC-/LRMI-Tags und JSON-LD
+- ein **JPEG-Screenshot des sichtbaren Tabs** (`background/background.js:350-353`), wenn die Seite kein eigenes Vorschaubild nennt
+- Repository-Zugangsdaten (Basic, nur im Login-Request), danach ein Session-Cookie mit `credentials: 'include'` (`background/background.js:111`)
+- bis **50 000 Zeichen** Inhaltstext an ContentJudge, bis 20 000 an den Chatbot — beide mit der aktuellen `featureBlacklist` unerreichbar, siehe B1
+- ein lokal erzeugter, dauerhafter Nostr-Schlüssel — der Pubkey geht an ein öffentliches Relay; mit
+  der aktuellen `featureBlacklist` unerreichbar, siehe B1
 
-Zu schreiben: Datenschutzerklärung unter öffentlich erreichbarer URL, Support-URL, LICENSE.
-**≈1–2 PT Textarbeit, plus externe juristische Abnahme.**
+**Ein Entwurf liegt seit diesem Umbau als [PRIVACY.md](PRIVACY.md) im Repo** — deutschsprachig,
+mit Fundstellen belegt, aber ausdrücklich als ungeprüft markiert (Platzhalter für Verantwortlichen,
+Rechtsgrundlagen und Kontakt). Offen bleiben: externe juristische Abnahme, eine öffentlich
+erreichbare Hosting-URL (erst dann kann das Manifest sie nennen), eine Support-URL und die LICENSE.
+**≈1–2 PT für die verbleibende Textarbeit nach der Abnahme, plus die Abnahme selbst.**
 
 ### B3 — `host_permissions: https://*/*` + `http://*/*` *(weich, aber teuer)*
 
@@ -283,9 +291,11 @@ bleibt sinnvoll, ist aber nicht mehr dringend. **≈0,5–1 PT, wenn `onlyOffice
   selbst, mit bereits aktivem Inhalt, oder im Dev-Modus. Kernfunktion, nicht blacklist-gated, keine
   Korrektur nötig, nur zur Disclosure festgehalten.
 
-**Summe der noch offenen Punkte (B1, B2, B3-Rest, B5-Rest): ≈5,5–9 PT**, ohne die externen
+**Summe der noch offenen Punkte (B1-b, B2-Rest, B3-Rest, B5-Rest): ≈4–7 PT**, ohne die externen
 Abhängigkeiten (Produktions-Deployments, juristische Abnahme, Bundle-Quellen) und ohne B4 und B6, die
-als zurückgestellt bzw. derzeit wirkungslos gelten (s.o.).
+als zurückgestellt bzw. derzeit wirkungslos gelten (s.o.). B1-a (≈3–5 PT) und die Textarbeit von B2
+(≈1–2 PT) sind aus der ursprünglichen Summe (≈5,5–9 PT) jetzt heraus — B2 bleibt aber wegen der
+noch fehlenden juristischen Abnahme und Hosting-URL insgesamt offen.
 
 ---
 
@@ -370,10 +380,10 @@ Drei Abstufungen:
 | Reichweite | öffentlich suchbar | öffentlich suchbar | nur über Link oder Policy |
 
 Kontext zur Einordnung: die Extension ist heute ein Werkzeug für Redaktionen an
-edu-sharing-Repositories, mit Defaults auf Staging und einer Kernfunktion, die laut
-[MATURITY.md](präsentation/MATURITY.md) außerhalb des Default-Repositories nicht nutzbar ist — „die
-Agent-Adresse ist auf `APP_CONFIG.defaultRepositoryUrl` gepinnt … in einem fremden Core-Repo
-antwortet der Proxy also nicht".
+edu-sharing-Repositories. Seit B1-a hat sie keinen Repository-Default mehr, aber die Kernfunktion ist
+laut [MATURITY.md](präsentation/MATURITY.md) weiterhin außerhalb eines einzigen, gepinnten
+Repositorys nicht nutzbar — „die Agent-Adresse ist auf `APP_CONFIG.defaultRepositoryUrl` gepinnt …
+in einem fremden Core-Repo antwortet der Proxy also nicht".
 
 ---
 

@@ -1,0 +1,30 @@
+<section class="es-card ob-card">
+  <i class="ob-avatar" esIcon="waving_hand"></i>
+  <h2 class="ob-heading">Willkommen</h2>
+  <p class="ob-lead">
+    Diese Erweiterung liest die gerade geöffnete Seite aus, sobald eine Erschließung gestartet wird —
+    deshalb braucht sie Zugriff auf jede Seite. Das geschieht nicht von selbst: Es wird kein
+    Repository angefragt, bevor hier eines eingetragen ist.
+  </p>
+
+  <label class="es-field-label" for="ob-repo-url">Repository-URL <span class="es-req">*</span></label>
+  <input id="ob-repo-url" type="url" class="es-input" placeholder="https://…/edu-sharing"
+         [class.invalid]="missingUrl() || badUrlSuffix()"
+         [ngModel]="url()" (ngModelChange)="setUrl($event)" (blur)="touch()" />
+
+  @if (missingUrl()) {
+    <p class="es-hint">Die Repository-URL ist erforderlich.</p>
+  } @else if (badUrlSuffix()) {
+    <p class="es-hint">Die Repository-URL muss auf <code>/edu-sharing</code> enden.</p>
+  }
+
+  <button type="button" class="es-btn es-btn--tonal es-btn--small ob-suggestion" (click)="useSuggestion()">
+    Vorschlag übernehmen: {{ suggestedRepositoryUrl }}
+  </button>
+
+  <button type="button" class="ob-submit" [disabled]="connecting()" (click)="connect()">
+    {{ connecting() ? 'Verbinden…' : 'Verbinden' }}
+  </button>
+
+  <button type="button" class="ob-link" (click)="openPrivacy()">Datenschutzerklärung</button>
+</section>

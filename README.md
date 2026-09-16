@@ -110,11 +110,13 @@ flat.
 
 ## Configuration
 
-- **Repository URL** — set in *Einstellungen* (default:
-  `https://repository.staging.openeduhub.net/edu-sharing`). Used for login and every embedded
-  element; changing it reloads the sidebar.
-- **Metadata agent** — not that URL, but the default repository's B-API proxy; see
-  [ARCHITECTURE.md](ARCHITECTURE.md#the-metadata-agents-address).
+- **Repository URL** — asked for once, on first open (an onboarding screen — nothing is asked of any
+  repository before this), and editable afterwards in *Einstellungen*. The shipped staging instance
+  (`https://repository.staging.openeduhub.net/edu-sharing`) is offered there only as a suggestion to
+  click, never entered on its own. Used for login and every embedded element; changing it reloads the
+  sidebar.
+- **Metadata agent** — not that URL, but a fixed staging deployment's B-API proxy regardless of which
+  repository is configured; see [ARCHITECTURE.md](ARCHITECTURE.md#the-metadata-agents-address).
 - **Repository config variables** — `browserExtensionCustomWebComponent` swaps in the WLO editor and
   switches the panel login off, and the checkbox *WLO-Funktionen verwenden* in *Einstellungen* refuses
   it so the base version's flow stays reachable against such a repository;

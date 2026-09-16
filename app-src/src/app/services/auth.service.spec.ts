@@ -130,10 +130,10 @@ describe('AuthService', () => {
       expect(auth.loggedIn()).toBe(true);
     });
 
-    it('falls back to the shipped default when nothing was ever configured', async () => {
+    it('falls back to empty when nothing was ever configured, asking nothing of any repository', async () => {
       await auth.init();
 
-      expect(auth.repositoryUrl()).toBe(APP_CONFIG.defaultRepositoryUrl);
+      expect(auth.repositoryUrl()).toBe('');
     });
   });
 

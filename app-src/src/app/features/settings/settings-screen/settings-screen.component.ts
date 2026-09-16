@@ -12,6 +12,7 @@ import { ContextRefreshService } from '../../../services/context-refresh.service
 import { CurationService } from '../../../services/curation.service';
 import { DebugService } from '../../../services/debug.service';
 import { DevModeService } from '../../../services/dev-mode.service';
+import { NavigationService } from '../../../services/navigation.service';
 import { NostrForwardService } from '../../../services/nostr-forward.service';
 import {
   BrowserExtensionService,
@@ -39,6 +40,12 @@ type SettingsSection = 'developer' | 'sso' | 'ai' | 'recommendation' | 'quality'
  * shipped defaults. *SSO-Anmeldung* holds none: it reports what the repository answered.
  */
 type TunableSection = Exclude<SettingsSection, 'sso'>;
+
+/** Asked before every stored key is wiped — the most destructive action this screen offers. */
+const RESET_PLUGIN_PROMPT =
+  'Alle in diesem Browser gespeicherten Daten dieser Erweiterung werden entfernt — Repository-URL, ' +
+  'Anmeldedaten, Verlauf und alle übrigen Einstellungen. Das Panel wird danach neu geladen. ' +
+  'Fortfahren?';
 
 // Repository configuration plus the settings of the chat, the checks and the two development switches.
 // Changing the URL requires a reload, because the API library freezes its rootUrl at bootstrap (see
@@ -76,6 +83,7 @@ export class SettingsScreenComponent implements OnDestroy {
   protected readonly nostr = inject(NostrForwardService);
   protected readonly oauth = inject(OAuthService);
   private readonly browserExtension = inject(BrowserExtensionService);
+  private readonly navigation = inject(NavigationService);
 
   /** Whether the credential is legible on screen; masked until it is asked for. */
   protected readonly basicAuthVisible = signal(false);
@@ -208,13 +216,32 @@ export class SettingsScreenComponent implements OnDestroy {
     // untouched for it, which is what lets the field be cleared and retyped.
     if (url.trim() && !isRepositoryUrl(url)) return;
     this.changed = true;
-    this.auth.setRepositoryUrl(url);
+    void this.auth.setRepositoryUrl(url);
   }
 
   /** Take the changed repository over right away, instead of leaving it to the screen being left. */
   protected reload(): void {
     if (this.badUrlSuffix()) return;
     void this.contextRefresh.refresh();
+  }
+
+  /**
+   * Wipe every key this extension has stored in this browser and reload — `BrowserExtensionService.storageClear`,
+   * which reaches everything `APP_CONFIG.storageKeys` names (repository URL, session tokens, history,
+   * every other setting) and the worker's own bookkeeping alongside it, not one key at a time like
+   * every other write on this screen. Confirmed first, since there is no way back from it; reloaded
+   * right after, unlike the cookie drop above, since a cleared repository leaves nothing here still
+   * worth looking at — the next thing to show is onboarding, which only the boot decides.
+   */
+  protected async resetPlugin(): Promise<void> {
+    if (!confirm(RESET_PLUGIN_PROMPT)) return;
+    await this.browserExtension.storageClear();
+    this.reloadPanel();
+  }
+
+  /** The same screen the onboarding offers before a repository is even configured — see model/navigation.ts. */
+  protected openPrivacy(): void {
+    this.navigation.go('privacy');
   }
 
   // ---- Collection proposal ------------------------------------------------

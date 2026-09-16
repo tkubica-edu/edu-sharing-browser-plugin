@@ -413,6 +413,8 @@ export class NavigationService {
     // A fresh start, so nothing is behind it — landing happens on boot, on a logout and whenever a
     // view falls away, and in none of those cases is the way the user came still theirs to walk back.
     this.trail.set([]);
+    // Before the login: nothing is asked of a repository until one has been chosen at all.
+    if (!this.conditions.snapshot().onboarded) return this.open('onboarding', null);
     if (!this.conditions.snapshot().loggedIn) return this.open('login', null);
     this.openMenu();
   }

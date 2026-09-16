@@ -15,8 +15,17 @@ How the sidebar decides what to show. The catalogue of what the options *do* is
 ## No wizard: options and conditions
 
 The start view is always the list of **Aktionen & Optionen** — only being logged out (→ the login
-gate) or an explicitly loaded node (→ its Vorschau) opens something else. No option opens itself
-from a page match: what the current page offers stays visible instead of being decided for the user.
+gate), an explicitly loaded node (→ its Vorschau), or a fresh install with no repository configured
+yet (→ onboarding, see below) opens something else. No option opens itself from a page match: what
+the current page offers stays visible instead of being decided for the user.
+
+**A third exception, ahead of the other two: onboarding.** A fresh install has no repository
+configured, and nothing is asked of one — no config, no session, no page-recognition lookup — until
+a person enters one. `NavigationService.land()` checks this first, before the login gate: with no
+repository saved it opens the `onboarding` section instead of anything else, and `AppComponent.ngOnInit`
+stops its own boot right after the storage-only steps (theme, the WLO switch's persisted setting) so
+that nothing network-bound runs before that choice is made. See the `onboarded` condition in
+`model/navigation.ts`.
 
 There is no wizard and no fixed step order: every option is offered whenever its preconditions hold.
 `ConditionsService` collects those facts (login, OnlyOffice page, Edu-Sharing page, active node,

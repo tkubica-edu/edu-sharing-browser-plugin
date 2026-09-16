@@ -5,20 +5,22 @@ import { AppComponent } from './app/app.component';
 import { buildAppConfig } from './app/app.config';
 import { APP_CONFIG, toApiRootUrl } from './app/config';
 
-// Read the persisted repository URL before bootstrapping, so the library gets the
-// right rootUrl up front.
+// Read the persisted repository URL before bootstrapping, so the library gets the right rootUrl up
+// front. Empty on a fresh install — nothing is asked of a repository until the onboarding screen
+// persists one (see NavigationService.land); the placeholder rootUrl that then bootstraps the
+// library goes unused until that happens.
 async function readRepositoryBase(): Promise<string> {
   try {
     if (browser?.runtime?.id && browser.storage?.local) {
       const key = APP_CONFIG.storageKeys.repositoryUrl;
-      const items = await browser.storage.local.get({ [key]: APP_CONFIG.defaultRepositoryUrl });
+      const items = await browser.storage.local.get({ [key]: '' });
       const stored = items[key];
       if (typeof stored === 'string' && stored.trim()) return stored.trim();
     }
   } catch {
-    /* not in an extension context — use default */
+    /* not in an extension context — no repository either */
   }
-  return APP_CONFIG.defaultRepositoryUrl;
+  return '';
 }
 
 (async () => {

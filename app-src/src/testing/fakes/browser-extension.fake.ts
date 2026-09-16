@@ -84,6 +84,10 @@ export function fakeBrowserExtension() {
       storage.set(key, value);
       return Promise.resolve();
     }),
+    storageClear: vi.fn((): Promise<void> => {
+      storage.clear();
+      return Promise.resolve();
+    }),
     navigateTab: vi.fn((): Promise<void> => Promise.resolve()),
     getActiveTab: vi.fn((): Promise<PageSource | null> => Promise.resolve(activeTab)),
     getOwnTabId: vi.fn((): Promise<number | null> => Promise.resolve(ownTabId)),

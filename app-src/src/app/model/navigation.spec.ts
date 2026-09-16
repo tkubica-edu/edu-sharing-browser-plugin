@@ -5,6 +5,7 @@ import { AppSection, Conditions, SECTIONS, SectionId, sectionText } from './navi
 /** A world in which nothing applies — the state the panel starts in before anything is known. */
 function noConditions(overrides: Partial<Conditions> = {}): Conditions {
   return {
+    onboarded: false,
     onlyOfficePresent: false,
     onEduSharing: false,
     loggedIn: false,
@@ -25,6 +26,7 @@ function noConditions(overrides: Partial<Conditions> = {}): Conditions {
 /** A signed-in user on an ordinary page, with the repository's own web component enabled. */
 function signedIn(overrides: Partial<Conditions> = {}): Conditions {
   return noConditions({
+    onboarded: true,
     loggedIn: true,
     hasSession: true,
     browserExtensionCustomWebComponent: true,
@@ -79,13 +81,20 @@ describe('the registry itself', () => {
   });
 });
 
-describe('what is offered before a login', () => {
-  it('offers the login and the settings, and nothing else', () => {
-    expect(visible(noConditions())).toEqual(['login', 'settings']);
+describe('what is offered before onboarding, or before a login', () => {
+  it('offers only onboarding, login and the always-visible utilities on a fresh install', () => {
+    expect(visible(noConditions())).toEqual(['onboarding', 'login', 'privacy', 'settings']);
+  });
+
+  it('stops offering onboarding once a repository has been configured', () => {
+    expect(visible(noConditions({ onboarded: true }))).toEqual(['login', 'privacy', 'settings']);
   });
 
   it('stops offering the login once there is a session of one\'s own', () => {
-    expect(visible(noConditions({ hasSession: true }))).toEqual(['settings']);
+    expect(visible(noConditions({ onboarded: true, hasSession: true }))).toEqual([
+      'privacy',
+      'settings',
+    ]);
   });
 
   it('offers the settings in every state, being about the panel rather than about a content', () => {
@@ -93,9 +102,13 @@ describe('what is offered before a login', () => {
     expect(section('settings').topbar).toBe(true);
   });
 
+  it('offers the privacy notice in every state, before onboarding included', () => {
+    expect(section('privacy').visible(noConditions())).toBe(true);
+  });
+
   it('offers the login to a guest, who may sign in although nothing demands it', () => {
     // `loggedIn` without `hasSession` is the guest the web component brings.
-    expect(visible(noConditions({ loggedIn: true }))).toContain('login');
+    expect(visible(noConditions({ onboarded: true, loggedIn: true }))).toContain('login');
   });
 });
 
