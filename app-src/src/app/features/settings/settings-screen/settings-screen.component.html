@@ -1,11 +1,13 @@
 <section class="es-card">
   <label class="es-field-label" for="repo-url">Repository-URL <span class="es-req">*</span></label>
   <input id="repo-url" type="url" class="es-input" placeholder="https://…/edu-sharing"
-         [class.invalid]="missingUrl()"
+         [class.invalid]="missingUrl() || badUrlSuffix()"
          [ngModel]="repositoryUrl()" (ngModelChange)="apply($event)" />
 
   @if (missingUrl()) {
     <p class="es-hint">Die Repository-URL ist erforderlich.</p>
+  } @else if (badUrlSuffix()) {
+    <p class="es-hint">Die Repository-URL muss auf <code>/edu-sharing</code> enden.</p>
   }
 
   <!-- Was das Repository über sich selbst sagt (`GET /_about`), keine Einstellung: die Version
@@ -42,7 +44,9 @@
   @if (auth.needsReload()) {
     <div class="es-notice">
       <span>Repository geändert. Wird beim Verlassen der Einstellungen übernommen — dazu lädt das Panel neu.</span>
-      <button class="es-btn es-btn--tonal es-btn--small" (click)="reload()">Jetzt übernehmen</button>
+      <button class="es-btn es-btn--tonal es-btn--small" [disabled]="badUrlSuffix()" (click)="reload()">
+        Jetzt übernehmen
+      </button>
     </div>
   }
 </section>

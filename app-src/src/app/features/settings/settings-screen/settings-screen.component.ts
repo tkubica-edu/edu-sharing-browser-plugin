@@ -23,6 +23,7 @@ import { ContentJudgeService } from '../../../services/content-judge.service';
 import { QualityJudgeService } from '../../../services/quality-judge.service';
 import { RepositoryVersionService } from '../../../services/repository-version.service';
 import { ThemeService, ThemeSetting } from '../../../services/theme.service';
+import { isRepositoryUrl } from '../../../util/repository-links';
 import { configuredSchemes } from '../../../util/quality-schemes';
 
 /**
@@ -126,6 +127,11 @@ export class SettingsScreenComponent implements OnDestroy {
 
   protected readonly missingUrl = computed(() => this.touched() && !this.repositoryUrl().trim());
 
+  /** Set once the field holds text that isn't empty but doesn't name an edu-sharing deployment either — see {@link isRepositoryUrl}. */
+  protected readonly badUrlSuffix = computed(
+    () => this.touched() && !!this.repositoryUrl().trim() && !isRepositoryUrl(this.repositoryUrl()),
+  );
+
   /** Set by every setting, so leaving without having changed anything costs no requests. */
   private changed = false;
 
@@ -196,12 +202,18 @@ export class SettingsScreenComponent implements OnDestroy {
   protected apply(url: string): void {
     this.repositoryUrl.set(url);
     this.touched.set(true);
+    // A non-empty value that doesn't name an edu-sharing deployment is never handed to the auth
+    // service — it would otherwise persist (see AuthService.setRepositoryUrl) despite failing the
+    // hint shown for it. An empty value is passed through: the auth service already leaves storage
+    // untouched for it, which is what lets the field be cleared and retyped.
+    if (url.trim() && !isRepositoryUrl(url)) return;
     this.changed = true;
     this.auth.setRepositoryUrl(url);
   }
 
   /** Take the changed repository over right away, instead of leaving it to the screen being left. */
   protected reload(): void {
+    if (this.badUrlSuffix()) return;
     void this.contextRefresh.refresh();
   }
 

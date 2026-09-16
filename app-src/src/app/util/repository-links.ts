@@ -6,6 +6,14 @@ export function renderLink(repositoryUrl: string, nodeId: string): string {
   return `${repositoryUrl.replace(/\/+$/, '')}/components/render/${nodeId}`;
 }
 
+/**
+ * Whether a URL can be the repository's: edu-sharing always serves its API and web components under a
+ * `/edu-sharing` path, so an address without it names a host but not the deployment on it.
+ */
+export function isRepositoryUrl(url: string): boolean {
+  return /\/edu-sharing\/?$/.test(url.trim());
+}
+
 /** A node id as the repository writes it into its URLs. */
 const NODE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
