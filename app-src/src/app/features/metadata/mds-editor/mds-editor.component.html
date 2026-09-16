@@ -4,7 +4,10 @@
   } @else if (generating()) {
     <!-- The repository's own generation runs before the form is built, so its findings are in the form
          the moment it appears — see MdsEditorComponent.generateSuggestions. -->
-    <p class="es-muted">Metadaten werden vorgeschlagen…</p>
+    <div class="mds-waiting" role="status">
+      <es-spinner></es-spinner>
+      <p class="es-muted">Metadaten werden vorgeschlagen…</p>
+    </div>
   } @else if (!ready()) {
     <p class="es-muted">Editor wird geladen…</p>
   }

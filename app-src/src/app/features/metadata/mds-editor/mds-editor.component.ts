@@ -24,6 +24,7 @@ import { MdsValuespaceService } from '../../../services/mds-valuespace.service';
 import { pageTermsOf } from '../../../util/derived-metadata';
 import type { PageTerms } from '../../../util/page-statements';
 import { loadWebComponentBundle } from '../../../services/web-component-bundle.service';
+import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 
 const EDITOR_TAG = 'edu-sharing-mds-editor-wrapper';
 
@@ -68,6 +69,7 @@ interface MdsEditorElement extends HTMLElement {
   selector: 'es-mds-editor',
   templateUrl: './mds-editor.component.html',
   styleUrl: './mds-editor.component.scss',
+  imports: [SpinnerComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   changeDetection: ChangeDetectionStrategy.OnPush
 })

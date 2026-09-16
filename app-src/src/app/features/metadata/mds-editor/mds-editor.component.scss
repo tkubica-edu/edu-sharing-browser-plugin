@@ -4,6 +4,18 @@
 
 .mds-host { display: block; width: 100%; }
 
+// The wait for the generation run: the house spinner above its caption, since the caption alone gave
+// no sign that anything was moving.
+.mds-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 0;
+
+  es-spinner { --es-spinner-size: 32px; }
+}
+
 // The core's own KI banner (`.ai-info` of es-mds-editor-core): the bar in the KI colour above the views,
 // with the toggle that starts a generation run of its own. The panel runs the generation itself, before
 // the form is built (see MdsAiSuggestionService), so the bar offers a second way into what has already
