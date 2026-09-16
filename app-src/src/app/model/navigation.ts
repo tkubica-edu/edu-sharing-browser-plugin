@@ -7,6 +7,7 @@
 export type ScreenId =
   | 'onboarding'
   | 'privacy'
+  | 'impressum'
   | 'login'
   | 'ai-assistant'
   | 'settings'
@@ -38,6 +39,7 @@ export type SectionId =
   | 'menu'
   | 'onboarding'
   | 'privacy'
+  | 'impressum'
   | 'login'
   | 'ai-assistant'
   | 'settings'
@@ -528,6 +530,15 @@ export const SECTIONS: readonly AppSection[] = [
     // whether to configure a repository at all needs this before there is anything else to gate it on.
     visible: () => true,
     tabs: [{ id: 'privacy', label: 'Datenschutz' }]
+  },
+  {
+    id: 'impressum',
+    label: 'Impressum',
+    description: 'Anbieterkennzeichnung dieser Erweiterung',
+    title: 'Impressum',
+    // Reachable from the settings, like the Datenschutzerklärung right above it.
+    visible: () => true,
+    tabs: [{ id: 'impressum', label: 'Impressum' }]
   },
   {
     id: 'settings',

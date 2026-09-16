@@ -83,16 +83,28 @@ describe('the registry itself', () => {
 
 describe('what is offered before onboarding, or before a login', () => {
   it('offers only onboarding, login and the always-visible utilities on a fresh install', () => {
-    expect(visible(noConditions())).toEqual(['onboarding', 'login', 'privacy', 'settings']);
+    expect(visible(noConditions())).toEqual([
+      'onboarding',
+      'login',
+      'privacy',
+      'impressum',
+      'settings'
+    ]);
   });
 
   it('stops offering onboarding once a repository has been configured', () => {
-    expect(visible(noConditions({ onboarded: true }))).toEqual(['login', 'privacy', 'settings']);
+    expect(visible(noConditions({ onboarded: true }))).toEqual([
+      'login',
+      'privacy',
+      'impressum',
+      'settings'
+    ]);
   });
 
   it('stops offering the login once there is a session of one\'s own', () => {
     expect(visible(noConditions({ onboarded: true, hasSession: true }))).toEqual([
       'privacy',
+      'impressum',
       'settings',
     ]);
   });

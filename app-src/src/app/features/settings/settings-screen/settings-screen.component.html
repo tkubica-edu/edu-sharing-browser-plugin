@@ -677,6 +677,10 @@ wa          <strong>ausschließlich</strong> über „Anmelden mit OAuth“, Ben
   </div>
 </section>
 
-<!-- The same screen the onboarding offers before a repository is even configured — kept reachable
-     here too, since it stops applying to a fresh install once a repository is saved. -->
-<button type="button" class="privacy-link" (click)="openPrivacy()">Datenschutzerklärung</button>
+<!-- Two legal notices, neither a repository setting: the Datenschutzerklärung is the same screen the
+     onboarding offers before a repository is even configured, kept reachable here too since it stops
+     applying to a fresh install once one is saved; the Impressum has no other entry point. -->
+<div class="legal-links">
+  <button type="button" class="legal-link" (click)="openPrivacy()">Datenschutzerklärung</button>
+  <button type="button" class="legal-link" (click)="openImpressum()">Impressum</button>
+</div>

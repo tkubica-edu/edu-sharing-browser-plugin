@@ -244,6 +244,11 @@ export class SettingsScreenComponent implements OnDestroy {
     this.navigation.go('privacy');
   }
 
+  /** Reachable only from here — see model/navigation.ts, section `impressum`. */
+  protected openImpressum(): void {
+    this.navigation.go('impressum');
+  }
+
   // ---- Collection proposal ------------------------------------------------
   // Written as it is edited, like every other setting here. A field the user has emptied reports no
   // number at all — that is a field halfway through being typed in, not a value, so it is ignored and

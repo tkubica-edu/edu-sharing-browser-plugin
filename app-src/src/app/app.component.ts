@@ -58,6 +58,7 @@ import { InteractionsScreenComponent } from './features/overview/interactions-sc
 import { PreviewScreenComponent } from './features/overview/preview-screen/preview-screen.component';
 import { ShareScreenComponent } from './features/overview/share-screen/share-screen.component';
 import { UsagesScreenComponent } from './features/overview/usages-screen/usages-screen.component';
+import { ImpressumScreenComponent } from './features/impressum/impressum-screen/impressum-screen.component';
 import { PrivacyScreenComponent } from './features/privacy/privacy-screen/privacy-screen.component';
 import { AiQualityScreenComponent } from './features/quality/ai-quality-screen/ai-quality-screen.component';
 import { FlowChoiceScreenComponent } from './features/quality/flow-choice-screen/flow-choice-screen.component';
@@ -76,7 +77,7 @@ const DISCARD_PROMPT =
     IconDirective,
     // AiAssistantBarComponent belongs here — commented out with its tag, see the template.
     ActionBarComponent, TabBarComponent, UserBarComponent, MenuComponent,
-    OnboardingScreenComponent, PrivacyScreenComponent,
+    OnboardingScreenComponent, PrivacyScreenComponent, ImpressumScreenComponent,
     LoginComponent, LoginGateComponent, AiAssistantScreenComponent, HistoryScreenComponent,
     SettingsScreenComponent, SearchScreenComponent, AddContentScreenComponent,
     ContentOptionsScreenComponent, CurationScreenComponent, CurationPreviewScreenComponent,
