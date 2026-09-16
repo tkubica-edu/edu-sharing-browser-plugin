@@ -278,6 +278,15 @@ describe('CurationService — taking a content back up', () => {
       expect(curation.pendingExtraction()).toBeNull();
     });
 
+    it('drops the mark unrun where metadataAgentGenerate is blacklisted', async () => {
+      agent.fake.generateBlacklisted.set(true);
+
+      await curation.resumePendingExtraction('https://example.org/optik');
+
+      expect(agent.fake.runForUrl).not.toHaveBeenCalled();
+      expect(curation.pendingExtraction()).toBeNull();
+    });
+
     it('runs nothing while the panel is not authorized, or while a run is already out', async () => {
       auth.fake.authorized.set(false);
       await curation.resumePendingExtraction('https://example.org/optik');
@@ -581,6 +590,13 @@ describe('CurationService — taking a content back up', () => {
 
       await expect(curation.analyze()).resolves.toBe(false);
       expect(agent.fake.run).not.toHaveBeenCalled();
+    });
+
+    it('still analyzes the page where metadataAgentGenerate is blacklisted — via readPage, not run', async () => {
+      agent.fake.generateBlacklisted.set(true);
+      agent.reads({ 'cclom:title': 'Optik' });
+
+      await expect(curation.analyze()).resolves.toBe(true);
     });
   });
 

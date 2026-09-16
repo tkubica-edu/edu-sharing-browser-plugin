@@ -36,6 +36,14 @@
  *   the call never runs regardless of the stored switch or a configured credential, and the
  *   *ContentJudge: Inhalt per LLM bewerten* checkbox plus the credential field above it are hidden the
  *   same way. Independent of `metalookup` and of `wlo`, same reasoning.
+ * - `metadataAgentGenerate`: the metadata agent's `/generate` call — `MetadataAgentService.run` and
+ *   `runForUrl`, both funneled through `CurationService`. Blacklisted, those two are never called and
+ *   `CurationService.analyze` falls back to `MetadataAgentService.readPage` (the page's own statements,
+ *   no agent) exactly as it already does while `wlo` is off; `runPendingExtraction` skips the same way
+ *   it already does for `wlo`. Independent of `wlo`: a deployment can run the WLO canvas without the
+ *   agent, or the agent without WLO. `MetadataAgentService.extractField` (`/extract-field`, the
+ *   single-field generation behind *Passende Inhalte*) is a different endpoint and not covered here —
+ *   it stays gated by `onlyOfficeEvents` alone, via `OnlyOfficeDocumentService`.
  */
 export type FeatureKey =
   | 'onlyOfficeEvents'
@@ -43,7 +51,8 @@ export type FeatureKey =
   | 'nostr'
   | 'developerOptions'
   | 'metalookup'
-  | 'contentJudge';
+  | 'contentJudge'
+  | 'metadataAgentGenerate';
 
 /**
  * Which way a scheme's number has to go for the criterion it judges to count as met: `atLeast` where the higher
@@ -100,7 +109,8 @@ export const APP_CONFIG = {
     "wlo",
     "developerOptions",
     "metalookup",
-    "contentJudge"
+    "contentJudge",
+    "metadataAgentGenerate"
   ] as readonly FeatureKey[],
   /**
    * MetalookUp, which evaluates a resource and answers with the metadata it could extract from it

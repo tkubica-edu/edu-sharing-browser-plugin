@@ -12,6 +12,7 @@ import {
   fakePageDerivation,
 } from '../../testing/fakes';
 import { provideFake } from '../../testing/provide-fake';
+import { useFeatureBlacklist } from '../../testing/feature-blacklist';
 import {
   BrowserExtensionService,
   PageData,
@@ -45,6 +46,7 @@ describe('MetadataAgentService', () => {
   let devMode: DevModeFake;
   let derivation: PageDerivationFake;
   let fetchMock: Mock;
+  const blacklist = useFeatureBlacklist();
 
   beforeEach(() => {
     extension = fakeBrowserExtension();
@@ -151,6 +153,49 @@ describe('MetadataAgentService', () => {
 
       expect(await agent.run()).toEqual({ ok: false, error: 'kaputt' });
       expect(agent.running()).toBe(false);
+    });
+  });
+
+  describe('with metadataAgentGenerate blacklisted', () => {
+    it('reports itself blacklisted', () => {
+      blacklist('metadataAgentGenerate');
+      expect(agent.generateBlacklisted()).toBe(true);
+    });
+
+    it('calls neither the worker nor the agent for a run, and answers a failure instead', async () => {
+      extension.analyzes({ 'cclom:title': 'Optik' }, SOURCE);
+      blacklist('metadataAgentGenerate');
+
+      const outcome = await agent.run();
+
+      expect(extension.fake.analyzeActiveTab).not.toHaveBeenCalled();
+      expect(outcome).toEqual({
+        ok: false,
+        error: 'Die Erschließung durch den Metadaten-Agenten ist für dieses Deployment abgeschaltet.',
+      });
+    });
+
+    it('does the same for a run named by URL', async () => {
+      extension.analyzes({ 'cclom:title': 'Optik' }, SOURCE);
+      blacklist('metadataAgentGenerate');
+
+      const outcome = await agent.runForUrl('https://example.org/optik');
+
+      expect(extension.fake.analyzeUrl).not.toHaveBeenCalled();
+      expect(outcome.ok).toBe(false);
+    });
+
+    it('leaves readPage and extractField untouched — a different endpoint each', async () => {
+      extension.reads({ success: true, source: SOURCE, data: aPage() });
+      blacklist('metadataAgentGenerate');
+
+      expect((await agent.readPage()).ok).toBe(true);
+
+      fetchMock.mockImplementation(() =>
+        Promise.resolve(new Response(JSON.stringify({ value: ['Optik'] }), { status: 200 })),
+      );
+      const longEnough = 'Der Artikel selbst, lang genug, dass der Agent damit etwas anfangen kann.';
+      expect((await agent.extractField(longEnough, 'cclom:general_keyword')).ok).toBe(true);
     });
   });
 

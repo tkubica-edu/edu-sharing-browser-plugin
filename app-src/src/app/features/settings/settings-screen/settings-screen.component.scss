@@ -9,6 +9,10 @@
 // heading of its own rather than a fold button's.
 .reset-heading { margin: 0 0 var(--es-space-2); font-size: 15px; font-weight: 600; color: var(--es-text); }
 
+// The one destructive action on the screen, set off to the end of its row rather than the leading
+// edge every other `.es-row` button sits at.
+.reset-row { justify-content: flex-end; }
+
 // Sits below every card rather than in one of them — it is not a repository setting.
 .privacy-link {
   display: block;

@@ -45,6 +45,7 @@ export function fakeMetadataAgent() {
 
   const fake = {
     running: signal(false),
+    generateBlacklisted: signal(false),
     lastRun,
     run,
     readPage: run,

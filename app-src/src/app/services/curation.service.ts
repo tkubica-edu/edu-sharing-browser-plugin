@@ -198,7 +198,7 @@ export class CurationService {
   async runPendingExtraction(): Promise<void> {
     const url = this.pendingExtractionState();
     if (!url || !this.auth.authorized() || this.metadataAgent.running()) return;
-    if (!this.browserExtensionCustomWebComponent.enabled()) {
+    if (!this.browserExtensionCustomWebComponent.enabled() || this.metadataAgent.generateBlacklisted()) {
       // Nothing to run: the agent is a WLO function, and the page of a content taken up from the
       // Verlauf is not the open one, so there is nothing to read either. The content stands as it was
       // saved, and the Metadaten step has the repository propose for it (see MdsAiSuggestionService).
@@ -947,12 +947,14 @@ export class CurationService {
   async analyze(): Promise<boolean> {
     if (!this.auth.authorized()) return false;
     this.resetNodeState();
-    // The metadata agent only where the WLO functions are switched on: its `/generate` is one of them.
-    // Elsewhere the page is read and nothing is generated from it — the fields it does not state are
-    // proposed by the repository at the Metadaten step (see MetadataAgentService.readPage).
-    const outcome = this.browserExtensionCustomWebComponent.enabled()
-      ? await this.metadataAgent.run()
-      : await this.metadataAgent.readPage();
+    // The metadata agent only where the WLO functions are switched on and this deployment allows its
+    // `/generate` call at all. Elsewhere the page is read and nothing is generated from it — the fields
+    // it does not state are proposed by the repository at the Metadaten step (see
+    // MetadataAgentService.readPage).
+    const outcome =
+      this.browserExtensionCustomWebComponent.enabled() && !this.metadataAgent.generateBlacklisted()
+        ? await this.metadataAgent.run()
+        : await this.metadataAgent.readPage();
     const ok = outcome.ok && !!outcome.parsed && !!outcome.source;
     this.resultPending.set(ok);
     // A content that is being erschlossen right now is not one that was erschlossen: from here it counts

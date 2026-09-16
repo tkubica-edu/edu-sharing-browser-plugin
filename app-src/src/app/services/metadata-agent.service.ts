@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 
 import {
   BrowserExtensionService,
@@ -6,6 +6,7 @@ import {
   WORKER_UNREACHABLE,
   WORKER_UNREACHABLE_TEXT
 } from './browser-extension.service';
+import { isFeatureEnabled } from '../config';
 import { DevModeService } from './dev-mode.service';
 import { MetadataAgentApiService } from './metadata-agent-api.service';
 import { PageDerivationService } from './page-derivation.service';
@@ -50,6 +51,9 @@ const PAGE_UNREADABLE =
   'Diese Seite kann nicht gelesen werden. Öffne die Seite des Inhalts und versuche es erneut.';
 
 const EXTRACT_TIMEOUT = 'Der Metadaten-Agent hat nicht rechtzeitig geantwortet.';
+
+/** What {@link MetadataAgentService.run} and {@link MetadataAgentService.runForUrl} answer while blacklisted. */
+const GENERATE_BLACKLISTED = 'Die Erschließung durch den Metadaten-Agenten ist für dieses Deployment abgeschaltet.';
 
 export interface MetadataField {
   key: string;
@@ -104,7 +108,14 @@ export class MetadataAgentService {
   readonly lastRun = this.lastRunState.asReadonly();
   readonly running = signal(false);
 
+  /** True where `APP_CONFIG.featureBlacklist` names `metadataAgentGenerate` — see `FeatureKey`. */
+  readonly generateBlacklisted = computed(() => !isFeatureEnabled('metadataAgentGenerate'));
+
   async run(): Promise<AnalyzeOutcome> {
+    // The screens that would ask for a run are not offered then (see CurationService.analyze, which
+    // falls back to {@link readPage} instead), so this is the guard behind them rather than a case
+    // they run into.
+    if (this.generateBlacklisted()) return this.remember({ ok: false, error: GENERATE_BLACKLISTED });
     this.running.set(true);
     try {
       // The worker has no repository of its own to derive the agent from, so it is told which one
@@ -190,6 +201,9 @@ export class MetadataAgentService {
    * stored as the same last run, since it is the same statement about the same kind of thing.
    */
   async runForUrl(url: string, title?: string | null): Promise<AnalyzeOutcome> {
+    // Same guard as {@link run}, and for the same reason: CurationService.runPendingExtraction skips
+    // this call while blacklisted rather than running into the failure here.
+    if (this.generateBlacklisted()) return this.remember({ ok: false, error: GENERATE_BLACKLISTED });
     this.running.set(true);
     try {
       const response = await this.browserExtension.analyzeUrl(
