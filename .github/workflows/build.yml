@@ -78,7 +78,6 @@ jobs:
 
       - name: Lint Firefox build
         run: npm run lint:firefox
-        continue-on-error: true
 
       - name: Upload Chrome build
         uses: actions/upload-artifact@v7
@@ -106,7 +105,8 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           manifest_version="$(jq -r .version manifest.base.json)"
           if [ "$version" != "$manifest_version" ]; then
-            echo "::warning::Tag version $version does not match manifest.base.json version $manifest_version"
+            echo "::error::Tag version $version does not match manifest.base.json version $manifest_version"
+            exit 1
           fi
           mkdir -p release
           for target in chrome firefox safari; do

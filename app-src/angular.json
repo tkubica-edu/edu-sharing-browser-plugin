@@ -19,6 +19,11 @@
             "tsConfig": "tsconfig.app.json",
             "assets": [
               {
+                "glob": "**/*",
+                "input": "src/assets",
+                "output": "assets"
+              },
+              {
                 "glob": "theme-boot.js",
                 "input": "src",
                 "output": "."
@@ -60,7 +65,7 @@
                   "minify": true,
                   "inlineCritical": false
                 },
-                "fonts": true
+                "fonts": false
               },
               "extractLicenses": false,
               "sourceMap": false

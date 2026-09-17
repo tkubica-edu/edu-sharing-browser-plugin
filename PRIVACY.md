@@ -87,10 +87,8 @@ zugehörige Zeile in Abschnitt 4 neu bewerten.
 
 ### 3.5 Schriftarten
 
-Bei jedem Öffnen des Panels werden Schriftdateien von `fonts.gstatic.com` geladen
-(`sidebar/index.html:15,19`), wobei IP-Adresse, User-Agent und Accept-Language an Google übertragen
-werden. Diese Anbindung ist aktiv, ihre Ablösung (Selbsthosten der Schriftarten) ist zurückgestellt,
-siehe [STORE-RELEASE.md § B7](STORE-RELEASE.md).
+Die Icon-Schriftarten sind im Erweiterungspaket enthalten (`sidebar/assets/fonts/`) und werden
+lokal geladen. Für Schriftarten werden keine Verbindungen zu Google aufgebaut.
 
 ## 4. Lokale Speicherung
 

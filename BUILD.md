@@ -75,13 +75,20 @@ and workers are covered too. The boerdi widget has a script for that overwrite, 
 [WEB-COMPONENTS.md § Refreshing a bundle](WEB-COMPONENTS.md#refreshing-a-bundle). What stays and why
 is [TROUBLESHOOTING.md § Bundle size](TROUBLESHOOTING.md#bundle-size).
 
+## Bundled icon fonts
+
+The sidebar loads Material Icons, Material Icons Outlined and Material Symbols Outlined from
+`app-src/src/assets/fonts/`, copied into each package as `sidebar/assets/fonts/`. Font assets,
+source URLs, checksums and the license are committed together. Angular font inlining is disabled;
+production builds and icon rendering do not fetch Google Fonts.
+
 ## Prebuilt downloads
 
 `.github/workflows/build.yml` runs three jobs. `test` and `build` start together and share nothing:
 `test` installs the sidebar's lockfile alone and runs `npm --prefix app-src run test`, so the unit
 tests are a check of their own that lands in about a minute instead of behind the packaging of three
-54 MB targets. Unlike the Firefox lint it has no `continue-on-error` — a failing test fails the
-run and blocks the release. See [TESTING.md § Unit tests](TESTING.md#unit-tests). `build` installs
+54 MB targets. Failing tests or Firefox lint errors fail the run and block the release; lint
+warnings remain non-blocking. See [TESTING.md § Unit tests](TESTING.md#unit-tests). `build` installs
 both lockfiles, runs `scripts/build.mjs --target=all`, zips Safari, lints the Firefox target and
 uploads the three unpacked builds. A per-target matrix would buy nothing: `--target=all` is one
 `ng build` plus file copies out of the same 68 MB of vendored bundles.
@@ -90,7 +97,8 @@ uploads the three unpacked builds. A per-target matrix would buy nothing: `--tar
 `contents: write` — the workflow is read-only otherwise, so the job that executes the whole npm
 dependency tree cannot write to the repository. The split is possible because the naming of the
 assets stays in `build`, which has the checkout it needs to compare the tag against
-`manifest.base.json`; the finished `edu-sharing-<target>-<version>.zip` files travel over as the
+`manifest.base.json`. A version mismatch fails the build before release assets are prepared.
+The finished `edu-sharing-<target>-<version>.zip` files travel over as the
 `edu-sharing-release-zips` artifact, and `release` downloads them, writes the notes and calls
 `gh release create` without a checkout of its own.
 

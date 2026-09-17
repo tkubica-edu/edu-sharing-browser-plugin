@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "edu-sharing",
   "version": "0.2.1",
-  "description": "Liest den Inhalt der aktuellen Seite aus und erzeugt daraus Metadaten über die edu-sharing Metadata-Agent-API.",
+  "description": "Webseiten als Lernressourcen erfassen, Metadaten bearbeiten und im verbundenen edu-sharing-Repository speichern.",
   "homepage_url": "https://edu-sharing.com/",
 
   "icons": {
@@ -44,6 +44,6 @@
   ],
 
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https: http:; connect-src 'self' data: blob: https: http: wss: ws:; frame-ancestors *; object-src 'none'; base-uri 'self'; form-action 'self'"
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https: http:; connect-src 'self' data: blob: https: http: wss: ws:; frame-ancestors *; object-src 'none'; base-uri 'self'; form-action 'self'"
   }
 }

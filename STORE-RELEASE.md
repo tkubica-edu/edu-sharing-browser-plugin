@@ -280,11 +280,10 @@ bleibt sinnvoll, ist aber nicht mehr dringend. **≈0,5–1 PT, wenn `onlyOffice
 - **Der Chatbot läuft nicht** — `wlo` blacklisted macht die Boerdi-Sektion unsichtbar (siehe B1).
 - **Nostr-Publikation läuft nicht** — `nostr` blacklisted, `NostrForwardService.blacklisted` ist
   wahr, weder `publish` noch `lookup` erreicht je ein Relay.
-- **Google Fonts zur Laufzeit** von `fonts.gstatic.com` (`app-src/src/index.html:15,19`) bei jedem
-  Panel-Öffnen. Kein Store-Verstoß, aber bei einem deutschen Bildungsprojekt DSGVO-relevant.
-  **Zurückgestellt** (Entscheidung 15.09.2026) — self-hosten bliebe der saubere Weg (räumt zugleich
-  die `style-src`-/`font-src`-Ausnahmen aus dem CSP), ist aber bewusst nicht Teil dieser Runde.
-  **≈0,5 PT, wenn es doch angegangen wird.**
+- **Schriftarten lokal gebündelt (17.09.2026).** Material Icons, Material Icons Outlined und
+  Material Symbols Outlined liegen mit ihrer Lizenz in `app-src/src/assets/fonts/`. Build und
+  Panel benötigen keine Google-Fonts-Anfragen mehr; die externen Font-/Style-Hosts sind aus der
+  CSP entfernt.
 - Solange das Panel offen und eingeloggt ist, fragt `PageRecognitionService.recognize()`
   (`page-recognition.service.ts:111`, über `WebsiteInformationService`) für **jede URL, zu der der
   Tab navigiert,** das Repository per `getWebsiteInformation` — außer auf einem edu-sharing-Host
