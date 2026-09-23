@@ -739,6 +739,8 @@
     "ASSIGNMENT_CANCEL_CONFIRM": "Volete davvero annullare questo compito? L'operazione non può essere annullata.",
     "ASSIGNMENT_FINISH": "Concludi compito",
     "ASSIGNMENT_FINISH_CONFIRM": "Volete davvero concludere questo compito? L'operazione non può essere annullata.",
+    "ASSIGNMENT_DELETE": "Elimina compito",
+    "ASSIGNMENT_DELETE_CONFIRM": "Volete davvero eliminare definitivamente questo compito? Il compito e tutti i documenti e le consegne associati verranno eliminati irreversibilmente.",
     "MANAGE_CONTENT": "Ordina"
   },
   "NO_SIZE": "-",
@@ -765,6 +767,7 @@
     "ERROR_INVALID_TYPE_COMBINATION": "Gli elementi di tipo diverso (file/cartelle) non possono essere modificati in blocco",
     "ERROR_ELEMENT_TYPE_UNSUPPORTED": "Gli elementi di questo tipo non possono essere modificati",
     "ERROR_FILE_EXTENSION_VERIFICATION_EXCEPTION": "L'estensione scelta non è consentita per questo tipo di file. Si prega di utilizzare un'estensione di file appropriata",
+    "ERROR_DUPLICATE_NODE_NAME": "Questo nome di file è già utilizzato in questa cartella, si prega di modificarlo.",
     "LICENSE_NO_PERMISSIONS_MATERIAL": "Non si dispone di autorizzazioni sufficienti per concedere in licenza questo materiale.",
     "LICENSE_NO_PERMISSIONS": "Le autorizzazioni per la licenza dei materiali sono insufficienti",
     "LICENSE_NO_PERMISSIONS_SAFE": "Non è possibile cambiare le licenze in un ambiente sicuro",
@@ -919,7 +922,8 @@
     "OPTION_DISABLED_OR_UNAVAILABLE": "Purtroppo l'azione richiesta non è disponibile.",
     "ASSIGNMENT_CANCEL": "Il compito è stato annullato.",
     "ASSIGNMENT_FINISH": "Il compito è stato concluso.",
-    "ASSIGNMENT_COPY": "Il compito è stato copiato."
+    "ASSIGNMENT_COPY": "Il compito è stato copiato.",
+    "ASSIGNMENT_DELETE": "Il compito è stato eliminato."
   },
   "VCARD": {
     "Givenname": "Nome",
@@ -1645,6 +1649,9 @@
     "MESSAGE": "Volete nascondere la condivisione o le condivisioni? In futuro non saranno più visualizzate in questo elenco. Il vostro accesso agli elementi, ad esempio tramite la ricerca, rimane però invariato.",
     "CONFIRM": "Nascondi",
     "TOAST_DONE": "{{count}} condivisione/i nascosta/e"
+  },
+  "SHARE_UNREJECT": {
+    "TOAST_DONE": "{{count}} condivisione/i di nuovo visibile/i"
   },
   "PDF_EDITOR": {
     "HEADING": "Inserire l'ID del contenuto o selezionare un contenuto tramite la ricerca{{suffix}}",

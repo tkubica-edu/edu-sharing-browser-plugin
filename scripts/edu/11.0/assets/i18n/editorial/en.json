@@ -32,6 +32,7 @@
       "EXIT_FULLSCREEN": "Exit fullscreen",
       "OPEN": "Open actions & options",
       "CLOSE": "Close actions & options",
+      "CLOSE_PANEL": "Close sidebar",
       "PREVIOUS": "Previous",
       "NEXT": "Next",
       "SUBMISSION": {
@@ -72,6 +73,7 @@
     },
     "OPTION": {
       "REJECT_SHARE": "Hide share",
+      "UNREJECT_SHARE": "Show share again",
       "TOGGLE_SIDEBAR_ENABLED": "Hide sidebar",
       "TOGGLE_SIDEBAR_DISABLED": "Show sidebar"
     },
@@ -120,14 +122,21 @@
         },
         "NO_SEARCH_RESULTS": "No results could be found.",
         "SEARCH": {
-          "PLACEHOLDER": "Search for contents"
+          "PLACEHOLDER": "Search for contents",
+          "REPOSITORY": "Source"
         },
         "COLLECTIONS": {
           "EMPTY_MESSAGE": "So far you have neither created your own collection nor been given access to a collection.",
           "PLACEHOLDER": "Search for collections",
           "RECENT_COLLECTIONS": "Recently used",
           "MY_COLLECTIONS": "My collections",
-          "EDITORIAL_COLLECTIONS": "Editorial collections"
+          "EDITORIAL_COLLECTIONS": "Editorial collections",
+          "DISPLAY_TYPE": {
+            "LABEL": "Display type",
+            "GRID": "Display as tiles",
+            "TABLE": "Display as list",
+            "TREE": "Display as tree"
+          }
         },
         "WORKSPACE": {
           "EMPTY_MESSAGE": "So far you have created neither your own nor shared contents.",

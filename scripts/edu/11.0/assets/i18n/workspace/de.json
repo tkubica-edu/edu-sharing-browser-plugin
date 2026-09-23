@@ -469,7 +469,8 @@
       "LINK_INFO_FOLDER": "Jeder, der Zugriff auf den Link hat, darf alle Dateien des Ordners herunterladen. Auf Unterordner kann nicht zugegriffen werden.",
       "LINK_DOWNLOADS": "Bisherige Downloads: {{ count }}",
       "COPIED_CLIPBOARD": "Link wurde in die Zwischenablage kopiert",
-      "COPIED_CLIPBOARD_ERROR": "Link konnte nicht kopiert werden. Bitte markieren und kopieren Sie den Link manuell"
+      "COPIED_CLIPBOARD_ERROR": "Link konnte nicht kopiert werden. Bitte markieren und kopieren Sie den Link manuell",
+      "QR_CODE_ARIA_LABEL": "QR-Code für diesen Freigabelink"
     },
     "WORKFLOW": {
       "TITLE": "Workflow",
@@ -514,6 +515,7 @@
       "ERROR_ORG_NAME": "Bitte geben Sie den Namen der beteiligten Organisation an",
       "DELETE_TITLE": "Beteiligten entfernen",
       "DELETE_MESSAGE": "Sind Sie sicher, dass Sie den/die Beteiligten {{ name }} entfernen möchten?",
+      "REMOVE": "{{ name }} entfernen",
       "TYPE": {
         "PUBLISHER": "Herausgeber{{GENDER_SEPARATOR}}in/Anbieter{{GENDER_SEPARATOR}}in",
         "AUTHOR": "Autor{{GENDER_SEPARATOR}}in",
@@ -565,6 +567,7 @@
       "RELEASE_MULTI": "{{count}} Objekte mit dieser Lizenz veröffentlichen",
       "CONTACT": "Andere Nutzende dürfen mich für weitere Lizenzverhandlungen kontaktieren",
       "MORE": "Mehr Informationen",
+      "MORE_ARIA": "Mehr Informationen zu {{ license }}",
       "CHECKBOX_AUTHOR": "Ich bin Autor{{GENDER_SEPARATOR}}in des Materials",
       "MIXED_AUTHORS": "Unterschiedliche Autoren-Angaben",
       "MIXED_AUTHORS_INFO": "Die gewählten Elemente enthalten unterschiedliche Autoren-Angaben. Wenn diese im Bulk bearbeitet werden sollen, müssen alle Werte überschrieben werden.\nWählen Sie \"Ändern\", wenn Sie dies tun möchten.",

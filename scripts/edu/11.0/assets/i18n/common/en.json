@@ -61,6 +61,7 @@
   "CLOSE": "close",
   "DOWNLOAD": "download",
   "LOAD_MORE": "Load more",
+  "TREE_LABEL": "Content tree",
   "LOADING": "loading...",
   "INFORMATION": "information",
   "TODAY": "today",
@@ -93,6 +94,8 @@
   "RADIO_BUTTON_SELECTED": "radio button selected",
   "RADIO_BUTTON_NOT_SELECTED": "radio button not selected",
   "DISABLED": "disabled",
+  "RESIZE_SIDEBAR": "Resize sidebar",
+  "RESIZE_SIDEBAR_VALUE": "{{width}} pixels",
   "COLLECTION_CHOOSER": {
     "ADD_TO_RECENT_COLLECTION": "Add to recently used collections",
     "SEARCH_COLLECTIONS": "Find collection...",
@@ -261,7 +264,10 @@
   "LIST_TABLE": {
     "DUMMY_ICON_LABEL": "File type",
     "TOGGLE_ALL": "Select all/none",
-    "CONFIGURE_COLUMNS": "Configure columns"
+    "CONFIGURE_COLUMNS": "Configure columns",
+    "COLUMN_ACTIONS": "Actions",
+    "ENTRY_COUNT": "{{total}} entries",
+    "ENTRY_COUNT_SELECTED": "{{selected}} of {{total}} selected"
   },
   "PAGINATOR": {
     "getRangeLabel": "Page {{page}} of {{pageCount}}",
@@ -413,6 +419,7 @@
   "NODE_COMMENTS": {
     "TITLE": "Comments",
     "NEW_COMMENT_PLACEHOLDER": "New comment...",
+    "ADD_COMMENT": "Send comment",
     "COMMENT_EMPTY": "Please enter a comment",
     "NO_COMMENTS": "No comments yet",
     "NO_GUEST_COMMENTING": "Please login to comment elements",
@@ -554,6 +561,8 @@
     "email": "e-mail",
     "status": "status",
     "primaryAffiliation": "primary role",
+    "PRIMARY_AFFILIATION_SWITCH_TO_LIST": "Switch to predefined list",
+    "PRIMARY_AFFILIATION_SWITCH_TO_TEXT": "Switch to free text",
     "password": "password",
     "sizeQuota": "quota size in MB",
     "PRIMARY_AFFILIATION": {
@@ -704,6 +713,9 @@
     "COLLECTION_PROPSE": "Submit a proposal?",
     "COLLECTION_PROPSE_INFO": "You do not have sufficient rights to the collection \"{{collection}}\". However, you can submit the material as a proposal. Would you like to continue?"
   },
+  "QR_CODE_ARIA_LABEL": "QR code for this link",
+  "QR_CODE_SHORTLINK_LABEL": "Short link",
+  "QR_CODE_SHORTLINK_COPY": "Copy link",
   "OPTIONS_FOR": "Actions for {{element}}",
   "NO_AVAILABLE_OPTIONS": "No actions are available for the selected items",
   "OPTIONS": {
@@ -780,6 +792,8 @@
     "ASSIGNMENT_CANCEL_CONFIRM": "Do you really want to cancel this assignment? This cannot be undone.",
     "ASSIGNMENT_FINISH": "Finish assignment",
     "ASSIGNMENT_FINISH_CONFIRM": "Do you really want to finish this assignment? This cannot be undone.",
+    "ASSIGNMENT_DELETE": "Delete assignment",
+    "ASSIGNMENT_DELETE_CONFIRM": "Do you really want to permanently delete this assignment? The assignment and all its documents and submissions will be deleted irrevocably.",
     "EDIT_CONNECTOR": "Edit",
     "NEW_ASSIGNMENT": "New assignment",
     "ASSIGNMENT_COPY": "Copy assignment",
@@ -809,6 +823,7 @@
     "ERROR_INVALID_TYPE_COMBINATION": "Elements with different type (Files/Folders) can't be edited in bulk",
     "ERROR_ELEMENT_TYPE_UNSUPPORTED": "elements with this type can't be edited",
     "ERROR_FILE_EXTENSION_VERIFICATION_EXCEPTION": "The choosen file extension is not allowed for this file type. Please use an appropriate file extension",
+    "ERROR_DUPLICATE_NODE_NAME": "This file name is already used in this folder, please change the name.",
     "LICENSE_NO_PERMISSIONS_MATERIAL": "You have insufficient permissions to license this material",
     "LICENSE_NO_PERMISSIONS": "You have insufficient permissions to license materials",
     "LICENSE_NO_PERMISSIONS_SAFE": "You may not change licenses in safe environment",
@@ -824,6 +839,7 @@
     "FILTER_TREE": "Filter...",
     "OPEN_CLOSE_EXTENDED": "Open/close view",
     "FILTER_FACET": "Filter...",
+    "FACET_COUNT": "{{ count }} hit(s)",
     "SHOW_EXTENDED_TRUE": "Display additional information",
     "NO_ARBITRARY_VALUES_NOTICE": "You cannot freely select values ​​for this field. Please select values ​​from the list.",
     "DELETE_KEY_NOTICE": "Delete with Delete key",
@@ -958,6 +974,9 @@
     "SAVED": "Saved changes"
   },
   "RENDERING": {
+    "DEFAULT_MODULE_INFO_TEXT": "This material cannot be displayed in the browser.",
+    "DEFAULT_MODULE_DOWNLOAD": "Download material",
+    "DOWNLOAD": "Download",
     "GO_TO_COURSE": "Go to course",
     "AUTHORED_BY": "by",
     "CONVERTING": "Converting",
@@ -1012,7 +1031,8 @@
     "OPTION_DISABLED_OR_UNAVAILABLE": "The selected action is currently unavailable",
     "ASSIGNMENT_CANCEL": "The assignment has been canceled.",
     "ASSIGNMENT_FINISH": "The assignment has been finished.",
-    "ASSIGNMENT_COPY": "The assignment has been copied."
+    "ASSIGNMENT_COPY": "The assignment has been copied.",
+    "ASSIGNMENT_DELETE": "The assignment has been deleted."
   },
   "NODE_SEARCH_SELECTOR": {
     "MORE_FILTERS": "Extended search filters",
@@ -1052,7 +1072,10 @@
     "delete": "delete",
     "add": "New",
     "redo": "Apply",
-    "edit": "Edit"
+    "edit": "Edit",
+    "settings": "settings",
+    "cloud_download": "download",
+    "content_copy": "copy"
   },
   "FILL_STATUS": {
     "REQUIRED": "mandatory fields",
@@ -1352,7 +1375,8 @@
   "NAV": {
     "MAIN": "main",
     "SKIP": "skip",
-    "COLLECTIONS": "collections"
+    "COLLECTIONS": "collections",
+    "WORKSPACE_TREE": "workspace navigation"
   },
   "SKIP_LINKS": {
     "MAIN_CONTENT": "Skip to main content",
@@ -1465,6 +1489,7 @@
     "NODE_ASPECTS": "Aspects",
     "NODE_PROPERTIES": "Properties",
     "NODE_TYPE": "Objekt type",
+    "COPY_NODE_ID": "Copy node id",
     "JSON": "Entire Objekt",
     "PERMISSIONS": "Permissions",
     "PERMISSIONS_INHERITED": "Inherited permissions",
@@ -1743,5 +1768,8 @@
     "MESSAGE": "Do you want to hide the share(s)? They will no longer be displayed in this list. Your access to the elements, e.g. via the search, remains unaffected.",
     "CONFIRM": "Hide",
     "TOAST_DONE": "{{count}} share(s) hidden"
+  },
+  "SHARE_UNREJECT": {
+    "TOAST_DONE": "{{count}} share(s) shown again"
   }
 }

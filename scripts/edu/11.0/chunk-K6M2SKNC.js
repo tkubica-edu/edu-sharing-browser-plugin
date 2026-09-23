@@ -1,0 +1,1 @@
+import{xb as E}from"./chunk-EG2Y2AZ3.js";var o="MDS.ERROR_DUPLICATE_NODE_NAME";function r(t){return t?.status===E.DUPLICATE_NODE_RESPONSE||!!t?.error?.error?.endsWith?.("DAODuplicateNodeNameException")}export{o as a,r as b};

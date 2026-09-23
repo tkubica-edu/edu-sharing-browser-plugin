@@ -739,6 +739,8 @@
     "ASSIGNMENT_CANCEL_CONFIRM": "Voulez-vous vraiment annuler ce devoir ? Cette action est irréversible.",
     "ASSIGNMENT_FINISH": "Terminer le devoir",
     "ASSIGNMENT_FINISH_CONFIRM": "Voulez-vous vraiment terminer ce devoir ? Cette action est irréversible.",
+    "ASSIGNMENT_DELETE": "Supprimer le devoir",
+    "ASSIGNMENT_DELETE_CONFIRM": "Voulez-vous vraiment supprimer définitivement ce devoir ? Le devoir ainsi que tous les documents et rendus associés seront supprimés irréversiblement.",
     "MANAGE_CONTENT": "Classer"
   },
   "NO_SIZE": "-",
@@ -765,6 +767,7 @@
     "ERROR_INVALID_TYPE_COMBINATION": "Les éléments de type différent (fichiers/dossiers) ne peuvent pas être modifiés en bloc",
     "ERROR_ELEMENT_TYPE_UNSUPPORTED": "les éléments de ce type ne peuvent pas être modifiés",
     "ERROR_FILE_EXTENSION_VERIFICATION_EXCEPTION": "L'extension de fichier choisie n'est pas autorisée pour ce type de fichier. Veuillez utiliser une extension de fichier appropriée",
+    "ERROR_DUPLICATE_NODE_NAME": "Ce nom de fichier est déjà utilisé dans ce dossier, veuillez le modifier.",
     "LICENSE_NO_PERMISSIONS_MATERIAL": "Vous ne disposez pas d'autorisations suffisantes pour accorder une licence à ce matériel",
     "LICENSE_NO_PERMISSIONS": "Vous ne disposez pas d'autorisations suffisantes pour concéder des licences",
     "LICENSE_NO_PERMISSIONS_SAFE": "Vous ne pouvez pas changer de licence dans un environnement sûr",
@@ -919,7 +922,8 @@
     "OPTION_DISABLED_OR_UNAVAILABLE": "L'action demandée n'est malheureusement pas disponible.",
     "ASSIGNMENT_CANCEL": "Le devoir a été annulé.",
     "ASSIGNMENT_FINISH": "Le devoir a été terminé.",
-    "ASSIGNMENT_COPY": "Le devoir a été copié."
+    "ASSIGNMENT_COPY": "Le devoir a été copié.",
+    "ASSIGNMENT_DELETE": "Le devoir a été supprimé."
   },
   "VCARD": {
     "Givenname": "Prénom",
@@ -1645,6 +1649,9 @@
     "MESSAGE": "Voulez-vous masquer le ou les partages ? Ils n'apparaîtront plus dans cette liste. Votre accès aux éléments, par exemple via la recherche, reste toutefois inchangé.",
     "CONFIRM": "Masquer",
     "TOAST_DONE": "{{count}} partage(s) masqué(s)"
+  },
+  "SHARE_UNREJECT": {
+    "TOAST_DONE": "{{count}} partage(s) réaffiché(s)"
   },
   "PDF_EDITOR": {
     "HEADING": "Saisir l'ID du contenu ou sélectionner un contenu via la recherche{{suffix}}",

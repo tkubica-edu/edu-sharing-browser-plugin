@@ -62,6 +62,7 @@
   "INFORMATION": "Informationen",
   "DOWNLOAD": "Herunterladen",
   "LOAD_MORE": "Weitere laden",
+  "TREE_LABEL": "Inhaltsbaum",
   "LOADING": "Lädt...",
   "TODAY": "Heute",
   "YESTERDAY": "Gestern",
@@ -93,6 +94,8 @@
   "RADIO_BUTTON_SELECTED": "Optionsfeld ausgewählt",
   "RADIO_BUTTON_NOT_SELECTED": "Optionsfeld nicht ausgewählt",
   "DISABLED": "deaktiviert",
+  "RESIZE_SIDEBAR": "Breite der Seitenleiste ändern",
+  "RESIZE_SIDEBAR_VALUE": "{{width}} Pixel",
   "PAGINATOR": {
     "itemsPerPageLabel": "Einträge pro Seite:",
     "firstPageLabel": "Erste Seite",
@@ -241,6 +244,7 @@
     "NODE_ASPECTS": "Aspekte",
     "NODE_PROPERTIES": "Properties",
     "NODE_TYPE": "Objekttyp",
+    "COPY_NODE_ID": "Node-ID kopieren",
     "JSON": "Gesamtes Objekt",
     "PERMISSIONS": "Berechtigungen",
     "PERMISSIONS_INHERITED": "Geerbte Berechtigungen",
@@ -289,7 +293,10 @@
   "LIST_TABLE": {
     "DUMMY_ICON_LABEL": "Dateityp",
     "TOGGLE_ALL": "Alle / Nichts auswählen",
-    "CONFIGURE_COLUMNS": "Spalten konfigurieren"
+    "CONFIGURE_COLUMNS": "Spalten konfigurieren",
+    "COLUMN_ACTIONS": "Optionen",
+    "ENTRY_COUNT": "{{total}} Einträge",
+    "ENTRY_COUNT_SELECTED": "{{selected}} von {{total}} ausgewählt"
   },
   "MAPTYPE": {
     "IMAGES": "Bilder",
@@ -578,6 +585,7 @@
   "NODE_COMMENTS": {
     "TITLE": "Kommentare",
     "NEW_COMMENT_PLACEHOLDER": "Neuer Kommentar...",
+    "ADD_COMMENT": "Kommentar absenden",
     "NO_COMMENTS": "Noch keine Kommentare vorhanden",
     "NO_GUEST_COMMENTING": "Bitte einloggen, um Elemente zu kommentieren.",
     "NO_PERMISSION": "Das Kommentieren ist für dieses Element deaktiviert.",
@@ -611,6 +619,9 @@
     "MESSAGE": "Möchten Sie die Freigabe(n) ausblenden? Sie werden zukünftig in dieser Liste nicht mehr angezeigt. Ihr Zugriff auf die Elemente, z.B. über die Suche, bleibt jedoch bestehen.",
     "CONFIRM": "Ausblenden",
     "TOAST_DONE": "{{count}} Freigabe(n) ausgeblendet"
+  },
+  "SHARE_UNREJECT": {
+    "TOAST_DONE": "{{count}} Freigabe(n) wieder eingeblendet"
   },
   "CREATE_NODE": {
     "tool_definition": "Neue Toolbeschreibung anlegen",
@@ -725,6 +736,8 @@
     "email": "E-Mail",
     "status": "Status",
     "primaryAffiliation": "Primäre Rolle",
+    "PRIMARY_AFFILIATION_SWITCH_TO_LIST": "Zu vordefinierter Liste wechseln",
+    "PRIMARY_AFFILIATION_SWITCH_TO_TEXT": "Zu Freitext wechseln",
     "password": "Passwort",
     "sizeQuota": "Speicherkontingent in MB",
     "PRIMARY_AFFILIATION": {
@@ -811,6 +824,9 @@
     "COLLECTION_PROPSE": "Vorschlag einreichen?",
     "COLLECTION_PROPSE_INFO": "Sie haben auf die Sammlung \"{{collection}}\" keine ausreichenden Rechte. Sie können das Material jedoch als Vorschlag einreichen. Möchten Sie fortfahren?"
   },
+  "QR_CODE_ARIA_LABEL": "QR-Code für diesen Link",
+  "QR_CODE_SHORTLINK_LABEL": "Kurzlink",
+  "QR_CODE_SHORTLINK_COPY": "Link kopieren",
   "OPTIONS_FOR": "Aktionen für {{element}}",
   "NO_AVAILABLE_OPTIONS": "Es sind keine Aktionen für die ausgewählten Elemente verfügbar.",
   "OPTIONS": {
@@ -889,6 +905,8 @@
     "ASSIGNMENT_CANCEL_CONFIRM": "Möchten Sie diese Aufgabe wirklich abbrechen? Dies kann nicht rückgängig gemacht werden.",
     "ASSIGNMENT_FINISH": "Aufgabe abschließen",
     "ASSIGNMENT_FINISH_CONFIRM": "Möchten Sie diese Aufgabe wirklich abschließen? Dies kann nicht rückgängig gemacht werden.",
+    "ASSIGNMENT_DELETE": "Aufgabe löschen",
+    "ASSIGNMENT_DELETE_CONFIRM": "Möchten Sie diese Aufgabe wirklich endgültig löschen? Die Aufgabe und alle zugehörigen Dokumente und Abgaben werden unwiderruflich gelöscht.",
     "MANAGE_CONTENT": "Einsortieren",
     "EDIT_CONNECTOR": "Bearbeiten"
   },
@@ -924,6 +942,7 @@
     "ERROR_INVALID_TYPE_COMBINATION": "Elemente unterschiedlichen Dateityps (Dateien/Ordner) können nicht im Bulk bearbeitet werden.",
     "ERROR_ELEMENT_TYPE_UNSUPPORTED": "Elemente dieses Typs können nicht bearbeitet werden.",
     "ERROR_FILE_EXTENSION_VERIFICATION_EXCEPTION": "Die gewählte Dateiendung darf für den Dateityp nicht verwendet werden. Bitte nutzen Sie eine passende Dateiendung.",
+    "ERROR_DUPLICATE_NODE_NAME": "Dieser Dateiname wird im Verzeichnis bereits verwendet, bitte ändern Sie den Namen.",
     "LICENSE_NO_PERMISSIONS_MATERIAL": "Sie besitzen keine Berechtigungen, um dieses Material zu lizenzieren.",
     "LICENSE_NO_PERMISSIONS": "Sie besitzen keine Berechtigungen, um Materialien zu lizenzieren.",
     "LICENSE_NO_PERMISSIONS_SAFE": "Sie können im gesicherten Bereich die Lizenz des Materials nicht ändern.",
@@ -939,6 +958,7 @@
     "FILTER_FOR": "Nach \"{{value}}\" filtern ({{count}} passende(s) Element(e)).",
     "FILTER_TREE": "Filtern...",
     "FILTER_FACET": "Filtern...",
+    "FACET_COUNT": "{{ count }} Treffer",
     "SUGGEST_VALUE_LABEL": "Neuen Wert vorschlagen",
     "SUGGEST_VALUE_SEND": "Vorschlagen",
     "SUGGEST_VALUE_SENT": "Der Vorschlag wurde eingereicht und wird durch die Redaktion geprüft. Der Vorschlag taucht erst auf, wenn er durch die Redaktion aktiviert wurde. Vielen Dank!",
@@ -1079,6 +1099,9 @@
     "SAVED": "Änderungen wurden gespeichert."
   },
   "RENDERING": {
+    "DEFAULT_MODULE_INFO_TEXT": "Das Anzeigen dieses Materials im Browser ist nicht möglich.",
+    "DEFAULT_MODULE_DOWNLOAD": "Laden Sie das Material herunter, um es zu benutzen.",
+    "DOWNLOAD": "Herunterladen",
     "GO_TO_COURSE": "Zum Kurs springen",
     "AUTHORED_BY": "von",
     "CONVERTING": "Konvertierung",
@@ -1133,7 +1156,8 @@
     "API_FORBIDDEN_LOGIN": "Bitte anmelden, um auf diesen Bereich zuzugreifen.",
     "ASSIGNMENT_CANCEL": "Die Aufgabe wurde abgebrochen.",
     "ASSIGNMENT_FINISH": "Die Aufgabe wurde abgeschlossen.",
-    "ASSIGNMENT_COPY": "Die Aufgabe wurde kopiert."
+    "ASSIGNMENT_COPY": "Die Aufgabe wurde kopiert.",
+    "ASSIGNMENT_DELETE": "Die Aufgabe wurde gelöscht."
   },
   "ADD_TO_STREAM": {
     "TITLE": "Zum Stream hinzufügen",
@@ -1239,7 +1263,10 @@
     "delete": "Löschen",
     "edit": "Bearbeiten",
     "add": "Neu",
-    "redo": "Übernehmen"
+    "redo": "Übernehmen",
+    "settings": "Einstellungen",
+    "cloud_download": "Herunterladen",
+    "content_copy": "Kopieren"
   },
   "FILL_STATUS": {
     "MESSAGE": "Feldern ausgefüllt",
@@ -1552,7 +1579,8 @@
   "NAV": {
     "MAIN": "Hauptmenü",
     "SKIP": "Sprungmarken",
-    "COLLECTIONS": "Sammlungshierarchie"
+    "COLLECTIONS": "Sammlungshierarchie",
+    "WORKSPACE_TREE": "Arbeitsbereich-Navigation"
   },
   "SKIP_LINKS": {
     "MAIN_CONTENT": "Springe zum Hauptinhalt",

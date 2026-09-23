@@ -48,12 +48,6 @@
       edu-sharing-app {
         flex-grow: 1;
       }
-      /* The embedded search fills the box the embedder gives it and scrolls internally. */
-      edu-sharing-search {
-        display: block;
-        height: 700px;
-        border: 1px solid #ccc;
-      }
       /* The usages preview grows with its content. */
       edu-sharing-usages {
         display: block;
@@ -71,24 +65,6 @@
         <input name="searchString" class="search-input" type="text" placeholder="Search"/>
       </form>
       <edu-sharing-app></edu-sharing-app>
-    </main>
-    <main class="main-container">
-      <h2>Search Example (search + metadata filters, no router)</h2>
-      <!-- filter ids are the mds widget ids, same as in the search page's `filters` parameter -->
-      <edu-sharing-search content-type="FILES" sort-properties="score" sort-ascending="false" initial-values="{&quot;cclom:general_keyword&quot;:[&quot;Bremen, Hansestadt&quot;]}"></edu-sharing-search>
-      <script>
-        const search = document.getElementsByTagName('edu-sharing-search')[0];
-        ['nodeClicked', 'nodeActivated', 'totalResults'].forEach((name) =>
-          search.addEventListener(name, (event) => console.log(name, event.detail)),
-        );
-        // remember the last query and restore it later via the two inputs
-        let lastSearch;
-        search.addEventListener('searchParametersChange', (event) => (lastSearch = event.detail));
-        function restoreLastSearch() {
-          search.searchString = lastSearch.searchString;
-          search.initialValues = lastSearch.filters;
-        }
-      </script>
     </main>
     <main class="main-container">
       <h2>Usages Example (statistics for one or more nodes)</h2>
@@ -132,5 +108,5 @@
         }, 1000);
       </script>
     </main>
-  <link rel="modulepreload" href="chunk-QLN3CDY6.js"><link rel="modulepreload" href="chunk-RWVGIKA6.js"><link rel="modulepreload" href="chunk-CNBBTZEV.js"><link rel="modulepreload" href="chunk-HNTYMJSK.js"><link rel="modulepreload" href="chunk-JX5W4U22.js"><link rel="modulepreload" href="chunk-SWV377PQ.js"><link rel="modulepreload" href="chunk-VZBF6OYS.js"><link rel="modulepreload" href="chunk-DYNHBHXC.js"><link rel="modulepreload" href="chunk-UHLJ7XLM.js"><link rel="modulepreload" href="chunk-6PMEBLIM.js"><script src="polyfills.js" type="module"></script><script src="scripts.js" defer></script><script src="main.js" type="module"></script></body>
+  <link rel="modulepreload" href="chunk-RI5BCBJ7.js"><link rel="modulepreload" href="chunk-D6UEPXI6.js"><link rel="modulepreload" href="chunk-XQVOROMB.js"><link rel="modulepreload" href="chunk-OCERACKU.js"><link rel="modulepreload" href="chunk-QDWUASDO.js"><link rel="modulepreload" href="chunk-T63BV7GL.js"><link rel="modulepreload" href="chunk-VZBF6OYS.js"><link rel="modulepreload" href="chunk-ZZSMHRBD.js"><link rel="modulepreload" href="chunk-QSU3TNPB.js"><link rel="modulepreload" href="chunk-5OSLEECB.js"><script src="polyfills.js" type="module"></script><script src="scripts.js" defer></script><script src="main.js" type="module"></script></body>
 </html>

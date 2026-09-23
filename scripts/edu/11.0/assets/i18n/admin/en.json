@@ -149,7 +149,7 @@
   "AUTHORITY_TYPE_GROUP": "Group",
   "AUTHORITY_TYPE_ORG": "Organisation",
   "CHILDOBJECT_COUNT": "{{count}} items (sequence)",
-  "OPTIONS_FOR": "Aktions for {{element}}",
+  "OPTIONS_FOR": "Options for {{element}}",
   "NO_AVAILABLE_OPTIONS": "No actions are available for the selected items",
   "NO_SIZE": "-",
   "VERSION_COMMENT": "Version comment",
@@ -170,6 +170,7 @@
   "Konto": "Account",
   "ADMIN": {
     "TITLE": "Admin-Tools",
+    "NAV": "Admin sections",
     "UNDERSTAND": "Understood, proceed",
     "WARNING_TITLE": "Administration area",
     "WARNING_INFO": "This area is intended for repository administration only. Improper settings can lead to errors or even data loss.\nDo not carry out any actions that you are unsure about!",
@@ -376,6 +377,9 @@
         "RENDER": "Rendering-Service"
       },
       "COPY": "copy",
+      "CONFIG": "Configuration",
+      "EDIT": "Edit",
+      "DELETE": "Delete",
       "COPIED_CLIPBOARD": "Copied to clipboard",
       "ADD_URL": "connect",
       "APP_REGISTERED": "App was successfully registered",
@@ -503,13 +507,18 @@
           "SOLUTION": "Check which systems can send AJAX requests if necessary. Then navigate to \"sources\" and edit the field \"allow_origin\" in the homeApplication.properties.xml.\nIf you use the edu-sharing app, add \"http://localhost:54361\" as an entry",
           "SOLUTION_LINK": "edit homeApplication.properties.xml"
         },
+        "RS2": {
+          "TITLE": "Rendering Service 2 Availability",
+          "STATUS_OK": "The rendering service 2 ({{url}}) is reachable and provides {{modules}} rendering modules",
+          "STATUS_FAIL": "The modules of the rendering service 2 ({{url}}) could not be fetched: {{message}}. The rendering service 2 is faulty or unreachable, content may therefore not be displayed",
+          "SOLUTION": "Check the rendering service 2: is the configured url {{url}} reachable, is the service running and what do its log files report?"
+        },
         "RS_XSS": {
           "TITLE": "Rendering Service Configuration for Cross-Side Scripting",
           "STATUS_OK": "The repository is located on a different domain ({{{repo}}) than the rendering service ({{{render}}). This prevents user-generated javascripts from accessing the API",
           "STATUS_INFO": " The repository is located on a different domain ({{{repo}}) than the rendering service ({{{render}}). However, the state of the CORS configuration is invalid. Check the CORS configuration",
           "STATUS_FAIL": "Repository and rendering service are on the same domain ({{{repo}}). Java scripts that are executed on the rendering service therefore have access to the API and possibly cookies.",
-          "SOLUTION": "Repository and rendering service should be located on different (sub-)domains for security reasons. For more information, see the documentation",
-          "SOLUTION_LINK": "Open documentation"
+          "SOLUTION": "Repository and rendering service should be located on different (sub-)domains for security reasons. For more information, see the documentation"
         }
       },
       "SYSTEM_TP_CHECKS": "Permission checks",
@@ -681,10 +690,12 @@
     },
     "FOLDERTEMPLATES": {
       "EDUGROUP": "Organisation",
+      "REMOVE_EDUGROUP": "Remove organisation",
       "APPLYTEMPLATE": "Apply folder template",
       "UPLOAD_DONE": "Folder template was stored as {{filename}} on the server.",
       "MISSING_GROUP": "At least one organisation must be selected.",
       "MISSING_TEMPLATE": "A folder template must be selected.",
+      "TEMPLATE": "Folder template",
       "TEMPLATE_APPLIED": "Template {{templatename}} was applied for {{groupname}}.",
       "TEMPLATE_NOTAPPLIED": "Folder template {{{templatename}} could not be applied to {{{groupname}}. Check the folder template for correctness.",
       "UPLOAD_HINT": "You can upload additional folder templates and then select them.",
