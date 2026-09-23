@@ -100,17 +100,25 @@ detail but the panel's own surface being wrong. Each bundle is therefore handed 
 
 | Bundle | What it is handed | Follows a switch without a reload |
 |---|---|---|
-| edu | `localStorage['accessibility_darkMode'] = "auto"` plus an answered `(prefers-color-scheme: dark)` query (`util/bundle-theme.ts`) | yes |
+| edu | `?theme=auto` on the panel's own URL plus an answered `(prefers-color-scheme: dark)` query (`util/bundle-theme.ts`) | yes |
 | boerdi | the element's `theme` attribute, `"light"` or `"dark"` (`AiAssistantScreenComponent`) | yes |
 | wlo | nothing — the bundle ships no dark theme (see [TROUBLESHOOTING.md](TROUBLESHOOTING.md#the-wlo-canvas-has-no-dark-theme)) | – |
 
-The edu bundle's own theme service resolves `(a query param ?? the stored preference) === 'dark'`, or
-the media query where that preference is `auto`; from that it puts `isDarkTheme` / `isLightTheme` on
-`<body>`, recomputes its whole Material palette and pulls in its dark token set. `installBundleTheme()`
-runs as the app boots rather than where the bundle is loaded, because the preference is read at the
-bundle's bootstrap and the answer has to exist by then; `publishPanelTheme()` reports every later
-switch. The mechanics and the two things to know about the patch are in
-[TROUBLESHOOTING.md](TROUBLESHOOTING.md#dependencies-and-runtime-limits).
+The edu bundle's own theme service treats web-component embedding as an "external context" — nothing
+there is isolated behind a shadow root, so a dark theme it picked on its own would colour the host page
+along with itself — and in that context it ignores the reader's stored preference outright and forces
+light, unless its own document's URL carries a `theme` query parameter. Read once at its own bootstrap
+and again on every navigation its own router processes, `dark`/`light` there decide everything, while
+`auto` is the one value that still asks further: it falls through to `(prefers-color-scheme: dark)`,
+exactly as if no external context applied at all. From whichever value wins it puts `isDarkTheme` /
+`isLightTheme` on `<body>`, recomputes its whole Material palette and pulls in its dark token set.
+
+Since the bundle runs in the panel's own document rather than an iframe, that URL is the panel's own —
+`installBundleTheme()` writes `auto` into it, once, before the bundle's scripts run, which is what makes
+the media query the lever the rest of the mechanism turns on; `publishPanelTheme()` then answers that
+query with the panel's own theme rather than the browser's, which is what makes a later switch reach an
+already-booted bundle without touching the URL again. The mechanics and the two things to know about the
+patch are in [TROUBLESHOOTING.md](TROUBLESHOOTING.md#dependencies-and-runtime-limits).
 
 `styles/_embedded-material.scss` needs nothing for this. Its `:root` overrides win over the `html { … }`
 of both bundles, while the edu bundle's dark set is declared on `body.isDarkTheme` and beats `:root`

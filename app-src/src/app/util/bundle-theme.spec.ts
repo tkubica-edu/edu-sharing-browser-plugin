@@ -3,8 +3,11 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { installColorSchemeQuery } from '../../testing/color-scheme.setup';
 import { installBundleTheme, publishPanelTheme } from './bundle-theme';
 
-/** The key the edu-sharing bundle reads its theme preference from. */
-const THEME_KEY = 'accessibility_darkMode';
+/** The URL's own theme, read back the way the bundle's theme service reads it. */
+const urlTheme = () => new URL(window.location.href).searchParams.get('theme');
+
+/** Back to no parameter at all, for a clean install each test. */
+const clearUrlTheme = () => history.replaceState(null, '', window.location.pathname);
 
 /**
  * The install patches `window.matchMedia` once and for the rest of the module's life — a module-level
@@ -13,13 +16,14 @@ const THEME_KEY = 'accessibility_darkMode';
  */
 describe('installBundleTheme', () => {
   beforeEach(() => {
-    localStorage.clear();
+    clearUrlTheme();
     installBundleTheme();
     publishPanelTheme(false);
   });
 
   afterEach(() => {
     publishPanelTheme(false);
+    clearUrlTheme();
   });
 
   // The install replaces `window.matchMedia` for the rest of the jsdom, which a worker shares with
@@ -28,17 +32,16 @@ describe('installBundleTheme', () => {
   // theme instead of the preference it stated (see `system-theme.spec.ts`).
   afterAll(installColorSchemeQuery);
 
-  it('sets the preference to follow the query, since the bundle defaults to light', () => {
-    // Written as JSON, exactly as the bundle's own storage wrapper writes it.
-    expect(localStorage.getItem(THEME_KEY)).toBe('"auto"');
+  it('writes the parameter to follow the query, since the bundle defaults to light', () => {
+    expect(urlTheme()).toBe('auto');
   });
 
-  it('rewrites the preference on a later install, so a cleared profile is filled again', () => {
-    localStorage.removeItem(THEME_KEY);
+  it('rewrites the parameter on a later install, so a cleared URL is filled again', () => {
+    clearUrlTheme();
 
     installBundleTheme();
 
-    expect(localStorage.getItem(THEME_KEY)).toBe('"auto"');
+    expect(urlTheme()).toBe('auto');
   });
 
   it('answers a colour-scheme query with the panel theme rather than the browser', () => {
@@ -112,11 +115,12 @@ describe('installBundleTheme', () => {
     expect(after.matches).toBe(true);
   });
 
-  it('carries on without a preference where the profile has no storage', () => {
-    // Stubbed on the prototype and put back by hand: `vi.stubGlobal('localStorage', …)` outlives
-    // `unstubAllGlobals` here and would leave every later spec file without storage.
-    const denied = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('storage denied');
+  it('carries on without a parameter where the URL cannot be rewritten', () => {
+    // Cleared for real first — the install is a no-op once the parameter already says `auto`, and a
+    // no-op never reaches the `replaceState` call the mock below means to deny.
+    clearUrlTheme();
+    const denied = vi.spyOn(history, 'replaceState').mockImplementation(() => {
+      throw new Error('history denied');
     });
     const warned = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {

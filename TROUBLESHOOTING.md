@@ -194,19 +194,22 @@ to put one back with.
   lockfile pins the builder; treat a minor bump as a change that needs `npm test` run before it is
   merged. Everything that moves lives in `app-src/src/testing/`, so a builder change touches one
   directory.
-- **The panel's theme is handed to the edu-sharing bundle through a patched media query.** The
-  bundle resolves its own theme from `(prefers-color-scheme: dark)` and from a preference in local
-  storage, and it reads that preference **once**, as its theme service subscribes — the notification
-  it listens on is internal to the bundle, so a value written from outside is only seen at bootstrap.
-  `util/bundle-theme.ts` therefore writes the preference as `"auto"` and replaces `window.matchMedia`
-  for colour-scheme queries alone, which is what makes the bundle follow a switch made while a form
-  is open. Two consequences to know about: `prefers-color-scheme` reports the *panel's* theme to
+- **The panel's theme is handed to the edu-sharing bundle through a URL parameter plus a patched media
+  query.** Web-component embedding counts to the bundle's own theme service as an "external context", and
+  in that context it ignores the reader's stored preference outright and forces light — unless its own
+  document's URL carries a `theme` parameter, read once at its own bootstrap and again on every
+  navigation its own router processes. `dark`/`light` there would decide everything outright, which is
+  not what is used: `util/bundle-theme.ts` writes **`auto`**, the one value that still asks
+  `(prefers-color-scheme: dark)` rather than fixing the answer, and then replaces `window.matchMedia` for
+  colour-scheme queries alone — answering with the *panel's* theme instead of the browser's, which is
+  what makes the bundle follow a switch made while a form is open, without the URL ever having to be
+  rewritten again. Two consequences to know about: `prefers-color-scheme` reports the *panel's* theme to
   everything in the sidebar document, not the browser's — the panel's own resolution therefore goes
   through the reference `util/system-theme.ts` takes at module load, before the patch exists — and a
-  bundle whose theme service stops asking the media query would silently fall back to light. What
-  pins the current behaviour is `app-src/src/app/util/bundle-theme.spec.ts`; that the *bundle* still
-  honours it is only verifiable by mounting one of its elements, see
-  [TESTING.md](TESTING.md#load-the-extension).
+  bundle whose theme service stops asking the media query, or starts resolving `dark`/`light` from the
+  URL outright, would silently fall back to light or stop following a live switch. What pins the current
+  behaviour is `app-src/src/app/util/bundle-theme.spec.ts`; that the *bundle* still honours it is only
+  verifiable by mounting one of its elements, see [TESTING.md](TESTING.md#load-the-extension).
 - **The repository URL cannot be changed at runtime** without reloading the sidebar — the library
   freezes `rootUrl` at bootstrap and does not export its config classes.
 - **The agent may only edit its own node for two hours.** Along the guest route the repository

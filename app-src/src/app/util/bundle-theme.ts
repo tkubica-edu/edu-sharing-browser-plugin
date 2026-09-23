@@ -3,30 +3,29 @@
  * `installBundleLanguage`), the bundle decides it itself — and it has to be told, because a light form in
  * a dark panel is the one part of the panel that does not follow the setting.
  *
- * **How the bundle decides.** Its theme service resolves
- * `isDark = (query param ?? the stored setting) === 'dark' || (that setting is 'auto' && the browser
- * prefers dark)`, and from that it puts `isDarkTheme` / `isLightTheme` on `<body>`, recomputes its whole
- * Material palette and pulls in its dark token set. Two facts about it shape what happens below:
+ * **How the bundle decides.** Web-component embedding counts to its theme service as an "external
+ * context" — nothing there is isolated behind a shadow root, so a dark theme it picked on its own would
+ * colour the host page along with itself. In that context it ignores the reader's stored preference
+ * outright and forces light, *unless* its own document's URL carries a `theme` query parameter: read once
+ * at its own bootstrap and again on every navigation its own router processes, `dark`/`light` there decide
+ * everything, while `auto` is the one value that still asks further — it falls through to
+ * `(prefers-color-scheme: dark)`, exactly as if no external context applied at all. Two facts about that
+ * media query shape what happens below:
  *
- * - the stored setting comes out of local storage under its own key, and it is read **once** as the
- *   service subscribes — the notification the service listens on is internal to the bundle, so a value
- *   written from outside is only ever seen at bootstrap;
- * - the browser's preference, by contrast, is read as a live media query, and the service re-resolves the
- *   theme on every `change` of it.
+ * - it is read as a live query, and the theme service re-resolves on every `change` of it;
+ * - `prefers-color-scheme` is the *only* thing an external context still lets the reader's own choice
+ *   reach, since the URL parameter itself is set once and not rewritten on every switch.
  *
- * So the setting is written as **`auto`** — which is what makes the bundle ask the media query at all,
- * since its own default is `light` — and the media query is the answered one. That way the theme is not
- * merely right at boot, it follows a switch the reader makes while a form is open.
+ * So the parameter is written as **`auto`**, once, before the bundle's scripts run — and the media query
+ * is the one answered below, with the panel's own theme rather than the browser's. That way the theme is
+ * not merely right at boot, it follows a switch the reader makes while a form is open.
  */
 
 /** Log prefix for what is forced here, as everywhere else in the extension. */
 const LOG_THEME = '[edu-sharing][bundle]';
 
-/**
- * The preference the bundle reads the theme from, under the prefix its accessibility settings share
- * (`AccessibilityService.STORAGE_PREFIX`). Stored as JSON, exactly as the bundle stores it itself.
- */
-const THEME_KEY = 'accessibility_darkMode';
+/** The query parameter the bundle's theme service reads from its own document's URL. */
+const THEME_PARAM = 'theme';
 
 /** The one value that leaves the decision to the media query below, rather than fixing it. */
 const FOLLOW_QUERY = 'auto';
@@ -56,21 +55,25 @@ interface AnsweredQuery extends MediaQueryList {
 }
 
 /**
- * Hand the panel's theme to the edu-sharing bundle, for the rest of the document's life: its stored
- * preference is set to follow the media query, and the media query is answered with
- * {@link publishPanelTheme}'s last word. Runs before the bundle's scripts do — the preference is read at
+ * Hand the panel's theme to the edu-sharing bundle, for the rest of the document's life: the bundle's own
+ * URL is given `theme=auto`, and the media query that answer defers to is answered with
+ * {@link publishPanelTheme}'s last word. Runs before the bundle's scripts do — the parameter is read at
  * its bootstrap. Idempotent, and every query that is not about the colour scheme is left to the browser.
  */
 export function installBundleTheme(): void {
   try {
-    localStorage.setItem(THEME_KEY, JSON.stringify(FOLLOW_QUERY));
+    const url = new URL(window.location.href);
+    if (url.searchParams.get(THEME_PARAM) !== FOLLOW_QUERY) {
+      url.searchParams.set(THEME_PARAM, FOLLOW_QUERY);
+      history.replaceState(history.state, '', url.toString());
+    }
   } catch {
-    // No local storage, no handover — the bundle then renders in its own default, which is light.
-    console.warn(`${LOG_THEME} theme preference could not be stored; the forms stay light`);
+    // No history API, no handover — the bundle then renders in its own default, which is light.
+    console.warn(`${LOG_THEME} theme parameter could not be written; the forms stay light`);
   }
 
   // Nothing to patch, and nothing that could ask: without `matchMedia` the bundle resolves its theme
-  // from the preference alone, which is what the `auto` above then leaves at light.
+  // from the parameter alone, which is what the `auto` above then leaves at light.
   if (patched || typeof window.matchMedia !== 'function') return;
   patched = true;
 
