@@ -30,9 +30,9 @@ Der Aufwand liegt **nicht** im Bauen.
 |---|---|---|
 | Manifest | MV3, `manifest.base.json` + drei Overlays, im Build gemerged | `scripts/build.mjs` |
 | Browser-API | `webextension-polyfill` überall, promise-style; **kein `chrome.*` im First-Party-Code** | `vendor/browser-polyfill.min.js`, `sw.js` |
-| Remote Code | keiner — alle drei Bundles gepackt, `script-src 'self'`, kein `eval` in eigenem Code | `manifest.base.json` CSP |
+| Remote Code | keiner — per Default nur `edu` gepackt (`--exclude=wlo,boerdi`, siehe B4), `script-src 'self'`, kein `eval` in eigenem Code | `manifest.base.json` CSP |
 | Chromium-Only-APIs | bewusst vermieden: kein `sidePanel` (das Panel ist ein injizierter iframe), kein `offscreen`, kein `declarativeNetRequest`, `storage.session` mit Fallback | `content/panel-host.js:2`, `background/background.js:147` |
-| `web-ext lint` | **0 Errors, 0 Notices**, 195 Warnings (alle aus den Vendor-Bundles) | `npm run lint:firefox` |
+| `web-ext lint` | **0 Errors, 0 Notices**, 186 Warnings (fast alle aus `edu/`) | `npm run lint:firefox` |
 | Paketgröße | 16,4 MB zip / 54 MB entpackt — unter allen harten Store-Limits | `dist/*.zip` |
 | CI | baut alle drei Targets, zippt, GitHub-Release auf `v*`-Tags | `.github/workflows/build.yml` |
 
@@ -40,22 +40,25 @@ Nicht vorhanden: `LICENSE`, eine geprüfte Datenschutzerklärung unter öffentli
 liegt als [PRIVACY.md](PRIVACY.md) im Repo), Screenshots, Promo-Assets, Store-Accounts, Upload-Jobs
 in der CI, Secrets (`.gitignore` listet nicht einmal `.env`).
 
-### Lint-Warnings nach Quelle (195 gesamt, 0 Errors, 0 Notices)
+### Lint-Warnings nach Quelle (186 gesamt, 0 Errors, 0 Notices)
 
-`edu/index.html` und `wlo/examples/*.html` sind aus dem Paket ausgeschlossen (siehe B5);
-`MISSING_DATA_COLLECTION_PERMISSIONS` ist keine Notice mehr (siehe §3).
+`edu/index.html` und `wlo/examples/*.html` sind aus dem Paket ausgeschlossen (siehe B5); `wlo` und
+`boerdi` fehlen in `dist/` seit dem Default-Build via `--exclude=wlo,boerdi` (siehe B4) ganz, daher
+keine Warnings mehr aus diesen beiden; `MISSING_DATA_COLLECTION_PERMISSIONS` ist keine Notice mehr
+(siehe §3).
 
 ```
  52  UNSAFE_VAR_ASSIGNMENT   edu/assets/tinymce
- 16  UNSAFE_VAR_ASSIGNMENT   edu/scripts.js
+ 17  UNSAFE_VAR_ASSIGNMENT / DANGEROUS_EVAL   edu/scripts.js
  14  DANGEROUS_EVAL          edu/assets/tinymce
  28  UNSAFE_VAR_ASSIGNMENT   edu/assets/viewer-5.4.1414*.mjs
  12  DANGEROUS_EVAL          edu/assets/pdf.worker-5.4.1414*.mjs
   7  UNEXPECTED_GLOBAL_ARG / DANGEROUS_EVAL   edu/assets/cordova
-  6  UNSAFE_VAR_ASSIGNMENT   boerdi/boerdi-widget.js
   5  DANGEROUS_EVAL          edu/pdf-metadata-page.module-*.js
-  1  INLINE_SCRIPT           wlo/index.html
 ```
+
+Der Rest verteilt sich auf einzelne `edu/chunk-*.js`-Dateien und zwei Treffer im eigenen
+`sidebar/main.js` (Angular-Production-Build) — nichts davon aus `wlo` oder `boerdi`.
 
 ---
 
@@ -139,35 +142,38 @@ und sind mit `wlo`/`nostr` blacklisted ohnehin nie referenziert. **Bei einer sp�
 von `wlo`/`nostr`:** `"wlo/*"`/`"boerdi/*"` müssen zurück in `manifest.base.json`, sonst bricht das
 Nachladen der Bundles in genau dem Fall lautlos.
 
-### B4 — AMO-Quellcodepflicht für die Vendor-Bundles *(hart, nur Firefox — der schwerste Punkt)*
+### B4 — AMO-Quellcodepflicht für den `edu`-Bundle *(hart, nur Firefox — der schwerste Punkt)*
 
 Mozilla verlangt bei minifiziertem oder gebündeltem Code den Quellcode **plus reproduzierbare
 Build-Anleitung**, und: *„all dependencies must either be included in the source code package
 directly or downloaded only through the respective official package managers during the build
-process."*
+process."* AMO prüft dabei, was im eingereichten Paket liegt, nicht was zur Laufzeit läuft.
 
-Dagegen steht:
+`npm run build`/`build:chrome`/`build:firefox`/`build:safari` rufen `scripts/build.mjs` seit
+diesem Umbau mit `--exclude=wlo,boerdi` auf (`package.json`) — `scripts/wlo/` und
+`scripts/boerdi/boerdi-widget.js` werden dadurch gar nicht mehr nach `dist/` kopiert, egal ob die
+Features blacklisted sind. Für eine Einreichung über die Standard-Build-Skripte betrifft die
+Quellcodepflicht damit **nur noch**, was tatsächlich im Paket landet:
 
 | Bundle | Größe | Problem |
 |---|---|---|
-| `scripts/edu/` | 66 MB im Repo, 51 MB im Paket | minifizierter Angular-Production-Build, verbatim eingecheckt, gebaut aus einem internen Maven-Checkout. Ohne veröffentlichten Quellstand oder öffentliches Build-Rezept nicht erfüllbar |
-| `scripts/boerdi/boerdi-widget.js` | 545 KB | wird von `scripts/fetch-widget.mjs` per HTTP von `87.106.127.225.nip.io` geholt, **ohne Checksumme**; der Docblock der Datei sagt selbst, „die Quelle ist die ganze Sicherheit". Genau der von AMO ausgeschlossene Fall |
-| `scripts/wlo/` | 1,8 MB | gleiche Frage, kleinerer Umfang |
+| `scripts/edu/` | 66 MB im Repo, 51 MB im Paket | minifizierter Angular-Production-Build, verbatim eingecheckt, gebaut aus einem internen Maven-Checkout. Ohne veröffentlichten Quellstand oder öffentliches Build-Rezept nicht erfüllbar. Bleibt gepackt — Kernfunktion, nicht ausschließbar |
 
-Zusammen 1271 der 1583 getrackten Dateien. [BUILD.md](BUILD.md) sagt dazu „Their contents are not
-ours to shape".
+1257 der 1737 getrackten Dateien, ausschließlich `edu`. [BUILD.md](BUILD.md) sagt dazu „Their
+contents are not ours to shape". `scripts/wlo/` (11 Dateien, 1,8 MB) und
+`scripts/boerdi/boerdi-widget.js` (545 KB, per HTTP ohne Checksumme geholt, siehe
+`scripts/fetch-widget.mjs`) bleiben im Repo dieselbe ungeklärte Quellenfrage — sie zählt nur nicht
+mehr für eine Store-Einreichung, solange der Build sie ausschließt. Wer `scripts/build.mjs` direkt
+ohne `--exclude` aufruft, packt beide wieder mit ein.
 
-Auswege: (a) Quellstände öffentlich machen und ein Build-Rezept beilegen, (b) die Bundles über
-npm-Pakete beziehen statt eingecheckt, (c) AMO **unlisted** nutzen, wo die Prüfung erheblich
+Auswege für `edu`: (a) Quellstand öffentlich machen und ein Build-Rezept beilegen, (b) das Bundle
+über ein npm-Paket beziehen statt eingecheckt, (c) AMO **unlisted** nutzen, wo die Prüfung erheblich
 schlanker ist. **(a) und (b) sind nicht seriös schätzbar, weil sie außerhalb dieses Repos liegen.**
 Das ist der Grund, warum Firefox-listed deutlich risikoreicher ist als Chrome-listed.
 
-**Bewusst zurückgestellt.** Weder `wlo` noch `boerdi` sind mit der aktuellen Blacklist erreichbar
-(siehe B1, B7), was den *Impact* eines AMO-Listed-Review-Stopps an dieser Stelle mindert — die
-Quellcodepflicht selbst betrifft aber weiterhin alle drei Bundles unverändert, unabhängig davon, ob
-ihr Code zur Laufzeit läuft: AMO prüft, was im Paket liegt, nicht was ausgeführt wird. Ohne
-Firefox-listed-Absicht ist das kein aktueller Blocker; sobald Firefox-listed wieder ansteht, ist dies
-weiterhin der schwerste offene Punkt und (a)/(b) bleiben ungelöst.
+**Bleibt der schwerste offene Punkt.** Anders als `wlo`/`boerdi` ist `edu` nicht ausschließbar —
+Kernfunktion, das eingebettete Repository-UI läuft ohne dieses Bundle nicht. Sobald Firefox-listed
+ansteht, sind (a)/(b) für `edu` weiterhin ungelöst.
 
 ### B5 — Entwickler-Artefakte im Produktionspaket *(weich, schnell)*
 
@@ -175,14 +181,15 @@ weiterhin der schwerste offene Punkt und (a)/(b) bleiben ungelöst.
 Web-Component-Bundles — beide jetzt gefiltert statt verbatim (`SHARED_EXCLUDES`/`BUNDLE_EXCLUDES`,
 `scripts/build.mjs`).
 
-**Erledigt** (`npm run lint:firefox`: 204 → 195 Warnings, 0 Errors, 0 Notices): `content/HOST-EVENTS.md`
+**Erledigt** (`npm run lint:firefox`: 204 → 186 Warnings, 0 Errors, 0 Notices): `content/HOST-EVENTS.md`
 (24 KB Doku, für einen Repository-/OnlyOffice-Plugin-Integrator interessant, nicht für die laufende
-Extension), `wlo/examples/*.html` (Demo-Seiten, Quelle der 4 `INLINE_SCRIPT`-Warnings) und
-`edu/<version>/index.html` (Startseite des Bundles, die die Extension nie öffnet, Quelle der 5
-`INLINE_SCRIPT`-Warnings dort) sind aus dem Paket ausgeschlossen. `wlo/index.html` bleibt gepackt —
-anders als `edu/`s Startseite ist es load-bearing: die content-gehashten Dateinamen des wlo-Bundles
-werden zur Laufzeit daraus gelesen ([WEB-COMPONENTS.md](WEB-COMPONENTS.md#loading-a-bundle)), sein
-einzelner `INLINE_SCRIPT`-Warning bleibt.
+Extension) und `edu/<version>/index.html` (Startseite des Bundles, die die Extension nie öffnet,
+Quelle mehrerer `INLINE_SCRIPT`-Warnings dort) sind einzeln aus dem Paket ausgeschlossen
+(`BUNDLE_EXCLUDES`). `wlo/examples/*.html` und `wlo/index.html` — Letzteres war load-bearing, die
+content-gehashten Dateinamen des wlo-Bundles wurden zur Laufzeit daraus gelesen
+([WEB-COMPONENTS.md](WEB-COMPONENTS.md#loading-a-bundle)) — sind seit dem `--exclude=wlo,boerdi` im
+Default-Build (siehe B4) ohnehin hinfällig: der ganze `wlo/`-Ordner fehlt in `dist/`, nicht nur
+einzelne Dateien darin.
 
 **Bewusst nicht angefasst:** `background/dev-fixtures.js` — 21 KB gefakte Agent-Antworten inklusive
 vollem Wikipedia-Text, von `sw.js`/`manifest.firefox.json` **immer** geladen. `developerOptions` ist
@@ -256,8 +263,8 @@ bleibt sinnvoll, ist aber nicht mehr dringend. **≈0,5–1 PT, wenn `onlyOffice
   Korrektur nötig, nur zur Disclosure festgehalten.
 
 **Noch offen (B1-b, B2-Rest, B3-Rest, B5-Rest): ≈4–7 PT**, ohne die externen Abhängigkeiten
-(Produktions-Deployments, juristische Abnahme, Bundle-Quellen) und ohne B4 und B6, die als
-zurückgestellt bzw. derzeit wirkungslos gelten (s.o.).
+(Produktions-Deployments, juristische Abnahme, `edu`-Bundle-Quelle) und ohne B6, das derzeit
+wirkungslos ist, und B4, das jetzt strukturell auf `edu` reduziert ist (s.o.).
 
 ---
 
@@ -292,7 +299,7 @@ Account liegen.
 |---|---|
 | Kosten | keine |
 | **`data_collection_permissions`** | **Gesetzt.** `manifest.firefox.json` → `browser_specific_settings.gecko.data_collection_permissions.required: ["websiteContent","authenticationInfo","browsingActivity"]` (Seitentext/Screenshot, Repository-Login, die pro Navigation gemeldete URL). Nostr/Chatbot/ContentJudge bewusst nicht gelistet — sie laufen mit der aktuellen Blacklist nicht (B1/B7); kommt eines davon zurück, muss die Liste neu geprüft werden. `strict_min_version` steht entsprechend auf `140.0` (Voraussetzung für das Feature selbst). `npm run lint:firefox` meldet die `MISSING_DATA_COLLECTION_PERMISSIONS`-Notice seither nicht mehr. |
-| Quellcode | Source-Paket plus reproduzierbare Build-Anleitung → **B4** |
+| Quellcode | Source-Paket plus reproduzierbare Build-Anleitung, jetzt nur noch für `edu` → **B4** |
 | Paketlimit | 200 MB, unkritisch. Aber: addons-linter kann Dateien >5 MB nicht parsen (`FILE_TOO_LARGE`), weshalb Monaco schon ausgeschlossen ist |
 | listed vs. unlisted | unlisted = signiertes `.xpi` zum Selbstverteilen, deutlich schlankere Prüfung |
 | Assets | Screenshots, Beschreibung, Kategorien |
@@ -359,11 +366,12 @@ Nach den Korrekturen aus §2 bleiben:
 - Off-Device-Übertragung von vollem Seitentext an den Metadata-Agent — das Kern-Erschließungsflow,
   bleibt. MetalookUp, ContentJudge und der Chatbot dagegen **nicht mehr**: alle drei sind mit der
   aktuellen `featureBlacklist` unerreichbar, siehe B1
-- 54 MB Vendor-Bundles mit Fremdcode; `frame-ancestors *` im CSP
+- 54 MB Vendor-Bundle mit Fremdcode, fast ausschließlich `edu` — `wlo`/`boerdi` sind seit
+  `--exclude=wlo,boerdi` nicht mehr im Paket; `frame-ancestors *` im CSP
 - der Origin-lose `postMessage`-Eingangspfad in `content/panel-host.js` — mit der aktuellen Blacklist
   ohne Wirkung, aber im Code weiterhin vorhanden (B6)
-- AMO: Quellcodepflicht bleibt (B4), zurückgestellt solange Firefox-listed nicht ansteht;
-  `data_collection_permissions` ist gesetzt
+- AMO: Quellcodepflicht bleibt, jetzt nur noch für `edu` (B4); `data_collection_permissions` ist
+  gesetzt
 
 Bereits behoben und keine Reviewer-Punkte mehr, mit Nachweis im jeweiligen Blocker: `clipboardRead`,
 die volle `web_accessible_resources`-Freigabe, die hartverdrahtete Chatbot-IP, Nostr-Publikation
