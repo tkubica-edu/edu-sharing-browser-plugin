@@ -28,9 +28,9 @@ guessed identifier is worse than no sentence.
 | `background/**`, `content/content.js`, `services/metadata-agent-api`, `repository-node`, `curation` save paths, endpoints, CORS, where a request runs | `ARCHITECTURE.md` |
 | `services/web-component-bundle.service.ts`, `scripts/{edu,wlo,boerdi}/`, `metadata-agent-canvas`, embedding rules, `browserExtensionCustomWebComponent` | `WEB-COMPONENTS.md` |
 | `scripts/build.mjs`, `manifest.*.json`, `.github/workflows/**`, packaging, versioning, release steps | `BUILD.md` |
-| `services/debug.service.ts`, loading the extension, test steps, which console shows what | `TESTING.md` |
+| Unit test setup, loading the extension, watch mode, which console shows what | `TESTING.md` |
 | A limitation, a browser quirk, a permission that needs explaining, an unverified assumption | `TROUBLESHOOTING.md` |
-| `content/panel-host.js`, `model/onlyoffice-events.ts`, the `window:message` listener, any host-page event | `content/HOST-EVENTS.md` |
+| `content/panel-host.js`, `model/onlyoffice-events.ts`, the `window:message` listener, any host-page event, `services/debug.service.ts` | `content/HOST-EVENTS.md` |
 | `<metadata-agent-canvas>` attributes, layouts, events | `WIDGET-REFERENZ.md` |
 
 Nothing fits? Add a section to the closest file. A new **file** is justified only when a subject
@@ -60,8 +60,8 @@ goes there; link to the owning file instead.
   `[ARCHITECTURE.md § Saving a content](ARCHITECTURE.md#saving-a-content)`.
 - **Update the cross-references** that the change invalidates — a renamed section breaks anchors in
   other files.
-- **Update the flow lists** in `FEATURES.md § Two flows end to end` and the checklist in
-  `TESTING.md` when a step is added, removed or reordered.
+- **Update the flow lists** in `FEATURES.md § Two flows end to end` when a step is added, removed or
+  reordered.
 - **Update `README.md`'s documentation table** when a file is added or renamed.
 
 ## 5. Verify

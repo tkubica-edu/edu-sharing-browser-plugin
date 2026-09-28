@@ -3,6 +3,8 @@
 // shared source, and zip each target into dist/.
 // Usage: node scripts/build.mjs [--target=chrome|firefox|safari|all] [--no-zip] [--no-ng]
 //        node scripts/build.mjs --target=<one> --watch [--run]
+//        node scripts/build.mjs [--exclude=<list>]   (the npm `build*` scripts already pass
+//                                                      --exclude=wlo,boerdi — see package.json)
 
 import { parseArgs } from 'node:util';
 import * as fs from 'node:fs/promises';
@@ -23,6 +25,7 @@ const SIDEBAR = path.join(ROOT, 'sidebar');
 //   scripts/wlo → wlo/  — WLO bundle (metadata-agent-canvas, …), loaded only when the repository
 //                         config enables the browser extension custom web component
 //   scripts/boerdi → boerdi/ — chat widget of the KI assistant (boerdi-chat), loaded by its screen
+// `--exclude=<name>[,<name>...]` (see parseCli) drops one or more of these from the package.
 const BUNDLE_DIRS = ['edu', 'wlo', 'boerdi'];
 
 // Parts of those bundles that stay out of the package, keyed by bundle name and given as POSIX
@@ -85,7 +88,26 @@ function parseCli() {
     console.error('--watch builds a single target; pass --target=chrome|firefox|safari.');
     process.exit(1);
   }
-  return { targets, zip, ng, watch, run };
+
+  // --exclude=wlo,boerdi drops those bundle dirs from the package. Their code stays reachable in the
+  // sidebar bundle (gated by APP_CONFIG.featureBlacklist), but the widget assets — several MB each —
+  // are never copied into dist/, so a deployment that ships neither feature does not have to carry them.
+  const excludeArg = argv.find((a) => a.startsWith('--exclude='));
+  const exclude = excludeArg
+    ? excludeArg
+        .slice('--exclude='.length)
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean)
+    : [];
+  for (const name of exclude) {
+    if (!BUNDLE_DIRS.includes(name)) {
+      console.error(`Unknown --exclude bundle "${name}". Use one of: ${BUNDLE_DIRS.join(', ')}.`);
+      process.exit(1);
+    }
+  }
+
+  return { targets, zip, ng, watch, run, exclude };
 }
 
 function isPlainObject(v) {
@@ -211,7 +233,7 @@ async function writeEduVersions(src, outDir) {
   log(`  ↳ edu: packaged version(s) ${versions.join(', ')}`);
 }
 
-async function assembleTarget(target) {
+async function assembleTarget(target, exclude = []) {
   const outDir = path.join(DIST, target);
   await fs.rm(outDir, { recursive: true, force: true });
   await fs.mkdir(outDir, { recursive: true });
@@ -233,6 +255,10 @@ async function assembleTarget(target) {
 
   // Web-component bundles → outDir/<name>, keeping the folder name the app loads them by.
   for (const name of BUNDLE_DIRS) {
+    if (exclude.includes(name)) {
+      log(`  ↳ ${name}: excluded from this build (--exclude)`);
+      continue;
+    }
     const src = path.join(ROOT, 'scripts', name);
     if (!existsSync(src)) {
       log(`⚠ ${rel(src)} not found — the ${name} web components will not be packaged.`);
@@ -329,7 +355,7 @@ function watchPath(target, handler) {
 // Development loop: `ng build --watch` rebuilds the sidebar app on every source change, its output
 // and the extension's own source are copied into the assembled target as they change, and (with
 // --run) web-ext keeps a Firefox instance on that folder, reloading the extension whenever it moves.
-async function watchTarget(target, { ng, run }) {
+async function watchTarget(target, { ng, run, exclude }) {
   await ensureVendorPolyfill();
 
   let ngProc = null;
@@ -344,7 +370,7 @@ async function watchTarget(target, { ng, run }) {
     await delay(500);
   }
 
-  const outDir = await assembleTarget(target);
+  const outDir = await assembleTarget(target, exclude);
   if (ngProc) await syncNgOutput(outDir);
 
   let webExtProc = null;
@@ -390,16 +416,16 @@ async function watchTarget(target, { ng, run }) {
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
-  const { targets, zip, ng, watch, run } = parseCli();
+  const { targets, zip, ng, watch, run, exclude } = parseCli();
   log(`edu-sharing build — targets: ${targets.join(', ')}\n`);
 
-  if (watch) return watchTarget(targets[0], { ng, run });
+  if (watch) return watchTarget(targets[0], { ng, run, exclude });
 
   if (ng) await buildAngular();
   await ensureVendorPolyfill();
 
   for (const target of targets) {
-    const outDir = await assembleTarget(target);
+    const outDir = await assembleTarget(target, exclude);
     if (zip && target !== 'safari') await zipDir(outDir);
   }
 

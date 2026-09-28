@@ -103,8 +103,7 @@ and only the second is visible from the extension:
    signs in. (`offline_access` is deliberately not requested for this very reason — Doorkeeper-based
    servers define none, and an undefined scope fails the whole request. Asking for it is also not
    what decides whether a refresh token is issued: that follows the client's registration at the
-   server, and edu-sharing's own issues one for `profile` alone — see
-   [OAUTH-SESSION-LIFETIME.md](OAUTH-SESSION-LIFETIME.md). Adding the scope anyway means changing
+   server, and edu-sharing's own issues one for `profile` alone. Adding the scope anyway means changing
    `APP_CONFIG.oauth.scopes` and `DEFAULT_SCOPES` in `background/oauth.js` together.)
 2. **The client is not granted the scope**, even though the server defines it. On GitLab the
    application's own scope checkboxes have to include every scope requested — `openid`, `profile` and
@@ -147,9 +146,7 @@ A name with a guest-sized `tp` count beside it is that state (compare against th
 the same call with `credentials: 'omit'`, which sends no cookie and stores none). It arose from a
 bearer-token login taking over the guest session the boot's own requests had been given, which the
 panel no longer does — `AuthService.resumeOAuthSession` drops the repository's cookies before the
-token is exchanged, so the token login authors the session it authenticates. The measurements and the
-reasoning are in
-[OAUTH-SESSION-LIFETIME.md § The session a token login lands in](OAUTH-SESSION-LIFETIME.md#the-session-a-token-login-lands-in).
+token is exchanged, so the token login authors the session it authenticates.
 
 Note what that fix costs, since it is a state worth recognising too: the cookies are dropped for the
 whole browser, not for the panel, so a resume signs the user out of any edu-sharing tab they had open

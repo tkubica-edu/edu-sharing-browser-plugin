@@ -318,10 +318,18 @@ find nothing behind them, so the debug mode goes off with the exchange it simula
 ## Debug mode — simulating the host side
 
 `DebugService` (`app-src/src/app/services/debug.service.ts`) stands in for the host-side plugin, so
-the OnlyOffice flows can be developed without an editor. What it fakes, how it is switched on and what
-the test node id is for is
-[TESTING.md § Debug mode](../TESTING.md#debug-mode-onlyoffice-without-onlyoffice); what belongs here are
-the two properties that make it a simulation of *this contract* rather than a shortcut around it:
+the OnlyOffice flows can be developed without an editor. Switched on via *Einstellungen* →
+*Entwickler-Optionen* → **Debug-Modus: OnlyOffice-Events simulieren**: every page then counts as an
+insert host (`ConditionsService.onlyOfficePresent` true throughout), so *Metadaten anreichern*,
+*Passende Inhalte finden* and *Inhalt suchen* are reachable anywhere; each `REQUEST_DOCUMENT_CONTENT`
+/ `REQUEST_DOCUMENT_INFO` is answered immediately with a hard-coded test document instead of being
+broadcast to a page that would never reply; `PREVIEW_NODE` has no request to answer, so the settings
+offer a button that fires one; every simulated event is logged as `[edu-sharing][debug]`. **Test-Node-ID**
+is what the simulated document reports as the edited node — the default is a fake id (the repository
+load fails silently and the UI falls back to it); put a real node id in to exercise the whole flow
+including *Speichern*. `APP_CONFIG.featureBlacklist` naming `developerOptions` or `onlyOfficeEvents`
+(`app-src/src/app/config.ts`) turns the switch off, hiding it from *Entwickler-Optionen* — what belongs
+here are the two properties that make it a simulation of *this contract* rather than a shortcut around it:
 
 - **Same route.** The answers are not returned from the call: they are posted to the sidebar's own
   window with the plugin's `edu-sharing-onlyoffice-plugin` marker, so `AppComponent`'s single

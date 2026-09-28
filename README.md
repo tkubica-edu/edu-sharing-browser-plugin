@@ -88,7 +88,7 @@ tagged release — see [BUILD.md](BUILD.md#prebuilt-downloads).
 | [CHATBOT-IO.md](CHATBOT-IO.md) | What the assistant is given, asked and answers: contexts, tasks, result schemas, recorded properties |
 | [WIDGET-REFERENZ.md](WIDGET-REFERENZ.md) | `<metadata-agent-canvas>`: layouts, attributes, events — a snapshot of the metadata-agent project's own widget, in German |
 | [BUILD.md](BUILD.md) | Building, what goes into the package, CI artifacts, cutting a release |
-| [TESTING.md](TESTING.md) | The service unit tests, loading the extension, the OnlyOffice debug mode, the manual test checklist |
+| [TESTING.md](TESTING.md) | The service unit tests, loading the extension, watch mode, where errors show up |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Known issues, permission quirks, bundle size, lint output |
 | [STORE-RELEASE.md](STORE-RELEASE.md) | What publishing to the Chrome, Firefox and Safari stores would take, and where the blockers are, in German |
 

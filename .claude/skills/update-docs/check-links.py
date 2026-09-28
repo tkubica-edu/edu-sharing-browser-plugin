@@ -22,13 +22,10 @@ DOCS = [
     "BUILD.md",
     "TESTING.md",
     "TROUBLESHOOTING.md",
-    "TEST-PLAN.md",
     "content/HOST-EVENTS.md",
     "WIDGET-REFERENZ.md",
     "CHATBOT.md",
     "CHATBOT-IO.md",
-    "OAUTH-SESSION-LIFETIME.md",
-    "SUGGESTION-API.md",
     "STORE-RELEASE.md",
 ]
 

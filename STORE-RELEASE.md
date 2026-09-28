@@ -1,19 +1,17 @@
 # Store-Reife: Chrome Web Store, Firefox AMO, Safari App Store
 
-Bestandsaufnahme vom 28.08.2026, fortgeschrieben am 15.09.2026, Extension v0.1.5. Was für eine
-Veröffentlichung in den Stores zu tun wäre, was es kostet, und wo die Blocker liegen. Keine
-Empfehlung und keine Festlegung auf einen Weg — Aufwände in Personentagen (PT) sind Schätzungen.
+Stand: 28.09.2026, Extension v0.1.5. Was für eine Veröffentlichung in den Stores noch zu tun wäre,
+was es kostet, und wo die Blocker liegen. Keine Empfehlung und keine Festlegung auf einen Weg —
+Aufwände in Personentagen (PT) sind Schätzungen.
 
-Seit der ursprünglichen Aufnahme kam `APP_CONFIG.featureBlacklist` dazu
-(`app-src/src/app/config.ts`), mit der eine Deployment-Variante gebaut werden kann, in der
-`onlyOfficeEvents`, `nostr`, `wlo`, `developerOptions`, `metalookup` und `contentJudge` fest
-abgeschaltet sind — das ist der Stand, den die Blocker unten (B1, B3, B6, B7) jetzt beschreiben. Ein
-Deployment, das einen dieser sechs Einträge wieder freischaltet, muss die dort verlinkten Punkte neu
-bewerten.
+`APP_CONFIG.featureBlacklist` (`app-src/src/app/config.ts`) schaltet in dieser Auslieferung
+`onlyOfficeEvents`, `nostr`, `wlo`, `developerOptions`, `metalookup`, `contentJudge` und
+`metadataAgentGenerate` fest ab — das ist der Stand, den B1, B3, B6 und B7 unten beschreiben. Ein
+Deployment, das einen dieser sieben Einträge wieder freischaltet, muss die dort verlinkten Punkte
+neu bewerten.
 
 Was die Extension inhaltlich kann, ist [FEATURES.md](FEATURES.md); wie sie gebaut wird,
-[BUILD.md](BUILD.md); die bekannten Einschränkungen [TROUBLESHOOTING.md](TROUBLESHOOTING.md); der
-Reifegrad der Funktionen [MATURITY.md](präsentation/MATURITY.md).
+[BUILD.md](BUILD.md); die bekannten Einschränkungen [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 - [Ausgangslage](#1-ausgangslage--was-schon-store-fähig-ist)
 - [Blocker für jeden Weg](#2-blocker-die-für-jeden-store-und-jede-sichtbarkeit-gelten)
@@ -39,14 +37,13 @@ Der Aufwand liegt **nicht** im Bauen.
 | CI | baut alle drei Targets, zippt, GitHub-Release auf `v*`-Tags | `.github/workflows/build.yml` |
 
 Nicht vorhanden: `LICENSE`, eine geprüfte Datenschutzerklärung unter öffentlicher URL (ein Entwurf
-liegt seit B2 als [PRIVACY.md](PRIVACY.md) im Repo), Screenshots, Promo-Assets, Store-Accounts,
-Upload-Jobs in der CI, Secrets (`.gitignore` listet nicht einmal `.env`).
+liegt als [PRIVACY.md](PRIVACY.md) im Repo), Screenshots, Promo-Assets, Store-Accounts, Upload-Jobs
+in der CI, Secrets (`.gitignore` listet nicht einmal `.env`).
 
 ### Lint-Warnings nach Quelle (195 gesamt, 0 Errors, 0 Notices)
 
-`edu/index.html` und `wlo/examples/*.html` (9 der ursprünglich 204 Warnings, die einzigen aus reinem
-Beiwerk) sind seit B5 aus dem Paket ausgeschlossen; `MISSING_DATA_COLLECTION_PERMISSIONS` ist seit
-dem Firefox-Manifest-Update (§3) keine Notice mehr.
+`edu/index.html` und `wlo/examples/*.html` sind aus dem Paket ausgeschlossen (siehe B5);
+`MISSING_DATA_COLLECTION_PERMISSIONS` ist keine Notice mehr (siehe §3).
 
 ```
  52  UNSAFE_VAR_ASSIGNMENT   edu/assets/tinymce
@@ -64,45 +61,36 @@ dem Firefox-Manifest-Update (§3) keine Notice mehr.
 
 ## 2. Blocker, die für jeden Store und jede Sichtbarkeit gelten
 
-### B1 — Default-Endpunkte zeigen auf Staging *(Repository-Default erledigt, Agent-Adresse bleibt gepinnt)*
+### B1 — Default-Endpunkte zeigen auf Staging *(vier von fünf blacklisted, Repository-Onboarding erledigt)*
 
-`config.js:7` und `app-src/src/app/config.ts` nennen fünf Staging-Adressen, aber sie stehen nicht
-alle gleich: `APP_CONFIG.featureBlacklist` (`config.ts:95`, **erledigt 15.09.2026**) schaltet `wlo`,
-`nostr`, `metalookup` und `contentJudge` aus:
+`config.js:7` und `app-src/src/app/config.ts` nennen fünf Staging-Adressen. Vier sind mit der
+aktuellen `featureBlacklist` nie erreichbar:
 
-- `https://repository.staging.openeduhub.net/edu-sharing` — **kein Default mehr, seit B1-a
-  (erledigt).** Die Extension startet ohne Repository und fragt es beim ersten Öffnen ab
-  (Onboarding-Bildschirm); die Adresse steht dort nur noch als anklickbarer Vorschlag. Der daran
-  gepinnte Metadata-Agent (`METADATA_AGENT_API_URL`) ist davon unberührt — ein neu verbundenes
-  Repository kann die Kernfunktion „Inhalt erschließen" also weiterhin nicht nutzen, siehe die
-  gepinnte Agent-Adresse in [MATURITY.md](präsentation/MATURITY.md) und
-  [ARCHITECTURE.md § The metadata agent's address](ARCHITECTURE.md#the-metadata-agents-address).
-- `https://metalookup-2.staging.openeduhub.net` — **jetzt blacklisted.** `QualityJudgeService.judge`
-  ist der eine Ort, von dem aus beide Judges laufen — unabhängig vom `wlo`-Stand — und prüft dort
-  zuerst `isFeatureEnabled('metalookup')` (`quality-judge.service.ts`), vor der Einstellung und
-  vor jedem anderen Test. Mit `metalookup` in der Liste läuft `runMetalookup` nie an, `evaluate()`
-  wird nie aufgerufen, egal was die *Einstellungen* sagen — und die Checkbox *MetalookUp: Inhalt
-  messen* ist aus *Einstellungen → Qualitätsprüfung* selbst verschwunden.
-- `https://llm-contentjudge.staging.openeduhub.net` — **jetzt blacklisted**, zusätzlich zur
-  vorbestehenden Absicherung über das fehlende Default-Credential (`contentJudge.credentialSet()`).
-  Mit `contentJudge` in der Liste ist auch die Zugangsdaten-Eingabe (`#cj-auth`) aus den
-  Einstellungen verschwunden.
-- `https://87.106.127.225.nip.io` — Chatbot-Backend, **nackte IP, hartverdrahtet** in
-  `ai-assistant-screen.component.ts:21`. Blacklist-gated: die *Boerdi*-Sektion ist nur sichtbar,
-  wenn `browserExtensionCustomWebComponent` an ist (`navigation.ts`, `visible: requiresLogin((c) =>
-  c.browserExtensionCustomWebComponent)`), und das ist mit `wlo` blacklisted immer aus. Mit der
-  aktuellen Blacklist wird diese IP nie kontaktiert.
-- `wss://amb-relay.edufeed.org` — Nostr-Relay, mit `nostr` blacklisted ebenso nie kontaktiert
-  (`NostrForwardService.blacklisted`, `nostr-forward.service.ts:89`).
+- MetalookUp (`https://metalookup-2.staging.openeduhub.net`) — `isFeatureEnabled('metalookup')`,
+  geprüft in `QualityJudgeService.judge` vor jedem anderen Test.
+- ContentJudge (`https://llm-contentjudge.staging.openeduhub.net`) — `isFeatureEnabled('contentJudge')`,
+  zusätzlich zum fehlenden Default-Credential.
+- Chatbot (`https://87.106.127.225.nip.io`, hartverdrahtet in `ai-assistant-screen.component.ts:21`) —
+  die *Boerdi*-Sektion selbst ist unsichtbar, solange `wlo` blacklisted ist (`navigation.ts`).
+- Nostr-Relay (`wss://amb-relay.edufeed.org`) — `NostrForwardService.blacklisted`.
 
-Alle vier Staging-Adressen außer dem Repository laufen mit dieser Deployment-Konfiguration nie an.
-Offen bleibt die gepinnte Metadaten-Agent-Adresse — der erste der „nächsten drei Schritte" aus
-[MATURITY.md](präsentation/MATURITY.md) — sowie B1-b unten.
+Nimmt ein Deployment `metalookup`/`contentJudge`/`wlo`/`nostr` aus der Liste, ist der jeweilige Punkt
+neu zu bewerten.
+
+Die fünfte Adresse, `https://repository.staging.openeduhub.net/edu-sharing`, ist kein Default mehr —
+die Extension startet ohne Repository und fragt es beim ersten Öffnen ab (Onboarding-Bildschirm,
+`model/navigation.ts` Sektion `onboarding`, `NavigationService.land`); die Adresse steht dort nur
+noch als anklickbarer Vorschlag. Der Metadata-Agent (`METADATA_AGENT_API_URL`, an
+`APP_CONFIG.defaultRepositoryUrl` gepinnt) ist davon unberührt, aber mit `metadataAgentGenerate`
+blacklisted ohnehin nicht erreichbar: `MetadataAgentService.run`/`runForUrl` (der einzige Aufruf, der
+die gepinnte Adresse trifft) laufen nicht an, `CurationService.analyze()` fällt auf die lokale
+Seiten-Auswertung (`readPage`, kein Netzwerk-Call) zurück — dieselbe, die schon bei `wlo` blacklisted
+greift. **Latent, nicht aktiv:** ein Deployment, das `metadataAgentGenerate` reaktiviert, reaktiviert
+damit auch die Pinning-Frage.
 
 | | Was | Aufwand |
 |---|---|---|
-| B1-a | **Erledigt.** Onboarding statt Default: die Extension startet ohne Repository und fragt es beim ersten Öffnen ab (`model/navigation.ts` Sektion `onboarding`, `NavigationService.land`) — die sauberste Antwort auf „warum brauchst du Zugriff auf alle Seiten". Löst **nicht** die gepinnte Agent-Adresse mit; die bleibt offen | ≈3–5 PT |
-| B1-b | Chatbot-, ContentJudge- und MetalookUp-URL trotzdem konfigurierbar machen, für ein Deployment, das eine der beiden Blacklists später lockert | ≈1–2 PT |
+| B1-b | Chatbot-, ContentJudge- und MetalookUp-URL trotzdem konfigurierbar machen, für ein Deployment, das eine der Blacklists später lockert | ≈1–2 PT |
 
 ### B2 — Keine geprüfte Datenschutzerklärung, keine LICENSE *(hart)*
 
@@ -117,11 +105,11 @@ verarbeitet werden — und hier verlässt Folgendes das Gerät:
 - ein lokal erzeugter, dauerhafter Nostr-Schlüssel — der Pubkey geht an ein öffentliches Relay; mit
   der aktuellen `featureBlacklist` unerreichbar, siehe B1
 
-**Ein Entwurf liegt seit diesem Umbau als [PRIVACY.md](PRIVACY.md) im Repo** — deutschsprachig,
-mit Fundstellen belegt, aber ausdrücklich als ungeprüft markiert (Platzhalter für Verantwortlichen,
-Rechtsgrundlagen und Kontakt). Offen bleiben: externe juristische Abnahme, eine öffentlich
-erreichbare Hosting-URL (erst dann kann das Manifest sie nennen), eine Support-URL und die LICENSE.
-**≈1–2 PT für die verbleibende Textarbeit nach der Abnahme, plus die Abnahme selbst.**
+**Ein Entwurf liegt als [PRIVACY.md](PRIVACY.md) im Repo** — deutschsprachig, mit Fundstellen
+belegt, aber ausdrücklich als ungeprüft markiert (Platzhalter für Verantwortlichen, Rechtsgrundlagen
+und Kontakt). Offen bleiben: externe juristische Abnahme, eine öffentlich erreichbare Hosting-URL
+(erst dann kann das Manifest sie nennen), eine Support-URL und die LICENSE. **≈1–2 PT für die
+verbleibende Textarbeit nach der Abnahme, plus die Abnahme selbst.**
 
 ### B3 — `host_permissions: https://*/*` + `http://*/*` *(weich, aber teuer)*
 
@@ -142,25 +130,14 @@ Re-Injektion nur nach erneuter Nutzeraktion) ist die eigentliche Arbeit.
 `activeTab`/`tabs`/`scripting`/`storage`/`cookies`/`identity` bleiben — die trägt Kernfunktion, nicht
 eine der blacklisteten Features.
 
-**Erledigt, 15.09.2026:**
-
-- `clipboardRead` gestrichen (`manifest.base.json`). Es hing an *einer* Option des edu-Bundle-Preview-
-  Widgets („Aus der Zwischenablage einfügen"); ohne die Permission antwortet
-  `navigator.permissions.query({name:'clipboard-read'})` mit `denied` und das Widget blendet die
-  Option selbst aus. Cmd/Ctrl+V funktioniert weiter, siehe
-  [TROUBLESHOOTING.md](TROUBLESHOOTING.md#permissions) — der `paste`-Event-Listener braucht keine
-  Permission. `content/panel-host.js`s `iframe allow` verlangt entsprechend nur noch
-  `clipboard-write`, für die Kopieren-Buttons des Nostr-Empfangsbelegs.
-- `web_accessible_resources` von `["sidebar/*","edu/*","wlo/*","boerdi/*"]` auf `["sidebar/*",
-  "edu/*"]` verengt. `wlo/*` und `boerdi/*` waren nie aus einer Web-Seite heraus nötig — beide
-  Bundles werden ausschließlich aus dem Sidebar-Dokument selbst nachgeladen
-  (`web-component-bundle.service.ts`, `ai-assistant-screen.component.ts`), same-origin
-  `chrome-extension://`, keine WAR-Freigabe nötig — und sind mit `wlo`/`nostr` blacklisted ohnehin
-  nie referenziert. `edu/*` bleibt unangetastet (Kernfunktion, das „same-origin genügt"-Argument
-  dafür nicht separat verifiziert).
-  **Wichtig für eine spätere Freischaltung:** wird `wlo` oder `nostr` aus dem Blacklist entfernt,
-  müssen `"wlo/*"`/`"boerdi/*"` in `manifest.base.json` wieder in die Liste — sonst bricht das
-  Nachladen der Bundles in genau dem Fall, in dem WAR tatsächlich nötig wäre, lautlos.
+**Erledigt:** `clipboardRead` aus dem Manifest gestrichen (hing an einer Preview-Widget-Option, „Aus
+der Zwischenablage einfügen" — Cmd/Ctrl+V bleibt über den `paste`-Event-Listener unberührt) und
+`web_accessible_resources` von `["sidebar/*","edu/*","wlo/*","boerdi/*"]` auf `["sidebar/*","edu/*"]`
+verengt — beide Bundles laden nur same-origin aus dem Sidebar-Dokument
+(`web-component-bundle.service.ts`, `ai-assistant-screen.component.ts`), keine WAR-Freigabe nötig,
+und sind mit `wlo`/`nostr` blacklisted ohnehin nie referenziert. **Bei einer späteren Freischaltung
+von `wlo`/`nostr`:** `"wlo/*"`/`"boerdi/*"` müssen zurück in `manifest.base.json`, sonst bricht das
+Nachladen der Bundles in genau dem Fall lautlos.
 
 ### B4 — AMO-Quellcodepflicht für die Vendor-Bundles *(hart, nur Firefox — der schwerste Punkt)*
 
@@ -185,12 +162,12 @@ npm-Pakete beziehen statt eingecheckt, (c) AMO **unlisted** nutzen, wo die Prüf
 schlanker ist. **(a) und (b) sind nicht seriös schätzbar, weil sie außerhalb dieses Repos liegen.**
 Das ist der Grund, warum Firefox-listed deutlich risikoreicher ist als Chrome-listed.
 
-> **Stand 15.09.2026: bewusst zurückgestellt.** Weder `wlo` noch `boerdi` sind mit der aktuellen
-> Blacklist erreichbar (siehe B1, B7), was den *Impact* eines AMO-Listed-Review-Stopps an dieser
-> Stelle mindert — die Quellcodepflicht selbst betrifft aber weiterhin alle drei Bundles unverändert,
-> unabhängig davon, ob ihr Code zur Laufzeit läuft: AMO prüft, was im Paket liegt, nicht was
-> ausgeführt wird. Ohne Firefox-listed-Absicht ist das kein aktueller Blocker; sobald Firefox-listed
-> wieder ansteht, ist dies weiterhin der schwerste offene Punkt und (a)/(b) bleiben ungelöst.
+**Bewusst zurückgestellt.** Weder `wlo` noch `boerdi` sind mit der aktuellen Blacklist erreichbar
+(siehe B1, B7), was den *Impact* eines AMO-Listed-Review-Stopps an dieser Stelle mindert — die
+Quellcodepflicht selbst betrifft aber weiterhin alle drei Bundles unverändert, unabhängig davon, ob
+ihr Code zur Laufzeit läuft: AMO prüft, was im Paket liegt, nicht was ausgeführt wird. Ohne
+Firefox-listed-Absicht ist das kein aktueller Blocker; sobald Firefox-listed wieder ansteht, ist dies
+weiterhin der schwerste offene Punkt und (a)/(b) bleiben ungelöst.
 
 ### B5 — Entwickler-Artefakte im Produktionspaket *(weich, schnell)*
 
@@ -198,15 +175,14 @@ Das ist der Grund, warum Firefox-listed deutlich risikoreicher ist als Chrome-li
 Web-Component-Bundles — beide jetzt gefiltert statt verbatim (`SHARED_EXCLUDES`/`BUNDLE_EXCLUDES`,
 `scripts/build.mjs`).
 
-**Erledigt, 15.09.2026** (`npm run lint:firefox`: 204 → 195 Warnings, 0 Errors, 0 Notices):
-
-- `content/HOST-EVENTS.md` — 24 KB Doku, für einen Repository-/OnlyOffice-Plugin-Integrator interessant, nicht für die laufende Extension
-- `wlo/examples/*.html` — Demo-Seiten, Quelle der 4 `INLINE_SCRIPT`-Warnings
-- `edu/<version>/index.html` — Startseite des Bundles, die die Extension nie öffnet, Quelle der 5 `INLINE_SCRIPT`-Warnings dort
-
-`wlo/index.html` bleibt gepackt — anders als `edu/`s Startseite ist es load-bearing: die
-content-gehashten Dateinamen des wlo-Bundles werden zur Laufzeit daraus gelesen
-([WEB-COMPONENTS.md](WEB-COMPONENTS.md#loading-a-bundle)), sein einzelner `INLINE_SCRIPT`-Warning bleibt.
+**Erledigt** (`npm run lint:firefox`: 204 → 195 Warnings, 0 Errors, 0 Notices): `content/HOST-EVENTS.md`
+(24 KB Doku, für einen Repository-/OnlyOffice-Plugin-Integrator interessant, nicht für die laufende
+Extension), `wlo/examples/*.html` (Demo-Seiten, Quelle der 4 `INLINE_SCRIPT`-Warnings) und
+`edu/<version>/index.html` (Startseite des Bundles, die die Extension nie öffnet, Quelle der 5
+`INLINE_SCRIPT`-Warnings dort) sind aus dem Paket ausgeschlossen. `wlo/index.html` bleibt gepackt —
+anders als `edu/`s Startseite ist es load-bearing: die content-gehashten Dateinamen des wlo-Bundles
+werden zur Laufzeit daraus gelesen ([WEB-COMPONENTS.md](WEB-COMPONENTS.md#loading-a-bundle)), sein
+einzelner `INLINE_SCRIPT`-Warning bleibt.
 
 **Bewusst nicht angefasst:** `background/dev-fixtures.js` — 21 KB gefakte Agent-Antworten inklusive
 vollem Wikipedia-Text, von `sw.js`/`manifest.firefox.json` **immer** geladen. `developerOptions` ist
@@ -259,30 +235,19 @@ Damit ist dies aktuell kein aktiver Blocker — aber der Origin-Check fehlt weit
 Deployment, das `onlyOfficeEvents` reaktiviert, reaktiviert die Lücke mit. Origin-Check nachrüsten
 bleibt sinnvoll, ist aber nicht mehr dringend. **≈0,5–1 PT, wenn `onlyOfficeEvents` je wieder an soll.**
 
-### B7 — Stille Datenübertragungen *(vier von fünf sind jetzt mit einer Blacklist aus)*
+### B7 — Stille Datenübertragungen *(vier von fünf sind mit einer Blacklist aus)*
 
-- **MetalookUp und ContentJudge laufen nicht mehr — erledigt, 15.09.2026.** `metalookup` und
-  `contentJudge` sind zwei weitere `FeatureKey`-Einträge in derselben `APP_CONFIG.featureBlacklist`
-  wie `wlo`/`nostr`/`developerOptions` — die gaten sonst ganze Bildschirme, diese beiden gaten einen
-  Aufruf, `QualityJudgeService.judge`, den die Qualitätsprüfung *automatisch* nach jeder Erschließung
-  macht, unabhängig vom `wlo`-Stand. `isFeatureEnabled('metalookup' | 'contentJudge')` wird als
-  erstes geprüft, vor der *Einstellungen*-Checkbox und vor jedem anderen Test — mit beiden in der
-  Liste läuft weder `runMetalookup` noch `runContentJudge` je an, unabhängig vom Setting oder einem
-  gesetzten Credential. Die zugehörigen Checkboxen (*MetalookUp: Inhalt messen*, *ContentJudge:
-  Inhalt per LLM bewerten*) und das Zugangsdaten-Feld (`#cj-auth`) sind aus *Einstellungen →
-  Qualitätsprüfung* verschwunden statt nur wirkungslos — dieselbe Behandlung wie die WLO-/Nostr-/
-  Entwickler-Schalter. Ein Setting, das von vor der Blacklist übrig war, zählt nicht mehr als
-  „geändert" (`QualityJudgeService.changedSettings`, `settings-screen.component.ts`
-  `changedPerSection`). Löst zugleich den zweiten der „nächsten drei Schritte" in
-  [MATURITY.md](präsentation/MATURITY.md) — der war „aus dem WLO-Gate lösen", das Ergebnis ist jetzt
-  „ganz abgeschaltet", was das eigentliche Ziel (nicht mehr *ungesehen und unabschaltbar*) klarer
-  erreicht.
+- **MetalookUp und ContentJudge laufen nicht mehr.** Beide sind eigene `FeatureKey`-Einträge in
+  `APP_CONFIG.featureBlacklist`, geprüft in `QualityJudgeService.judge` vor der *Einstellungen*-Checkbox
+  und vor jedem anderen Test — unabhängig vom `wlo`-Stand und von einem gesetzten Credential. Die
+  zugehörigen Checkboxen (*MetalookUp: Inhalt messen*, *ContentJudge: Inhalt per LLM bewerten*) und
+  das Zugangsdaten-Feld (`#cj-auth`) sind aus *Einstellungen → Qualitätsprüfung* verschwunden statt
+  nur wirkungslos.
 - **Der Chatbot läuft nicht** — `wlo` blacklisted macht die Boerdi-Sektion unsichtbar (siehe B1).
 - **Nostr-Publikation läuft nicht** — `nostr` blacklisted, `NostrForwardService.blacklisted` ist
   wahr, weder `publish` noch `lookup` erreicht je ein Relay.
-- **Schriftarten lokal gebündelt (17.09.2026).** Material Icons, Material Icons Outlined und
-  Material Symbols Outlined liegen mit ihrer Lizenz in `app-src/src/assets/fonts/`. Build und
-  Panel benötigen keine Google-Fonts-Anfragen mehr; die externen Font-/Style-Hosts sind aus der
+- **Schriftarten sind lokal gebündelt** (`app-src/src/assets/fonts/`, Material Icons/Outlined,
+  Material Symbols Outlined, mit Lizenz) — keine Google-Fonts-Anfragen mehr, die Hosts sind aus der
   CSP entfernt.
 - Solange das Panel offen und eingeloggt ist, fragt `PageRecognitionService.recognize()`
   (`page-recognition.service.ts:111`, über `WebsiteInformationService`) für **jede URL, zu der der
@@ -290,11 +255,9 @@ bleibt sinnvoll, ist aber nicht mehr dringend. **≈0,5–1 PT, wenn `onlyOffice
   selbst, mit bereits aktivem Inhalt, oder im Dev-Modus. Kernfunktion, nicht blacklist-gated, keine
   Korrektur nötig, nur zur Disclosure festgehalten.
 
-**Summe der noch offenen Punkte (B1-b, B2-Rest, B3-Rest, B5-Rest): ≈4–7 PT**, ohne die externen
-Abhängigkeiten (Produktions-Deployments, juristische Abnahme, Bundle-Quellen) und ohne B4 und B6, die
-als zurückgestellt bzw. derzeit wirkungslos gelten (s.o.). B1-a (≈3–5 PT) und die Textarbeit von B2
-(≈1–2 PT) sind aus der ursprünglichen Summe (≈5,5–9 PT) jetzt heraus — B2 bleibt aber wegen der
-noch fehlenden juristischen Abnahme und Hosting-URL insgesamt offen.
+**Noch offen (B1-b, B2-Rest, B3-Rest, B5-Rest): ≈4–7 PT**, ohne die externen Abhängigkeiten
+(Produktions-Deployments, juristische Abnahme, Bundle-Quellen) und ohne B4 und B6, die als
+zurückgestellt bzw. derzeit wirkungslos gelten (s.o.).
 
 ---
 
@@ -328,8 +291,7 @@ Account liegen.
 | | |
 |---|---|
 | Kosten | keine |
-| **`data_collection_permissions`** | **Erledigt, 15.09.2026.** `manifest.firefox.json` setzt jetzt unter `browser_specific_settings.gecko`: `required: ["websiteContent", "authenticationInfo", "browsingActivity"]` — Seitentext/Screenshot (websiteContent, auch an MetalookUp, siehe B1/B7), Repository-Login (authenticationInfo), die pro Navigation an `getWebsiteInformation` gemeldete URL (browsingActivity). Nostr/Chatbot/ContentJudge bewusst nicht gelistet — sie laufen mit der aktuellen Blacklist nicht (B1/B7); kommt eines davon zurück, muss die Liste neu geprüft werden. `npm run lint:firefox` meldet die `MISSING_DATA_COLLECTION_PERMISSIONS`-Notice seither nicht mehr. |
-| Folge daraus | **Erledigt.** `manifest.firefox.json` steht jetzt auf `strict_min_version: "140.0"` (vorher `128.0`), Voraussetzung für das Feature selbst |
+| **`data_collection_permissions`** | **Gesetzt.** `manifest.firefox.json` → `browser_specific_settings.gecko.data_collection_permissions.required: ["websiteContent","authenticationInfo","browsingActivity"]` (Seitentext/Screenshot, Repository-Login, die pro Navigation gemeldete URL). Nostr/Chatbot/ContentJudge bewusst nicht gelistet — sie laufen mit der aktuellen Blacklist nicht (B1/B7); kommt eines davon zurück, muss die Liste neu geprüft werden. `strict_min_version` steht entsprechend auf `140.0` (Voraussetzung für das Feature selbst). `npm run lint:firefox` meldet die `MISSING_DATA_COLLECTION_PERMISSIONS`-Notice seither nicht mehr. |
 | Quellcode | Source-Paket plus reproduzierbare Build-Anleitung → **B4** |
 | Paketlimit | 200 MB, unkritisch. Aber: addons-linter kann Dateien >5 MB nicht parsen (`FILE_TOO_LARGE`), weshalb Monaco schon ausgeschlossen ist |
 | listed vs. unlisted | unlisted = signiertes `.xpi` zum Selbstverteilen, deutlich schlankere Prüfung |
@@ -379,17 +341,17 @@ Drei Abstufungen:
 | Reichweite | öffentlich suchbar | öffentlich suchbar | nur über Link oder Policy |
 
 Kontext zur Einordnung: die Extension ist heute ein Werkzeug für Redaktionen an
-edu-sharing-Repositories. Seit B1-a hat sie keinen Repository-Default mehr, aber die Kernfunktion ist
-laut [MATURITY.md](präsentation/MATURITY.md) weiterhin außerhalb eines einzigen, gepinnten
-Repositorys nicht nutzbar — „die Agent-Adresse ist auf `APP_CONFIG.defaultRepositoryUrl` gepinnt …
-in einem fremden Core-Repo antwortet der Proxy also nicht".
+edu-sharing-Repositories. Sie hat keinen Repository-Default mehr, aber die Kernfunktion bleibt
+außerhalb eines einzigen, gepinnten Repositorys nicht nutzbar, sobald ein Deployment
+`metadataAgentGenerate` reaktiviert (siehe B1) — die Agent-Adresse ist auf
+`APP_CONFIG.defaultRepositoryUrl` gepinnt, und in einem fremden Core-Repo antwortet der Proxy also
+nicht.
 
 ---
 
 ## 5. Was ein Reviewer voraussichtlich anspricht
 
-Stand 15.09.2026, nach den Korrekturen aus §2 — `clipboardRead` und die Chatbot-IP sind keine
-Reviewer-Punkte mehr, mit Begründung zum Nachweis dagegen:
+Nach den Korrekturen aus §2 bleiben:
 
 - `host_permissions https://*/*` plus programmatische Injektion in jede Seite — bleibt, trägt
   Kernfunktion (B3)
@@ -403,18 +365,11 @@ Reviewer-Punkte mehr, mit Begründung zum Nachweis dagegen:
 - AMO: Quellcodepflicht bleibt (B4), zurückgestellt solange Firefox-listed nicht ansteht;
   `data_collection_permissions` ist gesetzt
 
-**Ausgeräumt:**
-- ~~`clipboardRead`~~ — aus dem Manifest entfernt (B3)
-- ~~`web_accessible_resources` auf allen URLs~~ — auf `sidebar/*` + `edu/*` verengt, `wlo/*`/`boerdi/*`
-  raus (B3)
-- ~~der hartverdrahtete IP-Host `87.106.127.225.nip.io`~~ — mit `wlo` blacklisted nie erreichbar (B1)
-- ~~Nostr-Publikation kuratierter Metadaten~~ — mit `nostr` blacklisted nie erreichbar (B1/B7)
-- ~~MetalookUp läuft per Default, unabschaltbar~~ — mit `featureBlacklist` seit 15.09.2026 aus,
-  Checkbox aus den Einstellungen verschwunden (B1/B7)
-- ~~ContentJudge könnte per Credential aktiviert werden~~ — dasselbe, das Zugangsfeld ist mit aus
-  (B1/B7)
-- ~~Google-Fonts-Fetch zur Laufzeit~~ — bleibt technisch bestehen (bewusst zurückgestellt, B7), aber
-  kein Reviewer-*Blocker*, eher ein DSGVO-Punkt für die Datenschutzerklärung (B2)
+Bereits behoben und keine Reviewer-Punkte mehr, mit Nachweis im jeweiligen Blocker: `clipboardRead`,
+die volle `web_accessible_resources`-Freigabe, die hartverdrahtete Chatbot-IP, Nostr-Publikation
+kuratierter Metadaten und die unabschaltbaren MetalookUp-/ContentJudge-Läufe (alle B1/B3/B7). Der
+Google-Fonts-Fetch zur Laufzeit ist technisch behoben (B7) und war ohnehin kein Reviewer-*Blocker*,
+eher ein DSGVO-Punkt für die Datenschutzerklärung (B2).
 
 ---
 

@@ -188,15 +188,13 @@ says the rest. The repository's cookies are dropped before the token is presente
 (`BrowserExtensionService.dropSessionCookies`), so the token login authors the session it
 authenticates instead of taking over the guest session the boot's own requests were given — a session
 taken over keeps the tool permissions it was resolved with, and is then a session named after the user
-that may not write anything (see
-[OAUTH-SESSION-LIFETIME.md § The session a token login lands in](OAUTH-SESSION-LIFETIME.md#the-session-a-token-login-lands-in)).
+that may not write anything.
 Only ever on a boot that holds a token *and* was told by the repository what the session it has is:
 the cookies go for the whole browser, so a repository that answered nothing keeps the session it may
 still have. (The panel asks for `profile` alone; `offline_access` is not defined by the
 deployments this runs against, and asking for it is not what decides whether a refresh token comes
 back — that follows the client's registration at the server. Which of the two checks applies is
-therefore the server's answer, and where it offers neither, nothing is resumed at all — see
-[OAUTH-SESSION-LIFETIME.md](OAUTH-SESSION-LIFETIME.md).) *Abmelden*
+therefore the server's answer, and where it offers neither, nothing is resumed at all.) *Abmelden*
 drops everything: the repository session, the stored tokens, the token's validity
 at the server where it names a revocation endpoint, and the provider's own session where it names an
 `end_session_endpoint`. The last matters because the provider's cookie would otherwise answer the

@@ -92,7 +92,7 @@ precedes every `/generate` rather than as a failed extraction a minute later.
 | Leg | Where it runs | Why |
 |-----|---------------|-----|
 | `POST /generate`, `POST /nodes` (Metadata-Agent) | background service worker | background fetch is gated by `host_permissions`, not CORS/page-CSP — portable everywhere (`analyze.run`: extract the tab, generate everything). `/generate` only while the WLO functions are on; `page.read` is the same extraction without it |
-| `POST /bapi/api/v1/edu-sharing/suggestions` (b-API) | Angular `HttpClient` (`ngx-edu-sharing-b-api`) | the repository's own metadata generation, on the **configured** repository — same origin and same session as every other repository call, so the library's interceptor carries it (see [SUGGESTION-API.md](SUGGESTION-API.md)) |
+| `POST /bapi/api/v1/edu-sharing/suggestions` (b-API) | Angular `HttpClient` (`ngx-edu-sharing-b-api`) | the repository's own metadata generation, on the **configured** repository — same origin and same session as every other repository call, so the library's interceptor carries it |
 | `POST /extract-field` (Metadata-Agent) | sidebar document (`MetadataAgentService`) | same context the WLO canvas calls `/generate` from, so the request is visible in the panel's own DevTools and there is no worker build that can fall out of sync with the app. Relies on `host_permissions` for the cross-origin call, like the repository login |
 | Page content extraction | `scripting.executeScript` (background) | no cross-origin fetch |
 | Repository login | Angular `HttpClient` (library) | the library owns the call; relies on `host_permissions` bypassing CORS on Chrome/Edge/Firefox |
@@ -188,9 +188,7 @@ alone and `offline_access` is deliberately not asked for — an undefined scope 
 authorization request — but a server issues a refresh token where its client registration carries
 the `refresh_token` grant, whether or not that scope was requested, and edu-sharing's own
 authorization server does exactly that. Neither path is therefore "the" one, and against a given
-repository both can be unavailable at once: see
-[OAUTH-SESSION-LIFETIME.md](OAUTH-SESSION-LIFETIME.md), which records what a deployment actually
-answered.
+repository both can be unavailable at once.
 
 The token is presented to a session of the resume's own making. Every request the boot has already
 made was answered with a session cookie, and a bearer login that takes such a session over keeps the
@@ -198,8 +196,7 @@ tool permissions edu-sharing resolved for it — an authenticated session carryi
 `AuthService.resumeOAuthSession` drops the repository's cookies (`session.dropCookies` →
 `dropRepositoryCookies`) before `exchangeForSession`, and only there: with a token in hand, and for a
 session the repository described rather than one it failed to answer about, since the cookies are the
-browser's and not the panel's. See
-[OAUTH-SESSION-LIFETIME.md § The session a token login lands in](OAUTH-SESSION-LIFETIME.md#the-session-a-token-login-lands-in).
+browser's and not the panel's.
 
 The worker hands the panel the access token and nothing else. The refresh token stays in
 `browser.storage.local` under `eduSharingOAuthTokens` and is read only there — the panel names the

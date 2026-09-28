@@ -41,8 +41,7 @@ of what the options *do*.
   yet, then loads the metadata into `edu-sharing-mds-editor-wrapper`. The generation is the MDS
   editor's own „Vorschläge erzeugen", asked for by the panel through the b-API client
   (`ngx-edu-sharing-b-api`, `EduSharingLlmService.suggestions`) with inputs of its own — the
-  content's title and the text of its page — and its findings are read back as KI-Vorschläge, see
-  [SUGGESTION-API.md](SUGGESTION-API.md). Saving
+  content's title and the text of its page — and its findings are read back as KI-Vorschläge. Saving
   creates a `ccm:io` node in the **inbox** the first time (`NodeService.createChild`) and
   updates it in place thereafter (`editNodeMetadata`), then advances to the preview. Available
   for an active node or a fresh result that was never saved. Extracted fields and the raw JSON
@@ -379,7 +378,8 @@ instead of on the previous one; walking back out of it asks before that dialogue
 
 Both need the page-side edu-sharing plugin; the round trips they use are specified in
 [content/HOST-EVENTS.md](content/HOST-EVENTS.md). Without an OnlyOffice page they can still be
-exercised — see [TESTING.md § Debug mode](TESTING.md#debug-mode-onlyoffice-without-onlyoffice).
+exercised, through the debug mode `DebugService` implements (see
+[content/HOST-EVENTS.md § Debug mode](content/HOST-EVENTS.md#debug-mode--simulating-the-host-side)).
 
 - **Metadaten anreichern** — the same erschließen flow, but the content comes from the **edited
   document** instead of the page. The sidebar asks the page-side plugin for the document content
@@ -456,8 +456,8 @@ navigating to it, and closes it again where it stands; the step keeps running be
 - **Einstellungen** *(dotted while a change waits to be applied)* — the Repository-URL (used for
   login and every embedded element) at the top with the edu-sharing version under it, then
   *SSO-Anmeldung* and **Darstellung**, and below those five folded groups, one open at a time:
-  *Entwickler-Optionen* (the switch **WLO-Funktionen verwenden**, plus the dev and the debug mode, see
-  [TESTING.md](TESTING.md)), *KI- und
+  *Entwickler-Optionen* (the switch **WLO-Funktionen verwenden**, plus the dev and the debug mode),
+  *KI- und
   Chatbot-Optionen* (the corrections to the chat widget's display, the chatbot's master skill as
   *Vorgabe des Betreibers* / *An* / *Aus* — see
   [CHATBOT.md](CHATBOT.md#the-attributes-set-on-mount)),
@@ -484,10 +484,9 @@ navigating to it, and closes it again where it stands; the step keeps running be
   `APP_CONFIG.featureBlacklist` naming `developerOptions` — and the debug mode along with them by
   naming `onlyOfficeEvents` instead, since simulating an exchange that is itself off would offer
   options nothing answers any more; see
-  [TESTING.md § Dev mode](TESTING.md#dev-mode-faked-ki-answers) and
-  [TESTING.md § Debug mode](TESTING.md#debug-mode-onlyoffice-without-onlyoffice). Blacklisting
-  everything the card can hold — those two plus **WLO-Funktionen verwenden** — hides the whole card
-  instead of leaving it open on nothing.
+  [content/HOST-EVENTS.md § Debug mode](content/HOST-EVENTS.md#debug-mode--simulating-the-host-side).
+  Blacklisting everything the card can hold — those two plus **WLO-Funktionen verwenden** — hides the
+  whole card instead of leaving it open on nothing.
 
   *Qualitätsprüfung*'s two switches — **MetalookUp: Inhalt messen** and **ContentJudge: Inhalt per
   LLM bewerten**, the latter with the credential field above it — can each be turned off outright by a

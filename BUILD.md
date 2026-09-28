@@ -22,6 +22,21 @@ Useful variants:
 - `npm run build:no-ng` — reuse the last Angular build (skip `ng build`).
 - `npm run lint:firefox` — `web-ext lint` on the Firefox build.
 
+**`wlo` and `boerdi` are left out of every `build`/`build:<target>`/`build:no-ng` run** — those npm
+scripts pass `--exclude=wlo,boerdi` to `scripts/build.mjs`, mirroring what
+`APP_CONFIG.featureBlacklist` (`app-src/src/app/config.ts`) already turns off at runtime, so the
+package does not carry those widget assets for code paths that never run. Their code stays in the
+sidebar bundle; only the multi-MB widget assets are skipped — see
+[What goes into the package](#what-goes-into-the-package). `scripts/build.mjs` itself defaults to
+packaging every bundle; to package one or both anyway (a deployment that un-blacklists `wlo`/`nostr`
+in `config.ts` needs to, see [TROUBLESHOOTING.md § Permissions](TROUBLESHOOTING.md#permissions)),
+call it directly instead of through the npm scripts:
+
+```bash
+node scripts/build.mjs --target=chrome                    # package every bundle
+node scripts/build.mjs --target=chrome --exclude=boerdi    # leave only boerdi out
+```
+
 Output: `dist/chrome/`, `dist/firefox/`, `dist/safari/` (+ `.zip` for chrome/firefox). Edge uses the
 **Chrome** build (Chromium — no separate target).
 
@@ -48,9 +63,10 @@ Changes to the Angular app only reach the loaded extension through a build — `
 ## What goes into the package
 
 `scripts/edu/`, `scripts/wlo/` and `scripts/boerdi/` are prebuilt web-component bundles, copied
-verbatim to `dist/<target>/{edu,wlo,boerdi}/`. Their contents are not ours to shape — `scripts/edu/`
-is the output of one or more edu-sharing Frontend builds and is taken over as a whole, third-party
-libraries and all. See [WEB-COMPONENTS.md](WEB-COMPONENTS.md).
+verbatim to `dist/<target>/{edu,wlo,boerdi}/` unless named in `--exclude` — which the npm `build*`
+scripts pass for `wlo` and `boerdi` (see [Building](#building)). Their contents are not ours to
+shape — `scripts/edu/` is the output of one or more edu-sharing Frontend builds and is taken over as
+a whole, third-party libraries and all. See [WEB-COMPONENTS.md](WEB-COMPONENTS.md).
 
 `scripts/edu/` holds one folder per packaged release, named `<major>.<minor>` (e.g. `11.0/`) — a
 patch version is not distinguished, see
