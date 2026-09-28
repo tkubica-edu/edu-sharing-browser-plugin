@@ -1,12 +1,12 @@
 # Datenschutzerklärung (Entwurf)
 
 > **ENTWURF — nicht rechtlich geprüft.** Dieses Dokument beschreibt technisch, was die Extension in
-> der Auslieferung mit der aktuellen `APP_CONFIG.featureBlacklist` (`app-src/src/app/config.ts:95-102`)
+> der Auslieferung mit der aktuellen `APP_CONFIG.featureBlacklist` (`app-src/src/app/config.ts:106-114`)
 > sendet und speichert. Platzhalter für Verantwortlichen, Kontakt und Rechtsgrundlagen sind mit `TODO`
 > markiert und noch nicht ausgefüllt; die Formulierungen sind noch nicht juristisch abgenommen. Ein
 > Deployment, das einen der blacklisteten Einträge (`onlyOfficeEvents`, `nostr`, `wlo`,
-> `developerOptions`, `metalookup`, `contentJudge`) wieder freischaltet, muss dieses Dokument neu
-> prüfen — Abschnitt 3 nennt zu jedem, was er zusätzlich sendet.
+> `developerOptions`, `metalookup`, `contentJudge`, `metadataAgentGenerate`) wieder freischaltet, muss
+> dieses Dokument neu prüfen — Abschnitt 3 nennt zu jedem, was er zusätzlich sendet.
 >
 > Es gibt noch keine öffentlich erreichbare URL für dieses Dokument; das Manifest nennt entsprechend
 > noch keine `privacy_policy`-Adresse. Siehe [STORE-RELEASE.md](STORE-RELEASE.md) § B2.
@@ -26,13 +26,19 @@ Diese Berechtigung wird nicht automatisch ausgenutzt: Die Extension startet ohne
 Repository und fragt beim allerersten Öffnen danach (Onboarding-Bildschirm). Vor dieser Eingabe wird
 kein Repository und kein anderer Dienst kontaktiert.
 
+Das Auslesen der Seite selbst — Text, HTML, Meta-Angaben und ein Screenshot, siehe Abschnitt 3.1 —
+läuft in dieser Auslieferung **vollständig lokal im Browser** ab, ohne dass dabei ein Metadaten-Agent
+kontaktiert wird (`APP_CONFIG.featureBlacklist` nennt `wlo` und `metadataAgentGenerate`, siehe
+Abschnitt 3.4). Ein externer Dienst kommt erst ins Spiel, wenn sich die Extension bei dem in den
+Einstellungen eingetragenen Repository anmeldet oder eine erstellte Lernressource dort speichert
+(Abschnitt 3.2, 3.3).
+
 ## 3. Datenkategorien und Empfänger
 
 ### 3.1 Inhalt der ausgelesenen Seite
 
 Beim Start einer Erschließung liest die Extension die aktive Seite aus
-(`content/content.js:5-76`, Zeichenbegrenzungen `:199-215`) und sendet das Ergebnis an den
-Metadaten-Agenten:
+(`content/content.js:5-76`, Zeichenbegrenzungen `:199-215`):
 
 - bis zu 20 000 Zeichen lesbarer Text, bis zu 10 000 Zeichen HTML des Hauptinhalts
 - Titel, Adresse, alle Meta-, Open-Graph-, Twitter-, Dublin-Core- und LRMI-Tags
@@ -41,15 +47,25 @@ Metadaten-Agenten:
 - erkannte Autor-, Lizenz- und Bildangaben
 
 Zusätzlich, wenn die Seite kein eigenes Vorschaubild nennt: ein JPEG-Screenshot des sichtbaren
-Tab-Bereichs (`background/background.js:350-353`). Der Screenshot kann als Vorschaubild des erzeugten
-Inhalts ins Repository hochgeladen werden (`curation.service.ts:898-900`) und dort dauerhaft
-gespeichert bleiben.
+Tab-Bereichs (`background/background.js:350-353`).
 
-**Empfänger:** Der Metadaten-Agent hinter dem Repository-Proxy, aktuell fest auf
-`https://repository.staging.openeduhub.net` (`METADATA_AGENT_API_URL`,
-`metadata-agent-api.service.ts:6-8`) — unabhängig davon, welches Repository in den Einstellungen
-eingetragen ist. Die Anfrage trägt das Sitzungs-Cookie des angemeldeten Repositorys
-(`background/background.js:111`).
+**In dieser Auslieferung bleibt das alles auf dem Gerät.** Weil `wlo` und `metadataAgentGenerate`
+beide in `APP_CONFIG.featureBlacklist` stehen, ruft `CurationService.analyze()`
+(`curation.service.ts:947-965`) nie den Metadaten-Agenten auf, sondern immer
+`MetadataAgentService.readPage()` (`metadata-agent.service.ts:167-196`) — die gelesenen Seitendaten
+werden ausschließlich lokal ausgewertet (`PageDerivationService.derive`, ohne Netzwerkzugriff), um das
+Formular vorzubefüllen. Erst wenn die Person das Ergebnis prüft und speichert, verlassen die
+übernommenen Angaben das Gerät — dann an das in den Einstellungen eingetragene Repository, nicht an
+einen separaten Agenten. Der Screenshot kann dabei als Vorschaubild des erzeugten Inhalts ins
+Repository hochgeladen werden (`curation.service.ts:898-900`) und dort dauerhaft gespeichert bleiben.
+
+**Falls ein Deployment `wlo` und/oder `metadataAgentGenerate` aus der Blacklist entfernt:** Dann
+sendet dieselbe Erschließung die obige Liste stattdessen an den Metadaten-Agenten hinter dem
+Repository-Proxy, aktuell fest auf `https://repository.staging.openeduhub.net`
+(`METADATA_AGENT_API_URL`, `metadata-agent-api.service.ts:6-8`) — unabhängig davon, welches Repository
+in den Einstellungen eingetragen ist. Die Anfrage trägt dann das Sitzungs-Cookie des angemeldeten
+Repositorys (`background/background.js:111`). Dieser Abschnitt muss für ein solches Deployment neu
+geprüft werden.
 
 ### 3.2 Besuchte Adressen
 
@@ -117,6 +133,10 @@ Ausschließlich im Browser dieser Installation, nirgends sonst:
 
 Ausführlicher begründet in [TROUBLESHOOTING.md § Permissions](TROUBLESHOOTING.md#permissions).
 
+Die Extension lädt keinen Code zur Laufzeit nach: alle drei Bundles (Panel, `edu`, `wlo`) sind Teil
+des Erweiterungspakets, die Content-Security-Policy erlaubt Skripte nur aus `'self'`
+(`manifest.base.json`), und der First-Party-Code verwendet kein `eval`.
+
 ## 6. Speicherdauer
 
 `TODO` — je Kategorie festzulegen. Bekannt: der Verlauf ist bei 200 Einträgen rollierend (älteste
@@ -133,4 +153,8 @@ Einträge fallen heraus), der Nostr-Schlüssel wird unbegrenzt gehalten, sobald 
 ## 9. Stand
 
 Erster Entwurf, erstellt im Rahmen von [STORE-RELEASE.md](STORE-RELEASE.md) § B2, auf Basis des
-Auslieferungsstands mit `APP_CONFIG.featureBlacklist` vom 15.09.2026.
+Auslieferungsstands mit `APP_CONFIG.featureBlacklist` vom 15.09.2026. Fortgeschrieben am 23.09.2026:
+`metadataAgentGenerate` als siebter Blacklist-Eintrag ergänzt, Abschnitt 2/3.1 richtiggestellt (der
+Metadaten-Agent wird in dieser Auslieferung nie kontaktiert — das galt bereits vor diesem Eintrag,
+weil `CurationService.analyze()` den Agenten-Call schon zuvor an `wlo` band), Remote-Code-Hinweis in
+Abschnitt 5 ergänzt.
