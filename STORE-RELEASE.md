@@ -95,6 +95,9 @@ damit auch die Pinning-Frage.
 |---|---|---|
 | B1-b | Chatbot-, ContentJudge- und MetalookUp-URL trotzdem konfigurierbar machen, für ein Deployment, das eine der Blacklists später lockert | ≈1–2 PT |
 
+**Zurückgestellt.** Die erste Version lockert keine der vier Blacklists — B1-b entfällt damit für sie
+und ist erst relevant, wenn ein Deployment tatsächlich eine davon reaktiviert.
+
 ### B2 — Keine geprüfte Datenschutzerklärung, keine LICENSE *(hart)*
 
 Weder `LICENSE`/`COPYING` noch ein rechtlich geprüftes Datenschutzdokument im Repo; das Manifest
@@ -132,6 +135,11 @@ Re-Injektion nur nach erneuter Nutzeraktion) ist die eigentliche Arbeit.
 **≈2–4 PT**, plus ≈1 PT für die Begründungstexte je Permission. `host_permissions` und
 `activeTab`/`tabs`/`scripting`/`storage`/`cookies`/`identity` bleiben — die trägt Kernfunktion, nicht
 eine der blacklisteten Features.
+
+**Zurückgestellt.** Der einzige Pfad, den `optional_host_permissions` bräche, ist genau das, was
+README-Punkt 2 beschreibt: das Panel ist über Navigationen hinweg geöffnet, ohne dass die Nutzerin
+erneut klickt (`restorePanel()`), und das ist gewollte Kernfunktion, keine Nebenwirkung. Der Umbau
+würde diese Persistenz kosten, um eine Dashboard-Warnung zu vermeiden — das lohnt den Tausch nicht.
 
 **Erledigt:** `clipboardRead` aus dem Manifest gestrichen (hing an einer Preview-Widget-Option, „Aus
 der Zwischenablage einfügen" — Cmd/Ctrl+V bleibt über den `paste`-Event-Listener unberührt) und
@@ -262,9 +270,9 @@ bleibt sinnvoll, ist aber nicht mehr dringend. **≈0,5–1 PT, wenn `onlyOffice
   selbst, mit bereits aktivem Inhalt, oder im Dev-Modus. Kernfunktion, nicht blacklist-gated, keine
   Korrektur nötig, nur zur Disclosure festgehalten.
 
-**Noch offen (B1-b, B2-Rest, B3-Rest, B5-Rest): ≈4–7 PT**, ohne die externen Abhängigkeiten
-(Produktions-Deployments, juristische Abnahme, `edu`-Bundle-Quelle) und ohne B6, das derzeit
-wirkungslos ist, und B4, das jetzt strukturell auf `edu` reduziert ist (s.o.).
+**Noch offen (B2-Rest, B5-Rest): ≈2–4 PT**, ohne die externen Abhängigkeiten (Produktions-
+Deployments, juristische Abnahme, `edu`-Bundle-Quelle). B1-b und B3-Rest sind für die erste Version
+zurückgestellt (s.o.); B6 ist derzeit wirkungslos und B4 jetzt strukturell auf `edu` reduziert (s.o.).
 
 ---
 
